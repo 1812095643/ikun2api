@@ -1,0 +1,11 @@
+{
+  "server_name": "browser.example.com",
+  "tls_certificate": "/etc/letsencrypt/live/browser.example.com/fullchain.pem",
+  "tls_certificate_key": "/etc/letsencrypt/live/browser.example.com/privkey.pem",
+  "upstream_socks5": {
+    "host": "proxy.example.invalid",
+    "port": 1080,
+    "username": "set-locally",
+    "password": "set-locally"
+  }
+}

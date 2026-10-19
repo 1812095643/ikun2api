@@ -1,0 +1,22 @@
+[Unit]
+Description=IKUN2api Data Management Daemon
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=ikun2api
+Group=ikun2api
+WorkingDirectory=/opt/ikun2api
+ExecStart=/opt/ikun2api/datamanagementd \
+  -socket-path /tmp/ikun2api-datamanagement.sock \
+  -sqlite-path /var/lib/ikun2api/datamanagement/datamanagementd.db \
+  -version 1.0.0
+Restart=always
+RestartSec=5s
+LimitNOFILE=100000
+NoNewPrivileges=true
+PrivateTmp=false
+
+[Install]
+WantedBy=multi-user.target

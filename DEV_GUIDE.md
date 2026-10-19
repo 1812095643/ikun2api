@@ -1,0 +1,545 @@
+# sub2api 项目开发指南
+
+> 本文档记录项目环境配置、常见坑点和注意事项，供 Claude Code 和团队成员参考。
+
+## 一、项目基本信息
+
+| 项目 | 说明 |
+|------|------|
+| **上游仓库** | MACOS-DO/sub4api |
+| **Fork 仓库** | bayma888/sub2api-bmai |
+| **技术栈** | Go 后端 (Ent ORM + Gin) + Vue3 前端 (pnpm) |
+| **数据库** | PostgreSQL 16 + Redis |
+| **包管理** | 后端: go modules, 前端: **pnpm**（不是 npm） |
+
+## 二、本地环境配置
+
+### PostgreSQL 16 (Windows 服务)
+
+| 配置项 | 值 |
+|--------|-----|
+| 端口 | 5432 |
+| psql 路径 | `C:\Program Files\PostgreSQL\16\bin\psql.exe` |
+| pg_hba.conf | `C:\Program Files\PostgreSQL\16\data\pg_hba.conf` |
+| 数据库凭据 | user=`sub2api`, password=`sub2api`, dbname=`sub2api` |
+| 超级用户 | user=`postgres`, password=`postgres` |
+
+### Redis
+
+| 配置项 | 值 |
+|--------|-----|
+| 端口 | 6379 |
+| 密码 | 无 |
+
+### 开发工具
+
+```bash
+# golangci-lint（CI 用 v2.13，本地建议装同一版以免版本差异带来的噪音）
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13
+
+# pnpm (前端包管理)
+npm install -g pnpm
+```
+
+## 三、CI/CD 流水线
+
+### GitHub Actions Workflows
+
+| Workflow | 触发条件 | 检查内容 |
+|----------|----------|----------|
+| **backend-ci.yml** | push, pull_request | 单元测试 + 集成测试 + golangci-lint v2.13 |
+| **security-scan.yml** | push, pull_request, 每周一 | govulncheck + gosec + pnpm audit |
+| **release.yml** | tag `v*` | 构建发布（PR 不触发） |
+
+### CI 要求
+
+- Go 版本必须是 **1.27.0**：三个 workflow 都用 `go-version-file: backend/go.mod` 取版本，随后硬断言 `go version | grep -q 'go1.27.0'`。升级 Go 时要同时改 `backend/go.mod`、`backend-ci.yml`（两处）、`release.yml`、`security-scan.yml` 里的这句断言，**以及三个 Dockerfile 里的 Go 构建镜像**（`Dockerfile` / `deploy/Dockerfile` 的 `ARG GOLANG_IMAGE`、`backend/Dockerfile` 的 `FROM golang:`）。前者漏了 CI 会在版本校验步骤直接失败；**后者漏了 CI 不会报，而是等到有人用这些 Dockerfile 构建时才失败**（`go.mod requires go >= X (running Y; GOTOOLCHAIN=local)`）。
+- 前端使用 `pnpm install --frozen-lockfile`，必须提交 `pnpm-lock.yaml`
+
+### 本地测试命令
+
+```bash
+# 后端单元测试
+cd backend && go test -tags=unit ./...
+
+# 后端集成测试
+cd backend && go test -tags=integration ./...
+
+# 代码质量检查
+cd backend && golangci-lint run ./...
+
+# 前端依赖安装（必须用 pnpm）
+cd frontend && pnpm install
+```
+
+### 上游同步：sub2api v0.2.13
+
+同步基线：[Wei-Shaw/sub2api v0.2.13](https://github.com/Wei-Shaw/sub2api/releases/tag/v0.2.13)，
+目标提交 `3040209f205472038c1ba745a1bedd2edd9053b1`。保留本项目模块路径、
+镜像地址和 `1.1.6` 版本标识，不将上游版本号当成本项目发布号。
+
+- 接入 TypeSafe/Jev 原生 System One、充值赠送/折扣阶梯、Claude 配额重置、
+  余额在途预留、API Key 创建限制与分组排序、模型归属检查、邮件验证码原子消费、
+  公共订单验证限速、风险用户白名单及用量/消费趋势。
+- 保留 OpenAI BPS、Codex 票据/诊断、请求时区、GPT-6.1 Sol 原生描述与推理约束、
+  OAuth 刷新和压缩、Claude 原始用户指纹、按分组选中的文件请求审计、
+  托管 Responses Web Search，以及计费任务满队列同步兜底。
+- 软删除 API Key 仍更新保留行的计数，但不恢复凭据或状态；物理不存在的 Key
+  跳过其计数，不回滚已经接受请求的用户余额/订阅结算。数据库错误仍回滚。
+- 新 TypeSafe 约束迁移使用 `247_add_typesafe_platform.sql`，在本地已有
+  `245_openai_bps_platform.sql` 之后执行，约束同时包含 `openai_bps` 和 `typesafe`。
+  不改历史迁移校验和；新增充值迁移按完整文件名独立记录。
+- 自动合并的模型目录、价格表和客户端配置可能产生重复项；合并时必须去重，
+  并保留调用方显式值优先、API key 与 OAuth/Lite 分离等本地契约。
+- TypeSafe → OpenAI BPS 切换时必须重置账号类型为 OAuth，不能遗留 TypeSafe 的
+  API Key 必填表单；BPS 的风险确认与保存后测试流程保持不变。
+- 含真实 token 的 cyber 拒绝请求也会计费；必须在启动异步计费前取得余额预留引用，
+  HTTP 使用请求 context，WS 使用当前有效的预留 context，提交结束后才归还。
+  仅记录风控事件而不计费时不额外持有余额预留。
+- 预留开启时 Redis 同步扣减出错，改为同步失效余额缓存，再从已提交的 DB 余额重载；
+  不异步重扣，避免预留提前释放及“已执行但返回错误”造成的重复扣减。
+  Redis 失效操作也失败时仍遵循原有告警/fail-open 策略，不宣称故障期间可严格防超支。
+- System One 接入同一按分组选中的文件审计，使用 `typesafe_systemone` 协议；
+  保留原生 state/questions、回答、用量及数值精度，不虚构聊天角色；管理端支持对应协议过滤。
+- 默认/各认证来源的平台配额矩阵与清洗均复用后端支持的完整平台集合，
+  保存无关设置不能删除 BPS、TypeSafe 或国产供应商的既有值；`0` 与 `null` 保持不同语义。
+- 账号优先级快捷编辑不增加后端没有的 `1..9999` 限制，保留旧值和一步增减；
+  Claude 不可逆重置请求使用与 Codex 重置一致的 90 秒客户端超时。
+- 充值优惠阶梯的编辑与提交复用同一错误校验；可见的重复阈值或非法比例会阻止保存，
+  不静默删行。无错误的未完成行仍按原约定在提交时省略。
+- key08 部署使用本地构建的 Linux/嵌入前端产物，备份后只替换既有 Docker 容器内应用文件，
+  只重启应用容器；不在服务端编译、不执行 `docker build`、不重建镜像，
+  不重启 PostgreSQL/Redis 或改变数据卷。未提交源码须标明本地基线、上游及 source-tree 指纹。
+- 自定义版本禁止控制台自更新：侧栏版本仅展示当前服务版本，不检查 GitHub 发布，
+  不提供更新、回退、下载安装命令或页面重启按钮。保留本地只读 `/admin/system/version`。
+- 旧浏览器调用 `/admin/system/check-updates`、`rollback-versions`、`update`、`rollback`
+  或 `restart` 时，在管理员认证后统一返回 HTTP 410 / `SELF_UPDATE_DISABLED`；
+  不复用旧操作的幂等成功结果，不下载或替换二进制，不触发进程退出。
+- 恢复误更新时先区分 Docker 镜像、磁盘二进制和 `/proc/1/exe`：更新器可能已覆盖磁盘
+  文件但尚未重启，不能把控制台版本号当作磁盘或镜像证明。先备份误装文件，再恢复已验证
+  自定义产物；最终重启后同时核对运行中进程与磁盘 SHA-256、健康状态和嵌入前端。
+  PID1 使用 UID 1000 时，以 `docker exec --user 1000:1000` 读取 `/proc/1/exe`，无需放宽权限。
+  Claude/Codex 客户端版本同步仍保留，与已移除的应用自更新不是同一功能。
+
+本地验证边界：原生 System One 与 Codex session 检查使用 loopback 上游；
+浏览器使用隔离 API fixtures，不能据此声称线上配置保存或真实上游验收通过。
+无 Docker 时不把仓库 PostgreSQL/Redis 集成套件的跳过记为通过；新增平台与充值
+迁移可在隔离 PostgreSQL 引擎中验证存量行保留、约束和重复执行。
+
+### OpenAI / Codex 协议兼容性
+
+公共 OpenAI API（API key）与 ChatGPT Codex 后端（OAuth/PAT）不是同一契约。
+行为对照基线为 `openai/codex` 提交 `1fb5158b3496a05abb89fb992d45737a02511d47`；
+ccodex README 仅用于发现差异，不能替代官方源码。主要依据是
+`codex-rs/core/src/client.rs`、`core/src/session/mod.rs`、`protocol/src/responses_metadata.rs`
+和 `login/src/auth/manager.rs`。
+
+- OAuth/PAT Responses Lite：工具和非空 instructions 转为输入前缀，保留已有历史工具声明、工具结果、schema 与显式 tool_choice；图片 detail 仅在图片内容项上移除，不递归改写工具 schema。API key 不套用此私有转换。
+- 普通 OpenAI/Codex HTTP、透传与 WS 请求在缺失时补齐 Codex 风格的 `client_metadata`、`x-codex-turn-metadata`、session/thread/window headers；已有调用方字段优先，整数与 compaction 元数据保持精度。未提升的非 OpenAI 兼容供应商 legacy compact body 不新增普通 `client_metadata`。
+- `environment_context` 的 `timezone` 与 `current_date` 使用账号固定 IANA 时区生成；已有客户端时区会被替换，缺失字段会补齐，日期按该时区重新生成。默认时区为 `Asia/Singapore`，配置不覆盖客户端之外的非 OpenAI 平台。
+- Codex identity fallback 使用本机 Windows 基线 `Windows 10.0.22621.1848; x86_64; dumb`，并与当前 Codex client version、originator、version header 同源；管理员显式 UA 设置仍可覆盖指纹部分。
+- `/responses/compact` 对 OpenAI 账号在 API ingress 转成当前 native Responses compaction v2：`stream=true`、`store=false`、末尾 `compaction_trigger`、`remote_compaction_v2`；非 OpenAI 兼容供应商保留原 legacy compact 路径。
+- 普通 HTTP 与透传统一 session/thread/turn 元数据，身份隔离包含调用方和上游凭据；工具续接保留真实 turn_id/时间，不凭每次 HTTP 请求生成新 turn。OpenAI 账号的 legacy compact 输入先转为 native `/responses` compaction v2，因此走 regular Responses zstd；非 OpenAI 兼容供应商 legacy compact、API key 其他域名与 WS 帧不套用 zstd。重试的 GetBody 和 ContentLength 必须与实际发送内容一致。
+- OAuth 提前五分钟刷新，优先读取 JWT 到期时间；推理 HTTP 与三个 WS 握手入口遇 401 最多原账号恢复一次。永久拒绝按凭据版本记忆；临时错误不能当作永久失效，API key/PAT/AgentIdentity 不进入 refresh-token 恢复。模型清单拉取与人工账号测试有独立发送链路，不能把推理恢复覆盖范围外推到这些探针。
+- 不应因第三方 README 删除合法 beta/turn-state：官方会声明已启用的 RemoteCompactionV2，且同 turn 的重试与续接可以携带 turn-state；跨账号隔离应针对具体 opaque token，而不是覆盖整段会话的最后一个 token。
+
+定向回归（在 `backend` 目录）：
+
+```bash
+go test -tags=unit ./internal/service ./internal/repository ./internal/handler ./internal/pkg/openai -run 'OpenAI|Codex|OAuthRefresh|HTTPUpstream' -count=1
+```
+
+协议兼容不等于与官方二进制逐字节相同，也不能证明账号不会被限制。Go 的 TLS/HTTP 栈、
+部署出口及运营方式仍可能不同；不自动伪造工作区、sandbox 或遥测。离线回归与本地抓包
+不代表真实 OpenAI 账号验收，不能用本文推断未公开的风控规则。
+
+GPT-6.1 Sol (`gpt-6.1-sol`) is included in the OpenAI catalog, model whitelist, Codex normalization, Responses/Chat reasoning guards, and billing fallbacks. The billing fallback follows the official API contract: $2/M uncached input, $0.10/M cached input, $2.50/M cache creation, $10/M output, 2x fast pricing, and the 272K long-context multiplier. Upstream model metadata remains authoritative when available.
+
+GPT-6.1 Sol is reasoning-only: explicit `none`, `minimal` or disabled thinking is rejected rather than silently upgraded. Supported API efforts are `low`, `medium`, `high`, `xhigh`, and `max`. Its pinned [official Codex descriptor](https://github.com/openai/codex/blob/b1e72963c3b71a9265a551e54beff078384efed9/codex-rs/models-manager/models.json) defaults to `low` and advertises Responses Lite/code mode for official ChatGPT OAuth; API-key catalogs keep plain Responses. The Codex `model is not supported when using Codex with a ChatGPT account` message does not prove a plan restriction: check the effective version, not just account type or the bundled descriptor's minimum version. With the same account and Lite/low request, `0.158.0` returned this 400 and `0.159.3` completed successfully. Manual version overrides take precedence over the synchronized value; when automatic synchronization is disabled, an old synchronized value remains in effect until an explicit version is set. Reference: [cc-switch #7797](https://github.com/farion1231/cc-switch/issues/7797).
+
+### 上游过载冷却与降智检测
+
+- OpenAI 容量降载（`server_is_overloaded`、"Our servers are currently overloaded" 等）不再走请求级早退：账号配置的 `temp_unschedulable_rules` 照常命中并写入模型级冷却（例如 503 + overloaded → 30 分钟），同账号有界重试与切号流程保持不变。规则按真实上游状态码匹配，HTTP 200 + 流内降载（SSE `error` / `response.failed`）不会命中 503 规则；`RequestScopedTransient` 仍只约束通用临时摘号，不约束用户自定义规则。
+- 降智检测是"号原生"：`RunCodexNativeDiagnostic`（`internal/service/codex_ticket_diagnostic.go`）用目标账号自身的 access token 直接打 ModelTrace 探测，管理员不再选择计费 Key，探测也不再回环进公开网关。打票代理池存在时与打票共用出口，未配置代理时直连。失败按 `credentials` / `proxy_unavailable` / `http_status` / `timeout` / `response_incomplete` / `template_invalid` 等原因返回，状态一律 `failed`，不参与降智判定。
+- `gpt-6.1-sol` 可参与检测，但指纹库暂无该分类：命中同系列参考类 `gpt-6-sol` 判「不确定」，命中其它 GPT 类判「疑似降智」，精确命中才判「正常」；库补上分类后自动回到精确匹配。
+- 自动降智检测（设置键 `codex_auto_degradation_check`）默认关闭。开启后按 `interval_minutes` 顺序探测到期的 OpenAI OAuth / Setup Token 活跃账号（单轮最多 8 个、每发 120 秒、双重 leader lock），状态写入 `accounts.extra` 的 `codex_degradation_check`：降智时用带 `source=auto_degradation_check` 标记的 reason 写临时停调并把复查时间对齐到封锁到期，仍降智则续期；`normal`/`uncertain` 且当前封锁带该标记时调用 `RateLimitService.ClearTempUnschedulable` 解封（会同时清掉该账号的模型级限流与 Redis 临时停调缓存）；`failed` 既不加封也不解封，其它来源的封锁永远保留。候选查询刻意不按 temp_unschedulable 过滤，否则被封锁的账号永远不会被复查。
+
+定向回归（在 `backend` 目录）：
+
+```bash
+go test -tags=unit ./internal/service ./internal/handler/admin ./internal/repository -run 'Codex|Diagnostic|CapacityShed|TempUnsched' -count=1
+```
+
+### Responses 服务端 Web Search
+
+这是中转站托管的工具，不是客户端函数工具。开启后，客户端不必注册搜索工具，
+普通 `POST /v1/responses` 请求即可让模型选择搜索；模型选择不搜索时正常返回回答。
+协议类型与输出格式参考 [OpenAI Web search](https://developers.openai.com/api/docs/guides/tools-web-search)。
+
+启用顺序：
+
+1. 系统设置 → 网关 → Web Search 模拟：配置 Brave/Tavily 并打开全局开关。
+2. 渠道管理 → 编辑 → 对应平台标签（例如 OpenAI）→ 关联分组下面的“Web Search 模拟”，或将 API Key 上游账号设为“开启”。OAuth 账号通过渠道控制，不显示账号级覆盖开关。
+   账号“默认”跟随渠道，“关闭”覆盖渠道；账号“开启”仍不能绕过全局关闭。
+   渠道搜索项始终可见；全局未开启/未配置服务商时禁用并提示，加载失败显示“重新加载”，不会隐藏整行或丢失已保存的渠道值。每次打开编辑弹窗重新读取全局状态。
+3. 客户端发送普通 Responses 请求，例如：
+
+   ```json
+   {"model":"your-model","input":"查一下今天的发布信息并附来源","stream":true}
+   ```
+
+执行与兼容边界：
+
+- 全局关闭、账号关闭、渠道未开启时不接管新的搜索，不移除或改写客户端原来的搜索工具。
+  原生上游搜索仍由原转发链路处理。显式 `tool_choice: "none"` 不启用新的托管搜索。
+  已由本网关签发的历史 `ws_sub4api_` 项仍先按用户/API Key/分组还原原始函数调用与真实结果，再决定新搜索是否允许；不能因 `none`、排除搜索的 `allowed_tools` 或搜索开关关闭而把公共 `web_search_call` 原样送给仅支持函数的上游。
+  托管搜索启用但本轮禁止新搜索时，仅从本轮工具声明移除网关拥有的 `web_search/web_search_preview`，保留客户端函数和 tool_choice。过期或跨作用域引用返回 400，不丢弃证据、不重搜计费、不进入上游重试。
+  客户端省略搜索项 `id` 或发送空字符串时，仅按去掉 `id` 后完整公共项的规范 JSON 指纹，在同一用户/API Key/分组内恢复唯一未过期结果；不按查询或 URL 模糊匹配。内容变化、歧义、缺失、过期和跨作用域引用明确返回 400，保留原始搜索片段，不重新搜索。缓存仍为进程内：重启前的历史不能自动恢复，须重搜或显式补回完整证据。
+- 启用时网关向上游模型提供内部搜索函数；由模型生成查询，Brave/Tavily 返回真实结果，
+  再回填模型继续生成。客户端函数工具可以共存，仍由客户端执行。
+- 对外返回标准 `web_search_call`、来源 URL 和回答；不暴露内部搜索函数或要求客户端执行它。
+  回答中实际引用来源 URL 时添加 `url_citation`，不为没有引用的文字伪造引用。
+- 客户端显式声明 `web_search` / `web_search_preview` 也由网关接管。
+  支持 `search_context_size`、`filters.allowed_domains` 和 `external_web_access: true`；
+  不支持的搜索约束返回明确错误，不静默忽略。域名限制同时用于查询和结果过滤。
+- 尊重强制客户端函数与 `allowed_tools` 限制；内部搜索满足 required 后，仅放宽继续生成的
+  必选要求，不扩大 allowed_tools 范围。默认最多 8 次搜索，可用 `max_tool_calls` 设置；
+  `max_output_tokens` 跨模型轮次扣减。用量与计费结果累计真实模型轮次的 token。
+- JSON 与 SSE 均支持。接管请求先收集每个模型轮次，再组装单个 Responses 结果和标准 SSE
+  生命周期；这是缓冲交付，不是逐 token 直通。关闭接管时原流式转发不变。
+  Codex 流中若终止事件的 `output` 为空，使用已经收到的 `response.output_item.done` 按索引恢复完整输出；非空的终止输出仍优先，避免丢失搜索调用或回答。
+- 保留最终上游 response ID。公共搜索项重放和“同轮服务端搜索 + 客户端调用”的续接结果
+  按用户/API Key/分组隔离，保存在当前进程的有界搜索缓存中（1 小时，最多 4096 条/64 MiB）。
+  进程重启或淘汰后，重放过期的网关搜索项会报错，应改为发送消息形式的上下文。
+- 覆盖 HTTP Responses 的原生 OpenAI 兼容链路、Chat/Anthropic 上游桥接及 Antigravity 桥接；
+  不接管 WebSocket、`/responses/compact`、`/responses/input_tokens`、Chat/Messages 原生入口。
+  托管搜索不支持 `background: true`，启用接管时明确拒绝；关闭功能后仍按原链路转发。
+  原 Anthropic“纯搜索请求”快捷模拟保持不变。
+
+定向回归：
+
+```bash
+go test -tags=unit ./internal/service ./internal/handler ./internal/pkg/apicompat ./internal/pkg/websearch -run 'HostedResponses|ResponsesSearch|GetWebSearchEmulationMode|WebSearch|ForwardResponses|ForwardAsResponses|ResponsesStream|ResponsesClientTools' -count=1
+```
+
+### Claude Code / Anthropic 转发兼容性
+
+以提供的 Claude Code 2.1.283 请求构造为对照，保持字段条件、值与会话关联一致，不凭空合成未观测的遥测或控制状态：
+
+- Anthropic SSE 必须按空行聚合；多条 `data:` 用换行拼接；流内错误使用 `event: error`；不完整 `message_stop` 不能提前视为终止。
+- OAuth 请求只改写明确需要隔离的身份字段；`metadata.user_id` 的 `parent_session_id`、`tk` 和未来扩展字段必须保留。真实存在的 Claude Code agent/request 头可以透传，但不得无条件合成。
+- `messages` 与 `count_tokens` 必须保持客户端识别、beta、system 和 provider 路由一致。Vertex service-account 的计数请求走 Vertex Anthropic `count-tokens:rawPredict`。
+- `ProxyID`、`custom_base_url`、Vertex/Bedrock/provider 配置是实际出口选择，必须保留账户级自定义地域和代理；不得用伪造 IP、地区头、遥测或机器标识规避上游策略。
+- 不自动转发 Claude Code 产品遥测，不把代理自己的 user/device ID 注入上游；模型请求上下文、产品遥测和可选 OTEL 详细记录是三条不同数据路径。
+- OAuth 出站 billing 的 `cc_version` 与所选上游 UA 同源：mimic 使用兼容 UA；真实 CC 在指纹统一开启时使用账号 CC 指纹，否则使用客户端 UA。已识别的 fingerprint 后缀按原始 user 文本及所选版本重算；缺失 billing block 时保留现有补齐策略。
+- OAuth mimic 指纹按 JavaScript UTF-16 下标采样；在 system 迁移前保存原始 user 文本，重试/出站同步仍使用该文本，避免把代理插入的指令当作用户消息。mimic 保留 `cch=00000`。
+- mimic 默认运行环境取自本机 Node 实测：`Windows / x64 / node / v22.19.0`，SDK 版本为提取包中的 `0.112.1`。这是固定兼容配置，不代表部署服务器实际运行 Node；已有账号指纹缓存不自动清空。
+- 账号指纹只接受合法 `claude-cli` UA；非 CC 调用不能写入自身的 Stainless 环境字段。存量非 CC/非法 UA 缓存按完整兼容配置自愈，保留稳定 ClientID；有效账号画像仍按既有版本升级策略更新，不改成逐请求漂移。
+- 真实 CC 与 mimic 均保留调用方已提供的 `anthropic-usage-limit`、`x-claude-code-prev-tool-durations`、`x-claude-code-context-compacted`、`x-cc-context-compacted`、`x-claude-code-compaction`、`x-cc-compaction-request`，保留多值和显式空值；不无条件生成这六个头。
+- Anthropic OAuth/setup-token 上游响应实际提供这六个字段时，按上游账号写入 Redis header 缓存；部分更新只覆盖出现的字段，缺失字段保留，显式空值覆盖旧值。缓存在最后一次更新七天后过期；认证及其他响应头不进入缓存。
+- 仅 mimic 请求从最新缓存补齐调用方未提供的字段，调用方显式值优先；真实客户端透传不被缓存补齐。native messages/count_tokens、Chat/Responses 转接及内部重试统一观察响应；缓存失败不改写上游响应、错误状态或 SSE。
+- session masking 使用账号级随机命名空间，将原始 session 与 parent session 按同一规则映射，保留独立会话、父子关联、未知 metadata 扩展及 body/header 会话一致性。命名空间连续十五分钟无请求后更新；Redis 原子选择并发创建的唯一 seed，旧固定会话缓存不再读取。
+
+本地回归：
+
+```bash
+go test -tags=unit ./internal/service ./internal/handler ./internal/repository ./internal/pkg/claude ./internal/pkg/anthropicfp -run 'Test(.*(Claude|Anthropic|Gateway|Metadata|Identity|Fingerprint|SessionMask|Streaming|Passthrough|CountTokens|OAuth|Cache|Beta|Thinking|Tool|SSE|HTTPUpstream|CLIVersion|Billing).*)' -count=1
+```
+
+## 四、常见坑点 & 解决方案
+
+### 坑 1：pnpm-lock.yaml 必须同步提交
+
+**问题**：`package.json` 新增依赖后，CI 的 `pnpm install --frozen-lockfile` 失败。
+
+**原因**：上游 CI 使用 pnpm，lock 文件不同步会报错。
+
+**解决**：
+```bash
+cd frontend
+pnpm install  # 更新 pnpm-lock.yaml
+git add pnpm-lock.yaml
+git commit -m "chore: update pnpm-lock.yaml"
+```
+
+---
+
+### 坑 2：npm 和 pnpm 的 node_modules 冲突
+
+**问题**：之前用 npm 装过 `node_modules`，pnpm install 报 `EPERM` 错误。
+
+**解决**：
+```bash
+cd frontend
+rm -rf node_modules  # 或 PowerShell: Remove-Item -Recurse -Force node_modules
+pnpm install
+```
+
+---
+
+### 坑 3：PowerShell 中 bcrypt hash 的 `$` 被转义
+
+**问题**：bcrypt hash 格式如 `$2a$10$xxx...`，PowerShell 把 `$2a` 当变量解析，导致数据丢失。
+
+**解决**：将 SQL 写入文件，用 `psql -f` 执行：
+```bash
+# 错误示范（PowerShell 会吃掉 $）
+psql -c "INSERT INTO users ... VALUES ('$2a$10$...')"
+
+# 正确做法
+echo "INSERT INTO users ... VALUES ('\$2a\$10\$...')" > temp.sql
+psql -U sub2api -h 127.0.0.1 -d sub2api -f temp.sql
+```
+
+---
+
+### 坑 4：psql 不支持中文路径
+
+**问题**：`psql -f "D:\中文路径\file.sql"` 报错找不到文件。
+
+**解决**：复制到纯英文路径再执行：
+```bash
+cp "D:\中文路径\file.sql" "C:\temp.sql"
+psql -f "C:\temp.sql"
+```
+
+---
+
+### 坑 5：PostgreSQL 密码重置流程
+
+**场景**：忘记 PostgreSQL 密码。
+
+**步骤**：
+1. 修改 `C:\Program Files\PostgreSQL\16\data\pg_hba.conf`
+   ```
+   # 将 scram-sha-256 改为 trust
+   host    all    all    127.0.0.1/32    trust
+   ```
+2. 重启 PostgreSQL 服务
+   ```powershell
+   Restart-Service postgresql-x64-16
+   ```
+3. 无密码登录并重置
+   ```bash
+   psql -U postgres -h 127.0.0.1
+   ALTER USER sub2api WITH PASSWORD 'sub2api';
+   ALTER USER postgres WITH PASSWORD 'postgres';
+   ```
+4. 改回 `scram-sha-256` 并重启
+
+---
+
+### 坑 6：Go interface 新增方法后 test stub 必须补全
+
+**问题**：给 interface 新增方法后，编译报错 `does not implement interface (missing method XXX)`。
+
+**原因**：所有测试文件中实现该 interface 的 stub/mock 都必须补上新方法。
+
+**解决**：
+```bash
+# 搜索所有实现该 interface 的 struct
+cd backend
+grep -r "type.*Stub.*struct" internal/
+grep -r "type.*Mock.*struct" internal/
+
+# 逐一补全新方法
+```
+
+---
+
+### 坑 7：Windows 上 psql 连 localhost 的 IPv6 问题
+
+**问题**：psql 连 `localhost` 先尝试 IPv6 (::1)，可能报错后再回退 IPv4。
+
+**建议**：直接用 `127.0.0.1` 代替 `localhost`。
+
+---
+
+### 坑 8：Windows 没有 make 命令
+
+**问题**：CI 里用 `make test-unit`，本地 Windows 没有 make。
+
+**解决**：直接用 Makefile 里的原始命令：
+```bash
+# 代替 make test-unit
+go test -tags=unit ./...
+
+# 代替 make test-integration
+go test -tags=integration ./...
+```
+
+---
+
+### 坑 9：Ent Schema 修改后必须重新生成
+
+**问题**：修改 `ent/schema/*.go` 后，代码不生效。
+
+**解决**：
+```bash
+cd backend
+go generate ./ent  # 重新生成 ent 代码（json.RawMessage 字段会生成为同类型的 jsontext.Value，属预期）
+git add ent/       # 生成的文件也要提交
+```
+
+---
+
+### 坑 10：前端测试看似正常，但后端调用失败（模型映射被批量误改）
+
+**典型现象**：
+- 前端按钮点测看起来正常；
+- 实际通过 API/客户端调用时返回 `Service temporarily unavailable` 或提示无可用账号；
+- 常见于 OpenAI 账号（例如 Codex 模型）在批量修改后突然不可用。
+
+**根因**：
+- OpenAI 账号编辑页默认不显式展示映射规则，容易让人误以为“没映射也没关系”；
+- 但在**批量修改同时选中不同平台账号**（OpenAI + Antigravity/Gemini）时，模型白名单/映射可能被跨平台策略覆盖；
+- 结果是 OpenAI 账号的关键模型映射丢失或被改坏，后端选不到可用账号。
+
+**修复方案（按优先级）**：
+1. **快速修复（推荐）**：在批量修改中补回正确的透传映射（例如 `gpt-5.3-codex -> gpt-5.3-codex-spark`）。
+2. **彻底重建**：删除并重新添加全部相关账号（最稳但成本高）。
+
+**关键经验**：
+- 如果某模型已被软件内置默认映射覆盖，通常不需要额外再加透传；
+- 但当上游模型更新快于本仓库默认映射时，**手动批量添加透传映射**是最简单、最低风险的临时兜底方案；
+- 批量操作前尽量按平台分组，不要混选不同平台账号。
+
+---
+
+### 坑 11：PR 提交前检查清单
+
+提交 PR 前务必本地验证：
+
+- [ ] `go test -tags=unit ./...` 通过
+- [ ] `go test -tags=integration ./...` 通过
+- [ ] `golangci-lint run ./...` 无新增问题
+- [ ] `pnpm-lock.yaml` 已同步（如果改了 package.json）
+- [ ] 所有 test stub 补全新接口方法（如果改了 interface）
+- [ ] Ent 生成的代码已提交（如果改了 schema）
+
+## 五、常用命令速查
+
+### 数据库操作
+
+```bash
+# 连接数据库
+psql -U sub2api -h 127.0.0.1 -d sub2api
+
+# 查看所有用户
+psql -U postgres -h 127.0.0.1 -c "\du"
+
+# 查看所有数据库
+psql -U postgres -h 127.0.0.1 -c "\l"
+
+# 执行 SQL 文件
+psql -U sub2api -h 127.0.0.1 -d sub2api -f migration.sql
+```
+
+### Git 操作
+
+```bash
+# 同步上游
+git fetch upstream
+git checkout main
+git merge upstream/main
+git push origin main
+
+# 创建功能分支
+git checkout -b feature/xxx
+
+# Rebase 到最新 main
+git fetch upstream
+git rebase upstream/main
+```
+
+### 前端操作
+
+```bash
+# 安装依赖（必须用 pnpm）
+cd frontend
+pnpm install
+
+# 开发服务器
+pnpm dev
+
+# 构建
+pnpm build
+```
+
+### 后端操作
+
+```bash
+# 运行服务器
+cd backend
+go run ./cmd/server/
+
+# 生成 Ent 代码
+go generate ./ent
+
+# 运行测试
+go test -tags=unit ./...
+go test -tags=integration ./...
+
+# Lint 检查
+golangci-lint run ./...
+```
+
+## 六、项目结构速览
+
+```
+sub2api-bmai/
+├── backend/
+│   ├── cmd/server/          # 主程序入口
+│   ├── ent/                 # Ent ORM 生成代码
+│   │   └── schema/          # 数据库 Schema 定义
+│   ├── internal/
+│   │   ├── handler/         # HTTP 处理器
+│   │   ├── service/         # 业务逻辑
+│   │   ├── repository/      # 数据访问层
+│   │   └── server/          # 服务器配置
+│   ├── migrations/          # 数据库迁移脚本
+│   └── config.yaml          # 配置文件
+├── frontend/
+│   ├── src/
+│   │   ├── api/             # API 调用
+│   │   ├── components/      # Vue 组件
+│   │   ├── views/           # 页面视图
+│   │   ├── types/           # TypeScript 类型
+│   │   └── i18n/            # 国际化
+│   ├── package.json         # 依赖配置
+│   └── pnpm-lock.yaml       # pnpm 锁文件（必须提交）
+└── .claude/
+    └── CLAUDE.md            # 本文档
+```
+
+## 用户请求审计记录
+
+用户请求审计的分组记录开关默认全部关闭（空的 `group_ids` allowlist）。管理员必须在“用户请求审计”页面选择分组并显式保存；页面可选择启用或停用的分组。只会记录保存选择之后发生的请求，已有审计记录不会因修改 allowlist 被删除。
+
+审计配置接口为 `GET/PUT /api/v1/admin/user-request-audit/config`。`group_ids` 是分组 ID 数组：显式发送 `[]` 会清空 allowlist 并停止所有新记录；PUT 省略该字段时保留现有选择。保留天数和清理间隔与该 allowlist 分开维护；JSON 会话存储不再使用分片大小设置。
+
+审计数据库是 ID、会话关联、元数据和文件路径的唯一权威。迁移 249 切换为数据库分配请求 ID；`user_request_audit_request_index` 与 `user_request_audit_payloads` 保存元数据、顺序、大小和相对路径，不保存正文。每次请求及完成事件分别写入 `$DATA_DIR/user-request-audit/payloads/` 下的不可变 JSON 文件；新增记录不读取或重写历史正文。构造、列表、统计、关联和过期清理不扫描正文目录；关键词筛选只搜索数据库元数据，不做全文搜索。正文仅在显式打开或导出时按数据库路径读取并组装会话。
+
+迁移 250 为请求正文增加可逆增量编码，旧完整快照不改写。仅在同一会话、用户和 API Key 范围内，当前完整请求的字节前缀 SHA-256 与既有请求完全匹配且请求证据完整时，存储父请求 ID、前缀字节数及全部新增后缀；候选仅查数据库最近 256 条记录，不读取历史正文。历史修改、压缩、截断或匹配失败时保存完整快照。多条新增工具结果、用户消息、THINK 和空白均逐字节保留；不采用“只取最后一条 user”。父引用只指向不可变请求，不引用可追加的响应块；之前的回答可能作为下一请求后缀再次保存，不宣称响应完全去重。
+
+人工打开和导出在同一数据库快照下按请求顺序重建并验证字节数、SHA-256、用户/API Key 隔离及父引用；持久化父子依赖保持同一会话删除/保留单元。阅读接口按请求窗口加载，导出仍包含完整会话；单条请求及其增量祖先的大小仍影响读取成本，不宣称正文网络响应有固定字节上限。
+
+会话关联限定在用户/API Key 范围内，使用真实客户端会话标识、response 链或唯一的精确历史哈希证明。不使用 prompt-cache key、相同首问或被截断的前缀猜测会话。证明仅从当前捕获计算并存储有界哈希，最多保留最近 256 个请求前缀边界，不为关联重读历史文件。显示用户名（缺失时邮箱）及 `#UID`、请求数；筛选条件选择会话，不截断会话内容；列表分页、阅读窗口均不限制导出的历史范围。
+
+`GET /api/v1/admin/user-request-audit/:id/conversation` 接收 `request_offset`（零起点）和 `request_limit`（默认 20、最多 100），返回 `request_start`/`request_end`（一起点闭区间）、总请求数与当前窗口的结构化消息。数据库仅提取当前窗口及前驱的 ID、所需正文与增量祖先，不枚举整个会话的请求 ID；前驱用于边界历史去重。阅读响应不重复携带原始 ChatML，原始单请求仍可从详情接口读取。页面前后翻页替换窗口而非无限追加；窗口内每页最多渲染 20 条消息，每条正文按 16,384 个 UTF-16 单元分段（不拆分代理对），所有段均可往返查看，超长助手正文采用纯文本分段以避免整段 Markdown 解析。THINK 和系统/元数据折叠时不挂载正文。支持 Responses、Chat Completions、Anthropic 的实际明文推理及工具事件，禁止把 reasoning 配置或加密推理当作 THINK。普通助手 Markdown 经消毒，不自动加载外部媒体。重发历史去重时保留先前保存、客户端未重发的 THINK。
+
+这是旧数据不迁移的干净切换：迁移 249 清空旧会话索引并删除旧 SQL 正文表，保留数据库 ID 序列高水位；不自动导入 NDJSON，也不从文件恢复数据库记录。清空与保留期清理先事务删除元数据并将数据库已知路径加入删除队列，再删除文件；不重置 ID，不复活已清记录。文件发布后、SQL 提交前的进程崩溃可能留下无引用文件，但这些文件不会被扫描或自动导入。新请求投影及响应捕获上限为 16 MiB，超过时明确标记截断；元数据仍限制为 32 KiB。
+
+`GET /api/v1/admin/user-request-audit/models` 按当前筛选（协议、分组、用户、时间范围）聚合返回留存数据中真实出现的模型及请求/会话计数，供页面模型下拉选择；该端点忽略模型自身条件，避免选项随选择自我收窄。`POST /api/v1/admin/user-request-audit/export` 提交后台任务，接收 `format: json|jsonl` 和可选 `conversation_ids`（列表代表记录 ID 数组），返回任务信息而不是文件。`conversation_ids` 只收窄筛选集合，筛选条件始终与选择求交集，选择会话时导出仍受模型/分组/时间筛选限制。空 ID 筛选字段应省略，非空 ID 必须为 JSON 整数。单 worker 有界队列生成 `.json.gz`/`.jsonl.gz`，每个对象包含与阅读器一致的 `messages`、原始 `requests` 及合并 `chatml`，不再有 10,000 条导出截断。JSONL 仅是批量导出格式，不是持久化格式。`GET /exports` 获取状态，完成后通过 `GET /exports/:job_id/download` 下载；所有路由继续要求管理员认证。
+
+导出文件位于审计目录的 `exports` 子目录，任务及文件 24 小时过期。任务状态保存在当前进程内，重启清理旧导出产物，原始审计记录不受影响。导出失败不会发布残缺压缩包；清空会取消运行任务、使旧队列写入失效并删除归档与导出文件，保留记录分组和归档配置。`POST /clear` 只在页面显式确认后调用；仍启用记录的分组可继续产生新记录。
+
+`GET /status` 从数据库统计正文文件数及字节数，并返回所在磁盘总量、可用量、`recording_paused`、`pause_reason`；文件数是不可变请求/响应块数量，不是会话数。实际写入前检查可用空间：低于 2 GiB（2,147,483,648 字节）或容量查询失败时停止记录；恢复空间后自动恢复。导出写入也受磁盘余量保护。已移除旧 SQL 审计表及 `legacy` 查询入口。
+
+
+## 七、参考资源
+
+- [上游仓库](https://github.com/MACOS-DO/sub4api)
+- [Ent 文档](https://entgo.io/docs/getting-started)
+- [Vue3 文档](https://vuejs.org/)
+- [pnpm 文档](https://pnpm.io/)

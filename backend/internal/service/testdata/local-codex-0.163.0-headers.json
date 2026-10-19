@@ -1,0 +1,11 @@
+{
+  "headers": {
+    "User-Agent": "codex_exec/0.163.0 (Ubuntu 24.4.0; x86_64) dumb (codex_exec; 0.163.0)",
+    "originator": "codex_exec",
+    "Accept": "text/event-stream"
+  },
+  "client": "codex",
+  "mode": "http",
+  "kernel": "6.8.0-137-generic",
+  "machine": "x86_64"
+}

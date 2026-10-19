@@ -1,0 +1,33 @@
+[Unit]
+Description=IKUN2api - AI API Gateway Platform
+Documentation=https://github.com/1812095643/ikun2api
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=ikun2api
+Group=ikun2api
+WorkingDirectory=/opt/ikun2api
+ExecStart=/opt/ikun2api/ikun2api
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ikun2api
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/ikun2api
+
+# Environment - Server configuration
+# Modify these values to change listen address and port
+Environment=GIN_MODE=release
+Environment=SERVER_HOST=0.0.0.0
+Environment=SERVER_PORT=8080
+
+[Install]
+WantedBy=multi-user.target

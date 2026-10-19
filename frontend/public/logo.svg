@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">IKUN2api</title>
+  <desc id="desc">IK monogram</desc>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="#181b20"/>
+  <path d="M30 34h13v60H30zm27 0h13v25l22-25h17L82 64l28 30H92L70 69v25H57z" fill="#e9d98b"/>
+</svg>
