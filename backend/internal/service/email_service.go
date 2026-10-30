@@ -77,8 +77,10 @@ type VerificationCodeData struct {
 // PasswordResetTokenData represents password reset token data
 type PasswordResetTokenData struct {
 	// Token holds the hex-encoded SHA-256 hash of the reset token (never the plaintext).
-	Token     string
-	CreatedAt time.Time
+	Token                 string
+	CreatedAt             time.Time
+	UserID                int64  `json:"UserID,omitempty"`
+	CredentialFingerprint string `json:"CredentialFingerprint,omitempty"`
 }
 
 const (
@@ -90,7 +92,7 @@ const (
 	passwordResetTokenTTL = 30 * time.Minute
 
 	// Password reset email cooldown (prevent email bombing)
-	passwordResetEmailCooldown = 30 * time.Second
+	passwordResetEmailCooldown = 1 * time.Minute
 )
 
 // SMTPConfig SMTP配置
@@ -503,6 +505,10 @@ func (s *EmailService) GeneratePasswordResetToken() (string, error) {
 
 // SendPasswordResetEmail sends a password reset email with a reset link
 func (s *EmailService) SendPasswordResetEmail(ctx context.Context, email, siteName, resetURL string, locale ...string) error {
+	return s.sendPasswordResetEmail(ctx, email, siteName, resetURL, nil, firstEmailLocale(locale))
+}
+
+func (s *EmailService) sendPasswordResetEmail(ctx context.Context, email, siteName, resetURL string, binding *PasswordResetTokenData, locale string) error {
 	// Only the SHA-256 hash of the token is stored, so an existing token cannot be
 	// re-sent; always issue a fresh token (the email cooldown bounds resend frequency).
 	token, err := s.GeneratePasswordResetToken()
@@ -513,17 +519,22 @@ func (s *EmailService) SendPasswordResetEmail(ctx context.Context, email, siteNa
 		Token:     hashPasswordResetToken(token),
 		CreatedAt: time.Now(),
 	}
+	if binding != nil {
+		data.UserID = binding.UserID
+		data.CredentialFingerprint = binding.CredentialFingerprint
+	}
 	if err := s.cache.SetPasswordResetToken(ctx, email, data, passwordResetTokenTTL); err != nil {
 		return fmt.Errorf("save reset token: %w", err)
 	}
 
-	// Build full reset URL with URL-encoded token and email
-	fullResetURL := fmt.Sprintf("%s?email=%s&token=%s", resetURL, url.QueryEscape(email), url.QueryEscape(token))
+	// Keep the bearer token in the URL fragment so it is not sent in HTTP
+	// requests, reverse-proxy logs, or the Referer header.
+	fullResetURL := buildPasswordResetURL(resetURL, email, token)
 
 	if s.notificationEmailService != nil {
 		err := s.notificationEmailService.Send(ctx, NotificationEmailSendInput{
 			Event:          NotificationEmailEventAuthPasswordReset,
-			Locale:         firstEmailLocale(locale),
+			Locale:         locale,
 			RecipientEmail: email,
 			RecipientName:  emailRecipientName(email),
 			Variables: map[string]string{
@@ -555,22 +566,27 @@ func (s *EmailService) SendPasswordResetEmail(ctx context.Context, email, siteNa
 // SendPasswordResetEmailWithCooldown sends password reset email with cooldown check (called by queue worker)
 // This method wraps SendPasswordResetEmail with email cooldown to prevent email bombing
 func (s *EmailService) SendPasswordResetEmailWithCooldown(ctx context.Context, email, siteName, resetURL string, locale ...string) error {
-	// Check email cooldown to prevent email bombing
-	if s.cache.IsPasswordResetEmailInCooldown(ctx, email) {
-		slog.Info("password reset email skipped due to cooldown", "email", email)
+	claimed := false
+	if claimer, ok := s.cache.(interface {
+		TrySetPasswordResetEmailCooldown(context.Context, string, time.Duration) (bool, error)
+	}); ok {
+		var err error
+		claimed, err = claimer.TrySetPasswordResetEmailCooldown(ctx, email, passwordResetEmailCooldown)
+		if err != nil {
+			slog.Error("failed to claim password reset email cooldown", "recipient_hash", notificationEmailHash(email), "error", err)
+			return ErrServiceUnavailable
+		}
+	} else {
+		return ErrServiceUnavailable
+	}
+	if !claimed {
+		slog.Info("password reset email skipped due to cooldown", "recipient_hash", notificationEmailHash(email))
 		return nil // Silent success to prevent revealing cooldown to attackers
 	}
 
-	// Send email using core method
 	if err := s.SendPasswordResetEmail(ctx, email, siteName, resetURL, firstEmailLocale(locale)); err != nil {
 		return err
 	}
-
-	// Set cooldown marker (Redis TTL handles expiration)
-	if err := s.cache.SetPasswordResetEmailCooldown(ctx, email, passwordResetEmailCooldown); err != nil {
-		slog.Error("failed to set password reset cooldown", "email", email, "error", err)
-	}
-
 	return nil
 }
 
@@ -578,6 +594,11 @@ func (s *EmailService) SendPasswordResetEmailWithCooldown(ctx context.Context, e
 func hashPasswordResetToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+func buildPasswordResetURL(resetURL, email, token string) string {
+	fragment := url.Values{"email": []string{email}, "token": []string{token}}.Encode()
+	return strings.TrimSuffix(resetURL, "#") + "#" + fragment
 }
 
 // VerifyPasswordResetToken verifies the password reset token without consuming it

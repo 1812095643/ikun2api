@@ -155,6 +155,11 @@ func (s *OpenAIGatewayService) buildNativeAnthropicUpstreamRequest(
 	targetURL string,
 	sessionBodies ...[]byte,
 ) (*http.Request, []byte, error) {
+	cleanBody, err := sanitizeClaudePrivacyBody(body)
+	if err != nil {
+		return nil, nil, err
+	}
+	body = cleanBody
 	// 能力维度 body sanitize：与 Anthropic 平台 passthrough 相同，按 beta
 	// header 决定是否保留 body 中的 beta 能力字段，避免客户端"body 带字段但
 	// header 忘带 token"的 bug 让第三方上游 400。
@@ -215,6 +220,7 @@ func (s *OpenAIGatewayService) buildNativeAnthropicUpstreamRequest(
 	// 账号级请求头覆写（最终生效，覆盖上面所有来源的同名头）
 	account.ApplyHeaderOverrides(req.Header)
 	filterSonnet55ToolsetBetaHeader(req.Header, body, gjson.GetBytes(body, "model").String())
+	sanitizeClaudePrivacyHeaders(req.Header)
 	payloads := append([][]byte{body}, sessionBodies...)
 	applyOpenCodeSessionHeader(c, account, targetURL, req.Header, payloads...)
 

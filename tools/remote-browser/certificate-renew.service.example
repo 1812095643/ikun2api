@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew IP certificate
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ikun2api-acme/bin/certbot renew --quiet --deploy-hook "/usr/bin/systemctl reload nginx"
+Nice=10
+MemoryMax=256M

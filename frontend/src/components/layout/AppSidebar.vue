@@ -46,15 +46,18 @@
                   'sidebar-link-collapsed': sidebarCollapsed
                 }"
                 :title="sidebarCollapsed ? item.label : undefined"
+                :aria-label="navigationLabel(item, groupBadge(item))"
                 @click="handleGroupClick(item)"
               >
                 <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                <SidebarBadge v-if="sidebarCollapsed" :badge="groupBadge(item)" collapsed />
                 <span
                   class="sidebar-label sidebar-label-flex"
                   :class="{ 'sidebar-label-collapsed': sidebarCollapsed }"
                   :aria-hidden="sidebarCollapsed ? 'true' : 'false'"
                 >
                   <span class="min-w-0 truncate">{{ item.label }}</span>
+                  <SidebarBadge v-if="!sidebarCollapsed" :badge="groupBadge(item)" />
                   <ChevronDownIcon
                     class="h-4 w-4 flex-shrink-0 transition-transform duration-200"
                     :class="isGroupExpanded(item) ? 'rotate-180' : ''"
@@ -67,12 +70,14 @@
                   v-for="child in item.children"
                   :key="child.path"
                   :to="child.path"
+                  :aria-label="navigationLabel(child)"
                   class="sidebar-link mb-0.5 py-1.5 text-sm"
                   :class="{ 'sidebar-link-active': route.path === child.path }"
                   @click="handleMenuItemClick(child.path)"
                 >
                   <component :is="child.icon" class="h-4 w-4 flex-shrink-0" />
                   <span>{{ child.label }}</span>
+                  <SidebarBadge :badge="notices.badge(child.path)" />
                 </router-link>
               </div>
             </template>
@@ -83,6 +88,7 @@
               class="sidebar-link mb-1"
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
+              :aria-label="navigationLabel(item)"
               :id="
                 item.path === '/admin/accounts'
                   ? 'sidebar-channel-manage'
@@ -97,6 +103,7 @@
               <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
               <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
               <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
+              <SidebarBadge :badge="notices.badge(item.path)" :collapsed="sidebarCollapsed" />
             </router-link>
           </template>
         </div>
@@ -109,40 +116,50 @@
             </span>
           </div>
 
-          <router-link
+          <component
             v-for="item in personalNavItems"
             :key="item.path"
-            :to="item.path"
-            class="sidebar-link mb-1"
+            :is="item.path === '/announcements' ? 'button' : item.external ? 'a' : RouterLink"
+            v-bind="item.path === '/announcements' ? { type: 'button' } : item.external ? { href: item.path, target: '_blank', rel: 'noopener noreferrer' } : { to: item.path }"
+            class="sidebar-link mb-1 w-full"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
-            :title="sidebarCollapsed ? item.label : undefined"
-            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
+            :title="item.external ? `${item.label}（新标签页打开）` : sidebarCollapsed ? item.label : undefined"
+            :aria-label="navigationLabel(item)"
+            :data-tour="selfTourTargets[item.path]"
+            :data-tour-path="item.path"
             @click="handleMenuItemClick(item.path)"
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
             <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
-          </router-link>
+            <SidebarBadge :badge="notices.badge(item.path)" :collapsed="sidebarCollapsed" />
+            <Icon v-if="item.external && !sidebarCollapsed" name="externalLink" size="sm" class="ml-auto opacity-50" />
+          </component>
         </div>
       </template>
 
       <!-- Regular User View -->
       <template v-else-if="!appStore.backendModeEnabled">
         <div class="sidebar-section">
-          <router-link
+          <component
             v-for="item in userNavItems"
             :key="item.path"
-            :to="item.path"
-            class="sidebar-link mb-1"
+            :is="item.path === '/announcements' ? 'button' : item.external ? 'a' : RouterLink"
+            v-bind="item.path === '/announcements' ? { type: 'button' } : item.external ? { href: item.path, target: '_blank', rel: 'noopener noreferrer' } : { to: item.path }"
+            class="sidebar-link mb-1 w-full"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
-            :title="sidebarCollapsed ? item.label : undefined"
-            :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
+            :title="item.external ? `${item.label}（新标签页打开）` : sidebarCollapsed ? item.label : undefined"
+            :aria-label="navigationLabel(item)"
+            :data-tour="selfTourTargets[item.path]"
+            :data-tour-path="item.path"
             @click="handleMenuItemClick(item.path)"
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
             <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
-          </router-link>
+            <SidebarBadge :badge="notices.badge(item.path)" :collapsed="sidebarCollapsed" />
+            <Icon v-if="item.external && !sidebarCollapsed" name="externalLink" size="sm" class="ml-auto opacity-50" />
+          </component>
         </div>
       </template>
     </nav>
@@ -188,8 +205,9 @@
 </template>
 
 <script setup lang="ts">
+import { nativeMenuIDs, imageStudioUrl } from '@/router/workspace'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import VersionBadge from '@/components/common/VersionBadge.vue'
@@ -199,12 +217,16 @@ import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import { useSidebarNotices } from '@/composables/useSidebarNotices'
+import SidebarBadge from './SidebarBadge.vue'
+import type { NavigationBadge } from '@/api/navigation'
 
 interface NavItem {
   path: string
   label: string
   icon: unknown
   iconSvg?: string
+  external?: boolean
   hideInSimpleMode?: boolean
   children?: NavItem[]
   /**
@@ -245,6 +267,16 @@ const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
 const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
+const notices = useSidebarNotices()
+
+function groupBadge(item: NavItem): NavigationBadge {
+  const badges = [notices.badge(item.path), ...(item.children || []).map(child => notices.badge(child.path))]
+  return { count: badges.reduce((sum, badge) => sum + badge.count, 0), dot: badges.some(badge => badge.dot), label: badges.map(badge => badge.label).filter(Boolean).join('，') }
+}
+
+function navigationLabel(item: Pick<NavItem, 'path' | 'label'>, badge = notices.badge(item.path)): string {
+  return badge.count > 0 || badge.dot ? `${item.label}，${badge.label}` : item.label
+}
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
@@ -717,6 +749,17 @@ const flagBatchImageAccess = () => canUseBatchImage.value
 //
 // 条目顺序：密钥 → 用量 → 可用渠道 → 渠道状态 → 订阅/支付 → 兑换/资料。
 // 可用渠道紧挨渠道状态之上，让用户"先看自己能用什么、再看对应状态"。
+const selfTourTargets: Record<string, string> = {
+  [imageStudioUrl]: 'sidebar-image-studio',
+  '/announcements': 'sidebar-announcements',
+  '/model-square': 'sidebar-model-square',
+  '/purchase': 'sidebar-purchase',
+  '/redeem': 'sidebar-redeem',
+  '/keys': 'sidebar-my-keys',
+  '/usage': 'sidebar-usage',
+  '/tickets': 'sidebar-tickets',
+}
+
 function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const items: NavItem[] = []
   if (withDashboard) {
@@ -726,6 +769,14 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/model-square', label: '模型广场', icon: FolderIcon },
+    { path: imageStudioUrl, label: '生图工作室', icon: BatchImageIcon, external: true },
+    { path: '/news', label: '时事新闻', icon: BellIcon },
+    { path: '/reset-monitor', label: 'FUCK TIBO', icon: SignalIcon },
+    { path: '/tickets', label: '我的工单', icon: TicketIcon },
+    { path: '/lottery', label: '幸运抽奖', icon: GiftIcon },
+    { path: '/checkin', label: '每日签到', icon: CreditCardIcon },
+    { path: '/announcements', label: '公告', icon: BellIcon },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, featureFlag: flagSubscription },
@@ -756,19 +807,19 @@ const userNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(tru
 // Personal navigation items (for admin's "My Account" section, without Dashboard).
 // Admins access 可用渠道 from this section just like regular users — there is no
 // separate admin entry, since the page is purely a user-facing view.
-const personalNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(false)))
+const personalNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(onboardingStore.userPreview)))
 
 // Custom menu items filtered by visibility
 const customMenuItemsForUser = computed(() => {
   const items = appStore.cachedPublicSettings?.custom_menu_items ?? []
   return items
-    .filter((item) => item.visibility === 'user')
+    .filter((item) => item.visibility === 'user' && !nativeMenuIDs.has(item.id))
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
 const customMenuItemsForAdmin = computed(() => {
   return adminSettingsStore.customMenuItems
-    .filter((item) => item.visibility === 'admin')
+    .filter((item) => item.visibility === 'admin' && !nativeMenuIDs.has(item.id))
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
@@ -793,6 +844,11 @@ const adminNavItems = computed((): NavItem[] => {
     // 「仅充值」站点连管理端的「订阅管理」入口也一并收起（路由本身不拦截）。
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, featureFlag: flagSubscription },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
+    { path: '/admin/upstream-balances', label: '上游余额', icon: CreditCardIcon },
+    { path: '/admin/relogin', label: '失效重登', icon: KeyIcon },
+    { path: '/admin/tickets', label: '工单管理', icon: TicketIcon },
+    { path: '/admin/lottery', label: '抽奖管理', icon: GiftIcon },
+    { path: '/admin/checkin', label: '签到管理', icon: CreditCardIcon },
     { path: '/admin/plugins', label: t('nav.plugins'), icon: PluginIcon, featureFlag: flagPluginManagement },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
@@ -876,23 +932,13 @@ function closeMobile() {
 }
 
 function handleMenuItemClick(itemPath: string) {
+  if (itemPath === '/announcements') window.dispatchEvent(new Event('ikun-open-announcements'))
   if (mobileOpen.value) {
     setTimeout(() => {
       appStore.setMobileOpen(false)
     }, 150)
   }
 
-  // Map paths to tour selectors
-  const pathToSelector: Record<string, string> = {
-    '/admin/groups': '#sidebar-group-manage',
-    '/admin/accounts': '#sidebar-channel-manage',
-    '/keys': '[data-tour="sidebar-my-keys"]'
-  }
-
-  const selector = pathToSelector[itemPath]
-  if (selector && onboardingStore.isCurrentStep(selector)) {
-    onboardingStore.nextStep(500)
-  }
 }
 
 function isActive(path: string): boolean {
@@ -978,6 +1024,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.sidebar-link {
+  position: relative;
+}
+
 .sidebar-logo {
   flex: 0 0 2.25rem;
   min-width: 2.25rem;

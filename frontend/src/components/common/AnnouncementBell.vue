@@ -28,6 +28,7 @@
         >
           <div
             class="w-full max-w-[620px] overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10"
+            data-tour="announcements-panel"
             @click.stop
           >
             <!-- Header with Gradient -->
@@ -352,6 +353,7 @@ function renderMarkdown(content: string): string {
 
 function openModal() {
   isModalOpen.value = true
+  void announcementStore.fetchAnnouncements(true)
 }
 
 function closeModal() {
@@ -406,10 +408,14 @@ function handleEscape(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('keydown', handleEscape)
+  window.addEventListener('ikun-open-announcements', openModal)
+  window.addEventListener('ikun-tour-close-announcements', closeModal)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEscape)
+  window.removeEventListener('ikun-open-announcements', openModal)
+  window.removeEventListener('ikun-tour-close-announcements', closeModal)
   document.body.style.overflow = ''
 })
 

@@ -11,6 +11,7 @@ import (
 )
 
 var codexModelMap = map[string]string{
+	"gpt-6.1-terra":        "gpt-6.1-terra",
 	"gpt-6.1-sol":          "gpt-6.1-sol",
 	"gpt-6-sol":            "gpt-6-sol",
 	"gpt-6-luna":           "gpt-6-luna",
@@ -63,6 +64,7 @@ var codexVersionModelPrefixes = []struct {
 	prefix string
 	target string
 }{
+	{prefix: "gpt-6.1-terra", target: "gpt-6.1-terra"},
 	{prefix: "gpt-6.1-sol", target: "gpt-6.1-sol"},
 	{prefix: "gpt-6-sol", target: "gpt-6-sol"},
 	{prefix: "gpt-6-luna", target: "gpt-6-luna"},
@@ -349,6 +351,12 @@ func applyCodexOAuthTransformWithOptions(reqBody map[string]any, opts codexOAuth
 	}
 
 	if !opts.IsCompact && ensureCodexResponsesDefaults(reqBody) {
+		result.Modified = true
+	}
+	if changed, err := completeOpenAICodexRequestToolFields(reqBody); err != nil {
+		result.Error = err
+		return result
+	} else if changed {
 		result.Modified = true
 	}
 	return result

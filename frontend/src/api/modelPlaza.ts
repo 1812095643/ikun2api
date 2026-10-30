@@ -97,4 +97,9 @@ export async function getModelPlaza(options?: { signal?: AbortSignal }): Promise
 
 export const modelPlazaAPI = { getModelPlaza }
 
+/** 登录后的原生工作台复用相同计价与分组权限，不改变公开广场开关。 */
+export async function getWorkspaceModels(options?: { signal?: AbortSignal }): Promise<ModelPlazaResponse> {
+  return (await apiClient.get<ModelPlazaResponse>('/workspace/models', { signal: options?.signal })).data
+}
+
 export default modelPlazaAPI

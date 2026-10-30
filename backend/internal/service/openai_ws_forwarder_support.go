@@ -68,7 +68,6 @@ func (s *OpenAIGatewayService) performOpenAIWSGeneratePrewarm(
 		logOpenAIWSModeInfo("prewarm_skip account_id=%d conn_id=%s reason=tool_continuation", account.ID, connID)
 		return nil
 	}
-	prewarmStart := time.Now()
 	logOpenAIWSModeInfo("prewarm_start account_id=%d conn_id=%s", account.ID, connID)
 
 	prewarmPayload := make(map[string]any, len(payload)+1)
@@ -76,6 +75,24 @@ func (s *OpenAIGatewayService) performOpenAIWSGeneratePrewarm(
 		prewarmPayload[k] = v
 	}
 	prewarmPayload["generate"] = false
+	return s.performOpenAIWSGeneratePrewarmPayload(ctx, lease, prewarmPayload, reqBody, account, stateStore, groupID, false)
+}
+
+// Both ordinary prewarming and OAuth search initialization use the same
+// write/read/terminal handling. A nil stateStore keeps a synthetic response
+// outside all business continuation bindings.
+func (s *OpenAIGatewayService) performOpenAIWSGeneratePrewarmPayload(
+	ctx context.Context,
+	lease *openAIWSConnLease,
+	prewarmPayload map[string]any,
+	reqBody map[string]any,
+	account *Account,
+	stateStore OpenAIWSStateStore,
+	groupID int64,
+	requireNoOutput bool,
+) error {
+	prewarmStart := time.Now()
+	connID := strings.TrimSpace(lease.ConnID())
 	prewarmPayloadJSON := payloadAsJSONBytes(prewarmPayload)
 
 	if err := lease.WriteJSONWithContextTimeout(ctx, prewarmPayload, s.openAIWSWriteTimeout()); err != nil {
@@ -115,6 +132,10 @@ func (s *OpenAIGatewayService) performOpenAIWSGeneratePrewarm(
 			continue
 		}
 		prewarmEventCount++
+		if requireNoOutput && (isOpenAIWSTokenEvent(eventType) || eventType == "response.output_item.added" || eventType == "response.output_item.done" || strings.HasPrefix(eventType, "response.web_search_call.") || len(gjson.GetBytes(message, "response.output").Array()) > 0) {
+			lease.MarkBroken()
+			return wrapOpenAIWSFallback("prewarm_unexpected_output", errors.New("Search initialization unexpectedly produced output"))
+		}
 		if prewarmResponseID == "" && eventResponseID != "" {
 			prewarmResponseID = eventResponseID
 		}
@@ -129,6 +150,15 @@ func (s *OpenAIGatewayService) performOpenAIWSGeneratePrewarm(
 			)
 		}
 
+		if requireNoOutput && (eventType == "error" || (isOpenAIWSTerminalEvent(eventType) && eventType != "response.completed" && eventType != "response.done")) {
+			lease.MarkBroken()
+			return newOpenAIWSSearchUpstreamError(message, lease.HandshakeHeaders())
+		}
+
+		if messageText, expired := openAIWSFailedConnectionLimit(eventType, message); expired {
+			lease.MarkBroken()
+			return wrapOpenAIWSFallback("prewarm_ws_connection_limit_reached", errors.New(messageText))
+		}
 		if eventType == "error" {
 			errCodeRaw, errTypeRaw, errMsgRaw := parseOpenAIWSErrorEventFields(message)
 			prewarmModel, _ := reqBody["model"].(string)
@@ -158,6 +188,11 @@ func (s *OpenAIGatewayService) performOpenAIWSGeneratePrewarm(
 		}
 
 		if isOpenAIWSTerminalEvent(eventType) {
+			status := gjson.GetBytes(message, "response.status").String()
+			if (eventType != "response.completed" && eventType != "response.done") || (status != "" && status != "completed") {
+				lease.MarkBroken()
+				return wrapOpenAIWSFallback("prewarm_terminal_failure", errors.New("OpenAI websocket prewarm did not complete successfully"))
+			}
 			prewarmTerminalCount++
 			break
 		}
@@ -604,7 +639,7 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 		return 0, nil, "", nil
 	}
-	if requestedModel != "" && !account.IsModelSupported(requestedModel) {
+	if requestedModel != "" && !supportsOpenAIRequestModel(account, requestedModel, requireCompact) {
 		return 0, nil, "", nil
 	}
 	if !account.SupportsOpenAIEndpointCapability(requiredCapability) {
@@ -643,7 +678,7 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 			_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 			return 0, nil, "", nil
 		}
-		if requestedModel != "" && !latest.IsModelSupported(requestedModel) {
+		if requestedModel != "" && !supportsOpenAIRequestModel(latest, requestedModel, requireCompact) {
 			return 0, nil, "", nil
 		}
 		if !latest.SupportsOpenAIEndpointCapability(requiredCapability) {
@@ -757,6 +792,17 @@ func (s *OpenAIGatewayService) newOpenAIWSRateLimitFailoverError(account *Accoun
 		false,
 		false,
 	)
+}
+
+// 连接寿命错误也可能通过失败终止事件返回，统一复用既有换连恢复策略。
+func openAIWSFailedConnectionLimit(eventType string, message []byte) (string, bool) {
+	if eventType != "response.failed" {
+		return "", false
+	}
+	response := gjson.GetBytes(message, "response")
+	code, errorType, text := parseOpenAIWSErrorEventFields([]byte(response.Raw))
+	reason, _ := classifyOpenAIWSErrorEventFromRaw(code, errorType, text)
+	return text, reason == "ws_connection_limit_reached"
 }
 
 func classifyOpenAIWSErrorEventFromRaw(codeRaw, errTypeRaw, msgRaw string) (string, bool) {

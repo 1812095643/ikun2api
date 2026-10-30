@@ -417,8 +417,8 @@ func TestRewriteSystemForNonClaudeCode(t *testing.T) {
 			require.Contains(t, billingBlock["text"], "x-anthropic-billing-header:")
 			require.Contains(t, billingBlock["text"], "cc_version=")
 			require.Contains(t, billingBlock["text"], "cc_entrypoint=cli")
-			// Claude Code 2.1.283 first-party billing includes conditional cch.
-			require.Contains(t, billingBlock["text"], "cch=00000;")
+			// 新版 Claude Code 的兼容 billing block 不再注入 cch 占位值。
+			require.NotContains(t, billingBlock["text"], "cch=00000;")
 
 			systemBlock, ok := systemArr[1].(map[string]any)
 			require.True(t, ok)
@@ -527,7 +527,7 @@ func TestRewriteSystemForNonClaudeCodeWithPromptBlocks_UsesConfiguredBlocks(t *t
 	require.True(t, system.IsArray())
 	arr := system.Array()
 	require.Len(t, arr, 3)
-	require.Contains(t, arr[0].Get("text").String(), "prefix "+claude.CLICurrentVersion+".")
+	require.Contains(t, arr[0].Get("text").String(), "prefix "+claude.EffectiveCLIVersion()+".")
 	require.Equal(t, "ephemeral", arr[0].Get("cache_control.type").String())
 	require.Equal(t, claude.DefaultCacheControlTTL, arr[0].Get("cache_control.ttl").String())
 	require.Equal(t, claudeCodeSystemPrompt, arr[1].Get("text").String())

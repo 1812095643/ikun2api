@@ -55,6 +55,12 @@ beforeEach(() => {
 afterEach(() => wrapper?.unmount())
 
 describe('proxy list filter pagination', () => {
+  it('does not mount the suspended ticket proxy pool', async () => {
+    wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'CodexTicketProxyPool' }).exists()).toBe(false)
+  })
+
   it.each([
     ['protocol', 'admin.proxies.allProtocols', 'socks5', ''],
     ['protocol', 'admin.proxies.allProtocols', '', 'http'],

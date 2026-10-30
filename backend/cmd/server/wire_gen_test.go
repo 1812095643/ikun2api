@@ -63,6 +63,7 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		subscriptionExpirySvc,
 		&service.UsageCleanupService{},
 		idempotencyCleanupSvc,
+		nil, // 显式缓存服务未启用时，退出清理仍可安全执行。
 		&service.BatchImageCleanupService{},
 		nil, // batchImageWorker
 		pricingSvc,
@@ -91,6 +92,7 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		nil, // openAIAutoReset
 		nil, // promptAudit
 		nil, // pluginManager
+		nil, // claudeTelemetry
 	)
 
 	require.NotPanics(t, func() {

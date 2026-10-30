@@ -1,3 +1,6 @@
+// 新版本暂停打票，保留实现和历史配置，恢复时须同时核对后端开关。
+export const CODEX_TICKET_ENABLED = false
+
 /**
  * Feature flag registry — single source of truth for public-settings-driven
  * feature switches used by the sidebar, routes, and views.

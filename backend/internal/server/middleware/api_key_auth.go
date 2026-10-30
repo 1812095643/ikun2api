@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
 	"github.com/MACOS-DO/sub4api/internal/pkg/ctxkey"
 	"github.com/MACOS-DO/sub4api/internal/pkg/ip"
 	"github.com/MACOS-DO/sub4api/internal/service"
@@ -169,7 +170,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// Async image task polling only reads data that already belongs to the
 		// authenticated key and must remain available after the completed
 		// generation consumes the key's remaining balance.
-		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
+		// 遥测本身不消耗模型额度；最后一次模型调用耗尽余额后仍应允许隐私拦截。
+		telemetryRequest := c.Request.Method == http.MethodPost && claude.IsTelemetryBatchPath(c.Request.URL.Path)
+		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || telemetryRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
@@ -181,7 +184,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			})
 			c.Set(string(ContextKeyUserRole), apiKey.User.Role)
 			setGroupContext(c, apiKey.Group)
-			if !billingInfoRequest {
+			if !billingInfoRequest && !telemetryRequest {
 				_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 			}
 			c.Next()
@@ -279,7 +282,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		})
 		c.Set(string(ContextKeyUserRole), apiKey.User.Role)
 		setGroupContext(c, apiKey.Group)
-		if !billingInfoRequest {
+		if !billingInfoRequest && !telemetryRequest {
 			_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 		}
 

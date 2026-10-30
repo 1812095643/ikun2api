@@ -150,7 +150,10 @@ func (s *SettingService) GetFrontendURL(ctx context.Context) string {
 	if err == nil && strings.TrimSpace(val) != "" {
 		return strings.TrimSpace(val)
 	}
-	return s.cfg.Server.FrontendURL
+	if s.cfg != nil {
+		return s.cfg.Server.FrontendURL
+	}
+	return ""
 }
 
 // GetPublicSettings 获取公开设置（无需登录）
@@ -242,6 +245,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyAffiliateEnabled,
 		SettingKeyRiskControlEnabled,
 		SettingKeyAllowUserViewErrorRequests,
+		SettingKeyUsageOutputRateMode,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -278,9 +282,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	googleEnabled := s.emailOAuthPublicEnabled(settings, "google")
 	weChatEnabled, weChatOpenEnabled, weChatMPEnabled, weChatMobileEnabled := s.weChatOAuthCapabilitiesFromSettings(settings)
 
-	// Password reset requires email verification to be enabled
 	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
-	passwordResetEnabled := emailVerifyEnabled && settings[SettingKeyPasswordResetEnabled] == "true"
+	passwordResetEnabled := settings[SettingKeyPasswordResetEnabled] == "true"
 	registrationEmailSuffixWhitelist := ParseRegistrationEmailSuffixWhitelist(
 		settings[SettingKeyRegistrationEmailSuffixWhitelist],
 	)
@@ -377,6 +380,12 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 
 		AllowUserViewErrorRequests: settings[SettingKeyAllowUserViewErrorRequests] == "true",
+		UsageOutputRateMode: func() string {
+			if settings[SettingKeyUsageOutputRateMode] == "total" {
+				return "total"
+			}
+			return "generation"
+		}(),
 	}, nil
 }
 
@@ -633,16 +642,17 @@ type PublicSettingsInjectionPayload struct {
 	// monitors; fail-closed (absent/false = hidden). Admin UI always shows it.
 	// ChannelMonitorHideUserRanking hides the user ranking tab and /users payload
 	// from non-admin channel-monitor v2 viewers; default false (visible).
-	ChannelMonitorHideUserRanking bool `json:"channel_monitor_hide_user_ranking"`
-	ChannelMonitorShowQuota       bool `json:"channel_monitor_show_quota"`
-	AvailableChannelsEnabled      bool `json:"available_channels_enabled"`
-	SubscriptionEnabled           bool `json:"subscription_enabled"`
-	ModelPlazaEnabled             bool `json:"model_plaza_enabled"`
-	ModelPlazaRequireAuth         bool `json:"model_plaza_require_auth"`
-	PluginManagementEnabled       bool `json:"plugin_management_enabled"`
-	AffiliateEnabled              bool `json:"affiliate_enabled"`
-	RiskControlEnabled            bool `json:"risk_control_enabled"`
-	AllowUserViewErrorRequests    bool `json:"allow_user_view_error_requests"`
+	ChannelMonitorHideUserRanking bool   `json:"channel_monitor_hide_user_ranking"`
+	ChannelMonitorShowQuota       bool   `json:"channel_monitor_show_quota"`
+	AvailableChannelsEnabled      bool   `json:"available_channels_enabled"`
+	SubscriptionEnabled           bool   `json:"subscription_enabled"`
+	ModelPlazaEnabled             bool   `json:"model_plaza_enabled"`
+	ModelPlazaRequireAuth         bool   `json:"model_plaza_require_auth"`
+	PluginManagementEnabled       bool   `json:"plugin_management_enabled"`
+	AffiliateEnabled              bool   `json:"affiliate_enabled"`
+	RiskControlEnabled            bool   `json:"risk_control_enabled"`
+	AllowUserViewErrorRequests    bool   `json:"allow_user_view_error_requests"`
+	UsageOutputRateMode           string `json:"usage_output_rate_mode"`
 }
 
 // GetPublicSettingsForInjection returns public settings in a format suitable for HTML injection.
@@ -727,6 +737,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		AffiliateEnabled:                     settings.AffiliateEnabled,
 		RiskControlEnabled:                   settings.RiskControlEnabled,
 		AllowUserViewErrorRequests:           settings.AllowUserViewErrorRequests,
+		UsageOutputRateMode:                  settings.UsageOutputRateMode,
 	}, nil
 }
 

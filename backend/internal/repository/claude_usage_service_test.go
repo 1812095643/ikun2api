@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
+	"github.com/MACOS-DO/sub4api/internal/service"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -125,4 +127,17 @@ func (s *ClaudeUsageServiceSuite) TestFetchUsage_InvalidProxyReturnsError() {
 
 func TestClaudeUsageServiceSuite(t *testing.T) {
 	suite.Run(t, new(ClaudeUsageServiceSuite))
+}
+
+func TestClaudeUsageUsesReviewedProfileDespiteLegacyCache(t *testing.T) {
+	observed := make(chan string, 1)
+	server := newLocalTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		observed <- r.Header.Get("User-Agent")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer server.Close()
+	fetcher := &claudeUsageService{usageURL: server.URL, allowPrivateHosts: true}
+	_, err := fetcher.FetchUsageWithOptions(context.Background(), &service.ClaudeUsageFetchOptions{AccessToken: "synthetic", Fingerprint: &service.Fingerprint{UserAgent: "claude-cli/2.999.999"}})
+	require.NoError(t, err)
+	require.Equal(t, claude.DefaultUserAgent(), <-observed)
 }

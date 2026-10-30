@@ -6,6 +6,8 @@ import (
 	"github.com/MACOS-DO/sub4api/internal/securityaudit"
 	"github.com/MACOS-DO/sub4api/internal/service"
 
+	"github.com/MACOS-DO/sub4api/internal/workspace"
+
 	"github.com/google/wire"
 )
 
@@ -121,11 +123,13 @@ func ProvideGatewayHandler(
 	cfg *config.Config,
 	settingService *service.SettingService,
 	coordinator *securityaudit.Coordinator,
+	geminiCachedContentService *service.GeminiCachedContentService,
 ) *GatewayHandler {
 	h := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
 		userService, concurrencyService, billingCacheService, usageService, apiKeyService, usageRecordWorkerPool,
 		errorPassthroughService, contentModerationService, userMsgQueueService, cfg, settingService)
 	h.securityAuditCoordinator = coordinator
+	h.geminiCachedContentService = geminiCachedContentService
 	h.userRequestAuditService = userRequestAuditService
 	return h
 }
@@ -168,8 +172,12 @@ func ProvideBatchImageHandler(
 }
 
 // ProvideSystemHandler creates admin.SystemHandler with the injected build version.
-func ProvideSystemHandler(buildInfo BuildInfo) *admin.SystemHandler {
-	return admin.NewSystemHandler(buildInfo.Version)
+func ProvideSystemHandler(buildInfo BuildInfo, cache service.UpdateCache, github service.GitHubReleaseClient, lockSvc *service.SystemOperationLockService) *admin.SystemHandler {
+	updateSvc := service.NewUpdateService(cache, github, buildInfo.Version, buildInfo.BuildType)
+	updateSvc.SetUpgradeSafety(service.NewUpgradeSafety())
+	h := admin.NewSystemHandler(updateSvc, lockSvc)
+	h.SetVersion(buildInfo.Version)
+	return h
 }
 
 // ProvideSettingHandler creates SettingHandler with version from BuildInfo
@@ -190,6 +198,7 @@ func ProvideAdminSettingHandler(settingService *service.SettingService, emailSer
 
 // ProvideHandlers creates the Handlers struct
 func ProvideHandlers(
+	workspaceHandler *workspace.Handler,
 	authHandler *AuthHandler,
 	userHandler *UserHandler,
 	apiKeyHandler *APIKeyHandler,
@@ -216,6 +225,7 @@ func ProvideHandlers(
 	_ *service.OpenAIQuotaAutoResetService,
 ) *Handlers {
 	return &Handlers{
+		Workspace:        workspaceHandler,
 		Auth:             authHandler,
 		User:             userHandler,
 		APIKey:           apiKeyHandler,
@@ -242,6 +252,7 @@ func ProvideHandlers(
 
 // ProviderSet is the Wire provider set for all handlers
 var ProviderSet = wire.NewSet(
+	workspace.NewHandler,
 	// Top-level handlers
 	NewAuthHandler,
 	NewUserHandler,

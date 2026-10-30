@@ -15,14 +15,20 @@
   pointer-events: none !important;
 }
 
-.driver-overlay svg {
+.driver-overlay * {
   pointer-events: none !important;
+}
+
+/* 分组下拉框通过 Teleport 挂载，仍需允许真实选择与键盘操作。 */
+.driver-active .select-dropdown-portal,
+.driver-active .select-dropdown-portal * {
+  pointer-events: auto;
 }
 
 .driver-active-element {
   position: relative !important;
   z-index: 99999999 !important;
-  outline: 4px solid rgba(20, 184, 166, 0.2) !important;
+  outline: 4px solid rgba(59, 130, 246, 0.2) !important;
   border-radius: 4px !important;
 }
 
@@ -35,7 +41,9 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
   border-radius: 12px !important;
   padding: 0 !important;
-  max-width: min(440px, 90vw) !important; /* Responsive on small screens */
+  width: min(440px, calc(100vw - 24px)) !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 24px) !important;
   color: #1f2937 !important;
   font-family: ui-sans-serif, system-ui, sans-serif !important;
   overflow: hidden !important;
@@ -99,6 +107,10 @@
 }
 .dark .theme-tour-popover .driver-popover-description { color: #cbd5e1 !important; }
 
+.theme-tour-popover .driver-popover-description p + p {
+  margin-top: 12px;
+}
+
 /* 5. Footer Area - Flex Row with Left/Right Containers */
 .theme-tour-popover .driver-popover-footer {
   display: flex !important;
@@ -159,6 +171,10 @@
 }
 .dark .shortcut-item { color: #94a3b8 !important; }
 
+@media (max-width: 640px) {
+  .theme-tour-popover .footer-shortcuts { display: none !important; }
+}
+
 .shortcut-item kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace !important;
   background-color: #ffffff !important;
@@ -196,12 +212,27 @@
   white-space: nowrap !important; /* Force no wrap */
 }
 
+.theme-tour-popover .driver-popover-next-btn[style*="display: none"],
+.theme-tour-popover .driver-popover-prev-btn[style*="display: none"],
+.theme-tour-popover .driver-popover-close-btn[style*="display: none"] {
+  display: none !important;
+}
+
 .theme-tour-popover .driver-popover-next-btn {
-  background-color: #14b8a6 !important;
+  background-color: #2563eb !important;
   color: #ffffff !important;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
 }
-.theme-tour-popover .driver-popover-next-btn:hover { background-color: #0d9488 !important; }
+.theme-tour-popover .driver-popover-next-btn:hover { background-color: #1d4ed8 !important; }
+
+@media (max-width: 640px) {
+  .theme-tour-popover .footer-shortcuts { display: none !important; }
+  .theme-tour-popover .driver-popover-footer { padding: 12px 16px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-tour-popover button { transition: none !important; }
+}
 
 .theme-tour-popover .driver-popover-prev-btn {
   background-color: white !important;

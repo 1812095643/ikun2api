@@ -100,6 +100,7 @@ export default {
   // Onboarding Tour
   onboarding: {
     restartTour: '重新查看新手引导',
+    finishTour: '完成引导',
     dontShowAgain: '不再提示',
     dontShowAgainTitle: '永久关闭新手引导',
     confirmDontShow: '确定不再显示新手引导吗？\n\n您可以随时在右上角头像菜单中重新开启。',
@@ -233,38 +234,38 @@ export default {
     // User tour steps
     user: {
       welcome: {
-        title: '👋 欢迎使用 IKUN2api',
-        description:
-          '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">您好！欢迎来到 IKUN2api AI 服务平台。</p><p style="margin-bottom: 12px;"><b>🎯 快速开始：</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>🔑 创建 API 密钥</li><li>📋 复制密钥到您的应用</li><li>🚀 开始使用 AI 服务</li></ul><p style="color: #10b981; font-weight: 600;">只需 1 分钟，让我们开始吧 →</p></div>',
-        nextBtn: '开始 🚀',
+        title: '欢迎使用 IKUN2api',
+        description: '<p>先选择模型，再准备余额、创建密钥，即可在客户端开始使用。</p><p>接下来带您认识几个常用入口。可随时关闭，也可从右上角头像菜单重新查看。</p>',
+        nextBtn: '开始了解',
         prevBtn: '跳过'
       },
+      models: {
+        title: '选择需要的模型',
+        description: '<p>在<b>模型广场</b>查看模型、价格和所属分组。</p><p>先确定需要使用的模型，创建 API Key 时选择对应分组。</p>'
+      },
+      purchase: {
+        title: '购买余额或订阅',
+        description: '<p>在这里选择充值金额或订阅套餐，核对订单后完成支付。</p><p>到账后可在顶部查看余额，在<b>我的订单</b>查看支付记录。</p>'
+      },
+      redeem: {
+        title: '使用兑换码',
+        description: '<p>已有兑换码时，进入<b>兑换</b>页面，粘贴完整兑换码并确认。</p><p>兑换成功后可查看到账余额或订阅，以及自己的兑换记录。</p>'
+      },
       keyManage: {
-        title: '🔑 API 密钥管理',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">在这里管理您的所有 API 访问密钥。</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 什么是 API 密钥？</b><br/>API 密钥是您访问 AI 服务的凭证，就像一把钥匙，让您的应用能够调用 AI 能力。</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击进入密钥页面</p></div>'
+        title: '创建并使用 API Key',
+        description: '<p>进入<b>API 密钥</b>，点击<b>创建密钥</b>，填写名称并选择对应的服务分组。</p><p>创建后复制 Key，通过<b>使用密钥</b>配置客户端；具体接入步骤可查看顶部的新手教程。请妥善保管密钥。</p>'
       },
-      createKey: {
-        title: '➕ 创建新密钥',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">点击按钮创建您的第一个 API 密钥。</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 提示：</b>创建后密钥只显示一次，请务必复制保存</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"创建密钥"</p></div>'
+      usage: {
+        title: '查看用量与消费',
+        description: '<p>在<b>使用记录</b>按日期、密钥或模型筛选请求，查看 Token 用量和实际消费。</p><p>遇到调用问题时，先核对请求时间和错误信息，再联系支持。</p>'
       },
-      keyName: {
-        title: '✏️ 密钥名称',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">为密钥起一个便于识别的名称。</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 示例：</b>"我的第一个密钥"、"测试用" 等</p></div>',
-        nextBtn: '下一步'
+      tickets: {
+        title: '通过工单联系支持',
+        description: '<p>在<b>我的工单</b>提交问题，附上报错和发生时间，收到回复后侧栏会显示未读提醒。</p><p>每天可新建一个工单，同一问题请在原工单内继续回复。请勿发送密码或完整密钥。</p>'
       },
-      keyGroup: {
-        title: '🎯 选择分组',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">选择管理员为您分配的服务分组。</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 分组说明：</b><br/>不同分组可能有不同的服务质量和计费标准，请根据需要选择。</p></div>',
-        nextBtn: '下一步'
-      },
-      keySubmit: {
-        title: '🎉 完成创建',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">点击确认创建您的 API 密钥。</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ 重要：</b><ul style="margin: 8px 0 0 16px;"><li>创建后请立即复制密钥（sk-xxx）</li><li>密钥只显示一次，丢失需重新生成</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>🚀 如何使用：</b><br/>将密钥配置到支持 OpenAI 接口的任何客户端（如 ChatBox、OpenCat 等），即可开始使用！</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"创建"按钮</p></div>'
+      tutorial: {
+        title: '随时查阅新手教程',
+        description: '<p>顶部的<b>新手教程</b>包含网站使用说明、客户端配置和 API 接入步骤，点击后会在新标签页打开。</p><p>现在可以开始使用了。需要重看本引导时，打开右上角头像菜单即可。</p>'
       }
     }
   },

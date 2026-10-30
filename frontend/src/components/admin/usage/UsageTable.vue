@@ -2,12 +2,13 @@
   <div :class="flat ? '' : 'card overflow-hidden'">
     <div
       v-if="showIpGeoToolbar"
-      class="flex items-center justify-end gap-2 border-b border-gray-200 px-4 py-2 dark:border-dark-700"
+      class="flex flex-wrap items-center justify-end gap-2 border-b border-gray-200 px-4 py-2 dark:border-dark-700"
     >
-      <span v-if="pendingIpCount > 0" class="text-xs text-gray-500 dark:text-gray-400">
+      <span v-if="showIpGeoToolbar && pendingIpCount > 0" class="text-xs text-gray-500 dark:text-gray-400">
         {{ t('usage.ipGeo.pending', { count: pendingIpCount }) }}
       </span>
       <button
+        v-if="showIpGeoToolbar"
         type="button"
         class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
         :disabled="ipGeoBatchLoading || pendingIpCount === 0"
@@ -247,6 +248,8 @@
               <span v-else class="text-gray-400 dark:text-gray-500">-</span>
               <span class="text-gray-400 dark:text-gray-500">{{ t('usage.latencyDuration') }}</span>
               <span class="font-medium tabular-nums" :class="LATENCY_TEXT_CLASSES[durationSeverity(row.duration_ms ?? 0)]">{{ formatDuration(row.duration_ms) }}</span>
+              <span class="text-gray-400 dark:text-gray-500" :title="outputRateHint">tok/s</span>
+              <span class="font-medium tabular-nums text-gray-700 dark:text-gray-200" :title="outputRateTitle(row)" data-testid="usage-output-rate">{{ formatOutputRate(row) }}</span>
             </div>
           </div>
         </template>
@@ -540,6 +543,7 @@ import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'
+import { getOutputRate } from '@/utils/outputRate'
 import {
   LATENCY_BAR_CLASSES,
   LATENCY_BAR_FROM_CLASSES,
@@ -621,6 +625,17 @@ const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)
 
 const showIpGeoToolbar = computed(() => props.columns.some((col) => col.key === 'ip_address'))
+const outputRateMode = computed(() => appStore.cachedPublicSettings?.usage_output_rate_mode === 'total' ? 'total' : 'generation')
+const outputRateHint = computed(() => t(outputRateMode.value === 'generation' ? 'usage.outputRateGenerationHint' : 'usage.outputRateTotalHint'))
+
+function formatOutputRate(row: AdminUsageLog): string {
+  const rate = getOutputRate(row, outputRateMode.value)
+  return rate == null ? '—' : rate.toFixed(1)
+}
+
+function outputRateTitle(row: AdminUsageLog): string {
+  return getOutputRate(row, outputRateMode.value) == null ? t('usage.outputRateUnavailable') : outputRateHint.value
+}
 
 const hasReasoningEffortMapping = (row: AdminUsageLog): boolean => {
   const requested = row.reasoning_effort?.trim() || ''

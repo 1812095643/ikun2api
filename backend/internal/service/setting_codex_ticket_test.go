@@ -21,6 +21,35 @@ func (r *codexTicketSettingRepo) GetValue(ctx context.Context, key string) (stri
 	return r.codexPolicyMigrationRepoStub.GetValue(ctx, key)
 }
 
+func TestCodexTicketSuspensionOverridesStoredConfiguration(t *testing.T) {
+	require.False(t, CodexTicketFeatureEnabled)
+	upstream := &httpUpstreamRecorder{}
+	repo := &codexTicketSettingRepo{codexPolicyMigrationRepoStub: &codexPolicyMigrationRepoStub{values: map[string]string{SettingKeyOpenAICodexTicketEnabled: "true"}}}
+	svc := ticketTestService(t, config.OpenAICodexTicketConfig{Enabled: true, FailClosed: true}, upstream)
+	svc.settingService = NewSettingService(repo, &config.Config{})
+	svc.openaiCodexTicketSuspended = !CodexTicketFeatureEnabled
+	account := ticketTestAccount(41)
+	account.Extra = map[string]any{openAICodexTicketExtraKey("gpt-6-astra"): verifiedTicket(account, "gpt-6-astra", fakeCodexTicketState(292), "")}
+	svc.accountRepo = &codexTicketRefreshRepo{accounts: []Account{*account}}
+
+	require.False(t, svc.openAICodexTicketEnabled())
+	svc.StartOpenAICodexTicketHarvester()
+	require.Nil(t, svc.openaiCodexTicketDone)
+	svc.refreshOpenAICodexTickets(context.Background())
+	_, err := svc.ManualCodexTicketHarvest(context.Background(), account.ID, "gpt-6-astra")
+	require.ErrorIs(t, err, ErrCodexTicketUnavailable)
+	for _, state := range []string{"", "client-state"} {
+		headers := http.Header{}
+		if state != "" {
+			headers.Set(openAICodexTurnStateHeader, state)
+		}
+		require.NoError(t, svc.applyOpenAICodexTicket(context.Background(), account, "gpt-6-astra", headers))
+		require.Equal(t, state, headers.Get(openAICodexTurnStateHeader))
+		require.Empty(t, headers.Get("Cookie"))
+	}
+	require.Empty(t, upstream.requests)
+}
+
 func TestCodexTicketEnabledRuntimeSettingOverridesYaml(t *testing.T) {
 	repo := &codexTicketSettingRepo{codexPolicyMigrationRepoStub: &codexPolicyMigrationRepoStub{values: map[string]string{}}}
 	settings := NewSettingService(repo, &config.Config{})

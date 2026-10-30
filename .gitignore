@@ -135,7 +135,10 @@ backend/cmd/server/server
 deploy/docker-compose.override.yml
 .gocache/
 vite.config.js
+frontend/config/*.js
+frontend/config/*.d.ts
 docs/*
+!docs/admin-api-keys.md
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
@@ -191,3 +194,7 @@ backend/ikun2api
 *.pcap
 *.pcapng
 /remote-browser/access.json
+
+# Keep private history and local work out of the public snapshot.
+/ikun2api
+/work/

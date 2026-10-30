@@ -5,12 +5,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/MACOS-DO/sub4api/internal/pkg/logger"
 	"github.com/MACOS-DO/sub4api/internal/pkg/tlsfingerprint"
 )
 
-// Only control/context fields actually supplied by an upstream response may
-// become defaults for later OAuth mimic requests. Identity and auth stay separate.
+// These fields belong to the current request/session. They are never learned
+// from another response or replayed from the account cache.
 var claudeCodeControlHeaderNames = [...]string{
 	"anthropic-usage-limit",
 	"x-claude-code-prev-tool-durations",
@@ -51,35 +50,10 @@ func (s *GatewayService) applyClaudeCodeControlHeaders(ctx context.Context, req 
 		deleteHeaderAllForms(req.Header, name)
 		req.Header[resolveWireCasing(name)] = values
 	}
-	if !mimic || tokenType != "oauth" || account == nil || !account.IsAnthropicOAuthOrSetupToken() || s.identityService == nil || s.identityService.cache == nil {
-		return
-	}
-	cached, err := s.identityService.cache.GetClaudeCodeHeaders(ctx, account.ID)
-	if err != nil {
-		logger.LegacyPrintf("service.gateway", "Warning: failed to read Claude Code headers for account %d: %v", account.ID, err)
-		return
-	}
-	for name, values := range filterClaudeCodeControlHeaders(cached) {
-		if _, supplied := caller[name]; supplied {
-			continue
-		}
-		deleteHeaderAllForms(req.Header, name)
-		req.Header[resolveWireCasing(name)] = values
-	}
 }
 
-// Observe every response before returning it, so error/retry responses update
-// the account's defaults before a retry is built. Cache failure never changes
-// the upstream response, body, status or transport error.
+// Responses retain their original headers/status. Session control state is not
+// persisted at account scope, including on errors and retries.
 func (s *GatewayService) doClaudeUpstreamRequest(ctx context.Context, req *http.Request, proxyURL string, account *Account, profile *tlsfingerprint.Profile) (*http.Response, error) {
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, profile)
-	if resp != nil && account.IsAnthropicOAuthOrSetupToken() && s.identityService != nil && s.identityService.cache != nil {
-		observed := filterClaudeCodeControlHeaders(resp.Header)
-		if len(observed) > 0 {
-			if cacheErr := s.identityService.cache.UpdateClaudeCodeHeaders(ctx, account.ID, observed); cacheErr != nil {
-				logger.LegacyPrintf("service.gateway", "Warning: failed to update Claude Code headers for account %d: %v", account.ID, cacheErr)
-			}
-		}
-	}
-	return resp, err
+	return s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, profile)
 }

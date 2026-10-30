@@ -30,7 +30,7 @@ func TestCLICurrentVersionMatchesDefaultUserAgent(t *testing.T) {
 	if idx := strings.IndexByte(rest, ' '); idx >= 0 {
 		version = rest[:idx]
 	}
-	require.Equal(t, CLICurrentVersion, version,
+	require.Equal(t, DefaultProfileVersion, version,
 		"DefaultHeaders User-Agent version must match CLICurrentVersion")
 }
 

@@ -13,11 +13,13 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { workspaceRoutes } from './workspace'
 
 /**
  * Route definitions with lazy loading
  */
 const routes: RouteRecordRaw[] = [
+  ...workspaceRoutes,
   // ==================== Setup Routes ====================
   {
     path: '/setup',
@@ -530,6 +532,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/upstream-balances',
+    name: 'AdminUpstreamBalances',
+    component: () => import('@/views/admin/UpstreamBalancesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: '上游余额'
+    }
+  },
+  {
     path: '/admin/plugins',
     name: 'AdminPlugins',
     component: () => import('@/views/admin/PluginsView.vue'),
@@ -736,10 +748,13 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  scrollBehavior(_to, _from, savedPosition) {
+  scrollBehavior(to, _from, savedPosition) {
     // Scroll to saved position when using browser back/forward
     if (savedPosition) {
       return savedPosition
+    }
+    if (to.name === 'WorkspaceTutorial' && to.hash) {
+      return { el: to.hash, top: 96 }
     }
     // Scroll to top for new routes
     return { top: 0 }
@@ -755,7 +770,7 @@ let authInitialized = false
 const navigationLoading = useNavigationLoadingState()
 // 延迟初始化预加载，传入 router 实例
 let routePrefetch: ReturnType<typeof useRoutePrefetch> | null = null
-const BACKEND_MODE_ALLOWED_PATHS = ['/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal']
+const BACKEND_MODE_ALLOWED_PATHS = ['/login', '/forgot-password', '/reset-password', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal']
 const BACKEND_MODE_CALLBACK_PATHS = [
   '/auth/callback',
   '/auth/linuxdo/callback',
@@ -768,6 +783,10 @@ const BACKEND_MODE_CALLBACK_PATHS = [
 const BACKEND_MODE_PENDING_AUTH_PATHS = ['/register', '/email-verify']
 
 function isBackendModePublicRouteAllowed(path: string, hasPendingAuthSession: boolean): boolean {
+  // 欢迎页和使用文档仅展示公开内容；后台模式下也应允许用户先阅读教程。
+  if (path === '/home' || path === '/tutorial' || path.startsWith('/tutorial/')) {
+    return true
+  }
   if (BACKEND_MODE_ALLOWED_PATHS.some((allowedPath) => path === allowedPath || path.startsWith(allowedPath))) {
     return true
   }

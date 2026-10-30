@@ -555,7 +555,30 @@
           <div class="h-3 w-8 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
           <div class="h-3 w-12 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
         </div>
-        <div v-if="loading" class="space-y-1">
+        <!-- Vertex 设置了配额上限：显示配额进度条 -->
+        <template v-if="isGeminiVertex">
+          <UsageProgressBar
+            v-if="quotaDailyBar"
+            label="1d"
+            :utilization="quotaDailyBar.utilization"
+            :resets-at="quotaDailyBar.resetsAt"
+            color="indigo"
+          />
+          <UsageProgressBar
+            v-if="quotaWeeklyBar"
+            label="7d"
+            :utilization="quotaWeeklyBar.utilization"
+            :resets-at="quotaWeeklyBar.resetsAt"
+            color="emerald"
+          />
+          <UsageProgressBar
+            v-if="quotaTotalBar"
+            label="total"
+            :utilization="quotaTotalBar.utilization"
+            color="purple"
+          />
+        </template>
+        <div v-else-if="loading" class="space-y-1">
           <div class="flex items-center gap-1">
             <div class="h-3 w-[32px] animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
             <div class="h-1.5 w-8 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"></div>
@@ -686,6 +709,7 @@ import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { enqueueUsageRequest } from '@/utils/usageLoadQueue'
 import { formatCompactNumber } from '@/utils/format'
+import { supportsAccountQuota } from '@/utils/accountQuota'
 import UsageProgressBar from './UsageProgressBar.vue'
 import AccountQuotaInfo from './AccountQuotaInfo.vue'
 import ClaudeResetCreditsCell from './ClaudeResetCreditsCell.vue'
@@ -754,6 +778,10 @@ let desktopViewportMediaQuery: MediaQueryList | null = null
 let desktopViewportListener: ((event: MediaQueryListEvent) => void) | null = null
 let visibilityObserver: IntersectionObserver | null = null
 
+const isGeminiVertex = computed(() => {
+  return props.account.platform === 'gemini' && props.account.type === 'service_account'
+})
+
 // Show usage windows for OAuth and Setup Token accounts
 const showUsageWindows = computed(() => {
   // Gemini: we can always compute local usage windows from DB logs (simulated quotas).
@@ -777,7 +805,7 @@ const shouldFetchUsage = computed(() => {
     return props.account.type === 'oauth' || props.account.type === 'setup-token'
   }
   if (props.account.platform === 'gemini') {
-    return true
+    return !isGeminiVertex.value
   }
   if (props.account.platform === 'antigravity') {
     return props.account.type === 'oauth'
@@ -803,7 +831,7 @@ const cnBalanceCellVisible = computed(() => cnBalanceCellVisibleFn(props.account
 const isBatchManaged = computed(() => typeof props.requestBatchedUsage === 'function')
 
 const showGeminiTodayStats = computed(() => {
-  return props.account.platform === 'gemini' && props.account.type === 'service_account'
+  return isGeminiVertex.value
 })
 
 const geminiUsageAvailable = computed(() => {
@@ -1562,7 +1590,7 @@ const makeQuotaBar = (
 }
 
 const hasApiKeyQuota = computed(() => {
-  if (props.account.type !== 'apikey' && props.account.type !== 'bedrock') return false
+  if (!supportsAccountQuota(props.account.type)) return false
   return (
     (props.account.quota_daily_limit ?? 0) > 0 ||
     (props.account.quota_weekly_limit ?? 0) > 0 ||

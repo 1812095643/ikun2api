@@ -15,6 +15,29 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   const replayCallback = ref<VoidCallback | null>(null)
   const nextStepCallback = ref<NextStepCallback | null>(null)
   const isCurrentStepCallback = ref<IsCurrentStepCallback | null>(null)
+  const actionCallback = ref<((action: string) => void) | null>(null)
+  const keyFormCloseCallback = ref<VoidCallback | null>(null)
+  const userPreview = ref(false)
+
+  function setActionCallback(callback: ((action: string) => void) | null): void {
+    actionCallback.value = callback
+  }
+
+  function completeAction(action: string): void {
+    actionCallback.value?.(action)
+  }
+
+  function setKeyFormCloseCallback(callback: VoidCallback | null): void {
+    keyFormCloseCallback.value = callback
+  }
+
+  function closeKeyForm(): void {
+    keyFormCloseCallback.value?.()
+  }
+
+  function setUserPreview(value: boolean): void {
+    userPreview.value = value
+  }
 
   // 全局 driver 实例，跨组件保持
   const driverInstance = shallowRef<Driver | null>(null)
@@ -75,6 +98,12 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   }
 
   return {
+    userPreview,
+    setUserPreview,
+    setActionCallback,
+    completeAction,
+    setKeyFormCloseCallback,
+    closeKeyForm,
     setReplayCallback,
     setControlMethods,
     clearControlMethods,

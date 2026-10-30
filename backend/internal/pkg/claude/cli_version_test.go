@@ -39,13 +39,14 @@ func TestResolveCLIVersion(t *testing.T) {
 		raw  string
 		want string
 	}{
-		{"未配置时用内置基线", "", CLICurrentVersion},
-		{"只有空白等同未配置", "   ", CLICurrentVersion},
-		{"合法覆盖生效", "2.1.284", "2.1.284"},
-		{"两侧空白被裁掉", "  2.1.284  ", "2.1.284"},
-		{"非法值回落基线", "not-a-version", CLICurrentVersion},
-		{"向下覆盖被拒", "2.0.0", CLICurrentVersion},
-		{"预发布后缀被拒（会毒化账号指纹）", "2.2.0-local", CLICurrentVersion},
+		{"未配置时用内置基线", "", DefaultProfileVersion},
+		{"未验证的新版不能单独切换UA", "2.1.314", DefaultProfileVersion},
+		{"只有空白等同未配置", "   ", DefaultProfileVersion},
+		{"合法覆盖生效", DefaultProfileVersion, DefaultProfileVersion},
+		{"两侧空白被裁掉", "  " + DefaultProfileVersion + "  ", DefaultProfileVersion},
+		{"非法值回落基线", "not-a-version", DefaultProfileVersion},
+		{"向下覆盖被拒", "2.0.0", DefaultProfileVersion},
+		{"预发布后缀被拒（会毒化账号指纹）", "2.2.0-local", DefaultProfileVersion},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -67,7 +68,7 @@ func TestDefaultHeadersUserAgentMatchesCLIVersion(t *testing.T) {
 
 // 没有配置覆盖时，CLIVersion() 必须等于内置基线——保证本 PR 对既有部署零行为变化。
 func TestCLIVersionDefaultsToBuiltinPin(t *testing.T) {
-	if got := CLIVersion(); got != CLICurrentVersion {
-		t.Fatalf("CLIVersion() = %q, want built-in pin %q (测试进程未设置 %s)", got, CLICurrentVersion, CLIVersionEnv)
+	if got := CLIVersion(); got != DefaultProfileVersion {
+		t.Fatalf("CLIVersion() = %q, want built-in pin %q (测试进程未设置 %s)", got, DefaultProfileVersion, CLIVersionEnv)
 	}
 }

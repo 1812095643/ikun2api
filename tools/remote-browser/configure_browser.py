@@ -32,9 +32,9 @@ for user, home in [('ikun2apibrowser', str(state)), ('ikun2apibrowserproxy', '/n
 state.mkdir(mode=0o700, parents=True, exist_ok=True)
 state.chmod(0o700)
 shutil.chown(state, user='ikun2apibrowser', group='ikun2apibrowser')
-profile = state / 'profile'
-profile.mkdir(mode=0o700, exist_ok=True)
-shutil.chown(profile, user='ikun2apibrowser', group='ikun2apibrowser')
+downloads = state / 'Downloads'
+downloads.mkdir(mode=0o700, exist_ok=True)
+shutil.chown(downloads, user='ikun2apibrowser', group='ikun2apibrowser')
 
 settings_path = Path(sys.argv[1]).resolve()
 if settings_path.stat().st_mode & 0o077:
@@ -89,7 +89,10 @@ prefs = {
     'media.peerconnection.ice.proxy_only':True,
     'geo.enabled':False,
     'permissions.default.geo':2,
-    'browser.startup.page':3,
+    'browser.startup.page':0,
+    'browser.startup.homepage':'about:blank',
+    'browser.sessionstore.resume_from_crash':False,
+    'browser.sessionstore.resume_session_once':False,
     'browser.privatebrowsing.autostart':False,
     'privacy.sanitize.sanitizeOnShutdown':False,
     'network.dns.disablePrefetch':True,
@@ -103,7 +106,8 @@ prefs = {
 }
 policy['policies']['Preferences'] = {key:{'Value':value,'Status':'locked'} for key,value in prefs.items()}
 write(policy_path, json.dumps(policy, indent=2)+'\n')
-write(profile / 'user.js', ''.join('user_pref('+json.dumps(key)+', '+json.dumps(value)+');\n' for key,value in prefs.items()), 0o600, 'ikun2apibrowser')
+write(root / 'browser-preferences.json', json.dumps(prefs, indent=2)+'\n', 0o644)
+write(root / 'ephemeral_browser.py', Path(__file__).with_name('ephemeral_browser.py').read_text(encoding='utf-8'), 0o755)
 nss = Path('/etc/nsswitch.conf').read_text().splitlines()
 write(root / 'nsswitch.conf', '\n'.join('hosts: files dns' if line.startswith('hosts:') else line for line in nss)+'\n')
 write(root / 'resolv.conf', 'nameserver 127.0.0.254\noptions timeout:1 attempts:1\n')
@@ -121,12 +125,11 @@ done
 '''.replace('BROWSER_UID', str(uid))
 write(root / 'firewall.sh', firewall, 0o700)
 desktop = '''set -eu
-/usr/bin/openbox &
-exec /usr/bin/firefox --no-remote --profile /var/lib/ikun2api-browser/profile
+exec /usr/bin/python3 /opt/ikun2api-remote-browser/ephemeral_browser.py --runtime-dir /run/ikun2api-browser --preferences /opt/ikun2api-remote-browser/browser-preferences.json --downloads-dir /var/lib/ikun2api-browser/Downloads
 '''
 write(root / 'desktop.sh', desktop, 0o755)
 session = '''set -eu
-export DISPLAY=:2
+export DISPLAY=unix/:2
 export XAUTHORITY=/run/ikun2api-browser/Xauthority
 touch "$XAUTHORITY"
 chmod 600 "$XAUTHORITY"
@@ -136,7 +139,7 @@ vnc_pid=$!
 desktop_pid=
 trap 'test -z "$desktop_pid" || kill "$desktop_pid" 2>/dev/null || true; kill "$vnc_pid" 2>/dev/null || true' EXIT TERM INT
 count=0
-while ! /usr/bin/xdpyinfo >/dev/null 2>&1; do
+while ! /usr/bin/timeout 2s /usr/bin/xdpyinfo >/dev/null 2>&1; do
     count=$((count + 1))
     test "$count" -lt 100 || exit 1
     kill -0 "$vnc_pid"
@@ -242,6 +245,8 @@ MemoryMax=96M
 [Install]
 WantedBy=multi-user.target
 ''')
+write('/etc/nginx/conf.d/ikun-browser-logging.conf', '''log_format ikun_browser_access escape=json '{"time":"$time_iso8601","remote_addr":"$remote_addr","server_port":$server_port,"method":"$request_method","uri":"$uri","status":$status,"bytes":$body_bytes_sent,"request_time":$request_time,"upstream_status":"$upstream_status"}';
+''')
 write('/etc/nginx/sites-available/ikun2api-browser', '''server {
     listen 9443 ssl;
     server_name IKUN_BROWSER_HOST;
@@ -254,6 +259,9 @@ write('/etc/nginx/sites-available/ikun2api-browser', '''server {
     root /opt/ikun2api-remote-browser/web;
     index vnc.html;
     client_max_body_size 1m;
+    access_log /var/log/nginx/ikun2api-browser-access.log ikun_browser_access;
+    error_log /var/log/nginx/ikun2api-browser-error.log error;
+    add_header Cache-Control "no-store, private" always;
     add_header X-Frame-Options DENY always;
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy no-referrer always;

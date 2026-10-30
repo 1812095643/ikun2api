@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/MACOS-DO/sub4api/internal/handler/admin"
 	"github.com/MACOS-DO/sub4api/internal/securityaudit"
+	"github.com/MACOS-DO/sub4api/internal/workspace"
 )
 
 // AdminHandlers contains all admin-related HTTP handlers
@@ -48,6 +49,7 @@ type AdminHandlers struct {
 
 // Handlers contains all HTTP handlers
 type Handlers struct {
+	Workspace        *workspace.Handler
 	Auth             *AuthHandler
 	User             *UserHandler
 	APIKey           *APIKeyHandler

@@ -1,29 +1,26 @@
 # IKUN2api
 
-**版本 1.0.0** · AI 账号与请求网关
+**版本 1.3.16** · AI 账号与请求网关
 
 提供 Claude、OpenAI / Codex、Gemini、Grok 等平台的账号、代理、分组、额度、用量与请求管理，包含 Vue 管理界面和 Go 服务端。
 
 本仓库同时提供客户端协议采样工具和独立远程浏览器配置。采样、浏览器运行环境和网关传输各自记录，避免混用不同入口的身份数据。
 
-## 开始使用
+## 从 Sub2API 带数据切换
 
-需要 Docker 与 Docker Compose，或者 Go 1.27、Node.js 24 与 pnpm 9。
+在原服务器执行；Compose 部署先进入原部署目录：
 
-```sh
-git clone https://github.com/1812095643/ikun2api.git
-cd ikun2api
-cp deploy/.env.example deploy/.env
-chmod 600 deploy/.env
+```bash
+curl -fsSL https://raw.githubusercontent.com/1812095643/ikun2api/main/deploy/migrate.sh | sudo bash
 ```
 
-填写 `deploy/.env` 中的数据库、Redis 密码和管理员信息，然后从源码构建：
+自动校验、备份、迁移和核对数据，保留账号、余额、Key、订阅、用量、数据卷及加密配置。支持 Linux systemd 与 Docker Compose 单实例部署。详见 [迁入与回退](deploy/MIGRATION.md)。
 
-```sh
-docker compose -f deploy/docker-compose.local.yml up -d --build
-```
+## 后续更新
 
-默认访问端口为 `8080`。数据库、Redis、账号和密钥应使用持久化目录。已有部署升级请先参考[部署与升级](docs/DEPLOYMENT.md)。
+管理员点击左上角版本号 → **检查更新** → **备份并一键更新**。只获取 IKUN 正式签名发布包，无需合并源码。
+
+[发布与下载](https://github.com/1812095643/ikun2api/releases/latest) · [新安装](deploy/README.md) · [维护者发布流程](scripts/release/README.md)
 
 | 内容 | 入口 |
 | --- | --- |

@@ -30,6 +30,8 @@ func RegisterAdminRoutes(
 	// 审计中间件挂在认证之后：所有管理面变更类操作 + 敏感读取入审计日志
 	admin.Use(gin.HandlerFunc(auditLog))
 	admin.Use(middleware.AdminComplianceGuard(settingService))
+	// 受限密钥的账户操作走独立资源校验，普通管理员保持原处理器。
+	admin.Use(h.Admin.Account.ScopedAdminKeyAccounts)
 	{
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)
@@ -74,7 +76,7 @@ func RegisterAdminRoutes(
 		registerPromoCodeRoutes(admin, h)
 
 		// 系统设置
-		registerSettingsRoutes(admin, h)
+		registerSettingsRoutes(admin, h, stepUpAuth)
 
 		// 数据管理
 		registerDataManagementRoutes(admin, h, stepUpAuth)
@@ -344,6 +346,7 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	groups := admin.Group("/groups")
+	groups.Use(h.Admin.Group.ScopedAdminKeyGroupModels)
 	{
 		groups.GET("", h.Admin.Group.List)
 		groups.GET("/all", h.Admin.Group.GetAll)
@@ -386,17 +389,20 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.GET("/opencode-go-usage/settings", h.Admin.Account.GetOpenCodeGoUsageSettings)
 		accounts.PUT("/opencode-go-usage/settings", h.Admin.Account.UpdateOpenCodeGoUsageSettings)
 		accounts.GET("/:id", h.Admin.Account.GetByID)
-		accounts.GET("/codex-ticket-cadence", h.Admin.Account.GetCodexTicketCadence)
-		accounts.PUT("/codex-ticket-cadence", h.Admin.Account.UpdateCodexTicketCadence)
+		// 新版暂停打票，相关管理入口保留源码但不注册。
+		if service.CodexTicketFeatureEnabled {
+			accounts.GET("/codex-ticket-cadence", h.Admin.Account.GetCodexTicketCadence)
+			accounts.PUT("/codex-ticket-cadence", h.Admin.Account.UpdateCodexTicketCadence)
+			accounts.GET("/:id/codex-ticket-history", h.Admin.Account.GetCodexTicketHistory)
+			accounts.GET("/:id/codex-ticket-events", h.Admin.Account.GetCodexTicketEvents)
+			accounts.GET("/:id/codex-ticket-invalidations", h.Admin.Account.ListCodexTicketInvalidations)
+			accounts.GET("/:id/codex-ticket-invalidations/:event_id", h.Admin.Account.GetCodexTicketInvalidation)
+			accounts.POST("/:id/codex-ticket-harvest", h.Admin.Account.HarvestCodexTicket)
+			accounts.PUT("/:id/codex-ticket-participation", h.Admin.Account.SetCodexTicketParticipation)
+		}
 		accounts.GET("/codex-ticket-fingerprint", h.Admin.Account.GetCodexFingerprintVersion)
 		accounts.POST("/codex-ticket-fingerprint/refresh", h.Admin.Account.RefreshCodexFingerprint)
-		accounts.GET("/:id/codex-ticket-history", h.Admin.Account.GetCodexTicketHistory)
-		accounts.GET("/:id/codex-ticket-events", h.Admin.Account.GetCodexTicketEvents)
-		accounts.GET("/:id/codex-ticket-invalidations", h.Admin.Account.ListCodexTicketInvalidations)
-		accounts.GET("/:id/codex-ticket-invalidations/:event_id", h.Admin.Account.GetCodexTicketInvalidation)
-		accounts.POST("/:id/codex-ticket-harvest", h.Admin.Account.HarvestCodexTicket)
 		accounts.POST("/:id/codex-ticket-diagnostic", h.Admin.Account.DiagnoseCodexModels)
-		accounts.PUT("/:id/codex-ticket-participation", h.Admin.Account.SetCodexTicketParticipation)
 		accounts.GET("/:id/claude/reset-credits", h.Admin.Account.ClaudeResetCredits)
 		// Same protection as the Codex reset-quota route (admin auth, audit, compliance guard).
 		accounts.POST("/:id/claude/reset-credits/redeem", h.Admin.Account.RedeemClaudeResetCredit)
@@ -550,8 +556,10 @@ func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth
 	{
 		proxies.GET("", h.Admin.Proxy.List)
 		proxies.GET("/all", h.Admin.Proxy.GetAll)
-		proxies.GET("/codex-ticket-pool", h.Admin.Proxy.GetCodexTicketPool)
-		proxies.PUT("/codex-ticket-pool", h.Admin.Proxy.UpdateCodexTicketPool)
+		if service.CodexTicketFeatureEnabled {
+			proxies.GET("/codex-ticket-pool", h.Admin.Proxy.GetCodexTicketPool)
+			proxies.PUT("/codex-ticket-pool", h.Admin.Proxy.UpdateCodexTicketPool)
+		}
 		// 代理导出泄露账号密码原文——要求 step-up 2FA
 		proxies.GET("/data", gin.HandlerFunc(stepUpAuth), h.Admin.Proxy.ExportData)
 		proxies.POST("/data", h.Admin.Proxy.ImportData)
@@ -596,8 +604,9 @@ func registerPromoCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
 	adminSettings := admin.Group("/settings")
+	registerScopedAdminKeyRoutes(adminSettings, h, stepUpAuth)
 	{
 		adminSettings.GET("", h.Admin.Setting.GetSettings)
 		adminSettings.PUT("", h.Admin.Setting.UpdateSettings)
@@ -610,8 +619,8 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		adminSettings.POST("/email-templates/:event/:locale/restore-official", h.Admin.Setting.RestoreOfficialEmailTemplate)
 		// Admin API Key 管理
 		adminSettings.GET("/admin-api-key", h.Admin.Setting.GetAdminAPIKey)
-		adminSettings.POST("/admin-api-key/regenerate", h.Admin.Setting.RegenerateAdminAPIKey)
-		adminSettings.DELETE("/admin-api-key", h.Admin.Setting.DeleteAdminAPIKey)
+		adminSettings.POST("/admin-api-key/regenerate", gin.HandlerFunc(stepUpAuth), h.Admin.Setting.RegenerateAdminAPIKey)
+		adminSettings.DELETE("/admin-api-key", gin.HandlerFunc(stepUpAuth), h.Admin.Setting.DeleteAdminAPIKey)
 		// 529过载冷却配置
 		adminSettings.GET("/overload-cooldown", h.Admin.Setting.GetOverloadCooldownSettings)
 		adminSettings.PUT("/overload-cooldown", h.Admin.Setting.UpdateOverloadCooldownSettings)
@@ -701,11 +710,12 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	system := admin.Group("/system")
 	{
 		system.GET("/version", h.Admin.System.GetVersion)
-		system.GET("/check-updates", h.Admin.System.SelfUpdateDisabled)
-		system.GET("/rollback-versions", h.Admin.System.SelfUpdateDisabled)
-		system.POST("/update", h.Admin.System.SelfUpdateDisabled)
-		system.POST("/rollback", h.Admin.System.SelfUpdateDisabled)
-		system.POST("/restart", h.Admin.System.SelfUpdateDisabled)
+		system.GET("/check-updates", h.Admin.System.CheckUpdates)
+		system.GET("/update-status", h.Admin.System.UpdateStatus)
+		system.GET("/rollback-versions", h.Admin.System.GetRollbackVersions)
+		system.POST("/update", h.Admin.System.StartUpdate)
+		system.POST("/rollback", h.Admin.System.Rollback)
+		system.POST("/restart", h.Admin.System.RestartService)
 	}
 }
 

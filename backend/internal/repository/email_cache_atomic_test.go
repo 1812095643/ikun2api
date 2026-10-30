@@ -148,3 +148,18 @@ func TestEmailCache_ConsumePasswordResetTokenMismatchKeepsToken(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, ok)
 }
+
+func TestEmailCache_TrySetPasswordResetEmailCooldownIsAtomic(t *testing.T) {
+	cache, mr, _ := newMiniredisEmailCache(t)
+	concrete := cache.(*emailCache)
+	ctx := context.Background()
+	email := "cooldown@example.com"
+
+	claimed, err := concrete.TrySetPasswordResetEmailCooldown(ctx, email, time.Minute)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	claimed, err = concrete.TrySetPasswordResetEmailCooldown(ctx, email, time.Minute)
+	require.NoError(t, err)
+	require.False(t, claimed)
+	require.True(t, mr.Exists(passwordResetSentAtKey(email)))
+}

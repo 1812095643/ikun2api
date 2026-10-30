@@ -115,9 +115,26 @@ describe('feature route guard', () => {
     authStore.isAuthenticated = true
     authStore.isAdmin = false
     authStore.isSimpleMode = false
+    appStore.backendModeEnabled = false
     appStore.publicSettingsLoaded = false
     appStore.cachedPublicSettings = null
     appStore.fetchPublicSettings.mockReset()
+  })
+
+  it.each(['/home', '/tutorial', '/tutorial/account', '/tutorial/keys'])('后台模式下未登录仍可阅读公开页面：%s', async (path) => {
+    authStore.isAuthenticated = false
+    appStore.backendModeEnabled = true
+    const { navigation, next } = runGuard({ requiresAuth: false }, path)
+    await navigation
+    expect(next).toHaveBeenCalledWith()
+  })
+
+  it.each(['/dashboard', '/keys', '/admin/users'])('公开教程不放开未登录的业务数据：%s', async (path) => {
+    authStore.isAuthenticated = false
+    appStore.backendModeEnabled = true
+    const { navigation, next } = runGuard({}, path)
+    await navigation
+    expect(next).toHaveBeenCalledWith({ path: '/login', query: { redirect: path } })
   })
 
   it('waits for the first public-settings request before deciding payment access', async () => {

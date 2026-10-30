@@ -49,6 +49,7 @@ func ProvideRouter(
 
 	r := gin.New()
 	r.Use(middleware2.Recovery())
+	r.Use(middleware2.UpgradeMaintenance())
 	configureTrustedProxies(r, cfg.Server)
 
 	// Wire up websearch Manager builder so it initializes on startup and rebuilds on config save.

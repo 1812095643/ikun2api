@@ -188,3 +188,7 @@ func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {
 	require.Equal(t, "<credential-bearing body omitted>", logs[0].RequestBody)
 	require.NotContains(t, logs[0].RequestBody, "audit-canary")
 }
+
+func TestUpstreamBalanceSettingsOmitWalletTokenFromAudit(t *testing.T) {
+	require.Contains(t, auditBodyOmittedRoutes, "PUT /api/v1/admin/workspace/upstream-balances/:id")
+}

@@ -283,6 +283,7 @@
             {{ t('admin.redeem.generateCodesTitle') }}
           </h2>
           <form @submit.prevent="handleGenerateCodes" class="space-y-4">
+            <label v-if="generateForm.type === 'balance'" class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"><input v-model="generateForm.gift" type="checkbox" />赠送兑换码（不计入抽奖充值条件）</label>
             <div>
               <label class="input-label">{{ t('admin.redeem.codeType') }}</label>
               <Select v-model="generateForm.type" :options="typeOptions" />
@@ -836,6 +837,7 @@ const redeemCodeExpiryOptions = computed<{ value: RedeemCodeExpiryOption; label:
 ])
 
 const generateForm = reactive({
+	 gift: false,
   type: 'balance' as RedeemCodeType,
   value: 10,
   count: 1,
@@ -1046,13 +1048,15 @@ const handleGenerateCodes = async () => {
       generateForm.value,
       generateForm.type === 'subscription' ? generateForm.group_id : undefined,
       generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
-      expiresInDays
+      expiresInDays,
+      generateForm.gift
     )
     showGenerateDialog.value = false
     generatedCodes.value = result
     showResultDialog.value = true
     // 重置表单
     generateForm.group_id = null
+    generateForm.gift = false
     generateForm.validity_days = 30
     generateForm.expiry_option = 'never'
     generateForm.custom_expiry_days = 7

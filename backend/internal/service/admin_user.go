@@ -172,7 +172,7 @@ func (s *adminServiceImpl) ensureNotLastAdmin(ctx context.Context) error {
 		return fmt.Errorf("count admin users: %w", err)
 	}
 	if result == nil || result.Total <= 1 {
-		return errors.New("cannot demote the last admin user")
+		return infraerrors.BadRequest("LAST_ADMIN_DEMOTE_FORBIDDEN", "cannot demote the last admin user")
 	}
 	return nil
 }
@@ -211,7 +211,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	// Protect admin users: cannot disable admin accounts
 	if user.Role == "admin" && input.Status == "disabled" {
-		return nil, errors.New("cannot disable admin user")
+		return nil, infraerrors.BadRequest("ADMIN_DISABLE_FORBIDDEN", "cannot disable admin user; change the role to user first")
 	}
 
 	oldConcurrency := user.Concurrency
@@ -363,7 +363,7 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		return err
 	}
 	if user.Role == "admin" {
-		return errors.New("cannot delete admin user")
+		return infraerrors.BadRequest("ADMIN_DELETE_FORBIDDEN", "cannot delete admin user; change the role to user first")
 	}
 
 	apiKeys, err := s.listUserAPIKeysForDeletion(ctx, id)
@@ -514,6 +514,9 @@ func (s *adminServiceImpl) BatchUpdateLimits(ctx context.Context, userIDs []int6
 }
 
 func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error) {
+	if operation == "add" && s.entClient != nil {
+		return s.creditUserBalance(ctx, userID, balance, notes)
+	}
 	// 余额调整必须走原子接口：先读后整行写回会把并发的计费扣款覆盖掉。
 	var (
 		change BalanceChange
@@ -1284,6 +1287,9 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			Value:     input.Value,
 			Status:    StatusUnused,
 			ExpiresAt: input.ExpiresAt,
+		}
+		if input.Gift {
+			code.Notes = "[赠送]"
 		}
 		// 订阅类型专用字段
 		if input.Type == RedeemTypeSubscription {

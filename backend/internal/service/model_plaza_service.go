@@ -121,24 +121,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	order := make([]int64, 0, len(groups))
 	for i := range groups {
 		g := &groups[i]
-		byGroup[g.ID] = &PlazaGroup{
-			ID:                        g.ID,
-			Name:                      g.Name,
-			Description:               g.Description,
-			Platform:                  g.Platform,
-			SubscriptionType:          g.SubscriptionType,
-			RateMultiplier:            g.RateMultiplier,
-			PeakRateEnabled:           g.PeakRateEnabled,
-			PeakStart:                 g.PeakStart,
-			PeakEnd:                   g.PeakEnd,
-			PeakRateMultiplier:        g.PeakRateMultiplier,
-			IsExclusive:               g.IsExclusive,
-			ImageRateIndependent:      g.ImageRateIndependent,
-			ImageRateMultiplier:       g.ImageRateMultiplier,
-			VideoRateIndependent:      g.VideoRateIndependent,
-			VideoRateMultiplier:       g.VideoRateMultiplier,
-			LongContextPricingEnabled: g.LongContextPricingEnabled,
-		}
+		byGroup[g.ID] = plazaGroupMetadata(g)
 		groupEnt[g.ID] = g
 		order = append(order, g.ID)
 	}
@@ -231,6 +214,11 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) {
 	if groupPricing := matchGroupModelPricing(g, m.Name); groupPricing != nil {
 		m.Pricing = groupPricing
+		// 分组模型级固定价就是实收价，不能再被分组图片兜底档位覆盖。
+		// 否则模型广场会显示 image_price_1k/2k/4k，而实际按 model_pricing 扣费。
+		if groupPricing.BillingMode == BillingModeImage || groupPricing.BillingMode == BillingModePerRequest {
+			return
+		}
 	}
 	if s.billingService != nil && s.resolver != nil {
 		sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{

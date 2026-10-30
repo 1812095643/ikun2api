@@ -1,3 +1,149 @@
+<script setup lang="ts">
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { AuthLayout } from '@/components/layout'
+import Icon from '@/components/icons/Icon.vue'
+import { useAppStore } from '@/stores'
+import { resetPassword } from '@/api/auth'
+
+const { t } = useI18n()
+
+// ==================== Router & Stores ====================
+
+const route = useRoute()
+const appStore = useAppStore()
+
+// ==================== State ====================
+
+const isLoading = ref<boolean>(false)
+const isSuccess = ref<boolean>(false)
+const errorMessage = ref<string>('')
+const showPassword = ref<boolean>(false)
+const showConfirmPassword = ref<boolean>(false)
+
+// URL parameters
+const email = ref<string>('')
+const token = ref<string>('')
+
+const formData = reactive({
+  password: '',
+  confirmPassword: ''
+})
+
+const errors = reactive({
+  password: '',
+  confirmPassword: ''
+})
+
+const validationToastMessage = computed(
+  () => errors.password || errors.confirmPassword || ''
+)
+
+watch(validationToastMessage, (value, previousValue) => {
+  if (value && value !== previousValue) {
+    appStore.showError(value)
+  }
+})
+
+// Check if the reset link is valid (has email and token)
+const isInvalidLink = computed(() => !email.value || !/^[a-f0-9]{64}$/i.test(token.value))
+
+// ==================== Lifecycle ====================
+
+onMounted(() => {
+  // New links keep the bearer token in the fragment, so it is not sent in
+  // HTTP requests or Referer headers. Keep query parsing for old links.
+  const fragment = new URLSearchParams((route.hash || '').replace(/^#/, ''))
+  email.value = (fragment.get('email') || (typeof route.query.email === 'string' ? route.query.email : '')).trim()
+  token.value = fragment.get('token') || (typeof route.query.token === 'string' ? route.query.token : '')
+
+  // Remove the token from the visible URL after the SPA has captured it.
+  if (typeof window !== 'undefined' && (route.hash || route.query.token || route.query.email)) {
+    window.history.replaceState(window.history.state, document.title, window.location.pathname)
+  }
+
+  if (!email.value || !token.value) {
+    appStore.showError(t('auth.invalidResetLink'))
+  }
+})
+
+// ==================== Validation ====================
+
+function validateForm(): boolean {
+  errors.password = ''
+  errors.confirmPassword = ''
+
+  let isValid = true
+
+  // Password validation
+  if (!formData.password) {
+    errors.password = t('auth.passwordRequired')
+    isValid = false
+  } else if (formData.password.length < 6) {
+    errors.password = t('auth.passwordMinLength')
+    isValid = false
+  } else if (new TextEncoder().encode(formData.password).length > 72) {
+    errors.password = t('auth.passwordMaxBytes')
+    isValid = false
+  }
+
+  // Confirm password validation
+  if (!formData.confirmPassword) {
+    errors.confirmPassword = t('auth.confirmPasswordRequired')
+    isValid = false
+  } else if (formData.password !== formData.confirmPassword) {
+    errors.confirmPassword = t('auth.passwordsDoNotMatch')
+    isValid = false
+  }
+
+  return isValid
+}
+
+// ==================== Form Handlers ====================
+
+async function handleSubmit(): Promise<void> {
+  if (isLoading.value || isInvalidLink.value) return
+  errorMessage.value = ''
+
+  if (!validateForm()) {
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    await resetPassword({
+      email: email.value,
+      token: token.value,
+      new_password: formData.password
+    })
+
+    formData.password = ''
+    formData.confirmPassword = ''
+    isSuccess.value = true
+    appStore.showSuccess(t('auth.passwordResetSuccess'))
+  } catch (error: unknown) {
+    const err = error as { code?: string; reason?: string; message?: string; response?: { data?: { detail?: string; code?: string } } }
+
+    // Check for invalid/expired token error
+    if (err.reason === 'INVALID_RESET_TOKEN' || err.code === 'INVALID_RESET_TOKEN' || err.response?.data?.code === 'INVALID_RESET_TOKEN') {
+      errorMessage.value = t('auth.invalidOrExpiredToken')
+    } else if (err.response?.data?.detail) {
+      errorMessage.value = err.response.data.detail
+    } else if (err.message) {
+      errorMessage.value = err.message
+    } else {
+      errorMessage.value = t('auth.resetPasswordFailed')
+    }
+
+    appStore.showError(errorMessage.value)
+  } finally {
+    isLoading.value = false
+  }
+}
+</script>
+
 <template>
   <AuthLayout>
     <div class="space-y-6">
@@ -41,16 +187,16 @@
 
       <!-- Success State -->
       <div v-else-if="isSuccess" class="space-y-6">
-        <div class="rounded-xl border border-green-200 bg-green-50 p-6 dark:border-green-800/50 dark:bg-green-900/20">
+        <div class="rounded-xl border border-primary-200 bg-primary-50 p-6 dark:border-primary-800/50 dark:bg-primary-900/20">
           <div class="flex flex-col items-center gap-4 text-center">
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-800/50">
-              <Icon name="checkCircle" size="lg" class="text-green-600 dark:text-green-400" />
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-800/50">
+              <Icon name="checkCircle" size="lg" class="text-primary-600 dark:text-primary-400" />
             </div>
             <div>
-              <h3 class="text-lg font-semibold text-green-800 dark:text-green-200">
+              <h3 class="text-lg font-semibold text-primary-800 dark:text-primary-200">
                 {{ t('auth.passwordResetSuccess') }}
               </h3>
-              <p class="mt-2 text-sm text-green-700 dark:text-green-300">
+              <p class="mt-2 text-sm text-primary-700 dark:text-primary-300">
                 {{ t('auth.passwordResetSuccessHint') }}
               </p>
             </div>
@@ -70,6 +216,7 @@
 
       <!-- Form State -->
       <form v-else @submit.prevent="handleSubmit" class="space-y-5">
+        <p v-if="errorMessage" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
         <!-- Email (readonly) -->
         <div>
           <label for="email" class="input-label">
@@ -199,138 +346,7 @@
   </AuthLayout>
 </template>
 
-<script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { AuthLayout } from '@/components/layout'
-import Icon from '@/components/icons/Icon.vue'
-import { useAppStore } from '@/stores'
-import { resetPassword } from '@/api/auth'
 
-const { t } = useI18n()
-
-// ==================== Router & Stores ====================
-
-const route = useRoute()
-const appStore = useAppStore()
-
-// ==================== State ====================
-
-const isLoading = ref<boolean>(false)
-const isSuccess = ref<boolean>(false)
-const errorMessage = ref<string>('')
-const showPassword = ref<boolean>(false)
-const showConfirmPassword = ref<boolean>(false)
-
-// URL parameters
-const email = ref<string>('')
-const token = ref<string>('')
-
-const formData = reactive({
-  password: '',
-  confirmPassword: ''
-})
-
-const errors = reactive({
-  password: '',
-  confirmPassword: ''
-})
-
-const validationToastMessage = computed(
-  () => errors.password || errors.confirmPassword || ''
-)
-
-watch(validationToastMessage, (value, previousValue) => {
-  if (value && value !== previousValue) {
-    appStore.showError(value)
-  }
-})
-
-// Check if the reset link is valid (has email and token)
-const isInvalidLink = computed(() => !email.value || !token.value)
-
-// ==================== Lifecycle ====================
-
-onMounted(() => {
-  // Get email and token from URL query parameters
-  email.value = (route.query.email as string) || ''
-  token.value = (route.query.token as string) || ''
-
-  if (!email.value || !token.value) {
-    appStore.showError(t('auth.invalidResetLink'))
-  }
-})
-
-// ==================== Validation ====================
-
-function validateForm(): boolean {
-  errors.password = ''
-  errors.confirmPassword = ''
-
-  let isValid = true
-
-  // Password validation
-  if (!formData.password) {
-    errors.password = t('auth.passwordRequired')
-    isValid = false
-  } else if (formData.password.length < 6) {
-    errors.password = t('auth.passwordMinLength')
-    isValid = false
-  }
-
-  // Confirm password validation
-  if (!formData.confirmPassword) {
-    errors.confirmPassword = t('auth.confirmPasswordRequired')
-    isValid = false
-  } else if (formData.password !== formData.confirmPassword) {
-    errors.confirmPassword = t('auth.passwordsDoNotMatch')
-    isValid = false
-  }
-
-  return isValid
-}
-
-// ==================== Form Handlers ====================
-
-async function handleSubmit(): Promise<void> {
-  errorMessage.value = ''
-
-  if (!validateForm()) {
-    return
-  }
-
-  isLoading.value = true
-
-  try {
-    await resetPassword({
-      email: email.value,
-      token: token.value,
-      new_password: formData.password
-    })
-
-    isSuccess.value = true
-    appStore.showSuccess(t('auth.passwordResetSuccess'))
-  } catch (error: unknown) {
-    const err = error as { message?: string; response?: { data?: { detail?: string; code?: string } } }
-
-    // Check for invalid/expired token error
-    if (err.response?.data?.code === 'INVALID_RESET_TOKEN') {
-      errorMessage.value = t('auth.invalidOrExpiredToken')
-    } else if (err.response?.data?.detail) {
-      errorMessage.value = err.response.data.detail
-    } else if (err.message) {
-      errorMessage.value = err.message
-    } else {
-      errorMessage.value = t('auth.resetPasswordFailed')
-    }
-
-    appStore.showError(errorMessage.value)
-  } finally {
-    isLoading.value = false
-  }
-}
-</script>
 
 <style scoped>
 .fade-enter-active,

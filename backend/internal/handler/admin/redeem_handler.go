@@ -34,6 +34,7 @@ func NewRedeemHandler(adminService service.AdminService, redeemService *service.
 
 // GenerateRedeemCodesRequest represents generate redeem codes request
 type GenerateRedeemCodesRequest struct {
+	Gift          bool       `json:"gift"`
 	Count         int        `json:"count" binding:"required,min=1,max=100"`
 	Type          string     `json:"type" binding:"required,oneof=balance concurrency subscription invitation"`
 	Value         float64    `json:"value"`
@@ -144,6 +145,7 @@ func (h *RedeemHandler) Generate(c *gin.Context) {
 
 	executeAdminIdempotentJSON(c, "admin.redeem_codes.generate", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		codes, execErr := h.adminService.GenerateRedeemCodes(ctx, &service.GenerateRedeemCodesInput{
+			Gift:         req.Gift,
 			Count:        req.Count,
 			Type:         req.Type,
 			Value:        req.Value,

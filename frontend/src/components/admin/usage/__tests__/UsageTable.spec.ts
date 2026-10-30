@@ -5,6 +5,7 @@ const ipGeoMocks = vi.hoisted(() => ({
 }))
 
 const appStoreMocks = vi.hoisted(() => ({
+  cachedPublicSettings: { usage_output_rate_mode: 'generation' },
   showSuccess: vi.fn(),
   showError: vi.fn(),
 }))
@@ -130,6 +131,7 @@ const baseImageRow = {
 
 describe('admin UsageTable tooltip', () => {
   beforeEach(() => {
+    appStoreMocks.cachedPublicSettings.usage_output_rate_mode = 'generation'
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       x: 0,
       y: 0,
@@ -141,6 +143,29 @@ describe('admin UsageTable tooltip', () => {
       height: 20,
       toJSON: () => ({}),
     } as DOMRect)
+  })
+
+  it('使用服务端统一速率口径，不再显示表格切换入口或采用旧浏览器偏好', () => {
+    const options = {
+      props: {
+        data: [{ ...baseImageRow, output_tokens: 1000, duration_ms: 12000, first_token_ms: 2000 }],
+        columns: [{ key: 'latency', label: 'Latency' }],
+      },
+      global: { stubs: {
+        DataTable: { props: ['data'], template: '<div><slot name="cell-latency" :row="data[0]" /></div>' },
+        EmptyState: true,
+        Icon: true,
+      } },
+    }
+    const first = mount(UsageTable, options)
+    expect(first.get('[data-testid="usage-output-rate"]').text()).toBe('100.0')
+    expect(first.find('[data-testid="usage-output-rate-mode"]').exists()).toBe(false)
+    first.unmount()
+    localStorage.setItem('usage-output-rate-mode', 'generation')
+    appStoreMocks.cachedPublicSettings.usage_output_rate_mode = 'total'
+    const second = mount(UsageTable, options)
+    expect(second.get('[data-testid="usage-output-rate"]').text()).toBe('83.3')
+    second.unmount()
   })
 
   it('marks only usage rows that actually applied long-context billing', () => {

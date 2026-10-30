@@ -27,7 +27,7 @@ func TestEffectiveCLIVersionDefaultsToCLIVersion(t *testing.T) {
 
 // b. 注入返回更高版本的 resolver 后，DefaultHeaders()["User-Agent"] 跟随变化。
 func TestEffectiveCLIVersionFollowsResolver(t *testing.T) {
-	const upgraded = "9.9.9"
+	const upgraded = DefaultProfileVersion
 	withCLIVersionResolver(t, func() string { return upgraded })
 
 	if got := EffectiveCLIVersion(); got != upgraded {
@@ -47,6 +47,8 @@ func TestEffectiveCLIVersionFallsBackOnInvalidResolverValues(t *testing.T) {
 	for name, invalid := range map[string]string{
 		"empty":          "",
 		"not semver":     "abc",
+		"unreviewed":     "2.1.314",
+		"sentinel":       "9.9.9",
 		"below baseline": "1.0.0",
 		"whitespace":     "   ",
 	} {

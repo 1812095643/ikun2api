@@ -1,7 +1,7 @@
-import { DriveStep } from 'driver.js'
+import type { DriveStep } from 'driver.js'
 
 /**
- * 管理员完整引导流程
+ * 管理员完整引导流程（已停用，仅保留原实现，不注册入口和自动启动）
  * 交互式引导：指引用户实际操作
  * @param t 国际化函数
  * @param isSimpleMode 是否为简易模式（简易模式下会过滤分组相关步骤）
@@ -243,67 +243,4 @@ export const getAdminSteps = (t: (key: string) => string, isSimpleMode = false):
   return allSteps
 }
 
-/**
- * 普通用户引导流程
- */
-export const getUserSteps = (t: (key: string) => string): DriveStep[] => [
-  {
-    popover: {
-      title: t('onboarding.user.welcome.title'),
-      description: t('onboarding.user.welcome.description'),
-      align: 'center',
-      nextBtnText: t('onboarding.user.welcome.nextBtn'),
-      prevBtnText: t('onboarding.user.welcome.prevBtn')
-    }
-  },
-  {
-    element: '[data-tour="sidebar-my-keys"]',
-    popover: {
-      title: t('onboarding.user.keyManage.title'),
-      description: t('onboarding.user.keyManage.description'),
-      side: 'right',
-      align: 'center',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="keys-create-btn"]',
-    popover: {
-      title: t('onboarding.user.createKey.title'),
-      description: t('onboarding.user.createKey.description'),
-      side: 'bottom',
-      align: 'end',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="key-form-name"]',
-    popover: {
-      title: t('onboarding.user.keyName.title'),
-      description: t('onboarding.user.keyName.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="key-form-group"]',
-    popover: {
-      title: t('onboarding.user.keyGroup.title'),
-      description: t('onboarding.user.keyGroup.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="key-form-submit"]',
-    popover: {
-      title: t('onboarding.user.keySubmit.title'),
-      description: t('onboarding.user.keySubmit.description'),
-      side: 'left',
-      align: 'center',
-      showButtons: ['close']
-    }
-  }
-]
+export { getUserSteps } from './userSteps'

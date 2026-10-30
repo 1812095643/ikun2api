@@ -110,16 +110,14 @@ func extractFirstUserText(body []byte) string {
 
 // buildBillingAttributionText 构造 system 数组的 billing attribution 文本。
 //
-// Claude Code 2.1.283 的 first-party/Vertex 请求包含条件性的 cch=00000
-// 字段；OAuth mimic 是向 Anthropic first-party 发送的兼容路径，因此保留该
-// 字段以避免生成缺失字段的非对称 billing block。这里不生成遥测或设备标识。
+// 仅兼容旧调用点；正式出站仍由隐私过滤器移除整个 billing 块，不生成占位校验值。
 func buildBillingAttributionText(body []byte, cliVersion string) (string, error) {
 	if cliVersion == "" {
 		return "", fmt.Errorf("cliVersion required")
 	}
 	fp := computeClaudeCodeFingerprint(body, cliVersion)
 	return fmt.Sprintf(
-		"x-anthropic-billing-header: cc_version=%s.%s; cc_entrypoint=cli; cch=00000;",
+		"x-anthropic-billing-header: cc_version=%s.%s; cc_entrypoint=cli;",
 		cliVersion, fp,
 	), nil
 }

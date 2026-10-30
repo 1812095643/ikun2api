@@ -123,6 +123,10 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			"This group is restricted to Claude Code clients (/v1/messages only)")
 		return
 	}
+	if geminiImageGenerationRejected(c, apiKey, nil, reqModel, channelMapping.MappedModel) {
+		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", service.ImageGenerationPermissionMessage())
+		return
+	}
 
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.responsesSecurityAuditError(c, decision)
@@ -307,7 +311,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			accountReleaseFunc()
 		}
 
-		submitResponsesUsage := func(res *service.ForwardResult) {
+		submitForwardUsage := func(res *service.ForwardResult) {
 			if res == nil {
 				return
 			}
@@ -343,7 +347,6 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		}
 
 		if err != nil {
-			submitResponsesUsage(result)
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
 				// Can't failover if streaming content already sent
@@ -374,11 +377,14 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				zap.Bool("upstream_error_response_already_written", upstreamErrorAlreadyCommunicated),
 				zap.Error(err),
 			)
+			if result != nil {
+				submitForwardUsage(result)
+			}
 			return
 		}
 
 		// 6. Record usage
-		submitResponsesUsage(result)
+		submitForwardUsage(result)
 		return
 	}
 }

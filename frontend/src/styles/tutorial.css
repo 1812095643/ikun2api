@@ -1,0 +1,808 @@
+.workspace.tutorial-site {
+  --ws-surface: #fff;
+  --ws-soft: #f5f7fb;
+  --ws-line: #e3e8ef;
+  --ws-text: #1e293b;
+  --ws-muted: #64748b;
+  --ws-primary: #2563eb;
+  min-height: 100dvh;
+  max-width: none;
+  background: var(--ws-surface);
+}
+.dark .workspace.tutorial-site {
+  --ws-surface: #101827;
+  --ws-soft: #192437;
+  --ws-line: #29364a;
+  --ws-text: #e5edf7;
+  --ws-muted: #a1b0c5;
+  --ws-primary: #80adff;
+}
+.tutorial-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--ws-line);
+  background: var(--ws-surface);
+}
+.tutorial-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1440px;
+  min-height: 72px;
+  margin: 0 auto;
+  padding: 12px 32px;
+}
+.tutorial-brand,
+.tutorial-header-actions,
+.tutorial-console-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tutorial-brand {
+  min-width: 0;
+  font-weight: 650;
+  font-size: 16px;
+}
+.tutorial-brand > span:first-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tutorial-brand img {
+  flex-shrink: 0;
+  border-radius: 7px;
+}
+.tutorial-brand .tutorial-brand-label {
+  padding-left: 14px;
+  border-left: 1px solid var(--ws-line);
+  color: var(--ws-muted);
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.tutorial-header-actions {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.tutorial-theme-button {
+  color: var(--ws-muted);
+}
+.tutorial-console-link,
+.tutorial-theme-button {
+  min-height: 40px;
+  border-radius: 8px;
+}
+.tutorial-theme-button {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+}
+.tutorial-theme-button:hover {
+  background: var(--ws-soft);
+}
+.tutorial-console-link {
+  gap: 7px;
+  padding: 8px 13px;
+  border: 1px solid var(--ws-line);
+  font-weight: 500;
+}
+.tutorial-console-link:hover {
+  color: var(--ws-primary);
+}
+.tutorial-skip-link {
+  position: fixed;
+  top: 8px;
+  left: 16px;
+  z-index: 30;
+  padding: 10px 16px;
+  background: var(--ws-primary);
+  color: var(--ws-surface);
+  transform: translateY(-150%);
+}
+.tutorial-skip-link:focus {
+  transform: translateY(0);
+}
+.tutorial-site a:focus-visible,
+.tutorial-site button:focus-visible {
+  outline: 2px solid var(--ws-primary);
+  outline-offset: 3px;
+}
+.tutorial-site .ws-button-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+.tutorial-site .ws-button-primary:hover {
+  background: #1d4ed8;
+}
+.tutorial-layout {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr) 176px;
+  align-items: start;
+  gap: 32px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 36px 32px 72px;
+  --tutorial-code: var(--ws-soft);
+}
+.tutorial-navigation,
+.tutorial-toc {
+  position: sticky;
+  top: 100px;
+  max-height: calc(100dvh - 112px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.tutorial-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 10px;
+  border: 1px solid var(--ws-line);
+  border-radius: 9px;
+  background: var(--ws-surface);
+  color: var(--ws-muted);
+}
+.tutorial-search:focus-within {
+  outline: 2px solid var(--ws-primary);
+  outline-offset: 2px;
+}
+.tutorial-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ws-text);
+  font-size: 12px;
+}
+.tutorial-search kbd {
+  display: none;
+}
+.tutorial-directory-toggle {
+  display: none;
+}
+.tutorial-directory {
+  padding-top: 20px;
+}
+.tutorial-nav-group + .tutorial-nav-group {
+  margin-top: 22px;
+}
+.tutorial-nav-group h2,
+.tutorial-toc > p {
+  margin: 0 10px 8px;
+  color: var(--ws-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.tutorial-nav-link {
+  display: block;
+  padding: 9px 10px;
+  border-radius: 7px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.tutorial-nav-link:hover,
+.tutorial-nav-link.is-active {
+  background: var(--ws-soft);
+  color: var(--ws-primary);
+}
+.tutorial-nav-link.is-active {
+  font-weight: 600;
+}
+.tutorial-main {
+  min-width: 0;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+}
+.tutorial-intro {
+  padding: 0 0 28px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--ws-line);
+}
+.tutorial-eyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  color: var(--ws-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+.tutorial-copy-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ws-muted);
+  min-height: 32px;
+  font-size: 11px;
+}
+.tutorial-copy-page:hover {
+  color: var(--ws-primary);
+}
+.tutorial-intro h1 {
+  margin-bottom: 12px;
+  color: var(--ws-text);
+  font-size: clamp(25px, 2.2vw, 34px);
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -0.03em;
+}
+.tutorial-intro > p {
+  color: var(--ws-muted);
+  font-size: 15px;
+  line-height: 1.9;
+}
+.tutorial-reading-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.tutorial-toc > p {
+  margin-left: 0;
+}
+.tutorial-toc a {
+  display: block;
+  margin: 12px 0;
+  color: var(--ws-muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.tutorial-toc a:hover {
+  color: var(--ws-primary);
+}
+.tutorial-body {
+  color: var(--ws-text);
+  font-size: 14px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.tutorial-body .icon {
+  display: inline-block;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  vertical-align: -3px;
+}
+.tutorial-body h2 {
+  margin: 36px 0 16px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.tutorial-body h3 {
+  margin: 22px 0 9px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.tutorial-body h2[id],
+.tutorial-faq-item {
+  scroll-margin-top: 96px;
+}
+.tutorial-body p {
+  margin: 0 0 16px;
+}
+.tutorial-body a {
+  color: var(--ws-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--ws-primary) 30%, transparent);
+}
+.tutorial-body a:hover {
+  text-decoration-color: currentColor;
+}
+.tutorial-body ul,
+.tutorial-body ol {
+  margin: 16px 0;
+  padding-left: 22px;
+}
+.tutorial-body ul {
+  list-style: disc;
+}
+.tutorial-body ol {
+  list-style: decimal;
+}
+.tutorial-body li + li {
+  margin-top: 9px;
+}
+.tutorial-body :not(pre) > code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--ws-soft);
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+.tutorial-body .setup-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--ws-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.tutorial-body .setup-summary > div {
+  min-width: 0;
+  padding: 16px;
+}
+.tutorial-body .setup-summary > div + div {
+  border-left: 1px solid var(--ws-line);
+}
+.tutorial-body .summary-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 9px;
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.tutorial-body .summary-value {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+}
+.tutorial-body .summary-value code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+.tutorial-body .icon-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  margin-top: -3px;
+  color: var(--ws-muted);
+}
+.tutorial-body .callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  margin: 20px 0;
+  border-radius: 8px;
+  background: var(--ws-soft);
+  color: var(--ws-muted);
+  font-size: 13px;
+}
+.tutorial-body .callout > .icon {
+  margin-top: 4px;
+  color: var(--ws-primary);
+}
+.tutorial-body .callout p {
+  margin: 0;
+}
+.tutorial-body .warning > .icon {
+  color: #b45309;
+}
+.tutorial-body .table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--ws-line);
+  border-radius: 8px;
+  margin: 20px 0;
+}
+.tutorial-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.tutorial-body th,
+.tutorial-body td {
+  min-width: 110px;
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+.tutorial-body th {
+  background: var(--ws-soft);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.tutorial-body tbody tr {
+  border-top: 1px solid var(--ws-line);
+}
+.tutorial-body .steps {
+  list-style: none;
+  padding: 0;
+  counter-reset: tutorial-step;
+}
+.tutorial-body .step {
+  position: relative;
+  padding: 0 0 14px 38px;
+  counter-increment: tutorial-step;
+}
+.tutorial-body .step::before {
+  content: counter(tutorial-step);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 25px;
+  height: 25px;
+  border: 1px solid var(--ws-line);
+  border-radius: 50%;
+  color: var(--ws-primary);
+  text-align: center;
+  font-size: 12px;
+  line-height: 24px;
+}
+.tutorial-body .step h3 {
+  margin: 0 0 6px;
+}
+.tutorial-body .route-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.tutorial-body .route-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ws-line);
+  border-radius: 9px;
+  color: var(--ws-text);
+  text-decoration: none;
+}
+.tutorial-body .route-card:hover {
+  background: var(--ws-soft);
+}
+.tutorial-body .route-card > .icon {
+  margin-top: 4px;
+  color: var(--ws-primary);
+}
+.tutorial-body .route-card strong,
+.tutorial-body .route-card span {
+  display: block;
+}
+.tutorial-body .route-card strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.tutorial-body .route-card span {
+  margin-top: 5px;
+  color: var(--ws-muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.tutorial-body .route-card .card-arrow {
+  margin-left: auto;
+  width: 14px;
+}
+.tutorial-body .code-block {
+  max-width: 100%;
+  margin: 20px 0;
+  border: 1px solid var(--ws-line);
+  border-radius: 9px;
+  background: var(--tutorial-code);
+  overflow: hidden;
+}
+.tutorial-body .code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--ws-line);
+}
+.tutorial-body .code-tabs {
+  display: flex;
+  min-width: 0;
+  gap: 18px;
+  overflow-x: auto;
+}
+.tutorial-body .code-tabs button {
+  padding: 11px 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ws-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.tutorial-body .code-tabs button[aria-selected='true'] {
+  border-color: var(--ws-primary);
+  color: var(--ws-primary);
+}
+.tutorial-body .copy-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 38px;
+  flex-shrink: 0;
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.tutorial-body pre {
+  margin: 0;
+  max-height: 600px;
+  overflow: auto;
+  padding: 18px;
+  font-size: 12px;
+  line-height: 1.9;
+  tab-size: 2;
+}
+.tutorial-body pre code {
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre;
+}
+.tutorial-body .check-list {
+  list-style: none;
+  padding: 0;
+}
+.tutorial-body .check-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.tutorial-body .check-list .icon {
+  margin-top: 5px;
+  color: var(--ws-primary);
+}
+.tutorial-body .source-links,
+.tutorial-body .feedback-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 22px 0;
+  font-size: 12px;
+}
+.tutorial-body .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  background: #0f766e;
+  color: #fff;
+  font-size: 12px;
+  text-decoration: none;
+}
+.tutorial-body .button.secondary {
+  border: 1px solid var(--ws-line);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+}
+.tutorial-pagination {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 44px;
+  padding: 24px 0;
+  border-top: 1px solid var(--ws-line);
+}
+.tutorial-pagination a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.tutorial-pagination a:hover {
+  color: var(--ws-primary);
+}
+.tutorial-pagination small {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ws-muted);
+  font-size: 10px;
+}
+.tutorial-pagination .tutorial-next {
+  grid-column: 2;
+  justify-content: flex-end;
+  text-align: right;
+}
+.tutorial-help-shortcuts {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+.tutorial-help-shortcuts a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  color: var(--ws-primary);
+  font-size: 13px;
+}
+.tutorial-faq-search {
+  padding: 12px;
+}
+.tutorial-faq-search input {
+  font-size: 13px;
+}
+.tutorial-faq-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+}
+.tutorial-faq-categories button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  color: var(--ws-muted);
+  font-size: 12px;
+}
+.tutorial-faq-categories button[aria-pressed='true'] {
+  background: var(--ws-soft);
+  color: var(--ws-primary);
+}
+.tutorial-result-count,
+.tutorial-empty {
+  margin: 14px 0;
+  color: var(--ws-muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.tutorial-faq-item {
+  border-bottom: 1px solid var(--ws-line);
+}
+.tutorial-faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 62px;
+  padding: 16px 0;
+  list-style: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+.tutorial-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+.tutorial-faq-item summary svg {
+  flex-shrink: 0;
+  color: var(--ws-muted);
+  transition: transform 0.18s;
+}
+.tutorial-faq-item[open] summary {
+  color: var(--ws-primary);
+}
+.tutorial-faq-item[open] summary svg {
+  transform: rotate(45deg);
+}
+.tutorial-faq-item .tutorial-body {
+  padding-bottom: 20px;
+  color: var(--ws-muted);
+  font-size: 13px;
+}
+.tutorial-support {
+  margin-top: 36px;
+  padding: 22px;
+  border-radius: 10px;
+  background: var(--ws-soft);
+}
+.tutorial-support h2 {
+  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.tutorial-support p {
+  margin-bottom: 18px;
+  color: var(--ws-muted);
+  font-size: 13px;
+  line-height: 1.9;
+}
+.tutorial-layout a:focus-visible,
+.tutorial-layout button:focus-visible,
+.tutorial-layout summary:focus-visible {
+  outline: 2px solid var(--ws-primary);
+  outline-offset: 3px;
+}
+.tutorial-layout [hidden] {
+  display: none !important;
+}
+@media (max-width: 1199px) {
+  .tutorial-layout {
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 28px;
+  }
+  .tutorial-toc {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .tutorial-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .tutorial-navigation {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--ws-line);
+  }
+  .tutorial-search {
+    min-height: 44px;
+  }
+  .tutorial-directory-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    width: 100%;
+    margin-top: 8px;
+    color: var(--ws-muted);
+    font-size: 12px;
+  }
+  .tutorial-directory-toggle svg:last-child {
+    margin-left: auto;
+  }
+  .tutorial-directory {
+    max-height: 55dvh;
+    overflow-y: auto;
+  }
+  .tutorial-nav-link {
+    min-height: 44px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 600px) {
+  .tutorial-header-inner {
+    min-height: 64px;
+    padding: 10px 16px;
+    gap: 8px;
+  }
+  .tutorial-brand,
+  .tutorial-header-actions {
+    gap: 8px;
+  }
+  .tutorial-brand-label {
+    display: none;
+  }
+  .tutorial-console-link {
+    padding: 8px;
+    font-size: 12px;
+  }
+  .tutorial-console-link svg {
+    display: none;
+  }
+  .tutorial-layout {
+    padding: 22px 18px 48px;
+  }
+  .tutorial-body .setup-summary,
+  .tutorial-body .route-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tutorial-body .setup-summary > div + div {
+    border-left: 0;
+    border-top: 1px solid var(--ws-line);
+  }
+  .tutorial-intro {
+    padding-bottom: 22px;
+    margin-bottom: 24px;
+  }
+  .tutorial-body h2 {
+    font-size: 18px;
+  }
+  .tutorial-body pre {
+    padding: 14px;
+    font-size: 11px;
+  }
+  .tutorial-body .code-tabs {
+    gap: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-faq-item summary svg {
+    transition: none;
+  }
+}

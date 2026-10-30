@@ -27,11 +27,10 @@ func TestIdentityClaudeCodeHeaders_PartialReplacementAndExpiry(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, empty)
 	initial := http.Header{
-		"anthropic-usage-limit":           {"one", "two"},
-		"x-claude-code-compaction":        {"keep"},
-		"x-cc-context-compacted":          nil,
-		"x-claude-code-context-compacted": {},
+		"anthropic-version": {"2023-06-01"}, "anthropic-beta": {"oauth"},
+		"anthropic-dangerous-direct-browser-access": {"true"},
 	}
+
 	require.NoError(t, cache.UpdateClaudeCodeHeaders(ctx, 1, initial))
 	got, err := cache.GetClaudeCodeHeaders(ctx, 1)
 	require.NoError(t, err)
@@ -44,10 +43,10 @@ func TestIdentityClaudeCodeHeaders_PartialReplacementAndExpiry(t *testing.T) {
 	require.Equal(t, fingerprintTTL-24*time.Hour, server.TTL(claudeCodeHeadersKey(1)), "reads do not renew expiry")
 	require.NoError(t, cache.UpdateClaudeCodeHeaders(ctx, 1, http.Header{}))
 	require.Equal(t, fingerprintTTL-24*time.Hour, server.TTL(claudeCodeHeadersKey(1)), "missing response fields do not renew expiry")
-	require.NoError(t, cache.UpdateClaudeCodeHeaders(ctx, 1, http.Header{"anthropic-usage-limit": {""}}))
+	require.NoError(t, cache.UpdateClaudeCodeHeaders(ctx, 1, http.Header{"anthropic-version": {""}}))
 	got, err = cache.GetClaudeCodeHeaders(ctx, 1)
 	require.NoError(t, err)
-	initial["anthropic-usage-limit"] = []string{""}
+	initial["anthropic-version"] = []string{""}
 	require.Equal(t, initial, got)
 	require.Equal(t, fingerprintTTL, server.TTL(claudeCodeHeadersKey(1)))
 	other, err := cache.GetClaudeCodeHeaders(ctx, 2)
@@ -63,13 +62,10 @@ func TestIdentityClaudeCodeHeaders_ConcurrentPartialUpdates(t *testing.T) {
 	cache, _ := newClaudeCodeHeaderCacheTest(t)
 	ctx := context.Background()
 	updates := http.Header{
-		"anthropic-usage-limit":             {"usage"},
-		"x-claude-code-prev-tool-durations": {"duration", "second"},
-		"x-claude-code-context-compacted":   {"context"},
-		"x-cc-context-compacted":            {""},
-		"x-claude-code-compaction":          {"compact"},
-		"x-cc-compaction-request":           {"request"},
+		"anthropic-version": {"2023-06-01"}, "anthropic-beta": {"oauth"},
+		"anthropic-dangerous-direct-browser-access": {"true"},
 	}
+
 	start := make(chan struct{})
 	errors := make(chan error, len(updates))
 	var workers sync.WaitGroup
@@ -90,4 +86,16 @@ func TestIdentityClaudeCodeHeaders_ConcurrentPartialUpdates(t *testing.T) {
 	got, err := cache.GetClaudeCodeHeaders(ctx, 1)
 	require.NoError(t, err)
 	require.Equal(t, updates, got, "independent updates must not discard each other's fields")
+}
+
+func TestIdentityClaudeCodeHeadersRejectsLegacySessionFields(t *testing.T) {
+	cache, server := newClaudeCodeHeaderCacheTest(t)
+	ctx := context.Background()
+	server.HSet(claudeCodeHeadersKey(41), "X-Claude-Code-Compaction", "not even JSON", "authorization", `["secret"]`, "anthropic-version", `["2023-06-01"]`)
+	got, err := cache.GetClaudeCodeHeaders(ctx, 41)
+	require.NoError(t, err)
+	require.Equal(t, http.Header{"anthropic-version": {"2023-06-01"}}, got)
+	require.Empty(t, server.HGet(claudeCodeHeadersKey(41), "X-Claude-Code-Compaction"))
+	require.NoError(t, cache.UpdateClaudeCodeHeaders(ctx, 41, http.Header{"x-cc-compaction-request": {"secret"}}))
+	require.Empty(t, server.HGet(claudeCodeHeadersKey(41), "x-cc-compaction-request"))
 }

@@ -46,8 +46,10 @@
 
         <!-- Tab: Security — Admin API Key -->
         <div v-show="activeTab === 'security'" class="space-y-6">
-          <!-- Admin API Key Settings -->
-          <div class="card">
+          <AdminAccessKeysSettings />
+          <!-- 已有全权密钥只提供轮换和删除入口。 -->
+          <details v-if="adminApiKeyExists" class="card">
+            <summary class="cursor-pointer px-6 py-4 font-medium">{{ t("adminAccessKeys.legacy") }}</summary>
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -84,48 +86,6 @@
                   class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary-600"
                 ></div>
                 {{ t("common.loading") }}
-              </div>
-
-              <!-- No Key Configured -->
-              <div
-                v-else-if="!adminApiKeyExists"
-                class="flex items-center justify-between"
-              >
-                <span class="text-gray-500 dark:text-gray-400">
-                  {{ t("admin.settings.adminApiKey.notConfigured") }}
-                </span>
-                <button
-                  type="button"
-                  @click="createAdminApiKey"
-                  :disabled="adminApiKeyOperating"
-                  class="btn btn-primary btn-sm"
-                >
-                  <svg
-                    v-if="adminApiKeyOperating"
-                    class="mr-1 h-4 w-4 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      class="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      stroke-width="4"
-                    ></circle>
-                    <path
-                      class="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  {{
-                    adminApiKeyOperating
-                      ? t("admin.settings.adminApiKey.creating")
-                      : t("admin.settings.adminApiKey.create")
-                  }}
-                </button>
               </div>
 
               <!-- Key Exists -->
@@ -197,7 +157,7 @@
                 </div>
               </div>
             </div>
-          </div>
+          </details>
         </div>
         <!-- /Tab: Security — Admin API Key -->
 
@@ -1581,9 +1541,8 @@
                 </div>
                 <Toggle v-model="form.invitation_code_enabled" />
               </div>
-              <!-- Password Reset - Only show when email verification is enabled -->
+              <!-- Password reset is independent of registration email verification. -->
               <div
-                v-if="form.email_verify_enabled"
                 class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
               >
                 <div>
@@ -1598,7 +1557,7 @@
               </div>
               <!-- Frontend URL - Only show when password reset is enabled -->
               <div
-                v-if="form.email_verify_enabled && form.password_reset_enabled"
+                v-if="form.password_reset_enabled"
                 class="border-t border-gray-100 pt-4 dark:border-dark-700"
               >
                 <label
@@ -4502,7 +4461,7 @@
               </h2>
             </div>
             <div class="p-6 space-y-4">
-                <div class="flex items-center justify-between gap-4">
+                <div v-if="CODEX_TICKET_ENABLED" class="flex items-center justify-between gap-4">
                   <div class="min-w-0">
                     <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                       {{ t("admin.settings.gatewayForwarding.codexTicketEnabled") }}
@@ -4516,7 +4475,7 @@
                     v-model="form.openai_codex_ticket_enabled"
                   />
                 </div>
-                <div class="flex items-center justify-between gap-4">
+                <div v-if="CODEX_TICKET_ENABLED" class="flex items-center justify-between gap-4">
                   <div class="min-w-0">
                     <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t("admin.settings.gatewayForwarding.codexTicketAllowWithoutTicket") }}</h3>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t("admin.settings.gatewayForwarding.codexTicketAllowWithoutTicketDesc") }}</p>
@@ -4534,7 +4493,7 @@
                   </div>
                   <textarea id="codex-probe-template" v-model="form.openai_codex_ticket_prompt_template" data-testid="codex-probe-template" aria-describedby="codex-probe-template-help" class="input w-full font-mono text-xs" rows="12" wrap="off" :spellcheck="false" :disabled="saving" />
                 </div>
-                <CodexTicketCadenceSettings ref="codexTicketCadenceRef" :saving="saving" />
+                <CodexTicketCadenceSettings v-if="CODEX_TICKET_ENABLED" ref="codexTicketCadenceRef" :saving="saving" />
                 <!-- 自动降智检测 -->
                 <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
                   <div class="flex items-center justify-between gap-4">
@@ -6479,6 +6438,24 @@
             </p>
           </div>
           <div class="space-y-4 p-6">
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('usage.outputRateMode') }}
+              </label>
+              <Select
+                v-model="form.usage_output_rate_mode"
+                :options="[
+                  { value: 'generation', label: t('usage.outputRateGeneration') },
+                  { value: 'total', label: t('usage.outputRateTotal') },
+                ]"
+                class="max-w-xs"
+                data-testid="settings-output-rate-mode"
+                :aria-label="t('usage.outputRateMode')"
+              />
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t(form.usage_output_rate_mode === 'total' ? 'usage.outputRateTotalHint' : 'usage.outputRateGenerationHint') }}
+              </p>
+            </div>
             <!-- User error requests visibility -->
             <div class="flex items-center justify-between">
               <div>
@@ -8591,29 +8568,8 @@
         </div>
 
         <div v-show="activeTab === 'email'" class="space-y-6">
-          <!-- Email disabled hint - show when email_verify_enabled is off -->
-          <div v-if="!form.email_verify_enabled" class="card">
-            <div class="p-6">
-              <div class="flex items-start gap-3">
-                <Icon
-                  name="mail"
-                  size="md"
-                  class="mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500"
-                />
-                <div>
-                  <h3 class="font-medium text-gray-900 dark:text-white">
-                    {{ t("admin.settings.emailTabDisabledTitle") }}
-                  </h3>
-                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {{ t("admin.settings.emailTabDisabledHint") }}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SMTP Settings - Only show when email verification is enabled -->
-          <div v-if="form.email_verify_enabled" class="card">
+          <!-- SMTP is shared by password recovery and all notification emails. -->
+          <div class="card">
             <div
               class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -8775,8 +8731,8 @@
             </div>
           </div>
 
-          <!-- Send Test Email - Only show when email verification is enabled -->
-          <div v-if="form.email_verify_enabled" class="card">
+          <!-- Send Test Email -->
+          <div class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -9091,6 +9047,7 @@
 
 <script setup lang="ts">
 import CodexTicketCadenceSettings from '@/components/admin/account/CodexTicketCadenceSettings.vue'
+import { CODEX_TICKET_ENABLED } from '@/utils/featureFlags'
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { adminAPI } from "@/api";
@@ -9167,6 +9124,7 @@ import {
   isStepUpBlocked,
   stepUpBlockReason,
 } from "@/composables/useStepUp";
+import AdminAccessKeysSettings from "@/components/admin/settings/AdminAccessKeysSettings.vue";
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
@@ -10196,6 +10154,7 @@ const form = reactive<SettingsForm>({
   affiliate_enabled: false,
   // Allow user view error requests
   allow_user_view_error_requests: false,
+  usage_output_rate_mode: "generation",
 });
 
 // 人机验证 UI 状态：单卡片「总开关 + 服务商单选」，落库仍是三个独立
@@ -12052,6 +12011,7 @@ async function saveSettings() {
       // Affiliate (邀请返利) feature switch
       affiliate_enabled: form.affiliate_enabled,
       allow_user_view_error_requests: form.allow_user_view_error_requests,
+      usage_output_rate_mode: form.usage_output_rate_mode,
     };
 
     // 仅当 openai_fast_policy_settings 已成功从后端加载时才回写，
@@ -12285,15 +12245,17 @@ async function loadAdminApiKey() {
 }
 
 async function createAdminApiKey() {
+  if (!adminApiKeyExists.value) return;
   adminApiKeyOperating.value = true;
   try {
-    const result = await adminAPI.settings.regenerateAdminApiKey();
+    const result = await settingsStepUp.run(() => adminAPI.settings.regenerateAdminApiKey());
     newAdminApiKey.value = result.key;
     adminApiKeyExists.value = true;
     adminApiKeyMasked.value =
       result.key.substring(0, 10) + "..." + result.key.slice(-4);
     appStore.showSuccess(t("admin.settings.adminApiKey.keyGenerated"));
   } catch (error: unknown) {
+    if (isStepUpCancelled(error)) return;
     appStore.showError(extractApiErrorMessage(error, t("common.error")));
   } finally {
     adminApiKeyOperating.value = false;
@@ -12309,12 +12271,13 @@ async function deleteAdminApiKey() {
   if (!confirm(t("admin.settings.adminApiKey.deleteConfirm"))) return;
   adminApiKeyOperating.value = true;
   try {
-    await adminAPI.settings.deleteAdminApiKey();
+    await settingsStepUp.run(() => adminAPI.settings.deleteAdminApiKey());
     adminApiKeyExists.value = false;
     adminApiKeyMasked.value = "";
     newAdminApiKey.value = "";
     appStore.showSuccess(t("admin.settings.adminApiKey.keyDeleted"));
   } catch (error: unknown) {
+    if (isStepUpCancelled(error)) return;
     appStore.showError(extractApiErrorMessage(error, t("common.error")));
   } finally {
     adminApiKeyOperating.value = false;
@@ -13567,19 +13530,17 @@ watch(
 }
 
 .settings-save-bar {
+  @apply border-gray-200/85 bg-white/95 dark:border-dark-700 dark:bg-dark-900/95;
   position: sticky;
   bottom: 0;
   z-index: 30;
   margin: 0 -0.25rem;
   padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
-  border: 1px solid rgb(226 232 240 / 0.85);
+  border-width: 1px;
   border-radius: 0.75rem;
-  background: rgb(255 255 255 / 0.94);
   backdrop-filter: blur(12px);
   box-shadow: 0 -8px 24px rgb(15 23 42 / 0.06);
 }
-
-:global(.dark) .settings-save-bar { background: rgb(30 41 59 / 0.94); border-color: rgb(71 85 105 / 0.7); }
 
 /* ============ 系统设置 Tab 导航 ============ */
 .settings-tabs-shell {

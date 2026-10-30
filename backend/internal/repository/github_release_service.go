@@ -61,6 +61,14 @@ func NewGitHubReleaseClient(proxyURL string, allowDirectOnProxyError bool) servi
 		downloadClient = &http.Client{Timeout: 10 * time.Minute}
 	}
 	downloadClient = cloneHTTPClient(downloadClient)
+	downloadClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		h := strings.ToLower(req.URL.Hostname())
+		if len(via) >= 5 || req.URL.Scheme != "https" || req.URL.User != nil || (req.URL.Port() != "" && req.URL.Port() != "443") || (h != "github.com" && h != "release-assets.githubusercontent.com" && h != "objects.githubusercontent.com") {
+			return fmt.Errorf("unsafe GitHub download redirect")
+		}
+		req.Header.Del("Authorization")
+		return nil
+	}
 
 	return &githubReleaseClient{
 		httpClient:         apiClient,
@@ -242,5 +250,9 @@ func (c *githubReleaseClient) FetchChecksumFile(ctx context.Context, url string)
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024+1))
+	if err == nil && len(data) > 1024*1024 {
+		return nil, fmt.Errorf("checksum file too large")
+	}
+	return data, err
 }

@@ -232,7 +232,7 @@ const (
 	// 默认 false：非白名单域名直接拒绝（白名单严格模式）。
 	SettingKeyRegistrationEmailDomainQuotaEnabled = "registration_email_domain_quota_enabled"
 	SettingKeyPromoCodeEnabled                    = "promo_code_enabled"                // 是否启用优惠码功能
-	SettingKeyPasswordResetEnabled                = "password_reset_enabled"            // 是否启用忘记密码功能（需要先开启邮件验证）
+	SettingKeyPasswordResetEnabled                = "password_reset_enabled"            // 是否启用忘记密码功能（通过一次性邮件链接验证）
 	SettingKeyFrontendURL                         = "frontend_url"                      // 前端基础URL，用于生成邮件中的重置密码链接
 	SettingKeyInvitationCodeEnabled               = "invitation_code_enabled"           // 是否启用邀请码注册
 	SettingKeyAffiliateEnabled                    = "affiliate_enabled"                 // 邀请返利功能总开关
@@ -782,3 +782,5 @@ const AdminAPIKeyPrefix = "admin-"
 // SettingKeyAllowUserViewErrorRequests controls whether end users can view
 // their own failed requests on the usage page. Default false (opt-in).
 const SettingKeyAllowUserViewErrorRequests = "allow_user_view_error_requests"
+
+const SettingKeyUsageOutputRateMode = "usage_output_rate_mode"

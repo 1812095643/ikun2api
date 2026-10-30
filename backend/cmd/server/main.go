@@ -7,7 +7,9 @@ import (
 	_ "embed"
 	"errors"
 	"flag"
+	"github.com/MACOS-DO/sub4api/internal/service"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -59,10 +61,49 @@ func main() {
 	// Parse command line flags
 	setupMode := flag.Bool("setup", false, "Run setup wizard in CLI mode")
 	showVersion := flag.Bool("version", false, "Show version information")
+	upgradePreflight := flag.Bool("upgrade-preflight", false, "Read-only check of existing database compatibility")
+	upgradeBackup := flag.String("upgrade-backup-dir", "", "Create a complete backup of existing deployment without starting server")
+	upgradeRestore := flag.String("upgrade-restore-file", "", "Restore an explicit local database snapshot; service must be stopped")
+	upgradeInfo := flag.Bool("upgrade-info", false, "Print non-secret deployment fingerprints without starting server")
+	supervise := flag.Bool("supervise", false, "Supervise server and recover failed upgrades")
+	_ = flag.Bool("serve-child", false, "Run the supervised server child")
 	flag.Parse()
 
 	if *showVersion {
 		log.Printf("IKUN2api %s (commit: %s, built: %s)\n", Version, Commit, Date)
+		return
+	}
+
+	if *upgradePreflight {
+		if err := runUpgradePreflight(); err != nil {
+			log.Printf("Upgrade preflight rejected: %v", err)
+			os.Exit(1)
+		}
+		log.Println("IKUN_UPGRADE_PREFLIGHT_OK")
+		return
+	}
+
+	if *upgradeBackup != "" || *upgradeRestore != "" {
+		if err := runUpgradeBackup(*upgradeBackup, *upgradeRestore); err != nil {
+			log.Printf("Upgrade backup/restore failed: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *upgradeInfo {
+		if err := runUpgradeInfo(); err != nil {
+			log.Printf("Upgrade inspect failed: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *supervise {
+		if err := runSupervisor(); err != nil {
+			log.Printf("Supervisor stopped: %v", err)
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -153,6 +194,9 @@ func runMainServer() {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
 	defer app.Cleanup()
+	if app.Workspace != nil {
+		defer app.Workspace.Stop()
+	}
 	if app.PluginManager != nil {
 		if err := app.PluginManager.Start(context.Background()); err != nil {
 			log.Printf("Plugin manager started in degraded state: %v", err)
@@ -168,14 +212,19 @@ func runMainServer() {
 		}
 	}
 
-	// 启动服务器
+	// Bind before marking an upgraded child ready.
+	listener, err := net.Listen("tcp", app.Server.Addr)
+	if err != nil {
+		log.Fatalf("Failed to bind server: %v", err)
+	}
 	go func() {
-		if err := app.Server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := app.Server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
 
 	log.Printf("Server started on %s", app.Server.Addr)
+	service.MarkUpgradeReady()
 
 	// 等待中断信号
 	quit := make(chan os.Signal, 1)

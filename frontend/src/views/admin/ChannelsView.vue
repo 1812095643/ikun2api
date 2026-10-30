@@ -1164,9 +1164,8 @@ function formToAPI(): { group_ids: number[], model_pricing: ChannelModelPricing[
   // rather than leaving a stale true value from the cloned features_config.
   const wsEmulation: Record<string, boolean> = {}
   for (const section of form.platforms) {
-    if (!section.enabled) continue
     if (supportsWebSearchEmulation(section.platform)) {
-      wsEmulation[section.platform] = !!section.web_search_emulation
+      wsEmulation[section.platform] = section.enabled ? !!section.web_search_emulation : false
     }
   }
   if (Object.keys(wsEmulation).length > 0) {

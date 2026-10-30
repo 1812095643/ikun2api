@@ -470,7 +470,7 @@
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" @completed="handleAccountTestCompleted" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
-    <CodexTicketDashboard :show="showCodexTickets" :account="codexTicketAcc" @close="showCodexTickets = false" @updated="handleAccountUpdated" />
+    <CodexTicketDashboard v-if="CODEX_TICKET_ENABLED" :show="showCodexTickets" :account="codexTicketAcc" @close="showCodexTickets = false" @updated="handleAccountUpdated" />
     <CodexDiagnosticModal :show="showCodexDiagnostic" :account="codexDiagnosticAcc" @close="showCodexDiagnostic = false" @completed="handleCodexDiagnosticCompleted" />
     <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" @codex-diagnostic="openCodexDiagnostic" />
     <SyncFromCrsModal :show="showSync" @close="showSync = false" @synced="reload" />
@@ -508,6 +508,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
+import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
 import { useTableSelection } from '@/composables/useTableSelection'
@@ -525,6 +526,7 @@ import AccountTableFilters from '@/components/admin/account/AccountTableFilters.
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
 import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
 import CodexTicketDashboard from '@/components/admin/account/CodexTicketDashboard.vue'
+import { CODEX_TICKET_ENABLED } from '@/utils/featureFlags'
 import CodexDiagnosticModal from '@/components/admin/account/CodexDiagnosticModal.vue'
 import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
@@ -684,6 +686,31 @@ const HIDDEN_COLUMNS_KEY = 'account-hidden-columns'
 // One-time migration: hide scheduler score for existing admins too, because showing it opt-ins to heavy backend scoring.
 const HIDDEN_COLUMNS_VERSION_KEY = 'account-hidden-columns-version'
 const HIDDEN_COLUMNS_CURRENT_VERSION = 'scheduler-score-hidden-by-default'
+
+// Account filter settings
+const ACCOUNT_FILTER_STORAGE_KEY = 'account-filter-values'
+type AccountFilterValues = {
+  platform: string
+  status: string
+}
+const loadInitialAccountFilterValues = (): AccountFilterValues => {
+  const fallback: AccountFilterValues = { platform: '', status: '' }
+  try {
+    const raw = localStorage.getItem(ACCOUNT_FILTER_STORAGE_KEY)
+    if (!raw) return fallback
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return fallback
+    const values = parsed as Record<string, unknown>
+    return {
+      platform: typeof values.platform === 'string' && CONCRETE_PLATFORM_OPTIONS.some(option => option.value === values.platform)
+        ? values.platform : '',
+      status: typeof values.status === 'string' && ['active', 'inactive', 'error', 'rate_limited', 'temp_unschedulable', 'unschedulable'].includes(values.status)
+        ? values.status : ''
+    }
+  } catch {
+    return fallback
+  }
+}
 
 // Sorting settings
 const ACCOUNT_SORT_STORAGE_KEY = 'account-table-sort'
@@ -1116,9 +1143,8 @@ const {
 } = useTableLoader<AccountListItem, any>({
   fetchFn: adminAPI.accounts.list,
   initialParams: {
-    platform: '',
+    ...loadInitialAccountFilterValues(),
     type: '',
-    status: '',
     privacy_mode: '',
     group: '',
     search: '',
@@ -1324,7 +1350,19 @@ const refreshUpstreamBillingSortedList = async (force = false) => {
 
 useIntervalFn(() => { void refreshUpstreamBillingRates() }, 5 * 60_000, { immediate: false })
 
+const saveAccountFilterValues = () => {
+  try {
+    localStorage.setItem(ACCOUNT_FILTER_STORAGE_KEY, JSON.stringify({
+      platform: params.platform,
+      status: params.status
+    }))
+  } catch {
+    // Filtering must remain available when browser storage is unavailable.
+  }
+}
+
 const debouncedReload = () => {
+  saveAccountFilterValues()
   clearSelection()
   syncAccountListDerivedParams()
   hasPendingListSync.value = false
@@ -1523,6 +1561,10 @@ const handleManualRefresh = async () => {
 }
 
 const loadCodexTicketGlobalState = async () => {
+  if (!CODEX_TICKET_ENABLED) {
+    codexTicketGloballyEnabled.value = false
+    return
+  }
   const requestId = ++codexTicketSettingsRequestId
   try {
     const settings = await adminAPI.settings.getSettings()

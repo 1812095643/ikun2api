@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -747,7 +748,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 		firstClientMessage = s.ReplaceModelInBody(firstClientMessage, capturedSessionModel)
 	}
 	firstMessageResponsesLite := isOpenAIResponsesLiteWebSocketPayload(firstClientMessage)
-	if normalized, compatibilityChanged, normalizeErr := normalizeOpenAIResponsesWebSocketCompatibilityBody(firstClientMessage, account, firstMessageResponsesLite); normalizeErr != nil {
+	if normalized, compatibilityChanged, normalizeErr := normalizeOpenAIResponsesWebSocketCompatibilityBodyWithConfig(s.cfg, firstClientMessage, account, firstMessageResponsesLite); normalizeErr != nil {
 		return fmt.Errorf("normalize first websocket response.create: %w", normalizeErr)
 	} else if compatibilityChanged {
 		firstClientMessage = normalized
@@ -892,6 +893,8 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	var upstreamConn openAIWSClientConn
 	statusCode := 0
 	var handshakeHeaders http.Header
+	searchInitFallback := false
+	hostedAvailable := openAIWSHostedToolsDeclared(firstClientMessage)
 	for {
 		headers, err = s.refreshOpenAIWSAuthHeaders(ctx, account, headers)
 		if err != nil {
@@ -905,6 +908,31 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			observeHandshake(sentHeaders, statusCode, handshakeHeaders)
 		}
 		if err == nil {
+			if !searchInitFallback && account.IsOpenAIOAuthLike() && s.cfg != nil && s.cfg.Gateway.OpenAIWS.SearchInitEnabled && hostedAvailable == 0 {
+				var payload map[string]any
+				if decodeErr := json.Unmarshal(firstClientMessage, &payload); decodeErr != nil {
+					_ = upstreamConn.Close()
+					return decodeErr
+				}
+				initConn := newOpenAIWSConn("passthrough-search-init", account.ID, &openAIWSSearchInitConn{upstreamConn}, handshakeHeaders)
+				initLease := &openAIWSConnLease{conn: initConn}
+				fallback, initErr := s.initializeOpenAIWSSearch(ctx, initLease, payload, account)
+				if initErr != nil {
+					_ = upstreamConn.Close()
+					if fallback {
+						searchInitFallback = true
+						continue
+					}
+					var failure *openAIWSSearchUpstreamError
+					if errors.As(initErr, &failure) {
+						writeCtx, cancel := newOpenAIWSDownstreamWriteContext(ctx, hooks, s.openAIWSWriteTimeout())
+						_ = clientConn.Write(writeCtx, coderws.MessageText, failure.Event)
+						cancel()
+					}
+					return initErr
+				}
+				hostedAvailable |= openAIWSHostedWebSearch
+			}
 			break
 		}
 		var handshakeErr *openAIWSHandshakeError
@@ -958,6 +986,38 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	upstreamFrameConn, ok := upstreamConn.(openaiwsv2.FrameConn)
 	if !ok {
 		return errors.New("openai ws passthrough upstream connection does not support frame relay")
+	}
+	if account.IsOpenAIOAuthLike() {
+		hostedRelay := newOpenAIWSHostedRelayConn(upstreamFrameConn, hostedAvailable, hostedAvailable != 0, func(redialCtx context.Context) (openaiwsv2.FrameConn, error) {
+			nextHeaders, refreshErr := s.refreshOpenAIWSAuthHeaders(redialCtx, account, cloneHeader(headers))
+			if refreshErr != nil {
+				return nil, refreshErr
+			}
+			dialCtx, cancel := context.WithTimeout(redialCtx, s.openAIWSDialTimeout())
+			defer cancel()
+			next, status, handshake, dialErr := dialer.Dial(dialCtx, wsURL, nextHeaders, proxyURL)
+			if observeHandshake != nil {
+				observeHandshake(nextHeaders, status, handshake)
+			}
+			if dialErr != nil {
+				return nil, s.mapOpenAIWSPassthroughDialError(dialErr, status, handshake)
+			}
+			frames, ok := next.(openaiwsv2.FrameConn)
+			if !ok {
+				_ = next.Close()
+				return nil, errors.New("hosted tool connection does not support frame relay")
+			}
+			return frames, nil
+		}, func(err error) {
+			var failure *openAIWSSearchUpstreamError
+			if errors.As(err, &failure) {
+				writeCtx, cancel := newOpenAIWSDownstreamWriteContext(ctx, hooks, s.openAIWSWriteTimeout())
+				defer cancel()
+				_ = clientConn.Write(writeCtx, coderws.MessageText, failure.Event)
+			}
+		})
+		defer hostedRelay.Close()
+		upstreamFrameConn = hostedRelay
 	}
 	relayUpstreamFrameConn := &openAIWSPassthroughFirstOutputFrameConn{
 		inner:             upstreamFrameConn,
@@ -1037,7 +1097,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			responsesLite := isResponseCreate && isOpenAIResponsesLiteWebSocketPayload(payload)
 			if isResponseCreate {
 				payload = normalizeOpenAIRequestLocale(ctx, account, payload, "ws")
-				if normalized, compatibilityChanged, normalizeErr := normalizeOpenAIResponsesWebSocketCompatibilityBody(payload, account, responsesLite); normalizeErr != nil {
+				if normalized, compatibilityChanged, normalizeErr := normalizeOpenAIResponsesWebSocketCompatibilityBodyWithConfig(s.cfg, payload, account, responsesLite); normalizeErr != nil {
 					return payload, nil, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", normalizeErr)
 				} else if compatibilityChanged {
 					payload = normalized

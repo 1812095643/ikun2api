@@ -627,12 +627,13 @@ func TestApplyCodexOAuthTransform_AddsFallbackNameForFunctionCallInput(t *testin
 
 	input, ok := reqBody["input"].([]any)
 	require.True(t, ok)
-	require.Len(t, input, 2)
+	require.Len(t, input, 3)
 	item, ok := input[1].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, "function_call", item["type"])
 	require.Equal(t, "tool", item["name"])
 	require.Equal(t, "fc_1", item["call_id"])
+	require.Equal(t, map[string]any{"type": "function_call_output", "call_id": "fc_1", "output": "aborted"}, input[2])
 }
 
 func TestApplyCodexOAuthTransform_PreservesFunctionCallInputName(t *testing.T) {
@@ -647,11 +648,12 @@ func TestApplyCodexOAuthTransform_PreservesFunctionCallInputName(t *testing.T) {
 
 	input, ok := reqBody["input"].([]any)
 	require.True(t, ok)
-	require.Len(t, input, 1)
+	require.Len(t, input, 2)
 	item, ok := input[0].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, "shell", item["name"])
 	require.Equal(t, "ctc_1", item["call_id"])
+	require.Equal(t, map[string]any{"type": "custom_tool_call_output", "call_id": "ctc_1", "output": "aborted"}, input[1])
 }
 
 func TestApplyCodexOAuthTransform_PreservesMCPToolCallIDAndName(t *testing.T) {

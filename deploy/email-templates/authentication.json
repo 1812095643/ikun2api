@@ -1,0 +1,29 @@
+[
+  {
+    "event": "auth.password_reset",
+    "locales": [
+      "zh",
+      "en"
+    ],
+    "subject": "[{{site_name}}] 重置您的登录密码",
+    "html_file": "auth.password_reset.zh.html"
+  },
+  {
+    "event": "auth.verify_code",
+    "locales": [
+      "zh",
+      "en"
+    ],
+    "subject": "[{{site_name}}] 您的邮箱验证码",
+    "html_file": "auth.verify_code.zh.html"
+  },
+  {
+    "event": "notification_email.verify_code",
+    "locales": [
+      "zh",
+      "en"
+    ],
+    "subject": "[{{site_name}}] 验证您的通知邮箱",
+    "html_file": "notification_email.verify_code.zh.html"
+  }
+]

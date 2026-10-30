@@ -29,6 +29,11 @@ import (
 //	          └─ 失败 → 设置模型限流 + 清除粘性绑定 → 切换账号
 func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte, isStickySession bool) (*ForwardResult, error) {
 	beginUpstreamResponseModelObservation(c)
+	cleanBody, privacyErr := sanitizeClaudePrivacyBody(body)
+	if privacyErr != nil {
+		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", privacyErr.Error())
+	}
+	body = cleanBody
 	// 上游透传账号直接转发，不走 OAuth token 刷新
 	if account.Type == AccountTypeUpstream {
 		return s.ForwardUpstream(ctx, c, account, body)
@@ -61,6 +66,9 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 	// 应用 thinking 模式自动后缀：如果 thinking 开启且目标是 claude-sonnet-4-5，自动改为 thinking 版本
 	thinkingEnabled := claudeReq.Thinking != nil && (claudeReq.Thinking.Type == "enabled" || claudeReq.Thinking.Type == "adaptive")
 	mappedModel = applyThinkingModelSuffix(mappedModel, thinkingEnabled)
+	if geminiImageGenerationDenied(c, nil, originalModel, mappedModel) {
+		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", ImageGenerationPermissionMessage())
+	}
 	billingModel := mappedModel
 
 	// 获取 access_token

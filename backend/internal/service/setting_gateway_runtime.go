@@ -98,7 +98,7 @@ const antigravityUserAgentVersionErrorTTL = 5 * time.Second
 const antigravityUserAgentVersionDBTimeout = 5 * time.Second
 
 // DefaultOpenAICodexUserAgent 是 OpenAI Codex 默认 User-Agent，用于规避浏览器 UA 的质询。
-// 默认采用 codex-tui 身份，版本段随 codexCLIVersion 一起更新。
+// 默认采用 codex_cli_rs 身份，避免历史 codex-tui 出口触发 sub2api 的身份风控指纹。
 const DefaultOpenAICodexUserAgent = codexCLIUserAgent
 
 // cachedOpenAICodexUserAgent 缓存 OpenAI Codex UA（进程内缓存，60s TTL）
@@ -482,7 +482,7 @@ func (s *SettingService) GetOpenAICodexUserAgent(ctx context.Context) string {
 
 // GetOpenAICodexClientVersion 返回出站声明的 Codex 客户端版本号。
 // 优先级：管理员在面板覆写的版本 → 自动同步到的官方最新稳定版 → 内置常量。
-// 上游在容量紧张时按客户端身份分优先级降载，陈旧版本会被优先丢弃，故该值需保持跟随官方发布；
+// 上游会按客户端身份进行风控分层，陈旧版本可能被优先丢弃，故该值需保持跟随官方发布；
 // 自动同步让运维不必为了跟版本而发新版本。
 func (s *SettingService) GetOpenAICodexClientVersion(ctx context.Context) string {
 	fallback := codexCLIVersion
@@ -562,15 +562,10 @@ func NormalizeClaudeCodeClientVersion(version string) string {
 	return normalized
 }
 
-// GetClaudeCodeClientVersion 返回出站声明的 Claude Code CLI 客户端版本号。
-// 优先级：管理员在面板覆写的版本 → 自动同步到的官方最新版本 → claude.CLIVersion()
-// （环境变量 SUB2API_CLAUDE_CLI_VERSION 覆盖 + 内置基线）。
-// 版本太旧会被 Anthropic 拒绝（HTTP 400 claude_code_version_too_old），故该值需保持跟随官方发布。
-//
-// ⚠️ 一致性约束：同一次请求里，拼 User-Agent（claude-cli/<版本>）的版本号和用于
-// billing attribution 的版本号必须是同一个值，否则 Anthropic 侧对不上、判为非正版客户端。
-// 因此调用点必须在一次请求内只取一次本函数并复用；本缓存的唯一主动变更点是
-// 同步任务写入后调用 InvalidateClaudeCodeClientVersionCache，60s TTL 不会在极短时间内抖动。
+// GetClaudeCodeClientVersion selects a reviewed client profile. The manual and
+// discovered version settings are still stored, but an unreviewed combination
+// cannot replace the active default. HTTP/SDK/runtime/TLS evidence is admitted
+// together through claude.ClientProfileForVersion.
 func (s *SettingService) GetClaudeCodeClientVersion(ctx context.Context) string {
 	fallback := claude.CLIVersion()
 	if s == nil || s.settingRepo == nil {
@@ -617,7 +612,7 @@ func (s *SettingService) GetClaudeCodeClientVersion(ctx context.Context) string 
 					"value", values[SettingKeyClaudeCodeClientVersionSynced])
 			}
 		}
-		if version == "" {
+		if _, approved := claude.ClientProfileForVersion(version); !approved {
 			version = fallback
 		}
 		s.claudeCodeVersionCache.Store(&cachedClaudeCodeClientVersion{
@@ -643,11 +638,11 @@ func (s *SettingService) InvalidateClaudeCodeClientVersionCache() {
 }
 
 // GetOpenAICodexCanonicalUserAgent 返回出站规范 Codex User-Agent。
-// 未填面板 UA 时按当前生效的客户端版本号拼出标准 Codex TUI UA。
+// 未填面板 UA 时按当前生效的客户端版本号拼出标准 Codex CLI UA。
 //
 // 面板 UA 只贡献客户端名与 OS / 架构 / 终端指纹，版本段一律用生效版本重建：该输入框是
 // 唯一能改 UA 后缀的地方，但它填写于某个历史版本，逐字沿用会把出站身份永久钉死在陈旧
-// 版本上并绕过自动同步——而陈旧身份正是上游优先降载的那一侧。
+// 版本上并绕过自动同步——而陈旧身份正是上游风控更严格的那一侧。
 // 需要固定版本请填「Codex 客户端版本号」并关闭自动同步。
 func (s *SettingService) GetOpenAICodexCanonicalUserAgent(ctx context.Context) string {
 	if s == nil {

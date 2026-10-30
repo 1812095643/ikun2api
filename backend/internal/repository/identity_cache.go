@@ -38,6 +38,9 @@ func NewIdentityCache(rdb *redis.Client) service.IdentityCache {
 func (c *identityCache) GetFingerprint(ctx context.Context, accountID int64) (*service.Fingerprint, error) {
 	key := fingerprintKey(accountID)
 	val, err := c.rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

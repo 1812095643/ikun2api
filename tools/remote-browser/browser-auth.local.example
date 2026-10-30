@@ -1,0 +1,11 @@
+[ikun-browser-auth]
+enabled = true
+backend = auto
+port = 9443
+filter = nginx-http-auth
+logpath = /var/log/nginx/ikun2api-browser-error.log
+maxretry = 8
+findtime = 10m
+bantime = 15m
+ignoreip = 127.0.0.1/8 ::1
+banaction = iptables-multiport

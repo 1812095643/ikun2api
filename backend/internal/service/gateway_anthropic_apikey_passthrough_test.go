@@ -333,7 +333,11 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_BearerAuthScheme(t *testing.T
 		"x-claude-code-prompt-id",
 		"x-anthropic-additional-protection",
 	} {
-		require.Equal(t, c.Request.Header.Get(header), msgReq.Header.Get(header), header)
+		if header == "x-claude-code-agent-id" || header == "x-claude-code-parent-agent-id" || header == "x-claude-code-prompt-id" {
+			require.Empty(t, msgReq.Header.Get(header), header)
+		} else {
+			require.Equal(t, c.Request.Header.Get(header), msgReq.Header.Get(header), header)
+		}
 	}
 
 	countReq, err := svc.buildCountTokensRequestAnthropicAPIKeyPassthrough(
@@ -352,7 +356,11 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_BearerAuthScheme(t *testing.T
 		"x-claude-code-prompt-id",
 		"x-anthropic-additional-protection",
 	} {
-		require.Equal(t, c.Request.Header.Get(header), countReq.Header.Get(header), header)
+		if header == "x-claude-code-agent-id" || header == "x-claude-code-parent-agent-id" || header == "x-claude-code-prompt-id" {
+			require.Empty(t, countReq.Header.Get(header), header)
+		} else {
+			require.Equal(t, c.Request.Header.Get(header), countReq.Header.Get(header), header)
+		}
 	}
 }
 
@@ -878,11 +886,15 @@ func TestGatewayService_AnthropicOAuth_NotAffectedByAPIKeyPassthroughToggle(t *t
 		"x-claude-code-prompt-id",
 		"x-anthropic-additional-protection",
 	} {
-		require.Equal(t, c.Request.Header.Get(header), req.Header.Get(header), header)
+		if header == "x-claude-code-agent-id" || header == "x-claude-code-parent-agent-id" || header == "x-claude-code-prompt-id" {
+			require.Empty(t, req.Header.Get(header), header)
+		} else {
+			require.Equal(t, c.Request.Header.Get(header), req.Header.Get(header), header)
+		}
 	}
 }
 
-func TestGatewayService_AnthropicOAuthMimic_RewritesSystemWithBillingBlock(t *testing.T) {
+func TestGatewayService_AnthropicOAuthMimic_PrivacyRemovesBillingBlock(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
@@ -983,18 +995,12 @@ func TestGatewayService_AnthropicOAuthMimic_RewritesSystemWithBillingBlock(t *te
 			require.True(t, system.Exists())
 			require.True(t, system.IsArray(), "system should be an array")
 			arr := system.Array()
-			require.Len(t, arr, 3, "system array should have billing block + cc prompt block + expansion block")
-
-			billingText := arr[0].Get("text").String()
-			require.Contains(t, billingText, "x-anthropic-billing-header:")
-			require.Contains(t, billingText, "cc_version="+claude.CLICurrentVersion+".")
-			require.Contains(t, billingText, "cc_entrypoint=cli;")
-
-			require.Equal(t, claudeCodeSystemPrompt, arr[1].Get("text").String())
-			require.False(t, arr[1].Get("cache_control").Exists(), "身份前缀 block 不应带 cache_control")
-
-			require.Equal(t, claudeCodeSystemPromptExpansion, arr[2].Get("text").String())
-			require.Equal(t, "ephemeral", arr[2].Get("cache_control.type").String())
+			require.Len(t, arr, 2, "出站只保留身份提示和原有扩展提示，移除自动 billing 块")
+			require.NotContains(t, string(upstream.lastBody), "x-anthropic-billing-header:")
+			require.Equal(t, claudeCodeSystemPrompt, arr[0].Get("text").String())
+			require.False(t, arr[0].Get("cache_control").Exists(), "身份前缀 block 不应带 cache_control")
+			require.Equal(t, claudeCodeSystemPromptExpansion, arr[1].Get("text").String())
+			require.Equal(t, "ephemeral", arr[1].Get("cache_control.type").String())
 
 			// 原始 system prompt 应迁移至 messages 中。
 			messages := gjson.GetBytes(upstream.lastBody, "messages")
@@ -1017,7 +1023,7 @@ func TestGatewayService_AnthropicOAuthMimic_RewritesSystemWithBillingBlock(t *te
 	}
 }
 
-func TestGatewayService_AnthropicOAuthRealClaudeCodeHaiku_AddsMissingBillingBlock(t *testing.T) {
+func TestGatewayService_AnthropicOAuthRealClaudeCodeHaiku_DoesNotAddBillingBlock(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	metadataUserID := FormatMetadataUserID(
@@ -1069,11 +1075,10 @@ func TestGatewayService_AnthropicOAuthRealClaudeCodeHaiku_AddsMissingBillingBloc
 	require.Equal(t, "real-client-package", getHeaderRaw(upstream.lastReq.Header, "X-Stainless-Package-Version"))
 	require.Equal(t, clientBeta, getHeaderRaw(upstream.lastReq.Header, "anthropic-beta"))
 	require.Empty(t, getHeaderRaw(upstream.lastReq.Header, "x-client-request-id"), "真实 CC 不应被强制写入 mimic request id")
-	require.Contains(t, gjson.GetBytes(upstream.lastBody, "system.0.text").String(), "x-anthropic-billing-header: cc_version="+claude.CLICurrentVersion+".")
-	require.Equal(t, gjson.GetBytes(body, "system.0.text").String(), gjson.GetBytes(upstream.lastBody, "system.1.text").String())
+	require.Equal(t, gjson.GetBytes(body, "system.0.text").String(), gjson.GetBytes(upstream.lastBody, "system.0.text").String())
 	require.Equal(t, metadataUserID, gjson.GetBytes(upstream.lastBody, "metadata.user_id").String())
 	require.True(t, gjson.GetBytes(upstream.lastBody, "context_management").Exists())
-	require.Contains(t, string(upstream.lastBody), "x-anthropic-billing-header:")
+	require.NotContains(t, string(upstream.lastBody), "x-anthropic-billing-header:")
 }
 
 func TestGatewayService_AnthropicOAuth_SystemPromptInjectionCanBeDisabled(t *testing.T) {

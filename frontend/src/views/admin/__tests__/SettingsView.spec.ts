@@ -5,6 +5,14 @@ import { flushPromises, mount, type DOMWrapper } from "@vue/test-utils";
 import type { DefaultPlatformQuotasMap } from "@/api/admin/settings";
 import SettingsView from "../SettingsView.vue";
 
+const ticketFeature = vi.hoisted(() => ({ enabled: true }));
+vi.mock('@/utils/featureFlags', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/utils/featureFlags')>(),
+  get CODEX_TICKET_ENABLED() { return ticketFeature.enabled; },
+}));
+
+beforeEach(() => { ticketFeature.enabled = true; });
+
 const {
   getSettings,
   updateSettings,
@@ -699,6 +707,18 @@ describe("admin SettingsView payment visible method controls", () => {
     });
     fetchPublicSettings.mockResolvedValue(undefined);
     adminSettingsFetch.mockResolvedValue(undefined);
+  });
+
+  it("hides suspended ticket controls even with a saved enabled value", async () => {
+    ticketFeature.enabled = false;
+    getSettings.mockResolvedValueOnce({ ...baseSettingsResponse, openai_codex_ticket_enabled: true });
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.find("#codex-ticket-enabled").exists()).toBe(false);
+    expect(wrapper.find("#codex-ticket-allow-without").exists()).toBe(false);
+    expect(wrapper.findComponent({ name: 'CodexTicketCadenceSettings' }).exists()).toBe(false);
+    expect(wrapper.find("#codex-probe-template").exists()).toBe(true);
+    wrapper.unmount();
   });
 
   it("defaults ticket harvesting to off and preserves a saved enabled value", async () => {

@@ -3,6 +3,12 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 
 import AccountsView from '../AccountsView.vue'
 
+const ticketFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/utils/featureFlags', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/utils/featureFlags')>(),
+  get CODEX_TICKET_ENABLED() { return ticketFeature.enabled }
+}))
+
 const { listAccounts, listWithEtag, getSettings, getById } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
@@ -114,6 +120,7 @@ afterEach(() => {
 })
 
 beforeEach(() => {
+  ticketFeature.enabled = true
   localStorage.clear()
   getSettings.mockReset().mockResolvedValue({ openai_codex_ticket_enabled: false })
   listWithEtag.mockReset().mockResolvedValue({ notModified: true, etag: 'accounts-etag', data: null })
@@ -213,6 +220,16 @@ describe('admin AccountsView ticket column', () => {
       ],
       total: 2, page: 1, page_size: 20, pages: 1
     })
+  })
+
+  it('hides suspended ticket entry points and skips settings requests', async () => {
+    ticketFeature.enabled = false
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-column="codex_ticket"]').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'CodexTicketDashboard' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'CodexDiagnosticModal' }).exists()).toBe(true)
+    expect(getSettings).not.toHaveBeenCalled()
   })
 
   it('shows counts and the column option when globally enabled, without loading row details', async () => {

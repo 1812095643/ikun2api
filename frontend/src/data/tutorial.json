@@ -1,0 +1,312 @@
+{
+  "docs": [
+    {
+      "id": "start",
+      "category": "开始使用",
+      "title": "快速开始",
+      "icon": "sparkles",
+      "description": "从一枚 API 密钥开始，把你喜欢的工具连接到 __IKUN_SITE_NAME__。",
+      "minutes": 3,
+      "body": "<div class=\"setup-summary\"><div><span class=\"summary-label\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><ellipse cx=\"12\" cy=\"12\" rx=\"4\" ry=\"9\"/><path d=\"M3 12h18\"/></svg>本站服务地址</span><div class=\"summary-value\"><code>__IKUN_API_BASE__</code><button class=\"icon-button\" data-copy=\"__IKUN_API_BASE__\" aria-label=\"复制服务地址\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg></button></div></div><div><span class=\"summary-label\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 3H6v7l-3 2 3 2v7h2m8-18h2v7l3 2-3 2v7h-2\"/></svg>OpenAI SDK Base URL</span><div class=\"summary-value\"><code>__IKUN_API_BASE__/v1</code><button class=\"icon-button\" data-copy=\"__IKUN_API_BASE__/v1\" aria-label=\"复制 OpenAI Base URL\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg></button></div></div></div><section><h2 id=\"prepare\">开始前，准备好这三样</h2><p>一个本站账户、一枚绑定了合适分组的 API Key，以及你准备使用的客户端。已有密钥可以直接跳到对应工具的配置教程。</p><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>本站提供模型 API 接入。账户余额用于本站 API 调用，与 ChatGPT、Claude 等官方产品的订阅分别管理。</p></div></section><section><h2 id=\"connect\">完成你的第一次连接</h2><ol class=\"steps\"><li class=\"step\"><h3>登录并确认余额</h3><p>打开<a href=\"__IKUN_API_BASE__/dashboard\" target=\"_blank\" rel=\"noopener noreferrer\">控制台</a>，查看账户可用余额。需要补充余额时，从<a href=\"__IKUN_API_BASE__/donate/\" target=\"_blank\" rel=\"noopener noreferrer\">赞助计划</a>进入当前购买页面，并按照订单说明完成兑换。</p></li><li class=\"step\"><h3>创建 API 密钥</h3><p>在<a href=\"__IKUN_API_BASE__/keys\" target=\"_blank\" rel=\"noopener noreferrer\">API 密钥</a>中新建密钥，按用途命名并选择分组。复制生成的 Key，保存在自己的密码管理工具中。<a href=\"#keys\">了解密钥与分组</a></p></li><li class=\"step\"><h3>选工具，填写配置</h3><p>优先使用 <a href=\"#ccswitch\">CC-Switch 导入</a>；聊天客户端填写地址、Key 和可用模型。不同工具的地址格式见<a href=\"#endpoints\">地址与协议</a>。</p></li><li class=\"step\"><h3>发一条短消息，确认完整回复</h3><p>例如“请只回复：连接成功”。看到完整正文后，打开<a href=\"__IKUN_API_BASE__/usage\" target=\"_blank\" rel=\"noopener noreferrer\">使用记录</a>核对模型与消费。仅显示“连接成功”或能获取模型列表，还不能证明实际对话可用。</p></li></ol></section><section><h2 id=\"choose\">选择你的接入方式</h2><div class=\"route-cards\"><a class=\"route-card\" href=\"#ccswitch\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"3\"/><path d=\"m7 9 3 3-3 3m7 0h3\"/></svg><div><strong>我使用编程工具</strong><span>CC-Switch、Codex 与 Claude Code</span></div><svg class=\"icon card-arrow\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a><a class=\"route-card\" href=\"#cherry\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 11.5a9 9 0 0 1-9 9c-1.5 0-3-.4-4.3-1.1L3 21l1.6-4.7A9 9 0 1 1 21 11.5Z\"/></svg><div><strong>我想在客户端聊天</strong><span>Cherry Studio、LobeChat 与 NextChat</span></div><svg class=\"icon card-arrow\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a><a class=\"route-card\" href=\"#api\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 3H6v7l-3 2 3 2v7h2m8-18h2v7l3 2-3 2v7h-2\"/></svg><div><strong>我正在写代码接入</strong><span>cURL、Python 和 Node.js 示例</span></div><svg class=\"icon card-arrow\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a><a class=\"route-card\" href=\"#help\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"m5.6 5.6 3.6 3.6m5.6 5.6 3.6 3.6m0-12.8-3.6 3.6m-5.6 5.6-3.6 3.6\"/></svg><div><strong>我在配置时遇到问题</strong><span>按现象和错误码找到解决步骤</span></div><svg class=\"icon card-arrow\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a></div></section><section><h2 id=\"confirm\">接入成功后，再开始正式任务</h2><ul class=\"check-list\"><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>密钥绑定的分组支持你选择的模型和协议。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>短消息返回了完整内容，控制台能找到对应使用记录。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>正式接入前，分别验证你要用到的图片、工具调用或长上下文能力。</span></li></ul></section>"
+    },
+    {
+      "id": "account",
+      "category": "开始使用",
+      "title": "账户与登录",
+      "icon": "user",
+      "description": "注册、邮箱验证与密码找回，遇到登录问题时从这里开始。",
+      "minutes": 2,
+      "body": "<section><h2 id=\"register\">注册与邮箱验证</h2><ol class=\"steps\"><li class=\"step\"><h3>打开本站注册页</h3><p>进入<a href=\"__IKUN_API_BASE__/register\" target=\"_blank\" rel=\"noopener noreferrer\">注册</a>，按照页面实际要求填写账户信息。可用登录方式以登录页显示为准。</p></li><li class=\"step\"><h3>检查验证码邮件</h3><p>确认邮箱地址没有拼错，再查看收件箱、垃圾邮件和拦截列表。等待页面倒计时结束后再重新发送，以最新邮件中的验证码为准。</p></li><li class=\"step\"><h3>返回控制台确认账户</h3><p>登录成功后再创建 API Key。不要把网站登录密码填写到客户端的 API Key 输入框里。</p></li></ol></section><section><h2 id=\"recover\">忘记密码或无法登录</h2><p>从<a href=\"__IKUN_API_BASE__/forgot-password\" target=\"_blank\" rel=\"noopener noreferrer\">找回密码</a>按页面提示操作。若收不到邮件，记录出现问题的时间；仍能登录时可在<a href=\"__IKUN_API_BASE__/custom/tickets\" target=\"_blank\" rel=\"noopener noreferrer\">工单页面</a>提交问题，无法登录时请通过站点公布的微信客服联系方式反馈。</p><div class=\"callout warning\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6v7m0 4h.01\"/></svg><p>不要连续尝试大量账号或密码。多次认证失败可能触发本站防护，请先确认账号信息并使用密码找回。</p></div></section>"
+    },
+    {
+      "id": "keys",
+      "category": "开始使用",
+      "title": "API 密钥与分组",
+      "icon": "key",
+      "description": "分组决定调用走哪条线路；API Key 是客户端使用这条线路的凭证。",
+      "minutes": 3,
+      "body": "<section><h2 id=\"create\">创建一枚用途明确的密钥</h2><ol class=\"steps\"><li class=\"step\"><h3>进入 API 密钥</h3><p>打开<a href=\"__IKUN_API_BASE__/keys\" target=\"_blank\" rel=\"noopener noreferrer\">API 密钥页面</a>并选择创建。使用“个人电脑”“开发环境”这类容易识别的名称。</p></li><li class=\"step\"><h3>选择对应分组</h3><p>按要调用的模型和用途选择分组。专属分组需要账户已获分配；看不到某个分组时，不要通过修改模型名来尝试绕过权限。</p></li><li class=\"step\"><h3>复制并配置客户端</h3><p>完整复制密钥，留意首尾空格、换行和中文引号。一个客户端先使用一枚密钥完成测试，再扩展到其他环境。</p></li></ol></section><section><h2 id=\"difference\">不要混淆这几个概念</h2><div class=\"table-scroll\"><table><thead><tr><th scope=\"col\">项目</th><th scope=\"col\">用途</th></tr></thead><tbody><tr><td>账户余额</td><td>支付本站的实际 API 调用费用。</td></tr><tr><td>分组</td><td>关联可用渠道、模型权限及计费规则。</td></tr><tr><td>API Key</td><td>授权客户端调用，绑定的分组与限制会影响请求。</td></tr><tr><td>密钥限额</td><td>若设置了限额，它是消费上限，不是额外赠送的余额。</td></tr><tr><td>兑换码 / 卡密</td><td>在控制台兑换权益，不能当作 API Key 使用。</td></tr></tbody></table></div></section><section><h2 id=\"protect\">保管和更换密钥</h2><ul><li>不要公开密钥，也不要把它写进公开仓库、网页前端或截图。</li><li>不同设备、开发与生产环境分别使用密钥，方便定位消费和撤销权限。</li><li>如果密钥泄露，立即在<a href=\"__IKUN_API_BASE__/keys\" target=\"_blank\" rel=\"noopener noreferrer\">密钥页</a>禁用或删除旧密钥，再创建新密钥并替换各客户端配置。</li><li>配置排查时只提供脱敏截图和请求 ID，不发送完整密钥。</li></ul></section>"
+    },
+    {
+      "id": "endpoints",
+      "category": "开始使用",
+      "title": "地址与接口协议",
+      "icon": "globe",
+      "description": "同一个站点，不同客户端的地址格式可能不同。先分清基础地址和完整端点。",
+      "minutes": 3,
+      "body": "<section><h2 id=\"addresses\">先选对你需要的地址</h2><div class=\"table-scroll\"><table><thead><tr><th scope=\"col\">使用场景</th><th scope=\"col\">应填写的地址</th></tr></thead><tbody><tr><td>OpenAI SDK / Codex 的 Base URL</td><td><code>__IKUN_API_BASE__/v1</code></td></tr><tr><td>Claude Code / Anthropic SDK 根地址</td><td><code>__IKUN_API_BASE__</code></td></tr><tr><td>要求完整 Chat Completions URL 的工具</td><td><code>__IKUN_API_BASE__/v1/chat/completions</code></td></tr><tr><td>完整 Responses API 地址</td><td><code>__IKUN_API_BASE__/v1/responses</code></td></tr><tr><td>完整 Anthropic Messages 地址</td><td><code>__IKUN_API_BASE__/v1/messages</code></td></tr><tr><td>查询当前 Key 的模型</td><td><code>__IKUN_API_BASE__/v1/models</code></td></tr></tbody></table></div></section><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>某些客户端会自动拼接 <code>/v1</code>。请根据该工具的字段说明填写，让最终请求中只出现一次 <code>/v1</code>。不要把文档地址 <code>/tutorial/</code> 当作 API 地址。</p></div><section><h2 id=\"protocols\">模型名与协议是两件事</h2><div class=\"table-scroll\"><table><thead><tr><th scope=\"col\">协议</th><th scope=\"col\">典型用途</th><th scope=\"col\">请求字段</th></tr></thead><tbody><tr><td>Responses API</td><td>Codex 与支持 Responses 的应用</td><td><code>model</code>、<code>input</code></td></tr><tr><td>Chat Completions</td><td>通用聊天客户端、翻译工具</td><td><code>model</code>、<code>messages</code></td></tr><tr><td>Anthropic Messages</td><td>Claude Code、Anthropic SDK</td><td><code>model</code>、<code>messages</code>、<code>max_tokens</code></td></tr></tbody></table></div><p>选择了某个模型，不代表所有协议和工具都自动兼容。先核对分组支持的接口，再选客户端中的协议类型。</p></section><section><h2 id=\"diagnose-url\">地址不对时怎样识别</h2><ul><li>出现 <code>/v1/v1/</code>：版本前缀重复，删除多出的那一段。</li><li>出现 <code>/responses/responses</code>：把完整端点误填到了 Base URL。</li><li>返回网页 HTML 而不是接口结果：检查实际请求 URL，确认没有调用首页或文档路径。</li><li>地址正确仍无法调用：继续检查 HTTP 方法、分组权限、模型名和错误正文。</li></ul></section>"
+    },
+    {
+      "id": "models",
+      "category": "开始使用",
+      "title": "模型与能力",
+      "icon": "layers",
+      "description": "以当前密钥能够访问的模型为准，不依赖固定的模型清单。",
+      "minutes": 2,
+      "body": "<section><h2 id=\"discover\">查找当前可用模型</h2><p>在<a href=\"__IKUN_API_BASE__/model-square/\" target=\"_blank\" rel=\"noopener noreferrer\">模型广场</a>查看模型介绍和定价；在客户端使用“获取模型”查询当前 Key 的可用列表。两者用途不同，广场可见不代表当前 Key 已有调用权限。</p><p>下面的命令使用环境变量中的本站密钥。还没设置环境变量时，先看<a href=\"#api/environment\">开发者示例</a>。</p><div class=\"code-block\" data-code-group=\"0\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-0-0\" aria-controls=\"code-panel-0-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">PowerShell</button><button type=\"button\" role=\"tab\" id=\"code-tab-0-1\" aria-controls=\"code-panel-0-1\" aria-selected=\"false\" tabindex=\"-1\" data-code-tab=\"1\">macOS / Linux</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"0\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-0-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-0-0\" tabindex=\"0\"><code>$headers = @{ Authorization = &quot;Bearer $env:SUB2API_API_KEY&quot; }\nInvoke-RestMethod -Uri &quot;__IKUN_API_BASE__/v1/models&quot; -Headers $headers</code></pre><pre id=\"code-panel-0-1\" role=\"tabpanel\" aria-labelledby=\"code-tab-0-1\" tabindex=\"0\" hidden><code>curl __IKUN_API_BASE__/v1/models \\\n  -H &quot;Authorization: Bearer $SUB2API_API_KEY&quot;</code></pre></div></section><section><h2 id=\"model-id\">完整复制模型 ID</h2><ul><li>严格保留模型名中的大小写、连字符、点号、版本号与后缀。</li><li>分组名称不是模型 ID，例如分组叫“Gemini cli”也不能直接把这个名称发给模型接口。</li><li>客户端自动发现不成功时，可以手动添加已确认可用的模型；不要凭印象猜名称。</li></ul></section><section><h2 id=\"capabilities\">分别确认你需要的能力</h2><p>纯文本调用成功后，再分别验证图像输入、生图、工具调用和流式输出。生图模型需要使用其对应接口，分辨率价格与文本 Token 价格不是一回事。</p><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>实时价格以<a href=\"__IKUN_API_BASE__/model-square/\" target=\"_blank\" rel=\"noopener noreferrer\">模型广场</a>、当前分组配置和<a href=\"__IKUN_API_BASE__/usage\" target=\"_blank\" rel=\"noopener noreferrer\">使用记录</a>为准；状态检测是采样参考，不代表每一次请求的完整能力。</p></div></section>"
+    },
+    {
+      "id": "balance",
+      "category": "账户与用量",
+      "title": "余额、兑换与计费",
+      "icon": "wallet",
+      "description": "本站使用余额消费。购买、兑换和实际调用是三个不同步骤。",
+      "minutes": 3,
+      "body": "<section><h2 id=\"balance-rules\">余额怎样使用</h2><p>当前赞助方案为余额包，不再采用月卡方案。账户余额用于 API 调用，具体包档、价格和积分数量以当前赞助页面为准。</p><p><a href=\"__IKUN_API_BASE__/donate/\" target=\"_blank\" rel=\"noopener noreferrer\">查看赞助计划</a> · <a href=\"__IKUN_API_BASE__/dashboard\" target=\"_blank\" rel=\"noopener noreferrer\">查看账户余额</a></p></section><section><h2 id=\"redeem\">购买后确认到账</h2><ol class=\"steps\"><li class=\"step\"><h3>确认购买入口</h3><p>从本站赞助计划进入对应的购买页面，核对包档和订单信息。</p></li><li class=\"step\"><h3>按订单说明兑换</h3><p>如果订单提供兑换码，在<a href=\"__IKUN_API_BASE__/redeem\" target=\"_blank\" rel=\"noopener noreferrer\">兑换页面</a>提交；不要把卡密填进客户端。其他交付方式按实际订单说明操作。</p></li><li class=\"step\"><h3>核对账户与使用记录</h3><p>确认登录的是购买时准备使用的账户，再核对余额变化。未到账时保留订单编号、购买时间和脱敏截图，<a href=\"__IKUN_API_BASE__/custom/tickets\" target=\"_blank\" rel=\"noopener noreferrer\">提交工单</a>等待回复，也可以联系微信客服；不要重复付款。</p></li></ol></section><section><h2 id=\"billing\">费用为什么会不同</h2><p>文本模型通常分别计算输入、输出及缓存相关 Token；不同模型、分组和计费方式对应不同价格。生图等按次或分辨率计费的模型，需要查看对应规则。</p><div class=\"table-scroll\"><table><thead><tr><th scope=\"col\">核对项</th><th scope=\"col\">需要关注</th></tr></thead><tbody><tr><td>模型与分组</td><td>同名模型走不同分组时，渠道和倍率可能不同。</td></tr><tr><td>输入与输出</td><td>历史对话、系统提示、工具定义都可能增加输入量。</td></tr><tr><td>缓存</td><td>仅实际命中缓存的部分按对应规则核算，不是所有输入都会命中。</td></tr><tr><td>最终消费</td><td>按使用记录中的实际用量和费用核对，不凭一次客户端估算判断。</td></tr></tbody></table></div><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>本站余额、客户端订阅、ChatGPT / Claude 官方订阅分别管理，彼此不会自动充值或互相抵扣。</p></div></section>"
+    },
+    {
+      "id": "usage",
+      "category": "账户与用量",
+      "title": "使用记录与费用核对",
+      "icon": "chart",
+      "description": "用同一条请求的时间、密钥、模型和用量来定位问题。",
+      "minutes": 2,
+      "body": "<section><h2 id=\"find-request\">找到对应的请求</h2><ol class=\"steps\"><li class=\"step\"><h3>打开使用记录</h3><p>进入<a href=\"__IKUN_API_BASE__/usage\" target=\"_blank\" rel=\"noopener noreferrer\">使用记录</a>，按发生时间、模型或密钥筛选。注意客户端和控制台的时区是否一致。</p></li><li class=\"step\"><h3>核对模型、分组和 Token</h3><p>查看请求实际使用的模型与分组，比较输入、输出、缓存等字段。长会话会重复携带历史上下文，用量可能高于最后一条消息的长度。</p></li><li class=\"step\"><h3>保留请求标识</h3><p>需要协助时提供请求 ID（如有）、时间、客户端版本和脱敏错误信息，方便管理员查找同一条记录。</p></li></ol></section><section><h2 id=\"unexpected\">用量和预期不一致</h2><ul><li>检查客户端是否同时启用了多轮代理任务、自动重试、后台总结或多模型对比。</li><li>多个设备共用密钥时，先按设备拆分密钥，再观察各自的使用记录。</li><li>流式中断不代表没有产生用量。不要在不确认请求状态的情况下反复重发大型任务。</li><li>查不到记录时，先核对客户端实际请求的域名与密钥，确认没有使用旧供应商。</li></ul></section>"
+    },
+    {
+      "id": "ccswitch",
+      "category": "工具接入",
+      "title": "CC-Switch 一键导入",
+      "icon": "switch",
+      "badge": "推荐",
+      "description": "从控制台导入配置，再在 CC-Switch 中启用对应应用的供应商。",
+      "minutes": 3,
+      "body": "<section><h2 id=\"install\">先安装桌面客户端</h2><p>前往<a href=\"https://github.com/farion1231/cc-switch/releases\" target=\"_blank\" rel=\"noopener noreferrer\">CC-Switch 官方 Releases</a>，选择适合系统的安装包。源码 ZIP 不是安装包。安装后打开客户端一次，确认窗口或托盘图标存在。</p></section><section><h2 id=\"import\">导入并启用</h2><ol class=\"steps\"><li class=\"step\"><h3>准备对应分组的 Key</h3><p>在<a href=\"__IKUN_API_BASE__/keys\" target=\"_blank\" rel=\"noopener noreferrer\">API 密钥</a>中创建或选择密钥，确保分组支持要配置的应用与模型。</p></li><li class=\"step\"><h3>从控制台发起导入</h3><p>使用 Chrome、Edge、Safari 等系统浏览器，在密钥相关操作中选择“导入到 CCS”。若浏览器询问是否打开外部应用，确认目标是已安装的 CC-Switch。</p></li><li class=\"step\"><h3>确认供应商并启用</h3><p>检查请求地址、密钥、模型映射以及目标应用，再保存和启用。导入条目不等于已经切换为当前供应商。</p></li><li class=\"step\"><h3>重新启动目标应用</h3><p>保存工作后完整退出 Codex、Claude Code 或承载插件的编辑器，再重新打开并发一条短消息验证。</p></li></ol></section><section><h2 id=\"import-help\">点击后没有反应</h2><ul class=\"check-list\"><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>不要使用微信、QQ 等应用内置浏览器；它们可能拦截本地应用协议。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>确认安装的是桌面客户端，并在系统中正确注册了打开链接的能力。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>完全退出 CC-Switch 后重开，再从控制台重试一次。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>仍无法导入时使用<a href=\"#codex\">Codex 手动配置</a>或<a href=\"#claude\">Claude Code 配置</a>。</span></li></ul></section><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>CC-Switch 支持的目标应用和写入方式由其版本决定。不会因为启用了一个供应商，就自动修改所有编辑器和聊天客户端。恢复配置时优先使用应用的备份或切换功能，不要随意删除整个配置目录。</p></div>"
+    },
+    {
+      "id": "codex",
+      "category": "工具接入",
+      "title": "Codex / VS Code / Cursor",
+      "icon": "terminal",
+      "description": "通过 CC-Switch，或在用户配置中设置支持 Responses API 的自定义供应商。",
+      "minutes": 4,
+      "body": "<section><h2 id=\"codex-choice\">选择配置方式</h2><p>已安装 CC-Switch 时先看<a href=\"#ccswitch\">一键导入</a>。下面是 Codex CLI 的手动方式；VS Code、Cursor 中的 Codex 扩展需确认使用同一用户配置和环境。这里配置的是 Codex，不等于修改编辑器自身的所有 AI 功能。</p></section><section><h2 id=\"codex-config\">合并用户配置</h2><p>用户配置通常位于 <code>~/.codex/config.toml</code>，Windows 对应 <code>%USERPROFILE%\\.codex\\config.toml</code>。供应商配置放在用户级配置中，不要写入项目配置来替代。</p><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>修改配置前保留原文件，将下面的字段合并进去。已有同名配置时修改原字段，不要重复添加，也不要整份覆盖其他设置。</p></div><div class=\"code-block\" data-code-group=\"1\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-1-0\" aria-controls=\"code-panel-1-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">config.toml</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"1\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-1-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-1-0\" tabindex=\"0\"><code>model_provider = &quot;ikun&quot;\nmodel = &quot;gpt-5.4&quot;\n\n[model_providers.ikun]\nname = &quot;ikun API&quot;\nbase_url = &quot;__IKUN_API_BASE__/v1&quot;\nenv_key = &quot;SUB2API_API_KEY&quot;\nwire_api = &quot;responses&quot;</code></pre></div><p>以下 <code>gpt-5.4</code> 仅作模型名示例。请先查询当前密钥可用模型，再替换为其中的完整名称；密钥需要绑定支持对应协议的分组。</p></section><section><h2 id=\"codex-key\">设置密钥并启动</h2><p>将示例密钥换成本站创建的 API Key，在同一个终端窗口启动 Codex。以下环境变量仅对当前终端及其子进程生效；从桌面图标启动的应用不会自动继承这个终端的变量。</p><div class=\"code-block\" data-code-group=\"2\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-2-0\" aria-controls=\"code-panel-2-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">PowerShell</button><button type=\"button\" role=\"tab\" id=\"code-tab-2-1\" aria-controls=\"code-panel-2-1\" aria-selected=\"false\" tabindex=\"-1\" data-code-tab=\"1\">macOS / Linux</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"2\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-2-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-2-0\" tabindex=\"0\"><code>$env:SUB2API_API_KEY = &quot;sk-your-api-key&quot;\n$env:SUB2API_MODEL = &quot;gpt-5.4&quot;\ncodex</code></pre><pre id=\"code-panel-2-1\" role=\"tabpanel\" aria-labelledby=\"code-tab-2-1\" tabindex=\"0\" hidden><code>export SUB2API_API_KEY=&quot;sk-your-api-key&quot;\nexport SUB2API_MODEL=&quot;gpt-5.4&quot;\ncodex</code></pre></div></section><section><h2 id=\"codex-check\">验证与恢复</h2><ul class=\"check-list\"><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>发送一条短消息，并到本站使用记录核对是否走了正确的密钥和模型。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>启用了 profile 或多套配置时，确认当前选中的配置没有覆盖供应商设置。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>切换后看不到旧会话时，先检查账户、工作目录、历史列表和原配置。不要删除历史文件来排错。</span></li></ul></section><div class=\"source-links\"><a href=\"https://learn.chatgpt.com/docs/config-file/config-advanced\" target=\"_blank\" rel=\"noopener noreferrer\">Codex 官方配置说明<svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a></div>"
+    },
+    {
+      "id": "claude",
+      "category": "工具接入",
+      "title": "Claude Code / Anthropic",
+      "icon": "sparkles",
+      "description": "使用 Anthropic 兼容协议，根地址不追加 /v1。",
+      "minutes": 3,
+      "body": "<section><h2 id=\"claude-fields\">填写正确的供应商配置</h2><div class=\"table-scroll\"><table><thead><tr><th scope=\"col\">字段</th><th scope=\"col\">内容</th></tr></thead><tbody><tr><td>请求地址</td><td><code>__IKUN_API_BASE__</code></td></tr><tr><td>认证字段</td><td><code>ANTHROPIC_AUTH_TOKEN</code></td></tr><tr><td>密钥</td><td>本站创建、绑定 Claude / Anthropic 可用分组的 API Key。</td></tr><tr><td>模型映射</td><td>从当前分组的可用模型中选择完整 ID，不自行补 thinking 等后缀。</td></tr></tbody></table></div><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>在 CC-Switch 中编辑 Anthropic 供应商时，确认认证字段与模型映射。本站接入使用主域名，无需自行改成 Kiro 子域名。</p></div></section><section><h2 id=\"claude-terminal\">终端启动方式</h2><p>已安装 Claude Code 后，在同一个终端中设置变量并启动。选择当前 Key 能调用的 Claude 模型。如果已有其他 Anthropic 认证配置，先确认当前使用的认证方式，避免混用旧供应商的密钥。</p><div class=\"code-block\" data-code-group=\"3\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-3-0\" aria-controls=\"code-panel-3-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">PowerShell</button><button type=\"button\" role=\"tab\" id=\"code-tab-3-1\" aria-controls=\"code-panel-3-1\" aria-selected=\"false\" tabindex=\"-1\" data-code-tab=\"1\">macOS / Linux</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"3\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-3-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-3-0\" tabindex=\"0\"><code>$env:ANTHROPIC_BASE_URL = &quot;__IKUN_API_BASE__&quot;\n$env:ANTHROPIC_AUTH_TOKEN = &quot;sk-your-api-key&quot;\nclaude</code></pre><pre id=\"code-panel-3-1\" role=\"tabpanel\" aria-labelledby=\"code-tab-3-1\" tabindex=\"0\" hidden><code>export ANTHROPIC_BASE_URL=&quot;__IKUN_API_BASE__&quot;\nexport ANTHROPIC_AUTH_TOKEN=&quot;sk-your-api-key&quot;\nclaude</code></pre></div></section><section><h2 id=\"claude-faq\">已经保存，但还是使用旧配置</h2><ul><li>保存工作，完整退出 Claude Code 或承载它的编辑器，再重新启动。</li><li>确认环境变量对启动进程可见，且没有项目级或其他配置覆盖。</li><li>403 时先检查账户余额、密钥限额和分组权限；404 或模型不可用时核对完整模型 ID，不要只反复更换 API 地址。</li></ul></section><div class=\"source-links\"><a href=\"https://code.claude.com/docs/en/llm-gateway-connect\" target=\"_blank\" rel=\"noopener noreferrer\">Claude Code 网关接入说明<svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a></div>"
+    },
+    {
+      "id": "cherry",
+      "category": "工具接入",
+      "title": "Cherry Studio",
+      "icon": "cherry",
+      "description": "为日常聊天添加自定义供应商，先获取可用模型，再开始对话。",
+      "minutes": 3,
+      "body": "<section><h2 id=\"cherry-provider\">添加一个自定义供应商</h2><ol class=\"steps\"><li class=\"step\"><h3>打开提供商设置</h3><p>在设置中找到模型服务或提供商，添加自定义提供商。菜单名称可能随版本变化。</p></li><li class=\"step\"><h3>选择兼容协议</h3><p>调用 OpenAI 兼容分组时选择 OpenAI / OpenAI Compatible；调用 Anthropic 分组时，使用对应的 Anthropic 类型。不要只看模型品牌来猜接口协议。</p></li><li class=\"step\"><h3>填写地址和密钥</h3><p>在 OpenAI 类型下，优先按客户端对 API 地址的说明填写；如果客户端自动补 /v1，使用本站根地址。如果要求含版本的 Base URL，则使用 /v1 地址。</p></li><li class=\"step\"><h3>获取模型并实际聊天</h3><p>获取模型列表，启用需要的模型，选择它发一条短消息。检测按钮成功后仍要验证完整正文。</p></li></ol></section><section><h2 id=\"cherry-values\">配置速查</h2><div class=\"table-scroll\"><table><thead><tr><th scope=\"col\">项目</th><th scope=\"col\">值</th></tr></thead><tbody><tr><td>提供商名称</td><td>__IKUN_SITE_NAME__</td></tr><tr><td>本站根地址</td><td><code>__IKUN_API_BASE__</code></td></tr><tr><td>含版本的 Base URL</td><td><code>__IKUN_API_BASE__/v1</code></td></tr><tr><td>API Key</td><td>从本站控制台复制的密钥。</td></tr><tr><td>模型</td><td>当前 Key 查询到的完整模型 ID。</td></tr></tbody></table></div></section><section><h2 id=\"cherry-trouble\">模型列表为空或对话失败</h2><p>先检查 Key 是否启用、绑定分组是否正确，以及最终请求有没有重复的 <code>/v1/v1</code>。若软件版本不支持当前分组的协议，改用支持该协议的客户端，或选择相应的可用分组。</p></section>"
+    },
+    {
+      "id": "lobechat",
+      "category": "工具接入",
+      "title": "LobeChat / NextChat",
+      "icon": "message-circle",
+      "description": "在网页聊天工具中设置自定义接口地址，并确认请求由哪里发出。",
+      "minutes": 3,
+      "body": "<section><h2 id=\"web-config\">打开自定义接口配置</h2><ol class=\"steps\"><li class=\"step\"><h3>找到模型服务设置</h3><p>在设置中选择 OpenAI 兼容服务，启用自定义接口地址或代理地址。</p></li><li class=\"step\"><h3>填写本站地址和 Key</h3><p>如果字段要求 Base URL，填写 <code>__IKUN_API_BASE__/v1</code>；如果明确会自动添加 /v1，填写根地址 <code>__IKUN_API_BASE__</code>。最终请求应是本站对应的完整接口地址。</p></li><li class=\"step\"><h3>填写可用模型</h3><p>使用当前密钥可用的完整模型名，发送简短消息，并在本站使用记录中核对。</p></li></ol></section><section><h2 id=\"web-deploy\">自建网页版时要检查什么</h2><ul><li>客户端配置和服务器环境变量可能同时存在，确认哪个值实际生效。</li><li>如果请求通过你自建的服务端转发，需要确认该服务器能访问本站，不能只测试自己的浏览器。</li><li>浏览器直接调用受跨域限制影响；自建应用宜由服务端持有密钥并转发请求。不要公开部署带有个人密钥的前端。</li></ul></section><section><h2 id=\"web-errors\">一直加载或返回空白</h2><p>检查实际 HTTP 状态、响应类型与流式事件。响应是 HTML 时先修地址；收到 429 时降低并发；收到正文但界面不显示时检查客户端协议解析。详见<a href=\"#errors\">按错误排查</a>。</p></section>"
+    },
+    {
+      "id": "immersive",
+      "category": "工具接入",
+      "title": "沉浸式翻译",
+      "icon": "languages",
+      "description": "使用 OpenAI 兼容接口翻译网页。这里通常需要填写完整请求地址。",
+      "minutes": 2,
+      "body": "<section><h2 id=\"translate-config\">设置翻译服务</h2><ol class=\"steps\"><li class=\"step\"><h3>打开翻译服务设置</h3><p>进入插件设置，选择 OpenAI 或对应的 OpenAI 兼容服务，并展开自定义接口相关选项。</p></li><li class=\"step\"><h3>填写完整接口地址</h3><p>自定义 API URL 填写 <code>__IKUN_API_BASE__/v1/chat/completions</code>，再填入本站 API Key。</p></li><li class=\"step\"><h3>选择模型并测试小段文字</h3><p>模型名按当前 Key 可用列表完整复制。先翻译一小段，再翻译整页。该分组需支持 Chat Completions 协议。</p></li></ol></section><section><h2 id=\"translate-cost\">控制翻译用量</h2><p>长网页、多次刷新与批量翻译都可能产生额外请求。先从少量段落测试，遇到限流减少并发，在使用记录中观察实际消费。</p></section>"
+    },
+    {
+      "id": "openclaw",
+      "category": "工具接入",
+      "title": "OpenClaw",
+      "icon": "bot",
+      "description": "把本站添加为自定义模型供应商，并明确指定对应的接口协议。",
+      "minutes": 4,
+      "body": "<section><h2 id=\"openclaw-prepare\">准备已安装的 OpenClaw</h2><p>安装和运行环境要求请以<a href=\"https://docs.openclaw.ai/\" target=\"_blank\" rel=\"noopener noreferrer\">OpenClaw 官方文档</a>为准。完成安装后，准备本站 Key 和一个当前分组可用的模型。</p><p>下面使用 <code>openai-responses</code>。如果分组支持的是 Chat Completions，应改为 <code>openai-completions</code>，不要混用请求协议。</p></section><section><h2 id=\"openclaw-config\">合并供应商配置</h2><p>在 <code>~/.openclaw/openclaw.json</code> 中合并下面的内容。供应商位于顶层 <code>models.providers</code>，默认模型使用 <code>供应商 ID/模型 ID</code>。</p><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>修改配置前保留原文件，将下面的字段合并进去。已有同名配置时修改原字段，不要重复添加，也不要整份覆盖其他设置。</p></div><div class=\"code-block\" data-code-group=\"4\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-4-0\" aria-controls=\"code-panel-4-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">openclaw.json</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"4\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-4-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-4-0\" tabindex=\"0\"><code>{\n  &quot;models&quot;: {\n    &quot;mode&quot;: &quot;merge&quot;,\n    &quot;providers&quot;: {\n      &quot;ikun&quot;: {\n        &quot;baseUrl&quot;: &quot;__IKUN_API_BASE__/v1&quot;,\n        &quot;apiKey&quot;: &quot;${SUB2API_API_KEY}&quot;,\n        &quot;api&quot;: &quot;openai-responses&quot;,\n        &quot;models&quot;: [\n          {\n            &quot;id&quot;: &quot;gpt-5.4&quot;,\n            &quot;name&quot;: &quot;GPT via ikun&quot;\n          }\n        ]\n      }\n    }\n  },\n  &quot;agents&quot;: {\n    &quot;defaults&quot;: {\n      &quot;model&quot;: {\n        &quot;primary&quot;: &quot;ikun/gpt-5.4&quot;\n      }\n    }\n  }\n}</code></pre></div><p>以下 <code>gpt-5.4</code> 仅作模型名示例。请先查询当前密钥可用模型，再替换为其中的完整名称；密钥需要绑定支持对应协议的分组。</p></section><section><h2 id=\"openclaw-run\">让运行进程读取密钥</h2><p>示例使用 <code>${SUB2API_API_KEY}</code> 引用环境变量。请把真实 Key 配置到运行 OpenClaw 的环境中；后台服务不会自动读取你另一个终端中临时设置的变量。按所安装版本的官方方式应用配置，再验证一次简单调用。</p><div class=\"callout warning\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6v7m0 4h.01\"/></svg><p>403 也可能是账户余额不足或密钥限额用尽。先核对余额和限额，再检查权限、模型限制与网关防护；自定义 User-Agent 不是通用修复方式。</p></div></section><div class=\"source-links\"><a href=\"https://docs.openclaw.ai/gateway/config-tools/custom-providers\" target=\"_blank\" rel=\"noopener noreferrer\">OpenClaw 自定义供应商<svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a></div>"
+    },
+    {
+      "id": "desktop",
+      "category": "工具接入",
+      "title": "Claude Desktop 接入说明",
+      "icon": "monitor",
+      "description": "先区分 Claude 桌面应用和 Claude Code，避免把一种工具的设置套到另一种上。",
+      "minutes": 2,
+      "body": "<section><h2 id=\"desktop-boundary\">桌面应用不等于 Claude Code</h2><p>Claude Code 的环境变量和供应商配置不能直接视为 Claude Desktop 的通用配置。桌面应用能否使用第三方网关，取决于客户端版本、账户与支持的接入方式。</p><p>需要稳定的本站 API 接入教程时，优先选择<a href=\"#claude\">Claude Code</a>，或明确支持自定义 Anthropic 服务的客户端。</p></section><section><h2 id=\"desktop-history\">已有桌面配置需要排查</h2><ul><li>先记录客户端版本、出现问题的时间与报错原文。</li><li>检查是否因升级改变了供应商入口、模型权限或请求格式。</li><li>保留原配置与会话，不要通过删除数据目录来解决接入问题。</li></ul><p>旧版的<a href=\"__IKUN_API_BASE__/tutorial/ccswitch-claude-desktop/\" target=\"_blank\" rel=\"noopener noreferrer\">CC-Switch / Claude Desktop 历史参考</a>仍可查阅，涉及的修改方式与截图可能只适用于其对应版本。执行前请核对当前官方说明。</p></section>"
+    },
+    {
+      "id": "api",
+      "category": "开发者指南",
+      "title": "API 与 SDK 示例",
+      "icon": "braces",
+      "description": "从获取模型到发送一条真实请求。所有示例均指向本站 API。",
+      "minutes": 5,
+      "body": "<section><h2 id=\"environment\">准备密钥与模型变量</h2><p>将 <code>sk-your-api-key</code> 替换成真实密钥。示例环境变量只对当前终端生效。先获取模型列表，再把 <code>SUB2API_MODEL</code> 改成当前 Key 可用的模型 ID。</p><div class=\"code-block\" data-code-group=\"5\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-5-0\" aria-controls=\"code-panel-5-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">PowerShell</button><button type=\"button\" role=\"tab\" id=\"code-tab-5-1\" aria-controls=\"code-panel-5-1\" aria-selected=\"false\" tabindex=\"-1\" data-code-tab=\"1\">macOS / Linux</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"5\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-5-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-5-0\" tabindex=\"0\"><code>$env:SUB2API_API_KEY = &quot;sk-your-api-key&quot;\n$env:SUB2API_MODEL = &quot;gpt-5.4&quot;</code></pre><pre id=\"code-panel-5-1\" role=\"tabpanel\" aria-labelledby=\"code-tab-5-1\" tabindex=\"0\" hidden><code>export SUB2API_API_KEY=&quot;sk-your-api-key&quot;\nexport SUB2API_MODEL=&quot;gpt-5.4&quot;</code></pre></div><p>以下 <code>gpt-5.4</code> 仅作模型名示例。请先查询当前密钥可用模型，再替换为其中的完整名称；密钥需要绑定支持对应协议的分组。</p></section><section><h2 id=\"api-models\">第一步：查询可用模型</h2><div class=\"code-block\" data-code-group=\"6\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-6-0\" aria-controls=\"code-panel-6-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">PowerShell</button><button type=\"button\" role=\"tab\" id=\"code-tab-6-1\" aria-controls=\"code-panel-6-1\" aria-selected=\"false\" tabindex=\"-1\" data-code-tab=\"1\">cURL</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"6\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-6-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-6-0\" tabindex=\"0\"><code>$headers = @{ Authorization = &quot;Bearer $env:SUB2API_API_KEY&quot; }\nInvoke-RestMethod -Uri &quot;__IKUN_API_BASE__/v1/models&quot; -Headers $headers</code></pre><pre id=\"code-panel-6-1\" role=\"tabpanel\" aria-labelledby=\"code-tab-6-1\" tabindex=\"0\" hidden><code>curl __IKUN_API_BASE__/v1/models \\\n  -H &quot;Authorization: Bearer $SUB2API_API_KEY&quot;</code></pre></div></section><section><h2 id=\"responses\">Responses API</h2><p>适用于 Codex 和支持 Responses 协议的应用。下面使用流式请求；cURL 的 <code>-N</code> 关闭输出缓冲。PowerShell 示例会在请求结束后展示返回内容。</p><div class=\"code-block\" data-code-group=\"7\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-7-0\" aria-controls=\"code-panel-7-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">cURL</button><button type=\"button\" role=\"tab\" id=\"code-tab-7-1\" aria-controls=\"code-panel-7-1\" aria-selected=\"false\" tabindex=\"-1\" data-code-tab=\"1\">PowerShell</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"7\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-7-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-7-0\" tabindex=\"0\"><code>curl -N __IKUN_API_BASE__/v1/responses \\\n  -H &quot;Authorization: Bearer $SUB2API_API_KEY&quot; \\\n  -H &quot;Content-Type: application/json&quot; \\\n  --data-binary @- &lt;&lt;JSON\n{\n  &quot;model&quot;: &quot;$SUB2API_MODEL&quot;,\n  &quot;input&quot;: &quot;Reply with: connected&quot;,\n  &quot;stream&quot;: true\n}\nJSON</code></pre><pre id=\"code-panel-7-1\" role=\"tabpanel\" aria-labelledby=\"code-tab-7-1\" tabindex=\"0\" hidden><code>$headers = @{ Authorization = &quot;Bearer $env:SUB2API_API_KEY&quot; }\n$body = @{\n  model = $env:SUB2API_MODEL\n  input = &quot;Reply with: connected&quot;\n  stream = $true\n} | ConvertTo-Json\nInvoke-WebRequest -Uri &quot;__IKUN_API_BASE__/v1/responses&quot; -Method Post -Headers $headers -ContentType &quot;application/json&quot; -Body $body</code></pre></div></section><section><h2 id=\"python\">Python SDK</h2><p>安装依赖：<code>pip install openai</code>。先配置前面的环境变量，再运行所选协议的示例。</p><div class=\"code-block\" data-code-group=\"8\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-8-0\" aria-controls=\"code-panel-8-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">Responses</button><button type=\"button\" role=\"tab\" id=\"code-tab-8-1\" aria-controls=\"code-panel-8-1\" aria-selected=\"false\" tabindex=\"-1\" data-code-tab=\"1\">Chat Completions</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"8\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-8-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-8-0\" tabindex=\"0\"><code>import os\nfrom openai import OpenAI\n\nclient = OpenAI(\n    api_key=os.environ[&quot;SUB2API_API_KEY&quot;],\n    base_url=&quot;__IKUN_API_BASE__/v1&quot;,\n)\n\nstream = client.responses.create(\n    model=os.environ[&quot;SUB2API_MODEL&quot;],\n    input=&quot;Reply with: connected&quot;,\n    stream=True,\n)\nfor event in stream:\n    if event.type == &quot;response.output_text.delta&quot;:\n        print(event.delta, end=&quot;&quot;, flush=True)\n    elif event.type in (&quot;response.failed&quot;, &quot;error&quot;):\n        raise RuntimeError(str(event))\nprint()</code></pre><pre id=\"code-panel-8-1\" role=\"tabpanel\" aria-labelledby=\"code-tab-8-1\" tabindex=\"0\" hidden><code>import os\nfrom openai import OpenAI\n\nclient = OpenAI(\n    api_key=os.environ[&quot;SUB2API_API_KEY&quot;],\n    base_url=&quot;__IKUN_API_BASE__/v1&quot;,\n)\n\nresult = client.chat.completions.create(\n    model=os.environ[&quot;SUB2API_MODEL&quot;],\n    messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Reply with: connected&quot;}],\n)\nprint(result.choices[0].message.content)</code></pre></div></section><section><h2 id=\"node\">Node.js SDK</h2><p>安装依赖：<code>npm install openai</code>。将代码保存为 <code>example.mjs</code>，在同一终端执行 <code>node example.mjs</code>。</p><div class=\"code-block\" data-code-group=\"9\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-9-0\" aria-controls=\"code-panel-9-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">Responses</button><button type=\"button\" role=\"tab\" id=\"code-tab-9-1\" aria-controls=\"code-panel-9-1\" aria-selected=\"false\" tabindex=\"-1\" data-code-tab=\"1\">Chat Completions</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"9\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-9-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-9-0\" tabindex=\"0\"><code>import OpenAI from &quot;openai&quot;;\n\nconst client = new OpenAI({\n  apiKey: process.env.SUB2API_API_KEY,\n  baseURL: &quot;__IKUN_API_BASE__/v1&quot;,\n});\n\nconst stream = await client.responses.create({\n  model: process.env.SUB2API_MODEL,\n  input: &quot;Reply with: connected&quot;,\n  stream: true,\n});\nfor await (const event of stream) {\n  if (event.type === &quot;response.output_text.delta&quot;) {\n    process.stdout.write(event.delta);\n  } else if ([&quot;response.failed&quot;, &quot;error&quot;].includes(event.type)) {\n    throw new Error(JSON.stringify(event));\n  }\n}\nprocess.stdout.write(&quot;\\n&quot;);</code></pre><pre id=\"code-panel-9-1\" role=\"tabpanel\" aria-labelledby=\"code-tab-9-1\" tabindex=\"0\" hidden><code>import OpenAI from &quot;openai&quot;;\n\nconst client = new OpenAI({\n  apiKey: process.env.SUB2API_API_KEY,\n  baseURL: &quot;__IKUN_API_BASE__/v1&quot;,\n});\nconst result = await client.chat.completions.create({\n  model: process.env.SUB2API_MODEL,\n  messages: [{ role: &quot;user&quot;, content: &quot;Reply with: connected&quot; }],\n});\nconsole.log(result.choices[0].message.content);</code></pre></div></section><section><h2 id=\"anthropic\">Anthropic SDK</h2><p>安装依赖：<code>pip install anthropic</code>，并把 <code>SUB2API_MODEL</code> 设为当前 Key 可用的 Claude 模型。这里的 <code>base_url</code> 不带 <code>/v1</code>。</p><div class=\"code-block\" data-code-group=\"10\"><div class=\"code-toolbar\"><div class=\"code-tabs\" role=\"tablist\" aria-label=\"代码示例\"><button type=\"button\" role=\"tab\" id=\"code-tab-10-0\" aria-controls=\"code-panel-10-0\" aria-selected=\"true\" tabindex=\"0\" data-code-tab=\"0\">Python</button></div><button class=\"copy-code\" type=\"button\" data-copy-code=\"10\" aria-label=\"复制当前代码示例\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg><span>复制</span></button></div><pre id=\"code-panel-10-0\" role=\"tabpanel\" aria-labelledby=\"code-tab-10-0\" tabindex=\"0\"><code>import os\nfrom anthropic import Anthropic\n\nclient = Anthropic(\n    api_key=os.environ[&quot;SUB2API_API_KEY&quot;],\n    base_url=&quot;__IKUN_API_BASE__&quot;,\n)\nresult = client.messages.create(\n    model=os.environ[&quot;SUB2API_MODEL&quot;],\n    max_tokens=256,\n    messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Reply with: connected&quot;}],\n)\nfor block in result.content:\n    if block.type == &quot;text&quot;:\n        print(block.text)</code></pre></div></section><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>这些示例展示协议与填写方式。正式使用前请验证所选分组的实际支持情况；图片、音频、工具等参数不要直接从其他模型照搬。</p></div><div class=\"source-links\"><a href=\"https://developers.openai.com/api/docs/quickstart\" target=\"_blank\" rel=\"noopener noreferrer\">OpenAI SDK 官方入门<svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a><a href=\"https://platform.claude.com/docs/en/api/client-sdks\" target=\"_blank\" rel=\"noopener noreferrer\">Anthropic 官方 SDK<svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a></div>"
+    },
+    {
+      "id": "streaming",
+      "category": "开发者指南",
+      "title": "流式输出与重试",
+      "icon": "activity",
+      "description": "连接建立只是开始。正确消费事件、确认结束，才能判断一次请求是否完成。",
+      "minutes": 3,
+      "body": "<section><h2 id=\"sse\">正确处理流式响应</h2><ul><li>启用 <code>stream: true</code> 后，按事件流处理响应，不要把整个返回当成一个普通 JSON 对象。</li><li>Responses 示例读取 <code>response.output_text.delta</code>。Chat Completions 和 Anthropic Messages 使用不同的事件结构，建议使用各自 SDK 解析。</li><li>HTTP 200 之后仍可能出现流内错误。客户端应显示中断原因，不能把连接建立直接当成任务完成。</li></ul></section><section><h2 id=\"timeout\">长时间没有正文</h2><p>先用短输入验证协议，再检查客户端总超时、首字等待和中间代理缓冲。长推理可能暂时没有可显示的正文；单凭“正在连接”不能区分推理、网络问题和解析不兼容。</p><p>可结合<a href=\"__IKUN_API_BASE__/status-detection/\" target=\"_blank\" rel=\"noopener noreferrer\">状态检测</a>和本站使用记录判断，但采样状态不能替代本次请求的错误信息。</p></section><section><h2 id=\"retry\">有限重试，避免重复消费</h2><div class=\"table-scroll\"><table><thead><tr><th scope=\"col\">现象</th><th scope=\"col\">建议</th></tr></thead><tbody><tr><td>401</td><td>先核对密钥与认证方式，不自动重复发送。</td></tr><tr><td>403</td><td>先检查账户余额、密钥限额，再检查分组和模型权限。</td></tr><tr><td>429</td><td>降低并发，按 Retry-After（如有）等待，使用有限的指数退避。</td></tr><tr><td>502</td><td>检查网络、代理和网关链路，记录错误正文与请求 ID 后有限重试。</td></tr><tr><td>503</td><td>分组暂无可用账号时等待恢复，或换用有权限且支持该模型的其他分组。</td></tr><tr><td>504</td><td>网关等待上游超时，缩短测试请求并有限重试。</td></tr><tr><td>已经输出一部分后断开</td><td>先保留已收到的内容和使用记录，再决定是否重新发起。</td></tr></tbody></table></div><div class=\"callout warning\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6v7m0 4h.01\"/></svg><p>不要无限重试。重新发送可能形成新的请求和用量，特别是长对话、图片生成和工具任务。</p></div></section>"
+    },
+    {
+      "id": "errors",
+      "category": "排错与帮助",
+      "title": "按错误排查",
+      "icon": "life-buoy",
+      "description": "先看实际请求和错误正文，再处理地址、认证、权限或限流。",
+      "minutes": 4,
+      "body": "<section><h2 id=\"first-check\">先做四项基础检查</h2><ul class=\"check-list\"><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>域名是 <code>__IKUN_API_BASE__</code>，没有混入其他供应商或文档路径。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>客户端协议与所选分组匹配，版本前缀没有重复。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>密钥有效且分组正确，模型 ID 来自当前 Key 可用列表。</span></li><li><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4L19 6\"/></svg><span>先关闭批量任务，用一条短消息复现，并记录时间与错误正文。</span></li></ul></section><section><h2 id=\"http-errors\">常见状态码</h2><div class=\"table-scroll\"><table><thead><tr><th scope=\"col\">状态 / 现象</th><th scope=\"col\">优先检查</th><th scope=\"col\">下一步</th></tr></thead><tbody><tr><td>400 / 请求格式</td><td>协议、字段类型、上下文长度、模型不支持的参数。</td><td>使用最小请求，逐项移除非必要参数。</td></tr><tr><td>401 / 认证</td><td>Key 是否完整、是否禁用、认证头是否发送。</td><td>重新核对本站 Key 与客户端认证方式。</td></tr><tr><td>403 / 余额或权限</td><td>账户余额不足、密钥限额用尽，也可能是分组、模型权限或防护规则。</td><td>先核对余额和限额，再按错误正文检查权限；不要反复猜密钥。</td></tr><tr><td>404 / 路径</td><td>请求 URL、HTTP 方法、版本前缀、模型是否存在。</td><td>对照地址速查，检查完整模型 ID。</td></tr><tr><td>429 / 限流</td><td>并发、请求频率、上游容量或额度提示。</td><td>降低并发，按错误信息等待或核对额度。</td></tr><tr><td>502 / 网关或链路异常</td><td>网关收到上游异常响应；也可能涉及本地网络、代理或中间链路。</td><td>若仅自己出现，尝试更换网络或代理，检查 DNS 与丢包；持续发生请反馈请求 ID。</td></tr><tr><td>503 / 暂无可用服务</td><td>当前分组暂无可用账号，或上游服务暂时不可用。</td><td>等待恢复，或换用有权限且支持该模型的其他分组；切换前确认新分组价格。</td></tr><tr><td>504 / 处理超时</td><td>网关等待上游响应超时。</td><td>用短消息确认是否持续超时，查看状态与使用记录，有限重试。</td></tr><tr><td>余额或额度不足</td><td>账户余额、当前分组条件与密钥限额。</td><td>分别核对余额和 Key 设置，不要只重建 Key。</td></tr></tbody></table></div><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>分组无可用账号时，可更换 Key 绑定的分组，或在客户端改用已绑定其他可用分组的 Key。请确认新分组有权限、支持目标模型，并核对计费规则。</p></div></section><section><h2 id=\"symptoms\">测试成功，但实际聊天不行</h2><p>获取模型或检测连接成功，只验证了部分流程。实际对话还涉及权限、协议、流式解析和模型能力。检查真实聊天请求，而不是只重复点击测试按钮。</p><p>如果浏览器报 CORS，检查请求是否由浏览器直接发往 API。自建应用应正确配置服务端转发，并让密钥留在服务端。</p></section><section><h2 id=\"feedback\">仍未解决时，提交工单或联系微信客服</h2><p>可以直接在<a href=\"__IKUN_API_BASE__/custom/tickets\" target=\"_blank\" rel=\"noopener noreferrer\">工单页面</a>提交问题并等待回复，也可以通过本站公布的联系方式联系微信客服。</p><ol class=\"steps\"><li class=\"step\"><h3>提交问题</h3><p>登录本站，打开<a href=\"__IKUN_API_BASE__/custom/tickets\" target=\"_blank\" rel=\"noopener noreferrer\">我的工单</a>，在“新建工单”中填写标题、问题类型和描述，再点击“提交工单”。</p></li><li class=\"step\"><h3>提供便于排查的信息</h3><p>写清发生时间与时区、客户端和版本、模型与分组、实际请求地址、HTTP 状态、脱敏报错及请求 ID（如有）。余额或订单问题请补充订单编号与购买时间。</p></li><li class=\"step\"><h3>查看回复并补充信息</h3><p>提交后等待处理，回到工单页面的“最近工单”查看状态和回复；需要补充信息时，打开同一张工单继续回复，无需重复提交。</p></li></ol><div class=\"feedback-actions\"><a class=\"button\" href=\"__IKUN_API_BASE__/custom/tickets\" target=\"_blank\" rel=\"noopener noreferrer\">提交工单 <svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a><button class=\"button secondary\" type=\"button\" data-feedback><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"13\" rx=\"2\"/><path d=\"M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3\"/></svg>复制排查信息模板</button></div><div class=\"callout\"><svg class=\"icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v6m0-10h.01\"/></svg><p>截图与日志请去掉完整 API Key、Authorization、Cookie 和私人对话。无需提供账号密码。</p></div></section>"
+    },
+    {
+      "id": "help",
+      "category": "排错与帮助",
+      "title": "帮助中心",
+      "icon": "life-buoy",
+      "description": "从第一次接入到日常使用，常见问题在这里找答案。",
+      "minutes": 0,
+      "body": "",
+      "help": true
+    }
+  ],
+  "faqs": [
+    {
+      "id": "first-request",
+      "category": "接入配置",
+      "question": "第一次使用，应该从哪里开始？",
+      "answer": "登录控制台并确认余额，创建绑定正确分组的 API Key，选择工具，发送短消息，再核对使用记录。<a href=\"#start\">按快速开始操作</a>。"
+    },
+    {
+      "id": "base-url",
+      "category": "接入配置",
+      "question": "Base URL 到底要不要加 /v1？",
+      "answer": "OpenAI SDK、Codex 的 Base URL 使用 <code>__IKUN_API_BASE__/v1</code>；Claude Code 和 Anthropic SDK 使用根地址。会自动添加 /v1 的客户端填根地址，要求完整端点的插件填完整请求 URL。<a href=\"#endpoints\">查看地址速查</a>。"
+    },
+    {
+      "id": "import-ccs",
+      "category": "接入配置",
+      "question": "点击“导入到 CCS”没有反应怎么办？",
+      "answer": "先确认安装并打开了 CC-Switch 桌面客户端，使用系统浏览器操作。完全退出 CCS 后重开，再尝试导入。导入后还要启用供应商并重启目标应用。"
+    },
+    {
+      "id": "models-missing",
+      "category": "接入配置",
+      "question": "模型广场有模型，为什么我的 Key 用不了？",
+      "answer": "广场展示模型信息，实际权限由账户、Key 绑定的分组和配置决定。用当前 Key 获取模型列表，并核对分组；完整复制模型名，不要自行添加版本后缀。"
+    },
+    {
+      "id": "gemini-name",
+      "category": "接入配置",
+      "question": "“Gemini cli”分组就是 Gemini CLI 客户端吗？",
+      "answer": "分组名和客户端名是两件事。分组名称并不保证某款原生客户端兼容；请按实际提供的协议选择客户端，模型 ID 仍从当前 Key 的列表中获取。"
+    },
+    {
+      "id": "restart",
+      "category": "接入配置",
+      "question": "配置已改好，为什么还在走旧接口？",
+      "answer": "检查当前启用的供应商、profile、项目覆盖项和环境变量。保存工作后完整退出并重新启动目标应用。从桌面启动的程序不一定继承另一个终端临时设置的变量。"
+    },
+    {
+      "id": "balance-package",
+      "category": "账户与用量",
+      "question": "现在还有月卡吗？",
+      "answer": "当前赞助计划使用余额包，不再采用月卡方案。包档和价格请以本站赞助页面为准；本站余额不会给官方 ChatGPT 或 Claude 账号充值。"
+    },
+    {
+      "id": "redeem-key",
+      "category": "账户与用量",
+      "question": "购买的卡密可以填到 API Key 里吗？",
+      "answer": "不能。兑换码用于控制台兑换余额等权益，API Key 用于授权接口调用。先完成兑换，再在 API 密钥页面创建或使用自己的 Key。"
+    },
+    {
+      "id": "balance-arrival",
+      "category": "账户与用量",
+      "question": "购买后余额没有变化怎么办？",
+      "answer": "核对登录账户是否正确，并按订单说明完成兑换。保留订单编号、购买时间和脱敏页面截图，<a href=\"__IKUN_API_BASE__/custom/tickets\" target=\"_blank\" rel=\"noopener noreferrer\">提交工单</a>等待回复，也可以联系微信客服；不要重复付款。"
+    },
+    {
+      "id": "cost",
+      "category": "账户与用量",
+      "question": "为什么同样一句话，每次费用不一样？",
+      "answer": "请求可能包含历史对话、系统提示与工具定义；输出长度和缓存命中也不同。模型、分组和计费类型都会影响费用，请按具体使用记录核对。"
+    },
+    {
+      "id": "refund",
+      "category": "账户与用量",
+      "question": "订单或余额问题找谁处理？",
+      "answer": "准备订单编号、购买时间和问题描述，在<a href=\"__IKUN_API_BASE__/custom/tickets\" target=\"_blank\" rel=\"noopener noreferrer\">工单页面</a>提交问题，或通过本站公布的联系方式联系微信客服。退款与订单处理以实际购买说明及确认结果为准。"
+    },
+    {
+      "id": "401",
+      "category": "调用排错",
+      "question": "出现 401，应该先改哪里？",
+      "answer": "确认使用的是本站 API Key，复制完整且没有空格换行，密钥已启用；再检查客户端确实发送了正确认证信息。不要把账号密码或兑换码当作 Key。"
+    },
+    {
+      "id": "403",
+      "category": "调用排错",
+      "question": "出现 403，是余额不足还是权限问题？",
+      "answer": "403 也可能是账户余额不足或密钥限额用尽。先在控制台核对余额与 Key 限额，再按错误正文检查分组、模型权限与防护规则。更换 User-Agent 不能解决余额或权限不足。"
+    },
+    {
+      "id": "502",
+      "category": "调用排错",
+      "question": "出现 502 或网络中断，怎样排查？",
+      "answer": "先检查本地网络、代理、DNS 和丢包，尤其是只有自己遇到问题时。502 表示网关收到上游异常响应，服务端或中间链路也可能有问题，不能只凭状态码认定是本机丢包。更换网络仍持续出现时，提供错误正文、时间和请求 ID。"
+    },
+    {
+      "id": "503",
+      "category": "调用排错",
+      "question": "出现 503，是当前分组没有可用账号了吗？",
+      "answer": "有这种可能。当前分组暂无可用账号或上游不可用时，可以等待恢复，也可以切换 Key 绑定的分组，或改用其他分组的 Key。新分组必须是你有权限使用且支持目标模型的分组，切换前先核对价格。"
+    },
+    {
+      "id": "429",
+      "category": "调用排错",
+      "question": "出现 429 或一直限流怎么办？",
+      "answer": "减少并发与重复任务，查看错误正文是否提示上游容量或额度。按 Retry-After（如有）等待，再做有限重试，不要无限循环请求。"
+    },
+    {
+      "id": "loading",
+      "category": "调用排错",
+      "question": "连接检测通过，聊天却一直转圈？",
+      "answer": "连接检测和实际生成不是同一步骤。检查真实聊天请求的协议、模型权限、HTTP 状态与流式事件，先发短消息，再核对使用记录。"
+    },
+    {
+      "id": "stream-interrupted",
+      "category": "调用排错",
+      "question": "回复到一半中断，重新发送会重复计费吗？",
+      "answer": "重新发送可能形成新的请求和用量。先保留已有回复与使用记录，核对是否存在客户端自动重试。不能仅凭客户端显示中断，就判断上一条没有产生用量。"
+    },
+    {
+      "id": "key-leak",
+      "category": "安全与密钥",
+      "question": "API Key 不小心泄露了怎么办？",
+      "answer": "立即禁用或删除泄露的 Key，检查异常用量，创建新 Key 并更新各设备。不要继续用旧 Key 测试；提交排错信息时也不要包含完整密钥。"
+    },
+    {
+      "id": "frontend-key",
+      "category": "安全与密钥",
+      "question": "可以把 Key 直接写进网站前端吗？",
+      "answer": "公开网站的前端代码和网络请求都可能暴露密钥。请由自己的服务端保存 Key 并转发请求，对用户请求进行必要的认证和限额管理。"
+    },
+    {
+      "id": "support-tickets",
+      "category": "问题反馈",
+      "question": "怎样提交问题并查看回复？",
+      "answer": "除了联系微信客服，也可以登录本站后打开<a href=\"__IKUN_API_BASE__/custom/tickets\" target=\"_blank\" rel=\"noopener noreferrer\">工单页面</a>，填写“新建工单”并提交。提交后等待回复，在“最近工单”查看状态和沟通记录；后续补充信息请打开原工单继续回复。"
+    },
+    {
+      "id": "support-details",
+      "category": "问题反馈",
+      "question": "反馈问题时需要提供什么？",
+      "answer": "时间与时区、客户端和版本、模型与分组、请求 URL、HTTP 状态和脱敏错误、请求 ID（如有）。订单问题请补充订单编号和购买时间。不要提供完整 Key、Cookie、密码或包含私人内容的对话。"
+    }
+  ],
+  "feedback": "Problem:\nTime and timezone:\nClient and version:\nOperating system:\nModel:\nGroup name:\nRequest URL (no key):\nHTTP status and redacted error:\nRequest ID (if available):\nSteps already tried:\n"
+}

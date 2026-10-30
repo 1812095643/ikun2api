@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	openAIWSConnMaxAge          = 60 * time.Minute
+	// 在上游连接寿命上限前退休，正在处理的轮次仍由归还路径正常收尾。
+	openAIWSConnMaxAge          = 55 * time.Minute
 	openAIWSConnHealthCheckIdle = 90 * time.Second
 	// 仅对没有常驻读循环的连接实现生效：这类连接空闲时无人应答上游 ping，须在
 	// 上游保活窗口到期前回收。coder/websocket 连接由池常驻读循环应答 ping，不受此阈值约束。
@@ -71,6 +72,8 @@ type openAIWSAcquireRequest struct {
 	Account *Account
 	WSURL   string
 	Headers http.Header
+	// 执行作用域独立于指纹收敛模式，防止其他线程或后台通道借用连接内上下文。
+	ExecutionScope string
 	// HeadersFactory is evaluated inside dialConn. It exists so credentials
 	// whose authorization is per-dial (Agent Identity) are never cached in
 	// lastAcquire or delayed prewarm state.
@@ -86,6 +89,8 @@ type openAIWSAcquireRequest struct {
 }
 
 type openAIWSHandshakeCompatibilityKey struct {
+	executionScope      string
+	credentialNamespace string
 	betaFeatures        string
 	codexInstallationID string
 	sessionIDHyphen     string
@@ -274,6 +279,14 @@ func (l *openAIWSConnLease) Release() {
 	if !l.released.CompareAndSwap(false, true) {
 		return
 	}
+	// 本轮请求处理完成后再退休，不把到龄租约直接转交给排队请求。
+	if l.conn.age(time.Now()) >= openAIWSConnMaxAge {
+		if l.pool != nil {
+			l.pool.evictConn(l.accountID, l.conn.id)
+		}
+		l.conn.close()
+		return
+	}
 	l.conn.release()
 	if l.pool != nil {
 		l.pool.notifyAccountPoolChanged(l.accountID)
@@ -294,6 +307,9 @@ type openAIWSConn struct {
 
 	readMu  sync.Mutex
 	writeMu sync.Mutex
+	// Protected by writeMu; capabilities belong to the physical socket.
+	responseCreateSent bool
+	initialHostedTools openAIWSHostedTools
 
 	// readerLoopResults 非 nil 表示池为该连接常驻了读循环：coder/websocket 只在
 	// 阻塞读期间应答上游 ping，空闲连接没有读循环会被上游按保活超时关闭。
@@ -309,6 +325,7 @@ type openAIWSConn struct {
 	waiters       atomic.Int32
 	createdAtNano atomic.Int64
 	lastUsedNano  atomic.Int64
+	hasRequest    atomic.Bool
 	prewarmed     atomic.Bool
 }
 
@@ -417,6 +434,11 @@ func (c *openAIWSConn) leaseTokenUsable() bool {
 		c.release()
 		return false
 	default:
+	}
+	// 连接可能在租约排队期间到龄；这里只标记，关闭操作留到池锁之外执行。
+	if c.isUnusable() || c.age(time.Now()) >= openAIWSConnMaxAge {
+		c.unusable.Store(true)
+		return false
 	}
 	if c.readerLoopPending() {
 		// 只记事件类型，不记报文原文，避免模型输出进日志。
@@ -602,6 +624,10 @@ func (c *openAIWSConn) writeJSON(value any, writeCtx context.Context) error {
 	if err := c.ws.WriteJSON(writeCtx, value); err != nil {
 		return err
 	}
+	if !c.responseCreateSent {
+		c.recordInitialHostedTools(value)
+	}
+	c.hasRequest.Store(true)
 	c.touch()
 	return nil
 }
@@ -1147,7 +1173,7 @@ func (p *openAIWSConnPool) acquire(ctx context.Context, req openAIWSAcquireReque
 
 retryAcquire:
 	accountID := req.Account.ID
-	compatibility := normalizeOpenAIWSHandshakeCompatibility(req.Account, req.Headers)
+	compatibility := normalizeOpenAIWSAcquireCompatibility(req)
 	routingAffinity := normalizeOpenAIWSRoutingAffinity(req.Headers)
 	effectiveMaxConns := p.effectiveMaxConnsByAccount(req.Account)
 	if effectiveMaxConns <= 0 {
@@ -1559,7 +1585,7 @@ func (p *openAIWSConnPool) pickOldestIdleConnLocked(ap *openAIWSAccountPool) *op
 		if conn == nil || conn.isLeased() || conn.waiters.Load() > 0 || p.isConnPinnedLocked(ap, conn.id) {
 			continue
 		}
-		if oldest == nil || conn.lastUsedAt().Before(oldest.lastUsedAt()) {
+		if oldest == nil || openAIWSConnEvictionLess(conn, oldest) {
 			oldest = conn
 		}
 	}
@@ -1580,7 +1606,7 @@ func (p *openAIWSConnPool) pickOldestIdleConnWithoutHandshakeCompatibilityLocked
 			conn.isLeased() || conn.waiters.Load() > 0 || p.isConnPinnedLocked(ap, conn.id) {
 			continue
 		}
-		if oldest == nil || conn.lastUsedAt().Before(oldest.lastUsedAt()) {
+		if oldest == nil || openAIWSConnEvictionLess(conn, oldest) {
 			oldest = conn
 		}
 	}
@@ -1665,6 +1691,13 @@ func (p *openAIWSConnPool) cleanupAccountLocked(ap *openAIWSAccountPool, now tim
 			evicted = append(evicted, conn)
 			continue
 		}
+		// 亲和固定不能绕过寿命限制；在途连接仍在归还时回收。
+		if maxAge > 0 && !conn.isLeased() && conn.age(now) >= maxAge {
+			delete(ap.conns, id)
+			delete(ap.pinnedConns, id)
+			evicted = append(evicted, conn)
+			continue
+		}
 		if p.isConnPinnedLocked(ap, id) {
 			continue
 		}
@@ -1678,13 +1711,6 @@ func (p *openAIWSConnPool) cleanupAccountLocked(ap *openAIWSAccountPool, now tim
 			evicted = append(evicted, conn)
 			p.metrics.scaleDownTotal.Add(1)
 			continue
-		}
-		if maxAge > 0 && !conn.isLeased() && conn.age(now) > maxAge {
-			delete(ap.conns, id)
-			if len(ap.pinnedConns) > 0 {
-				delete(ap.pinnedConns, id)
-			}
-			evicted = append(evicted, conn)
 		}
 	}
 
@@ -1712,7 +1738,7 @@ func (p *openAIWSConnPool) cleanupAccountLocked(ap *openAIWSAccountPool, now tim
 			idleConns = append(idleConns, conn)
 		}
 		sort.SliceStable(idleConns, func(i, j int) bool {
-			return idleConns[i].lastUsedAt().Before(idleConns[j].lastUsedAt())
+			return openAIWSConnEvictionLess(idleConns[i], idleConns[j])
 		})
 		redundant := len(ap.conns) - maxIdle
 		if redundant > len(idleConns) {
@@ -2158,7 +2184,7 @@ func (p *openAIWSConnPool) dialConn(ctx context.Context, req openAIWSAcquireRequ
 	accountID := req.Account.ID
 	evict := func() { p.evictConn(accountID, id) }
 	pooledConn.onPeerClosed.Store(&evict)
-	pooledConn.handshakeCompatibility = normalizeOpenAIWSHandshakeCompatibility(req.Account, req.Headers)
+	pooledConn.handshakeCompatibility = normalizeOpenAIWSAcquireCompatibility(req)
 	pooledConn.routingAffinity = normalizeOpenAIWSRoutingAffinity(req.Headers)
 	return pooledConn, nil
 }
@@ -2339,7 +2365,7 @@ func cloneOpenAIWSAcquireRequestPtr(req *openAIWSAcquireRequest) *openAIWSAcquir
 func sameOpenAIWSPrewarmTarget(a, b openAIWSAcquireRequest) bool {
 	return stringsTrim(a.WSURL) == stringsTrim(b.WSURL) &&
 		stringsTrim(a.ProxyURL) == stringsTrim(b.ProxyURL) &&
-		normalizeOpenAIWSHandshakeCompatibility(a.Account, a.Headers) == normalizeOpenAIWSHandshakeCompatibility(b.Account, b.Headers)
+		normalizeOpenAIWSAcquireCompatibility(a) == normalizeOpenAIWSAcquireCompatibility(b)
 }
 
 func normalizeOpenAIWSBetaFeatures(headers http.Header) string {

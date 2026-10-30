@@ -438,6 +438,7 @@ export default {
     passwordsDoNotMatch: '两次输入的密码不一致',
     resetPassword: '重置密码',
     resettingPassword: '重置中...',
+    passwordMaxBytes: '密码不能超过 72 个 UTF-8 字节。',
     resetPasswordFailed: '重置密码失败，请重试。',
     passwordResetSuccess: '密码重置成功',
     passwordResetSuccessHint: '您的密码已重置。现在可以使用新密码登录。',

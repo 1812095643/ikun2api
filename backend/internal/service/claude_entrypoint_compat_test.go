@@ -42,9 +42,9 @@ func TestClaudeOriginalEntrypointsRemainAccepted(t *testing.T) {
 				})
 				require.NoError(t, err)
 				fp := defaultFingerprint()
-				fp.ClientID, fp.UpdatedAt = "stable-existing-device", time.Now().Unix()
+				fp.ClientID, fp.UpdatedAt = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", time.Now().Unix()
 				cache := &stubIdentityCache{fingerprint: &fp}
-				gateway := &GatewayService{identityService: NewIdentityService(cache)}
+				gateway := &GatewayService{identityService: newTestIdentityService(cache)}
 				account := &Account{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
 				var req *http.Request
 				if endpoint == "messages" {
@@ -56,7 +56,7 @@ func TestClaudeOriginalEntrypointsRemainAccepted(t *testing.T) {
 				require.NotNil(t, req)
 				require.Equal(t, "Bearer offline-only", getHeaderRaw(req.Header, "authorization"))
 				require.Equal(t, "2.1.299", ExtractCLIVersion(getHeaderRaw(req.Header, "User-Agent")))
-				require.Equal(t, "stable-existing-device", cache.fingerprint.ClientID)
+				require.Equal(t, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", cache.fingerprint.ClientID)
 			})
 		}
 	}
@@ -65,7 +65,7 @@ func TestClaudeOriginalEntrypointsRemainAccepted(t *testing.T) {
 func TestClaudeEntrypointCleanupKeepsAPIKeyPath(t *testing.T) {
 	t.Setenv("SUB6_CLAUDE_CAPTURED_IDENTITY_ENABLED", "true")
 	cache := &stubIdentityCache{}
-	gateway := &GatewayService{identityService: NewIdentityService(cache), cfg: &config.Config{}}
+	gateway := &GatewayService{identityService: newTestIdentityService(cache), cfg: &config.Config{}}
 	account := &Account{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeAPIKey}
 	body := []byte(`{"model":"claude-haiku-5-5","max_tokens":16,"messages":[{"role":"user","content":"offline check"}]}`)
 	for _, countTokens := range []bool{false, true} {

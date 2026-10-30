@@ -285,14 +285,17 @@ type OpenAIForwardResult struct {
 	FirstTokenMs          *int
 	ClientDisconnect      bool
 	ImageCount            int
-	ImageSize             string
-	ImageInputSize        string
-	ImageOutputSize       string
-	ImageOutputSizes      []string
-	ImageSizeSource       string
-	ImageSizeBreakdown    map[string]int
-	VideoCount            int
-	VideoResolution       string
+	// ImageEndpoint 标记请求来自专用图片端点；分组 image_count_billing 开关
+	// 只对这类请求生效，混合 Responses/Chat/WS 请求仍按 token 计费。
+	ImageEndpoint      bool
+	ImageSize          string
+	ImageInputSize     string
+	ImageOutputSize    string
+	ImageOutputSizes   []string
+	ImageSizeSource    string
+	ImageSizeBreakdown map[string]int
+	VideoCount         int
+	VideoResolution    string
 	// VideoDurationSeconds 是提交时请求的生成时长（xAI 按输出秒数计费），已归一化到 1-15 秒。
 	VideoDurationSeconds int
 	// WebSearchCalls 是 Codex alpha/search 网页搜索调用次数（每次成功请求为 1）。
@@ -482,6 +485,8 @@ type OpenAIGatewayService struct {
 	liveAttestation       liveattestation.Provider
 	liveAttestationCipher SecretEncryptor
 
+	openaiWSHostedReplayMu         sync.Mutex
+	openaiWSHostedReplay           map[string]openAIWSHostedReplay
 	openaiWSPoolOnce               sync.Once
 	openaiWSStateStoreOnce         sync.Once
 	openaiSchedulerOnce            sync.Once
@@ -532,6 +537,7 @@ type OpenAIGatewayService struct {
 	openaiCodexTicketDone        chan struct{}
 	openaiCodexTicketWake        chan struct{}
 	openaiCodexTicketStopped     bool
+	openaiCodexTicketSuspended   bool
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
@@ -921,6 +927,13 @@ func resolveOpenAIWSFallbackErrorResponse(err error) (statusCode int, errType st
 func (s *OpenAIGatewayService) writeOpenAIWSFallbackErrorResponse(c *gin.Context, account *Account, wsErr error) bool {
 	if c == nil || c.Writer == nil || c.Writer.Written() {
 		return false
+	}
+	var searchErr *openAIWSSearchUpstreamError
+	if errors.As(wsErr, &searchErr) {
+		setOpsUpstreamError(c, searchErr.StatusCode, sanitizeUpstreamErrorMessage(searchErr.Message), "")
+		writeOpenAIPassthroughErrorHeaders(c.Writer.Header(), searchErr.Headers)
+		c.Data(searchErr.StatusCode, "application/json", searchErr.Body)
+		return true
 	}
 	statusCode, errType, clientMessage, upstreamMessage, ok := resolveOpenAIWSFallbackErrorResponse(wsErr)
 	if !ok {

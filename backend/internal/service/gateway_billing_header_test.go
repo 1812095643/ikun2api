@@ -87,12 +87,30 @@ func TestSyncBillingHeaderVersion_RecomputesSuffixAndIsIdempotent(t *testing.T) 
 	require.JSONEq(t, gjson.GetBytes(body, "messages").Raw, gjson.GetBytes(result, "messages").Raw)
 }
 
+func TestSyncBillingHeaderVersion_UnicodeSuffix(t *testing.T) {
+	for _, initialVersion := range []string{"2.1.81.df2", "2.1.283.000", "2.1.283.c7e"} {
+		t.Run(initialVersion, func(t *testing.T) {
+			body := []byte(`{"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=` + initialVersion + `; cc_entrypoint=cli;"},{"type":"text","text":"Keep this prompt."}],"messages":[{"role":"user","content":"这是一个用于验证中文指纹计算的测试消息，请保持一致。"}],"unknown":{"keep":true}}`)
+			result := syncBillingHeaderVersion(body, "claude-cli/2.1.283", nil)
+			// Node.js reference output; do not derive this from the helper under test.
+			require.Equal(t, "x-anthropic-billing-header: cc_version=2.1.283.c7e; cc_entrypoint=cli;", gjson.GetBytes(result, "system.0.text").String())
+			require.Equal(t, result, syncBillingHeaderVersion(result, "claude-cli/2.1.283", nil))
+			if initialVersion == "2.1.283.c7e" {
+				require.Equal(t, body, result)
+			}
+			for _, path := range []string{"messages", "system.1", "unknown"} {
+				require.Equal(t, gjson.GetBytes(body, path).Raw, gjson.GetBytes(result, path).Raw)
+			}
+		})
+	}
+}
+
 func TestClaudeCodeFingerprintMatchesJavaScriptUTF16Indexing(t *testing.T) {
 	body := []byte(`{"messages":[{"role":"user","isMeta":true,"content":"ignore this"},{"role":"user","content":"你好世界这是中文测试消息，用来检查指纹算法。"}]}`)
 	require.Equal(t, "d80", computeClaudeCodeFingerprint(body, "2.1.283"))
 }
 
-func TestBuildOAuthRequest_BillingMatchesWireUserAgent(t *testing.T) {
+func TestBuildOAuthRequest_PrivacyRemovesBillingPreservesUserAgent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, endpoint := range []string{"messages", "count_tokens"} {
 		for _, tc := range []struct {
@@ -125,7 +143,7 @@ func TestBuildOAuthRequest_BillingMatchesWireUserAgent(t *testing.T) {
 				svc := &GatewayService{cfg: cfg}
 				cachedUA := "claude-cli/2.9.0 (external, cli)"
 				if tc.identity {
-					svc.identityService = NewIdentityService(&stubIdentityCache{fingerprint: &Fingerprint{
+					svc.identityService = newTestIdentityService(&stubIdentityCache{fingerprint: &Fingerprint{
 						UserAgent: cachedUA, ClientID: "test-client", UpdatedAt: time.Now().Unix(),
 					}})
 				}
@@ -146,23 +164,15 @@ func TestBuildOAuthRequest_BillingMatchesWireUserAgent(t *testing.T) {
 				}
 				require.NoError(t, err)
 				defer func() { require.NoError(t, req.Body.Close()) }()
-				wantUA := cachedUA
+				wantUA := claude.DefaultUserAgent()
 				if tc.mimic {
 					wantUA = claude.DefaultHeaders()["User-Agent"]
+				} else if !tc.identity || tc.disableFP {
+					wantUA = tc.clientUA
 				}
-				if tc.mimic {
-					version := ExtractCLIVersion(wantUA)
-					require.Contains(t, gjson.GetBytes(wireBody, "system.0.text").String(),
-						"cc_version="+version+"."+computeClaudeCodeFingerprint(wireBody, version)+";")
-				} else {
-					version := "2.1.81"
-					if tc.identity && !tc.disableFP {
-						version = "2.9.0"
-					} else if tc.clientUA != "" {
-						version = ExtractCLIVersion(tc.clientUA)
-					}
-					require.Contains(t, gjson.GetBytes(wireBody, "system.0.text").String(), "cc_version="+version+".")
-				}
+				require.Equal(t, wantUA, getHeaderRaw(req.Header, "User-Agent"))
+				require.NotContains(t, string(wireBody), "x-anthropic-billing-header:")
+				require.NotContains(t, string(wireBody), "cch=")
 				actualBody, err := io.ReadAll(req.Body)
 				require.NoError(t, err)
 				require.Equal(t, wireBody, actualBody)

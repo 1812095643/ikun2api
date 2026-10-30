@@ -57,6 +57,29 @@ func TestListPlazaGroups_GroupCentricAggregation(t *testing.T) {
 	require.Equal(t, "claude-sonnet", out[0].Models[1].Name)
 }
 
+func TestWorkspacePlazaGroups_IncludesLegacyGroupsAndKeepsConfiguredPricing(t *testing.T) {
+	groups := []Group{
+		{ID: 10, Name: "configured", Platform: PlatformAnthropic, RateMultiplier: 1},
+		{ID: 20, Name: "legacy", Description: "account catalog", Platform: PlatformOpenAI, RateMultiplier: 0.5, IsExclusive: true},
+	}
+	svc := newPlazaService([]Channel{plazaPricedChannel(1, "channel", []int64{10}, PlatformAnthropic, "claude-sonnet")}, groups, nil)
+	result, err := svc.ListWorkspaceGroups(context.Background(), func(_ context.Context, group *Group) []string {
+		require.Equal(t, int64(20), group.ID, "已有渠道目录不应被账号默认目录覆盖")
+		return []string{"model-z", "model-a", "model-a", ""}
+	})
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Equal(t, int64(20), result[0].ID)
+	require.True(t, result[0].IsExclusive, "必须保留专属分组标记供权限过滤")
+	require.Equal(t, 0.5, result[0].RateMultiplier)
+	require.Equal(t, []string{"model-a", "model-z"}, []string{result[0].Models[0].Name, result[0].Models[1].Name})
+	require.Equal(t, "claude-sonnet", result[1].Models[0].Name)
+	require.InDelta(t, 3e-6, *result[1].Models[0].Pricing.InputPrice, 1e-12)
+	public, err := svc.ListGroups(context.Background())
+	require.NoError(t, err)
+	require.Len(t, public, 1, "公开广场仍保持原有目录语义")
+}
+
 func TestListPlazaGroups_Fable51HasNoImplicitReasoningMultiplier(t *testing.T) {
 	ch := plazaPricedChannel(1, "ch", []int64{10}, "anthropic", "claude-fable-5-1")
 	svc := newPlazaService([]Channel{ch}, []Group{{ID: 10, Platform: "anthropic"}}, nil)
@@ -307,6 +330,79 @@ func TestListPlazaGroups_GroupImagePriceOverridesChannelPricing(t *testing.T) {
 
 	// 合成为克隆,渠道原始定价不被修改
 	require.Len(t, channels[0].ModelPricing[0].Intervals, 1)
+}
+
+func TestListPlazaGroups_GroupModelImagePricingWinsOverGroupImageTiers(t *testing.T) {
+	groupImage1K, groupImage2K, groupImage4K := 0.05, 0.055, 0.06
+	model1K, model2K, model4K := 0.05, 0.075, 0.1
+	channels := []Channel{{
+		ID: 1, Name: "img-ch", Status: StatusActive, GroupIDs: []int64{10},
+		ModelPricing: []ChannelModelPricing{{
+			Platform:        "openai",
+			Models:          []string{"yeahzi-image"},
+			BillingMode:     BillingModeImage,
+			PerRequestPrice: testPtrFloat64(0.2),
+		}},
+	}}
+	groups := []Group{{
+		ID: 10, Name: "g", Platform: "openai", RateMultiplier: 1,
+		ImagePrice1K: &groupImage1K, ImagePrice2K: &groupImage2K, ImagePrice4K: &groupImage4K,
+		ModelPricing: []ChannelModelPricing{{
+			Platform:        "openai",
+			Models:          []string{"yeahzi-image"},
+			BillingMode:     BillingModeImage,
+			PerRequestPrice: testPtrFloat64(0.1),
+			Intervals: []PricingInterval{
+				{TierLabel: "1K", PerRequestPrice: &model1K},
+				{TierLabel: "2K", PerRequestPrice: &model2K},
+				{TierLabel: "4K", PerRequestPrice: &model4K},
+			},
+		}},
+	}}
+
+	out, err := newPlazaService(channels, groups, nil).ListGroups(context.Background())
+	require.NoError(t, err)
+	require.Len(t, out, 1)
+	require.Len(t, out[0].Models, 1)
+	p := out[0].Models[0].Pricing
+	require.Equal(t, BillingModeImage, p.BillingMode)
+	require.Len(t, p.Intervals, 3)
+	tierPrices := map[string]float64{}
+	for _, iv := range p.Intervals {
+		require.NotNil(t, iv.PerRequestPrice)
+		tierPrices[iv.TierLabel] = *iv.PerRequestPrice
+	}
+	require.InDelta(t, 0.05, tierPrices["1K"], 1e-9)
+	require.InDelta(t, 0.075, tierPrices["2K"], 1e-9)
+	require.InDelta(t, 0.1, tierPrices["4K"], 1e-9)
+}
+
+func TestListPlazaGroups_GroupModelFlatImagePriceWinsOverGroupImageTiers(t *testing.T) {
+	groupPrice := 0.2
+	channels := []Channel{{
+		ID: 1, Name: "img-ch", Status: StatusActive, GroupIDs: []int64{10},
+		ModelPricing: []ChannelModelPricing{{
+			Platform: "openai", Models: []string{"gemini-3.1-flash-lite-image"},
+			BillingMode: BillingModeImage, PerRequestPrice: testPtrFloat64(0.2),
+		}},
+	}}
+	groups := []Group{{
+		ID: 10, Name: "g", Platform: "openai", RateMultiplier: 1,
+		ImagePrice1K: &groupPrice,
+		ModelPricing: []ChannelModelPricing{{
+			Platform: "openai", Models: []string{"gemini-3.1-flash-lite-image"},
+			BillingMode: BillingModeImage, PerRequestPrice: testPtrFloat64(0.1),
+		}},
+	}}
+
+	out, err := newPlazaService(channels, groups, nil).ListGroups(context.Background())
+	require.NoError(t, err)
+	require.Len(t, out, 1)
+	p := out[0].Models[0].Pricing
+	require.Equal(t, BillingModeImage, p.BillingMode)
+	require.NotNil(t, p.PerRequestPrice)
+	require.InDelta(t, 0.1, *p.PerRequestPrice, 1e-9)
+	require.Empty(t, p.Intervals, "模型级固定价不应被分组图片档位覆盖")
 }
 
 func TestListPlazaGroups_GroupImagePriceIgnoredForNonImageModes(t *testing.T) {

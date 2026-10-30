@@ -439,6 +439,7 @@ export default {
     passwordsDoNotMatch: 'Passwords do not match',
     resetPassword: 'Reset Password',
     resettingPassword: 'Resetting...',
+    passwordMaxBytes: 'Password cannot exceed 72 UTF-8 bytes.',
     resetPasswordFailed: 'Failed to reset password. Please try again.',
     passwordResetSuccess: 'Password Reset Successful',
     passwordResetSuccessHint: 'Your password has been reset. You can now sign in with your new password.',

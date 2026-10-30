@@ -197,6 +197,10 @@ func (c *emailCache) SetPasswordResetEmailCooldown(ctx context.Context, email st
 	return c.rdb.Set(ctx, key, "1", ttl).Err()
 }
 
+func (c *emailCache) TrySetPasswordResetEmailCooldown(ctx context.Context, email string, ttl time.Duration) (bool, error) {
+	return c.rdb.SetNX(ctx, passwordResetSentAtKey(email), "1", ttl).Result()
+}
+
 // Notify email verification code methods
 
 func (c *emailCache) GetNotifyVerifyCode(ctx context.Context, email string) (*service.VerificationCodeData, error) {

@@ -565,3 +565,8 @@ func cloneTimePtr(src *time.Time) *time.Time {
 	value := *src
 	return &value
 }
+
+// cnQuotaHasMonthlyWindow 报告供应商的额度快照是否含月度窗口（OpenCode Go、Command Code）。
+func cnQuotaHasMonthlyWindow(provider string) bool {
+	return provider == PlatformOpenCodeGo
+}

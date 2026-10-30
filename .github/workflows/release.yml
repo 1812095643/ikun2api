@@ -1,0 +1,202 @@
+name: 发布 IKUN2api
+
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '仅构建验证，不发布'
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: ikun2api-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY_IMAGE: ghcr.io/1812095643/ikun2api
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - id: version
+        env:
+          RELEASE_REF: ${{ github.ref_name }}
+          RELEASE_TYPE: ${{ github.ref_type }}
+        run: |
+          python3 - <<'PY'
+          import os,pathlib,re,subprocess
+          version=pathlib.Path('backend/cmd/server/VERSION').read_text().strip()
+          assert re.fullmatch(r'\d+\.\d+\.\d+',version),'Use a stable semantic version'
+          if os.environ['RELEASE_TYPE']=='tag':assert os.environ['RELEASE_REF']=='v'+version,'Tag and VERSION must match'
+          assert pathlib.Path('changelog/'+version+'/CHANGELOG.md').is_file(),'Release notes required'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              print('version='+version,file=out)
+              print('commit='+subprocess.check_output(['git','rev-parse','HEAD']).decode().strip(),file=out)
+          PY
+      - name: 前端类型、文案与生产构建
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile && pnpm exec vitest run src/components/common/__tests__/SystemUpdateDialog.spec.ts src/views/auth/__tests__/ResetPasswordView.spec.ts && pnpm build
+      - name: 更新、安全与备份回归
+        working-directory: backend
+        run: go test -tags unit ./internal/service ./internal/repository ./internal/handler/admin ./internal/server/middleware -run 'Test(Update|Upgrade|SystemHandler|CompareVersions|ParseVersion|ValidateDownload|GitHubRelease|PgDumper)' -count=1 -timeout=180s
+      - name: 发布脚本检查
+        run: |
+          python3 -m py_compile deploy/switch-from-sub2api.py scripts/release/build.py scripts/release/sign.py
+          bash -n deploy/migrate.sh deploy/docker-entrypoint.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: embedded-frontend
+          path: backend/internal/web/dist
+          retention-days: 3
+
+  binaries:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux_amd64, linux_arm64, darwin_amd64, darwin_arm64, windows_amd64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/download-artifact@v4
+        with:
+          name: embedded-frontend
+          path: backend/internal/web/dist
+      - name: 编译与打包
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          COMMIT: ${{ needs.verify.outputs.commit }}
+          TARGET: ${{ matrix.target }}
+        run: python3 scripts/release/build.py --target "$TARGET" --version "$VERSION" --commit "$COMMIT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/release/*
+          retention-days: 7
+
+  images:
+    needs: [verify, binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-linux_${{ matrix.arch }}
+          path: dist/release
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.ref_type == 'tag' || inputs.dry_run == false
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 构建可直接迁入的运行镜像
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          COMMIT: ${{ needs.verify.outputs.commit }}
+          ARCH: ${{ matrix.arch }}
+          PUBLISH: ${{ github.ref_type == 'tag' || inputs.dry_run == false }}
+        run: |
+          mkdir -p dist/docker/deploy dist/docker/backend
+          tar -xzf "dist/release/ikun2api_${VERSION}_linux_${ARCH}.tar.gz" -C dist/docker ikun2api
+          cp deploy/docker-entrypoint.sh dist/docker/deploy/
+          cp -r backend/resources dist/docker/backend/
+          cp Dockerfile.goreleaser dist/docker/Dockerfile
+          docker buildx build --platform "linux/$ARCH" --load -t "$REGISTRY_IMAGE:$VERSION" -t "$REGISTRY_IMAGE:$VERSION-$ARCH" --label "org.opencontainers.image.revision=$COMMIT" --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" dist/docker
+          test "$(docker run --rm --platform linux/$ARCH --entrypoint sha256sum "$REGISTRY_IMAGE:$VERSION" /app/ikun2api | cut -d' ' -f1)" = "$(sha256sum dist/docker/ikun2api | cut -d' ' -f1)"
+          docker save "$REGISTRY_IMAGE:$VERSION" | gzip -1 > "dist/release/ikun2api_image_${VERSION}_linux_${ARCH}.tar.gz"
+          if [ "$PUBLISH" = true ]; then docker push "$REGISTRY_IMAGE:$VERSION-$ARCH"; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-image-${{ matrix.arch }}
+          path: dist/release/ikun2api_image_*.tar.gz
+          retention-days: 7
+
+  publish:
+    needs: [verify, binaries, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: dist/release
+      - name: 打包对应源码与完整发布信息
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          git archive --format=tar.gz --prefix="ikun2api-${VERSION}/" -o "dist/release/ikun2api_${VERSION}_source.tar.gz" "$COMMIT"
+          cp "changelog/$VERSION/CHANGELOG.md" dist/release/CHANGELOG.md
+          cp deploy/MIGRATION.md dist/release/MIGRATION.md
+          python3 - <<'PY'
+          import json,os,pathlib
+          pathlib.Path('dist/release/release-manifest.json').write_text(json.dumps({'version':os.environ['VERSION'],'commit':os.environ['COMMIT'],'repository':'1812095643/ikun2api','upstream_baseline':'0.2.19','schema_forward_only':True,'signature':'Ed25519'},indent=2))
+          PY
+      - name: 生成并签名完整校验清单
+        env:
+          IKUN_RELEASE_SIGNING_KEY: ${{ secrets.IKUN_RELEASE_SIGNING_KEY }}
+        run: python3 -m pip install cryptography && python3 scripts/release/sign.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-release
+          path: dist/release/*
+          retention-days: 14
+      - name: 发布正式 GitHub Release
+        if: github.ref_type == 'tag' || inputs.dry_run == false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: gh release create "v$VERSION" dist/release/* --verify-tag --title "IKUN2api $VERSION" --notes-file "changelog/$VERSION/CHANGELOG.md" --latest
+      - uses: docker/setup-buildx-action@v3
+        if: github.ref_type == 'tag' || inputs.dry_run == false
+      - uses: docker/login-action@v3
+        if: github.ref_type == 'tag' || inputs.dry_run == false
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 发布多架构版本与 latest 镜像
+        if: github.ref_type == 'tag' || inputs.dry_run == false
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: docker buildx imagetools create --tag "$REGISTRY_IMAGE:$VERSION" --tag "$REGISTRY_IMAGE:latest" "$REGISTRY_IMAGE:$VERSION-amd64" "$REGISTRY_IMAGE:$VERSION-arm64"

@@ -8,15 +8,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
 	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
 	"github.com/MACOS-DO/sub4api/internal/pkg/httpclient"
 	"github.com/MACOS-DO/sub4api/internal/service"
 )
 
 const defaultClaudeUsageURL = "https://api.anthropic.com/api/oauth/usage"
-
-// 默认 User-Agent，与用户抓包的请求一致
-const defaultUsageUserAgent = "claude-code/2.1.7"
 
 type claudeUsageService struct {
 	usageURL          string
@@ -59,12 +57,9 @@ func (s *claudeUsageService) FetchUsageWithOptions(ctx context.Context, opts *se
 	req.Header.Set("Authorization", "Bearer "+opts.AccessToken)
 	req.Header.Set("anthropic-beta", "oauth-2025-04-20")
 
-	// 设置 User-Agent（优先使用缓存的 Fingerprint，否则使用默认值）
-	userAgent := defaultUsageUserAgent
-	if opts.Fingerprint != nil && opts.Fingerprint.UserAgent != "" {
-		userAgent = opts.Fingerprint.UserAgent
-	}
-	req.Header.Set("User-Agent", userAgent)
+	// Use the same reviewed client configuration as Messages, even before the
+	// first model request has migrated an old Redis profile.
+	req.Header.Set("User-Agent", claude.DefaultUserAgent())
 
 	var resp *http.Response
 

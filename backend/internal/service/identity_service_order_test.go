@@ -51,7 +51,7 @@ func (s *identityCacheStub) UpdateClaudeCodeHeaders(_ context.Context, _ int64, 
 
 func TestIdentityService_RewriteUserID_PreservesTopLevelFieldOrder(t *testing.T) {
 	cache := &identityCacheStub{}
-	svc := NewIdentityService(cache)
+	svc := newTestIdentityService(cache)
 
 	originalUserID := `{"device_id":"d61f76d0730d2b920763648949bad5c79742155c27037fc77ac3f9805cb90169","account_uuid":"","session_id":"7578cf37-aaca-46e4-a45c-71285d9dbb83","parent_session_id":"parent-uuid","tk":"opaque-token"}`
 	body := []byte(`{"alpha":1,"messages":[],"metadata":{"user_id":` + strconvQuote(originalUserID) + `},"max_tokens":64000,"thinking":{"type":"adaptive"},"output_config":{"effort":"high"},"stream":true}`)
@@ -76,7 +76,7 @@ func TestIdentityService_RewriteUserID_PreservesTopLevelFieldOrder(t *testing.T)
 
 func TestIdentityService_RewriteUserIDWithMasking_PreservesTopLevelFieldOrder(t *testing.T) {
 	cache := &identityCacheStub{seeds: map[int64]string{123: "11111111-2222-4333-8444-555555555555"}}
-	svc := NewIdentityService(cache)
+	svc := newTestIdentityService(cache)
 
 	originalUserID := `{"device_id":"d61f76d0730d2b920763648949bad5c79742155c27037fc77ac3f9805cb90169","account_uuid":"","session_id":"7578cf37-aaca-46e4-a45c-71285d9dbb83","parent_session_id":"parent-uuid","tk":"opaque-token"}`
 	body := []byte(`{"alpha":1,"messages":[],"metadata":{"user_id":` + strconvQuote(originalUserID) + `},"max_tokens":64000,"thinking":{"type":"adaptive"},"output_config":{"effort":"high"},"stream":true}`)
@@ -118,7 +118,7 @@ func metadataSessionBody(session, parent string) []byte {
 
 func TestIdentityServiceMaskedSessionsKeepRelationships(t *testing.T) {
 	cache := &identityCacheStub{}
-	svc := NewIdentityService(cache)
+	svc := newTestIdentityService(cache)
 	ctx := context.Background()
 	account := &Account{ID: 123, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Extra: map[string]any{"session_id_masking_enabled": true}}
 	rewrite := func(session, parent string) *ParsedUserID {
@@ -162,7 +162,7 @@ func TestIdentityServiceMaskCacheFailureKeepsAccountRemapping(t *testing.T) {
 		{createErr: errors.New("cannot persist namespace")},
 		{seeds: map[int64]string{123: "cached-seed"}, createErr: errors.New("cannot refresh namespace")},
 	} {
-		svc := NewIdentityService(cache)
+		svc := newTestIdentityService(cache)
 		account := &Account{ID: 123, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Extra: map[string]any{"session_id_masking_enabled": true}}
 		body := metadataSessionBody("child-session", "parent-session")
 		normal, err := svc.RewriteUserID(body, 123, "acc-uuid", "client-xyz", "claude-cli/2.1.78 (external, cli)")
@@ -174,7 +174,7 @@ func TestIdentityServiceMaskCacheFailureKeepsAccountRemapping(t *testing.T) {
 }
 
 func TestIdentityServiceMaskingOffPreservesLegacyMapping(t *testing.T) {
-	svc := NewIdentityService(&identityCacheStub{getErr: errors.New("must not require mask cache")})
+	svc := newTestIdentityService(&identityCacheStub{getErr: errors.New("must not require mask cache")})
 	account := &Account{ID: 123}
 	deviceID := strings.Repeat("a", 64)
 	accountUUID := "123e4567-e89b-12d3-a456-426614174000"
@@ -195,7 +195,7 @@ func TestIdentityServiceUsesAuthoritativeMaskNamespaceAfterReadRace(t *testing.T
 	ctx := context.Background()
 	account := &Account{ID: 123, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Extra: map[string]any{"session_id_masking_enabled": true}}
 	cache := &identityCacheStub{seeds: map[int64]string{123: "winning-seed"}, readSeed: "stale-read-seed"}
-	svc := NewIdentityService(cache)
+	svc := newTestIdentityService(cache)
 	body := metadataSessionBody("child-session", "parent-session")
 	raced, err := svc.RewriteUserIDWithMasking(ctx, body, account, "acc-uuid", "client-xyz", "claude-cli/2.1.78 (external, cli)")
 	require.NoError(t, err)

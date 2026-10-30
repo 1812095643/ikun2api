@@ -19,12 +19,14 @@ import (
 	"github.com/MACOS-DO/sub4api/internal/server"
 	"github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
+	"github.com/MACOS-DO/sub4api/internal/workspace"
 
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
 )
 
 type Application struct {
+	Workspace     *workspace.Handler
 	Server        *http.Server
 	PromptAudit   *securityaudit.PromptService
 	PluginManager *service.PluginManager
@@ -56,7 +58,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		provideCleanup,
 
 		// Application struct
-		wire.Struct(new(Application), "Server", "PromptAudit", "PluginManager", "Cleanup"),
+		wire.Struct(new(Application), "Server", "PromptAudit", "PluginManager", "Workspace", "Cleanup"),
 	)
 	return nil, nil
 }
@@ -95,6 +97,7 @@ func provideCleanup(
 	subscriptionExpiry *service.SubscriptionExpiryService,
 	usageCleanup *service.UsageCleanupService,
 	idempotencyCleanup *service.IdempotencyCleanupService,
+	geminiCachedContent *service.GeminiCachedContentService,
 	batchImageCleanup *service.BatchImageCleanupService,
 	batchImageWorker *service.BatchImageWorkerRuntime,
 	pricing *service.PricingService,
@@ -123,6 +126,7 @@ func provideCleanup(
 	openAIAutoReset *service.OpenAIQuotaAutoResetService,
 	promptAudit *securityaudit.PromptService,
 	pluginManager *service.PluginManager,
+	claudeTelemetry *service.ClaudeTelemetryScheduler,
 ) func() {
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -135,6 +139,16 @@ func provideCleanup(
 
 		// 应用层清理步骤可并行执行，基础设施资源（Redis/Ent）最后按顺序关闭。
 		parallelSteps := []cleanupStep{
+			{"GeminiCachedContentService", func() error {
+				if geminiCachedContent != nil {
+					geminiCachedContent.Stop()
+				}
+				return nil
+			}},
+			{"ClaudeTelemetryScheduler", func() error {
+				claudeTelemetry.Stop()
+				return nil
+			}},
 			{"PluginManager", func() error {
 				if pluginManager != nil {
 					pluginManager.Stop()

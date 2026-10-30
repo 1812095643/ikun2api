@@ -1,6 +1,6 @@
 # 独立远程浏览器
 
-配置方案为 Firefox + Openbox + TigerVNC + noVNC / websockify + Nginx HTTPS。浏览器在服务器上运行，访问者只接收桌面画面；浏览器账号会话持续保存在独立 profile 中。
+配置方案为 Firefox + Openbox + TigerVNC + noVNC / websockify + Nginx HTTPS。浏览器在服务器上运行，访问者只接收桌面画面；每次启动 Firefox 都创建全新临时资料，不继承上一次登录状态。
 
 本目录整理的是已有部署使用的方法。公开版本去掉了实际服务器地址、代理凭据、Cookie、VNC 密码和证书私钥，不直接导出生产配置。
 
@@ -42,7 +42,13 @@ sudo python3 tools/remote-browser/configure_browser.py /root/ikun-browser-settin
 
 ## 会话与显示
 
-持久目录为 `/var/lib/ikun2api-browser/profile`，不轮换设备标识，不清理登录 Cookie。桌面为 `1366×900`，禁止远程连接自动改变屏幕尺寸；启用退出后的会话恢复。
+每次启动 Firefox 时，由 `ephemeral_browser.py` 在 `/run/ikun2api-browser/session-*` 下新建独立 profile、HOME 和 XDG 缓存目录。只加载安全偏好配置，不复制历史 Cookie、Local Storage、IndexedDB、Service Worker、缓存、密码或站点设备标识。关闭所有 Firefox 窗口后自动清理本轮资料，再启动新的空白会话；服务停止或重启时，systemd 同时清除运行目录。程序异常退出后，下次启动也不会复用残留资料。
+
+刷新或断开 noVNC 只是重新连接画面，不会结束仍在运行的 Firefox 会话；新窗口和新标签页也属于本轮资料。换账号前应关闭全部 Firefox 窗口，等待新的空白窗口出现。浏览器版本、UA、屏幕、WebGL 和硬件参数保持真实值，不把新 profile 描述成完全不同的物理设备。
+
+手动下载的文件独立存放在 `/var/lib/ikun2api-browser/Downloads`，不会随临时 profile 自动删除；下载文件可能包含敏感资料，需要使用者自行管理。旧部署的持久 profile 在停止浏览器后移到管理员专用封存目录，限制为 root 访问，既不加载也不复制到新会话。桌面仍为 `1366×900`，禁止远程连接自动改变屏幕尺寸。
+
+图形会话固定使用 `DISPLAY=unix/:2`，就绪检查设置 2 秒超时，避免启动早期回退连接 TCP `::1:6002` 后被防直连规则拖住。此设置只选择本地 Unix 套接字，不新增 TCP 放行规则。
 
 时区为 `Asia/Singapore`，语言为 `zh-SG,en-SG,en`。地理定位 API 默认拒绝，不伪造 GPS。采用服务器实际 Firefox、系统字体和硬件环境，不注入 Canvas、WebGL 或平台伪造脚本。
 
@@ -62,8 +68,12 @@ sudo systemctl restart fail2ban
 
 IPv6 示例不会由浏览器安装脚本自动应用；应先检查现有服务的 IPv6 依赖。防火墙规则只限制专用浏览器用户，不用于阻断宿主 SSH、数据库或模型网关。
 
+浏览器入口使用独立访问日志和错误日志，访问日志记录实际服务端口，不记录认证头、Cookie 或查询参数。`browser-auth.local.example` 复用 Fail2ban 的 `nginx-http-auth` 过滤器，只统计错误用户名或密码；10 分钟内累计 8 次后封禁该来源访问 9443 共 15 分钟，普通未登录请求和正常资源加载不计入。旧部署的日志名称可能仍为 `sub6-browser-error.log`，安装示例前须按实际 Nginx 日志路径调整，再运行 `fail2ban-client -t` 和 `fail2ban-client reload`。
+
+证书续期工具使用独立的 `/opt/ikun2api-acme` Python 环境，不能放在业务项目的发布或历史目录内。迁移时按原环境的完整版本清单重新安装，核对 `pip check`、导入路径和版本；通过 `certbot renew --dry-run --run-deploy-hooks` 后再切换服务路径。`certificate-renew.service.example` 提供服务示例，沿用现有证书、账户资料和定时任务，测试续签不能替换正式证书。
+
 ## 验收
 
-检查浏览器实际的 `navigator.languages`、`Intl.DateTimeFormat().resolvedOptions().timeZone`、屏幕尺寸、出口 IP 和 WebRTC 候选。然后停止专用代理，确认浏览器访问外网失败；恢复代理后确认可继续使用。最后重启浏览器服务，确认 profile 与登录会话仍在。
+检查浏览器实际的 `navigator.languages`、`Intl.DateTimeFormat().resolvedOptions().timeZone`、屏幕尺寸、出口 IP 和 WebRTC 候选。然后停止专用代理，确认浏览器访问外网失败；恢复代理后确认可继续使用。使用受控页面写入测试 Cookie 和站点存储，关闭 Firefox 后再次检查，确认新会话为空、旧目录已清除；再重启服务，确认不会复用上轮 profile。不要使用真实账号的 Cookie 值作为验收输出。
 
 公开脚本已做语法检查；已有服务器的配置记录与新机器从零安装是不同证据。没有完成的网页运行态、真实 OAuth 和重启后检查，不能写成已经验证。

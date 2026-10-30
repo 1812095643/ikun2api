@@ -345,6 +345,14 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyDocURL] = settings.DocURL
 	updates[SettingKeyHomeContent] = settings.HomeContent
 	updates[SettingKeyCompactHomeEnabled] = strconv.FormatBool(settings.CompactHomeEnabled)
+	outputRateMode := strings.TrimSpace(settings.UsageOutputRateMode)
+	if outputRateMode == "" {
+		outputRateMode = "generation"
+	}
+	if outputRateMode != "total" && outputRateMode != "generation" {
+		return nil, fmt.Errorf("usage_output_rate_mode must be total or generation")
+	}
+	updates[SettingKeyUsageOutputRateMode] = outputRateMode
 	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
 	updates[SettingKeyPurchaseSubscriptionEnabled] = strconv.FormatBool(settings.PurchaseSubscriptionEnabled)
 	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)

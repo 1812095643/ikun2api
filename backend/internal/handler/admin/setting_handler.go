@@ -307,7 +307,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ClaudeCodeClientVersion:                                settings.ClaudeCodeClientVersion,
 		ClaudeCodeClientVersionSynced:                          settings.ClaudeCodeClientVersionSynced,
 		ClaudeCodeVersionAutoSyncEnabled:                       settings.ClaudeCodeVersionAutoSyncEnabled,
-		OpenAICodexTicketEnabled:                               settings.OpenAICodexTicketEnabled,
+		OpenAICodexTicketEnabled:                               service.CodexTicketFeatureEnabled && settings.OpenAICodexTicketEnabled,
 		OpenAICodexTicketAllowWithoutTicket:                    settings.OpenAICodexTicketAllowWithoutTicket,
 		OpenAICodexTicketHarvestProxyURL:                       service.MaskProxyURL(settings.OpenAICodexTicketHarvestProxyURL),
 		OpenAICodexTicketHarvestProxyConfigured:                strings.TrimSpace(settings.OpenAICodexTicketHarvestProxyURL) != "",
@@ -408,6 +408,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 
 		AccountSchedulingThresholds: settings.AccountSchedulingThresholds,
 		AllowUserViewErrorRequests:  settings.AllowUserViewErrorRequests,
+		UsageOutputRateMode:         settings.UsageOutputRateMode,
 	}
 
 	// OpenAI fast policy (stored under a dedicated setting key)

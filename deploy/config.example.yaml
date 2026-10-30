@@ -217,6 +217,9 @@ security:
 # 网关配置
 # =============================================================================
 gateway:
+  # Minimum max_output_tokens when converting Chat Completions or Anthropic requests to Responses (minimum 16, default 128)
+  # Chat Completions 或 Anthropic 请求转换为 Responses 时的最小 max_output_tokens（最小 16，默认 128）
+  min_output_tokens: 128
   # Timeout for waiting upstream response headers (seconds)
   # 等待上游响应头超时时间（秒）
   response_header_timeout: 600
@@ -318,6 +321,8 @@ gateway:
   # OpenAI /responses/compact 上游模型（默认 gpt-5.5）。
   # Use this to avoid compact failures when newer models are not yet supported by the compact endpoint.
   # 当 compact 端点暂未支持更新模型时，可通过这里降级规避失败。
+  # GPT-5.5 is API-only after its ChatGPT Codex retirement; subscription
+  # requests skip this retired fallback and keep their selected model.
   openai_compact_model: "gpt-5.5"
   # ChatGPT OAuth x-codex-turn-state ticket: harvest a 292-length header via a
   # dedicated HTTP(S)/SOCKS proxy, store it for ttl_seconds (default 3600), then inject
@@ -383,6 +388,9 @@ gateway:
     store_disabled_force_new_conn: true
     # 是否启用 WSv2 generate=false 预热（默认 false）
     prewarm_generate_enabled: false
+    # OAuth 新 WS 首轮无搜索时，先声明搜索能力；与生成前预热独立。
+    # 环境变量：GATEWAY_OPENAI_WS_SEARCH_INIT_ENABLED=false 可关闭。
+    search_init_enabled: true
     # 协议 feature 开关，v2 优先于 v1
     responses_websockets: false
     responses_websockets_v2: true

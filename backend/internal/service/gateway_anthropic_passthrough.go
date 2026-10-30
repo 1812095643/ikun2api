@@ -299,9 +299,14 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	body []byte,
 	token string,
 ) (*http.Request, []byte, error) {
+	cleanBody, err := sanitizeClaudePrivacyBody(body)
+	if err != nil {
+		return nil, nil, err
+	}
+	body = cleanBody
 	body = stripDeferredToolCacheControl(body)
 	targetURL := claudeAPIURL
-	baseURL := account.GetBaseURL()
+	baseURL := getAnthropicGatewayBaseURL(account)
 	if baseURL != "" {
 		validatedURL, err := s.validateUpstreamBaseURL(baseURL)
 		if err != nil {
@@ -326,8 +331,8 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	}
 
 	// Ollama Cloud DeepSeek 出站 max_tokens clamp：判定与上方 targetURL 的
-	// base 取值同源（GetBaseURL），详见 helper 注释。
-	body = clampOllamaCloudAnthropicMessagesMaxTokens(account, account.GetBaseURL(), body)
+	// base 取值同源，详见 helper 注释。
+	body = clampOllamaCloudAnthropicMessagesMaxTokens(account, baseURL, body)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(body))
 	if err != nil {
@@ -354,7 +359,7 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	req.Header.Del("cookie")
 	// Ollama Cloud Anthropic 兼容端点按实际 base_url 强制 Bearer（同上方
 	// targetURL 的 base 取值），其余保持 extra/default 行为。
-	setAnthropicAPIKeyAuthHeader(req.Header, account, token, account.GetBaseURL())
+	setAnthropicAPIKeyAuthHeader(req.Header, account, token, baseURL)
 
 	if getHeaderRaw(req.Header, "content-type") == "" {
 		setHeaderRaw(req.Header, "content-type", "application/json")
@@ -366,6 +371,7 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	// 账号级请求头覆写（最终生效，覆盖上面所有来源的同名头）
 	account.ApplyHeaderOverrides(req.Header)
 	filterSonnet55ToolsetBetaHeader(req.Header, body, gjson.GetBytes(body, "model").String())
+	sanitizeClaudePrivacyHeaders(req.Header)
 
 	return req, body, nil
 }

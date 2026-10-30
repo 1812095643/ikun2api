@@ -70,12 +70,14 @@ export async function generate(
   value: number,
   groupId?: number | null,
   validityDays?: number,
-  expiresInDays?: number | null
+  expiresInDays?: number | null,
+  gift: boolean = false
 ): Promise<RedeemCode[]> {
   const payload: GenerateRedeemCodesRequest = {
     count,
     type,
-    value
+    value,
+    ...(gift ? { gift: true } : {})
   }
 
   // 订阅类型专用字段

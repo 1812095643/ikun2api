@@ -17,11 +17,12 @@ const (
 
 // EmailTask 邮件发送任务
 type EmailTask struct {
-	Email    string
-	SiteName string
-	TaskType string // "verify_code" or "password_reset"
-	ResetURL string // Only used for password_reset task type
-	Locale   string // Optional Accept-Language locale hint
+	Email        string
+	SiteName     string
+	TaskType     string // "verify_code" or "password_reset"
+	ResetURL     string // Only used for password_reset task type
+	Locale       string // Optional Accept-Language locale hint
+	ResetBinding *PasswordResetTokenData
 }
 
 // EmailQueueService 异步邮件队列服务
@@ -89,10 +90,16 @@ func (s *EmailQueueService) processTask(workerID int, task EmailTask) {
 			logger.LegacyPrintf("service.email_queue", "[EmailQueue] Worker %d sent verify code to %s", workerID, task.Email)
 		}
 	case TaskTypePasswordReset:
-		if err := s.emailService.SendPasswordResetEmailWithCooldown(ctx, task.Email, task.SiteName, task.ResetURL, task.Locale); err != nil {
-			logger.LegacyPrintf("service.email_queue", "[EmailQueue] Worker %d failed to send password reset to %s: %v", workerID, task.Email, err)
+		var err error
+		if task.ResetBinding != nil {
+			err = s.emailService.sendPasswordResetEmail(ctx, task.Email, task.SiteName, task.ResetURL, task.ResetBinding, task.Locale)
 		} else {
-			logger.LegacyPrintf("service.email_queue", "[EmailQueue] Worker %d sent password reset to %s", workerID, task.Email)
+			err = s.emailService.SendPasswordResetEmailWithCooldown(ctx, task.Email, task.SiteName, task.ResetURL, task.Locale)
+		}
+		if err != nil {
+			logger.LegacyPrintf("service.email_queue", "[EmailQueue] Worker %d failed to send password reset (recipient_hash=%s)", workerID, notificationEmailHash(task.Email))
+		} else {
+			logger.LegacyPrintf("service.email_queue", "[EmailQueue] Worker %d sent password reset (recipient_hash=%s)", workerID, notificationEmailHash(task.Email))
 		}
 	default:
 		logger.LegacyPrintf("service.email_queue", "[EmailQueue] Worker %d unknown task type: %s", workerID, task.TaskType)
@@ -129,7 +136,7 @@ func (s *EmailQueueService) EnqueuePasswordReset(email, siteName, resetURL strin
 
 	select {
 	case s.taskChan <- task:
-		logger.LegacyPrintf("service.email_queue", "[EmailQueue] Enqueued password reset task for %s", email)
+		logger.LegacyPrintf("service.email_queue", "[EmailQueue] Enqueued password reset task (recipient_hash=%s)", notificationEmailHash(email))
 		return nil
 	default:
 		return fmt.Errorf("email queue is full")
@@ -137,6 +144,15 @@ func (s *EmailQueueService) EnqueuePasswordReset(email, siteName, resetURL strin
 }
 
 // Stop 停止队列服务
+func (s *EmailQueueService) enqueueBoundPasswordReset(email, siteName, resetURL string, binding PasswordResetTokenData, locale string) error {
+	select {
+	case s.taskChan <- EmailTask{Email: email, SiteName: siteName, TaskType: TaskTypePasswordReset, ResetURL: resetURL, ResetBinding: &binding, Locale: locale}:
+		return nil
+	default:
+		return fmt.Errorf("email queue is full")
+	}
+}
+
 func (s *EmailQueueService) Stop() {
 	close(s.stopChan)
 	s.wg.Wait()

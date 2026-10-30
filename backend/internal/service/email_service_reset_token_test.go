@@ -48,3 +48,10 @@ func TestConsumePasswordResetToken_ComparesHashNotPlaintext(t *testing.T) {
 	cache.stored = &PasswordResetTokenData{Token: token}
 	require.ErrorIs(t, svc.ConsumePasswordResetToken(context.Background(), "a@b.c", token), ErrInvalidResetToken)
 }
+
+func TestBuildPasswordResetURL_KeepsBearerInFragment(t *testing.T) {
+	got := buildPasswordResetURL("https://example.com/reset-password", "user+tag@example.com", "secret-token")
+	require.Contains(t, got, "#email=user%2Btag%40example.com")
+	require.Contains(t, got, "token=secret-token")
+	require.NotContains(t, got, "?email=")
+}

@@ -109,10 +109,22 @@ func TestOpenAIGatewayService_OAuthPassthrough_SanitizesNativeToolItemIDs(t *tes
 			require.NotNil(t, result)
 			require.NotNil(t, upstream.lastReq)
 			require.Equal(t, "https://chatgpt.com/backend-api/codex/responses", upstream.lastReq.URL.String())
-			require.False(t, gjson.GetBytes(upstream.lastBody, "input.0.id").Exists())
-			require.Equal(t, "ctc_valid", gjson.GetBytes(upstream.lastBody, "input.1.id").String())
-			require.False(t, gjson.GetBytes(upstream.lastBody, "input.2.id").Exists())
-			require.Equal(t, "tsc_valid", gjson.GetBytes(upstream.lastBody, "input.3.id").String())
+			// 缺失的工具结果会插在调用后，按类型和调用标识核对原始条目。
+			calls := gjson.GetBytes(upstream.lastBody, `input.#(type=="custom_tool_call")#`).Array()
+			require.Len(t, calls, 2)
+			require.Equal(t, "call_custom_1", calls[0].Get("call_id").String())
+			require.False(t, calls[0].Get("id").Exists())
+			require.Equal(t, "ctc_valid", calls[1].Get("id").String())
+			searchCalls := gjson.GetBytes(upstream.lastBody, `input.#(type=="tool_search_call")#`).Array()
+			require.Len(t, searchCalls, 2)
+			require.False(t, searchCalls[0].Get("id").Exists())
+			require.Equal(t, "tsc_valid", searchCalls[1].Get("id").String())
+			outputs := gjson.GetBytes(upstream.lastBody, `input.#(type=="custom_tool_call_output")#`).Array()
+			require.Len(t, outputs, 2)
+			for index, output := range outputs {
+				require.Equal(t, calls[index].Get("call_id").String(), output.Get("call_id").String())
+				require.Equal(t, "aborted", output.Get("output").String())
+			}
 		})
 	}
 }

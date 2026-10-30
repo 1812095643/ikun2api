@@ -85,13 +85,20 @@ func TestNormalizeOpenAIResponsesWebSocketCompatibilityBody_SanitizesNativeItemI
 		require.NoError(t, err)
 		require.True(t, changed)
 		require.Equal(t, "response.create", gjson.GetBytes(normalized, "type").String())
-		require.False(t, gjson.GetBytes(normalized, "input.0.id").Exists())
-		require.Equal(t, "ctc_valid", gjson.GetBytes(normalized, "input.1.id").String())
-		require.False(t, gjson.GetBytes(normalized, "input.2.id").Exists())
-		require.Equal(t, "tsc_valid", gjson.GetBytes(normalized, "input.3.id").String())
+		var calls []gjson.Result
+		for _, item := range gjson.GetBytes(normalized, "input").Array() {
+			if isCodexToolCallContextItemType(item.Get("type").String()) {
+				calls = append(calls, item)
+			}
+		}
+		require.Len(t, calls, 4)
+		require.False(t, calls[0].Get("id").Exists())
+		require.Equal(t, "ctc_valid", calls[1].Get("id").String())
+		require.False(t, calls[2].Get("id").Exists())
+		require.Equal(t, "tsc_valid", calls[3].Get("id").String())
 		// Native Responses call_id values are correlation keys, not item IDs.
-		require.Equal(t, "call_custom_1", gjson.GetBytes(normalized, "input.0.call_id").String())
-		require.Equal(t, "call_search_1", gjson.GetBytes(normalized, "input.2.call_id").String())
+		require.Equal(t, "call_custom_1", calls[0].Get("call_id").String())
+		require.Equal(t, "call_search_1", calls[2].Get("call_id").String())
 	}
 }
 

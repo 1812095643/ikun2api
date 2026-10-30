@@ -1,6 +1,9 @@
 <template>
   <!-- Custom Home Content: Full Page Mode -->
   <div v-if="hasHomeContent" class="min-h-screen">
+    <nav aria-label="欢迎页文档" class="flex justify-end border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-dark-800 dark:bg-dark-950">
+      <TutorialLink class="btn btn-secondary" />
+    </nav>
     <!-- iframe mode -->
     <iframe
       v-if="isHomeContentUrl"
@@ -30,16 +33,7 @@
         </div>
         <div class="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
           <LocaleSwitcher />
-          <a
-            v-if="docUrl"
-            :href="docUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:text-dark-400 dark:hover:bg-dark-800"
-            :title="t('home.viewDocs')"
-          >
-            <Icon name="book" size="md" />
-          </a>
+          <TutorialLink class="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-800" />
           <router-link
             v-if="showModelPlazaEntry"
             to="/model-plaza"
@@ -76,12 +70,15 @@
         />
         <h1 class="[overflow-wrap:anywhere] text-3xl font-bold md:text-4xl">{{ siteName }}</h1>
         <p class="mt-4 whitespace-pre-wrap [overflow-wrap:anywhere] text-base text-gray-600 dark:text-dark-300">{{ siteSubtitle }}</p>
-        <router-link
-          :to="isAuthenticated ? dashboardPath : '/login'"
-          class="mt-8 inline-flex min-h-10 items-center justify-center rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-700"
-        >
-          {{ isAuthenticated ? t('home.goToDashboard') : t('home.login') }}
-        </router-link>
+        <div class="mt-8 flex flex-wrap justify-center gap-3">
+          <router-link
+            :to="isAuthenticated ? dashboardPath : '/login'"
+            class="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-700"
+          >
+            {{ isAuthenticated ? t('home.goToDashboard') : t('home.login') }}
+          </router-link>
+          <TutorialLink class="btn btn-secondary px-5 py-2.5" />
+        </div>
       </div>
     </main>
 
@@ -116,7 +113,7 @@
 
     <!-- Header -->
     <header class="relative z-20 px-6 py-4">
-      <nav class="mx-auto flex max-w-6xl items-center justify-between">
+      <nav class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
         <!-- Logo -->
         <div class="flex items-center">
           <div class="h-10 w-10 overflow-hidden rounded-xl shadow-md">
@@ -125,21 +122,12 @@
         </div>
 
         <!-- Nav Actions -->
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <!-- Language Switcher -->
           <LocaleSwitcher />
 
           <!-- Doc Link -->
-          <a
-            v-if="docUrl"
-            :href="docUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
-            :title="t('home.viewDocs')"
-          >
-            <Icon name="book" size="md" />
-          </a>
+          <TutorialLink class="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-white" />
 
           <!-- Model Plaza Link -->
           <router-link
@@ -216,7 +204,7 @@
             </p>
 
             <!-- CTA Button -->
-            <div>
+            <div class="flex flex-wrap justify-center gap-3 lg:justify-start">
               <router-link
                 :to="isAuthenticated ? dashboardPath : '/login'"
                 class="btn btn-primary px-8 py-3 text-base shadow-lg shadow-primary-500/30"
@@ -224,6 +212,7 @@
                 {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
                 <Icon name="arrowRight" size="md" class="ml-2" :stroke-width="2" />
               </router-link>
+              <TutorialLink class="btn btn-secondary px-6 py-3 text-base" />
             </div>
           </div>
 
@@ -470,15 +459,7 @@
           &copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}
         </p>
         <div class="flex items-center gap-4">
-          <a
-            v-if="docUrl"
-            :href="docUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
-          >
-            {{ t('home.docs') }}
-          </a>
+          <TutorialLink class="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white" />
           <a
             :href="githubUrl"
             target="_blank"
@@ -499,6 +480,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
+import TutorialLink from '@/components/common/TutorialLink.vue'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
@@ -511,7 +493,6 @@ const appStore = useAppStore()
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'IKUN2api')
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
-const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 const hasHomeContent = computed(() => homeContent.value.trim().length > 0)
 const compactHomeEnabled = computed(() => appStore.cachedPublicSettings?.compact_home_enabled === true)

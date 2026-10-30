@@ -2,7 +2,7 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-3" data-tour="keys-connect-help">
           <div class="flex flex-wrap items-center gap-3">
             <SearchInput
               v-model="filterSearch"
@@ -89,7 +89,7 @@
               </button>
             </div>
           </div>
-          <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
+          <button @click="openCreateModal" class="btn btn-primary" data-tour="keys-create-btn">
             <Icon name="plus" size="md" class="mr-2" />
             {{ t('keys.createKey') }}
           </button>
@@ -546,6 +546,7 @@
             :searchable="true"
             :search-placeholder="t('keys.searchGroup')"
             data-tour="key-form-group"
+            @update:model-value="onTourGroupSelected"
           >
             <template #selected="{ option }">
               <GroupBadge
@@ -1397,6 +1398,22 @@ const filterStatus = ref('')
 const filterGroupId = ref<string | number>('')
 
 const showCreateModal = ref(false)
+let tourOpenedKeyForm = false
+
+function openCreateModal() {
+  tourOpenedKeyForm = onboardingStore.isDriverActive()
+  showCreateModal.value = true
+}
+
+function onTourGroupSelected(value: unknown) {
+  if (typeof value === 'number' && value > 0) onboardingStore.completeAction('key-group-selected')
+}
+
+function closeTourKeyForm() {
+  if (!tourOpenedKeyForm) return
+  tourOpenedKeyForm = false
+  closeModals()
+}
 const showEditModal = ref(false)
 const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
@@ -2079,6 +2096,7 @@ function formatResetTime(resetAt: string | null): string {
 }
 
 onMounted(() => {
+  onboardingStore.setKeyFormCloseCallback(closeTourKeyForm)
   loadSavedColumns()
   loadApiKeys()
   loadGroups()
@@ -2089,6 +2107,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  onboardingStore.setKeyFormCloseCallback(null)
   document.removeEventListener('click', closeGroupSelector)
   if (resetTimer) clearInterval(resetTimer)
 })

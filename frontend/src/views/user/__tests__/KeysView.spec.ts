@@ -89,6 +89,9 @@ vi.mock('@/stores/onboarding', () => ({
   useOnboardingStore: () => ({
     isCurrentStep,
     nextStep,
+    isDriverActive: vi.fn(() => false),
+    completeAction: vi.fn(),
+    setKeyFormCloseCallback: vi.fn(),
   }),
 }))
 

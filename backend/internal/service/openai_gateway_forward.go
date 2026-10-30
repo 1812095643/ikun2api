@@ -65,6 +65,13 @@ func (s *OpenAIGatewayService) forwardWithoutHostedWebSearch(ctx context.Context
 	// 请求体里的 client_metadata / prompt_cache_key，用改写后的值取键会让不同会话
 	// 落到同一个键，也会与 WS 接入路径按原始报文算出的键对不上。
 	wsExecutionScope, _ := resolveOpenAIWSExecutionScope(c, body, apiKeyID)
+	hostedWindow := openAIWSPayloadCodexWindowID(body)
+	if c != nil && c.Request != nil {
+		if header := strings.TrimSpace(c.GetHeader(openAIWSWindowIDHeader)); header != "" {
+			hostedWindow = header
+		}
+	}
+	ctx = context.WithValue(ctx, openAIWSHostedWindowContextKey{}, hostedWindow)
 	logCodexCLIOnlyDetection(ctx, c, account, apiKeyID, restrictionResult, body)
 	if restrictionResult.Enabled && !restrictionResult.Matched {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
@@ -84,7 +91,7 @@ func (s *OpenAIGatewayService) forwardWithoutHostedWebSearch(ctx context.Context
 	if normalized {
 		body = normalizedBody
 	}
-	legacyIngressBody, legacyIngressChanged, legacyIngressErr := normalizeOpenAIResponsesLegacyIngress(body)
+	legacyIngressBody, legacyIngressChanged, legacyIngressErr := normalizeOpenAIResponsesLegacyIngressWithConfig(s.cfg, body)
 	if legacyIngressErr != nil {
 		return nil, legacyIngressErr
 	}

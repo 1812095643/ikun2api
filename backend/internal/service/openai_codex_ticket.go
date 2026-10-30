@@ -214,7 +214,7 @@ func (s *OpenAIGatewayService) openAICodexTicketEnabled() bool {
 }
 
 func (s *OpenAIGatewayService) openAICodexTicketEnabledContext(ctx context.Context) bool {
-	if s == nil {
+	if s == nil || s.openaiCodexTicketSuspended {
 		return false
 	}
 	fallback := s.cfg != nil && s.cfg.Gateway.OpenAICodexTicket.Enabled
@@ -301,6 +301,7 @@ func (s *OpenAIGatewayService) storeOpenAICodexTicket(ctx context.Context, accou
 	s.openaiCodexTickets.Store(openAICodexTicketKey(account.ID, model), ticket)
 	return nil
 }
+
 // applyOpenAICodexTicket 在出站请求上补齐 x-codex-turn-state：仅当请求没有回带
 // 该头时注入已捕获的有效门票（客户端自己回合内的回带保持原样，见
 // applyOpenAICodexTicketWithGeneration）。请求路径不现场打票；仅在无票策略
@@ -602,7 +603,7 @@ func needsOpenAICodexAstraVersion(model string) bool {
 }
 
 func (s *OpenAIGatewayService) StartOpenAICodexTicketHarvester() {
-	if s == nil {
+	if s == nil || s.openaiCodexTicketSuspended {
 		return
 	}
 	s.openaiCodexTicketLifecycleMu.Lock()

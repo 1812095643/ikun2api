@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { announcementsAPI } from '@/api'
 import type { UserAnnouncement } from '@/types'
+import { refreshNavigation } from '@/utils/navigationEvents'
 
 const THROTTLE_MS = 20 * 60 * 1000 // 20 minutes
 
@@ -96,6 +97,7 @@ export const useAnnouncementStore = defineStore('announcements', () => {
       if (ann) {
         ann.read_at = new Date().toISOString()
       }
+      refreshNavigation()
     } catch (err: any) {
       console.error('Failed to mark announcement as read:', err)
     }
@@ -112,6 +114,7 @@ export const useAnnouncementStore = defineStore('announcements', () => {
         a.read_at = new Date().toISOString()
       }))
       const failure = results.find((result) => result.status === 'rejected')
+      refreshNavigation()
       if (failure) throw failure.reason
     } catch (err: any) {
       console.error('Failed to mark all as read:', err)

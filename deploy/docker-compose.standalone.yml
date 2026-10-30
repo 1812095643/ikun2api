@@ -12,12 +12,7 @@
 
 services:
   ikun2api:
-    image: ikun2api:1.0.0
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      args:
-        VERSION: "1.0.0"
+    image: ghcr.io/1812095643/ikun2api:${IKUN_VERSION:-latest}
     container_name: ikun2api
     restart: unless-stopped
     security_opt:

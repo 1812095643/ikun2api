@@ -26,7 +26,7 @@ const (
 )
 
 // ClaudeCodeVersionSyncService 周期性把官方 Claude Code CLI 的最新稳定版版本号同步到设置，
-// 供出站规范身份使用，避免为了跟上游版本而发新版本。
+// 记录可供审核的新版本；仅已进入客户端资料目录的完整组合能用于出站。
 //
 // 同步值写入 SettingKeyClaudeCodeClientVersionSynced（本服务独占写入）；管理员在面板填写的
 // SettingKeyClaudeCodeClientVersion 优先级更高，因此手工固定版本不会被同步覆盖。

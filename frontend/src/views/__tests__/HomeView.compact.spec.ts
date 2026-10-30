@@ -181,4 +181,19 @@ describe('HomeView compact mode', () => {
 
     expect(modelPlazaDestination(wrapper)).toBeUndefined()
   })
+
+  it.each([
+    {},
+    { compact_home_enabled: true },
+    { home_content: '<section>欢迎使用</section>' },
+    { home_content: 'https://example.com/home' },
+  ])('不同欢迎页模式均提供独立教程入口：%s', (settings) => {
+    const links = mountHome(settings).findAll('a[href="/tutorial"]')
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) {
+      expect(link.text()).toContain('新手教程')
+      expect(link.attributes('target')).toBe('_blank')
+      expect(link.attributes('rel')).toBe('noopener noreferrer')
+    }
+  })
 })

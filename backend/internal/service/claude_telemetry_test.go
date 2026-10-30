@@ -6,17 +6,54 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/pkg/tlsfingerprint"
+	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )
 
+const telemetryTestAccount = "11111111-1111-4111-8111-111111111111"
+const telemetryTestSession = "22222222-2222-4222-8222-222222222222"
+const telemetryClientSession = "33333333-3333-4333-8333-333333333333"
+const telemetryTestEvent = "44444444-4444-4444-8444-444444444444"
+const telemetryTestProxy = "socks5://local-proxy:443"
+
+type telemetryIdentityCache struct {
+	IdentityCache
+	fp *Fingerprint
+}
+
+func (c *telemetryIdentityCache) GetFingerprint(context.Context, int64) (*Fingerprint, error) {
+	return c.fp, nil
+}
+
+func telemetryTestContext() *gin.Context {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	c.Set("api_key", &APIKey{ID: 17, UserID: 23})
+	return c
+}
+
+func telemetryTestWire() []byte {
+	return []byte(fmt.Sprintf(`{"model":"claude-sonnet-4-6","metadata":{"user_id":%q},"messages":[{"role":"user","content":"never-upload-this-content"}]}`, formatJSONMetadataUserID(strings.Repeat("a", 64), telemetryTestAccount, telemetryTestSession, nil)))
+}
+
+func telemetryTestBatch(t *testing.T, name string) *ClaudeTelemetryBatch {
+	t.Helper()
+	body := []byte(fmt.Sprintf(`{"events":[{"event_type":"ClaudeCodeInternalEvent","event_data":{"event_name":%q,"session_id":%q,"event_id":%q,"git_remote_url":"never-upload-git","head_sha":"never-upload-hash","additional_metadata":"bmV2ZXItdXBsb2Fk"}}]}`, name, telemetryClientSession, telemetryTestEvent))
+	batch, err := ParseClaudeTelemetryBatch(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return batch
+}
+
 func TestLocalClaudeTelemetryUsesObservedRequest(t *testing.T) {
-	userID := formatJSONMetadataUserID("local-device", "local-account", "local-session", nil)
-	wire := []byte(fmt.Sprintf(`{"model":"claude-opus-5-5","metadata":{"user_id":%q},"messages":[{"role":"user","content":"never-upload-this-content"}]}`, userID))
+	wire := telemetryTestWire()
 	req, _ := http.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/messages", nil)
 	req.Header.Set("Authorization", "Bearer never-upload-this-token")
 	result := &ForwardResult{RequestID: "actual-request", Usage: ClaudeUsage{InputTokens: 31, OutputTokens: 7, CacheReadInputTokens: 19}}
@@ -25,7 +62,7 @@ func TestLocalClaudeTelemetryUsesObservedRequest(t *testing.T) {
 		t.Fatalf("真实成功事件未正确建立：name=%s err=%v", name, err)
 	}
 	event := gjson.GetBytes(body, "events.0.event_data")
-	if event.Get("session_id").String() != "local-session" || event.Get("device_id").String() != "local-device" || event.Get("auth.account_uuid").String() != "local-account" {
+	if event.Get("session_id").String() != telemetryTestSession || event.Get("device_id").String() != strings.Repeat("a", 64) || event.Get("auth.account_uuid").String() != telemetryTestAccount {
 		t.Fatal("遥测必须与实际出站会话和设备身份一致")
 	}
 	metadata, err := base64.StdEncoding.DecodeString(event.Get("additional_metadata").String())
@@ -75,6 +112,7 @@ func TestLocalClaudeTelemetryRequiresAcknowledgement(t *testing.T) {
 		{"discarded", `{"accepted_count":0}`, 200, false},
 		{"empty_success", `{}`, 200, false},
 		{"malformed", `not-json`, 200, false},
+		{"trailing_json", `{"accepted_count":1}{"accepted_count":0}`, 200, false},
 		{"rejected", `{"accepted_count":1}`, 401, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -90,7 +128,7 @@ func TestLocalClaudeTelemetryRequiresAcknowledgement(t *testing.T) {
 				}
 			}}
 			gateway := &GatewayService{httpUpstream: transport}
-			_, _, err := gateway.sendClaudeTelemetry(context.Background(), claudeTelemetryDelivery{body: []byte(`{"events":[]}`), authorization: "Bearer local-only", userAgent: "claude-cli/2.1.302", proxyURL: "socks5://local-proxy:443", accountID: 2, concurrency: 3, profile: profile})
+			_, _, err := gateway.sendClaudeTelemetry(context.Background(), claudeTelemetryDelivery{body: []byte(`{"events":[{"event_data":{}}]}`), authorization: "Bearer local-only", userAgent: "claude-cli/2.1.302", proxyURL: "socks5://local-proxy:443", accountID: 2, concurrency: 3, profile: profile})
 			if (err == nil) != test.accepted || transport.calls != 1 {
 				t.Fatal("HTTP 200 不能代替遥测接收确认")
 			}
@@ -109,7 +147,7 @@ func TestLocalClaudeTelemetryScope(t *testing.T) {
 		{Platform: PlatformAnthropic, Type: AccountTypeAPIKey},
 		{Platform: PlatformAnthropic, Type: AccountTypeOAuth, Extra: map[string]any{"custom_base_url_enabled": true}},
 	} {
-		gateway.enqueueClaudeTelemetry(req, nil, account, nil, nil, time.Now(), 200, 1, "", nil)
+		gateway.rememberClaudeTelemetry(telemetryTestContext(), telemetryClientSession, req, telemetryTestWire(), account, nil, nil, time.Now(), 200, 1, "", nil)
 	}
 	if transport.calls != 0 {
 		t.Fatal("不能为 GPT、API Key 或缺少实际会话的请求发送 Claude 遥测")
@@ -118,19 +156,19 @@ func TestLocalClaudeTelemetryScope(t *testing.T) {
 
 func TestLocalClaudeTelemetryAcceptsProductionWireHeaders(t *testing.T) {
 	t.Setenv("SUB6_CLAUDE_TELEMETRY_ENABLED", "true")
-	account := &Account{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
-	wire := []byte(fmt.Sprintf(`{"model":"claude-sonnet-4-6","metadata":{"user_id":%q},"messages":[]}`, formatJSONMetadataUserID("local-device", "local-account", "local-session", nil)))
+	account := &Account{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Extra: map[string]any{"account_uuid": telemetryTestAccount}}
+	wire := telemetryTestWire()
 	for _, rawHeaders := range []bool{false, true} {
 		t.Run(fmt.Sprint(rawHeaders), func(t *testing.T) {
-			type observed struct{ authorization, beta, requestID string }
+			type observed struct{ authorization, beta, requestID, body, metadata string }
 			sent := make(chan observed, 1)
 			transport := &localClaudeTelemetryTransport{status: 200, response: `{"accepted_count":1}`,
 				check: func(req *http.Request, _ string, _ int64, _ int, _ *tlsfingerprint.Profile) {
 					body, _ := io.ReadAll(req.Body)
 					metadata, _ := base64.StdEncoding.DecodeString(gjson.GetBytes(body, "events.0.event_data.additional_metadata").String())
-					sent <- observed{getHeaderRaw(req.Header, "authorization"), gjson.GetBytes(body, "events.0.event_data.betas").String(), gjson.GetBytes(metadata, "clientRequestId").String()}
+					sent <- observed{getHeaderRaw(req.Header, "authorization"), gjson.GetBytes(body, "events.0.event_data.betas").String(), gjson.GetBytes(metadata, "clientRequestId").String(), string(body), string(metadata)}
 				}}
-			gateway := &GatewayService{httpUpstream: transport}
+			gateway := &GatewayService{httpUpstream: transport, identityService: &IdentityService{cache: &telemetryIdentityCache{fp: &Fingerprint{ClientID: strings.Repeat("a", 64), UserAgent: "claude-cli/2.1.301 (never-upload-ua)"}}}}
 			req, _ := http.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/messages", nil)
 			for key, value := range map[string]string{"authorization": "Bearer offline-only", "anthropic-beta": "oauth-2025-04-20", "x-client-request-id": "actual-wire-request"} {
 				if rawHeaders {
@@ -139,13 +177,20 @@ func TestLocalClaudeTelemetryAcceptsProductionWireHeaders(t *testing.T) {
 					req.Header.Set(key, value)
 				}
 			}
-			gateway.enqueueClaudeTelemetry(req, wire, account, nil, nil, time.Now(), 200, 1, "", nil)
+			gateway.rememberClaudeTelemetry(telemetryTestContext(), telemetryClientSession, req, wire, account, &ForwardResult{}, nil, time.Now(), 200, 1, telemetryTestProxy, nil)
+			if transport.calls != 0 {
+				t.Fatal("请求刚完成时只保存摘要，不立即发送")
+			}
+			batch := telemetryTestBatch(t, "tengu_api_success")
+			if gateway.RelayClaudeTelemetry(18, batch) != 0 || gateway.RelayClaudeTelemetry(17, batch) != 1 || gateway.RelayClaudeTelemetry(17, batch) != 0 {
+				t.Fatal("遥测必须按 Key 隔离且不能重复发送")
+			}
 			select {
 			case event := <-sent:
-				if event.authorization != "Bearer offline-only" || event.beta != "oauth-2025-04-20" || event.requestID != "actual-wire-request" {
-					t.Fatal("原始小写头与规范头必须得到同样的认证和关联信息")
+				if event.authorization != "Bearer offline-only" || event.beta != "" || event.requestID != "" || strings.Contains(event.body+event.metadata, "never-upload") {
+					t.Fatal("小写认证头必须生效，但任意附加字段和原始遥测不得外发")
 				}
-			case <-time.After(2 * time.Second):
+			case <-time.After(claudeTelemetryMinSendGap + 2*time.Second):
 				t.Fatal("生产使用的小写认证头未触发内存测试传输")
 			}
 		})
@@ -158,7 +203,10 @@ func TestLocalClaudeTelemetryDisabledDoesNotSend(t *testing.T) {
 	gateway := &GatewayService{httpUpstream: transport}
 	req, _ := http.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/messages", nil)
 	setHeaderRaw(req.Header, "authorization", "Bearer offline-only")
-	gateway.enqueueClaudeTelemetry(req, nil, &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth}, nil, nil, time.Now(), 200, 1, "", nil)
+	gateway.rememberClaudeTelemetry(telemetryTestContext(), telemetryClientSession, req, telemetryTestWire(), &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth}, nil, nil, time.Now(), 200, 1, "", nil)
+	if gateway.RelayClaudeTelemetry(17, telemetryTestBatch(t, "tengu_api_success")) != 0 {
+		t.Fatal("关闭时不能发送")
+	}
 	if transport.calls != 0 {
 		t.Fatal("未完成完整协议验收的实验遥测关闭时不得发送")
 	}

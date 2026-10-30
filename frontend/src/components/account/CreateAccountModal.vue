@@ -5,38 +5,11 @@
     width="wide"
     @close="handleClose"
   >
-    <!-- Step Indicator for OAuth accounts -->
-    <div v-if="isOAuthFlow" class="mb-6 flex items-center justify-center">
-      <div class="flex items-center space-x-4">
-        <div class="flex items-center">
-          <div
-            :class="[
-              'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold',
-              step >= 1 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500 dark:bg-dark-600'
-            ]"
-          >
-            1
-          </div>
-          <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">{{
-            t('admin.accounts.oauth.authMethod')
-          }}</span>
-        </div>
-        <div class="h-0.5 w-8 bg-gray-300 dark:bg-dark-600" />
-        <div class="flex items-center">
-          <div
-            :class="[
-              'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold',
-              step >= 2 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500 dark:bg-dark-600'
-            ]"
-          >
-            2
-          </div>
-          <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">{{
-            oauthStepTitle
-          }}</span>
-        </div>
-      </div>
-    </div>
+    <FormSteps
+      v-if="isOAuthFlow"
+      :steps="[t('admin.accounts.oauth.authMethod'), oauthStepTitle]"
+      :current="step"
+    />
 
     <!-- Step 1: Basic Info -->
     <form
@@ -2185,9 +2158,9 @@
         />
       </div>
 
-      <!-- 配额控制 (非 Anthropic apikey/bedrock) -->
+      <!-- 配额控制 (非 Anthropic apikey/bedrock，以及 Vertex service_account) -->
       <div
-        v-else-if="form.type === 'apikey' || form.type === 'bedrock'"
+        v-else-if="supportsAccountQuota(form.type)"
         class="border-t border-gray-200 pt-4 dark:border-dark-600 space-y-4"
       >
         <div class="mb-3">
@@ -3979,6 +3952,7 @@ import type {
   OpenAIEndpointCapability
 } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import FormSteps from '@/components/common/FormSteps.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
@@ -4025,6 +3999,7 @@ import {
 } from '@/utils/format'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
 import { supportsWebSearchEmulation } from '@/utils/webSearchEmulation'
+import { supportsAccountQuota } from '@/utils/accountQuota'
 import { getAccountExpiryTimestamp } from '@/components/account/accountExpiry'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
 import {
@@ -6084,7 +6059,7 @@ const createAccountAndFinish = async (
   }
   // Inject quota limits for apikey/bedrock accounts
   let finalExtra = withUpstreamRequestIdHeader(buildWebSearchExtra(extra))
-  if (type === 'apikey' || type === 'bedrock') {
+  if (supportsAccountQuota(type)) {
     const quotaExtra: Record<string, unknown> = { ...(finalExtra || {}) }
     if (editQuotaLimit.value != null && editQuotaLimit.value > 0) {
       quotaExtra.quota_limit = editQuotaLimit.value

@@ -102,6 +102,7 @@ export default {
   // Onboarding Tour
   onboarding: {
     restartTour: 'Restart Onboarding Tour',
+    finishTour: 'Finish tour',
     dontShowAgain: "Don't show again",
     dontShowAgainTitle: 'Permanently close onboarding guide',
     confirmDontShow: "Are you sure you don't want to see the onboarding guide again?\n\nYou can restart it anytime from the user menu in the top right corner.",
@@ -214,32 +215,38 @@ export default {
     // User tour steps
     user: {
       welcome: {
-        title: '👋 Welcome to IKUN2api',
-        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Hello! Welcome to the IKUN2api AI service platform.</p><p style="margin-bottom: 12px;"><b>🎯 Quick Start:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>🔑 Create API Key</li><li>📋 Copy key to your application</li><li>🚀 Start using AI services</li></ul><p style="color: #10b981; font-weight: 600;">Just 1 minute, let\'s get started →</p></div>',
-        nextBtn: 'Start 🚀',
+        title: 'Welcome to IKUN2api',
+        description: '<p>Choose a model, add balance, and create an API key to get started in your client.</p><p>This short tour introduces the main tools. Close it anytime or restart it from your profile menu.</p>',
+        nextBtn: 'Get started',
         prevBtn: 'Skip'
       },
+      models: {
+        title: 'Choose a model',
+        description: '<p>Open <b>Model Square</b> to see models, pricing, and service groups.</p><p>Choose the matching service group when creating your API key.</p>'
+      },
+      purchase: {
+        title: 'Add balance or subscribe',
+        description: '<p>Choose a top-up amount or subscription, review the order, and complete payment.</p><p>Check your balance in the header and payment history in <b>My Orders</b>.</p>'
+      },
+      redeem: {
+        title: 'Redeem a code',
+        description: '<p>Open <b>Redeem</b>, paste the complete code, and confirm.</p><p>After redemption, check the credited balance or subscription and your redemption history.</p>'
+      },
       keyManage: {
-        title: '🔑 API Key Management',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Manage all your API access keys here.</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 What is an API Key?</b><br/>An API key is your credential for accessing AI services, like a key that allows your application to call AI capabilities.</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click to enter key page</p></div>'
+        title: 'Create and use an API key',
+        description: '<p>Open <b>API Keys</b>, select <b>Create Key</b>, enter a name, and choose the service group.</p><p>Copy the key and select <b>Use Key</b> to configure a client. The tutorial in the header provides detailed instructions. Keep your key private.</p>'
       },
-      createKey: {
-        title: '➕ Create New Key',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Click the button to create your first API key.</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Tip:</b> Key is only shown once after creation, make sure to copy and save</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create Key"</p></div>'
+      usage: {
+        title: 'Check usage and spending',
+        description: '<p>Filter <b>Usage</b> by date, key, or model to view requests, tokens, and actual costs.</p><p>For connection problems, check the request time and error details before contacting support.</p>'
       },
-      keyName: {
-        title: '✏️ Key Name',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Give your key an easy-to-identify name.</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Examples:</b> "My First Key", "For Testing", etc.</p></div>',
-        nextBtn: 'Next'
+      tickets: {
+        title: 'Contact support',
+        description: '<p>Open <b>My Tickets</b> and include the error and request time. Unread replies appear in the sidebar.</p><p>You can open one ticket each day. Reply in the same ticket for the same issue, and never include passwords or complete API keys.</p>'
       },
-      keyGroup: {
-        title: '🎯 Select Group',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Select the service group assigned by the administrator.</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 Group Info:</b><br/>Different groups may have different service quality and billing rates, choose according to your needs.</p></div>',
-        nextBtn: 'Next'
-      },
-      keySubmit: {
-        title: '🎉 Complete Creation',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Click to confirm and create your API key.</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ Important:</b><ul style="margin: 8px 0 0 16px;"><li>Copy the key (sk-xxx) immediately after creation</li><li>Key is only shown once, need to regenerate if lost</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>🚀 How to Use:</b><br/>Configure the key in any OpenAI-compatible client (like ChatBox, OpenCat, etc.) and start using!</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create" button</p></div>'
+      tutorial: {
+        title: 'Find detailed instructions',
+        description: '<p>The <b>Tutorial</b> in the header covers the website, client setup, and API access. It opens in a new tab.</p><p>You are ready to begin. Restart this tour anytime from your profile menu.</p>'
       }
     }
   },

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/MACOS-DO/sub4api/internal/pkg/response"
@@ -21,6 +22,7 @@ type ModelPlazaHandler struct {
 	plazaService   *service.ModelPlazaService
 	apiKeyService  *service.APIKeyService
 	settingService *service.SettingService
+	gatewayService *service.GatewayService
 }
 
 // NewModelPlazaHandler 创建模型广场 handler。
@@ -28,11 +30,13 @@ func NewModelPlazaHandler(
 	plazaService *service.ModelPlazaService,
 	apiKeyService *service.APIKeyService,
 	settingService *service.SettingService,
+	gatewayService *service.GatewayService,
 ) *ModelPlazaHandler {
 	return &ModelPlazaHandler{
 		plazaService:   plazaService,
 		apiKeyService:  apiKeyService,
 		settingService: settingService,
+		gatewayService: gatewayService,
 	}
 }
 
@@ -108,12 +112,25 @@ type modelPlazaResponse struct {
 // Get 返回模型广场数据。
 // GET /api/v1/model-plaza
 func (h *ModelPlazaHandler) Get(c *gin.Context) {
+	h.get(c, false)
+}
+
+// GetWorkspace 复用分组可见性和计价，仅向已登录用户提供原生模型广场。
+func (h *ModelPlazaHandler) GetWorkspace(c *gin.Context) {
+	if subject, ok := middleware.GetAuthSubjectFromContext(c); !ok || subject.UserID <= 0 {
+		response.Unauthorized(c, "Authentication required")
+		return
+	}
+	h.get(c, true)
+}
+
+func (h *ModelPlazaHandler) get(c *gin.Context, workspace bool) {
 	if h.settingService == nil {
 		response.NotFound(c, "Model plaza is not enabled")
 		return
 	}
 	rt := h.settingService.GetModelPlazaRuntime(c.Request.Context())
-	if !rt.Enabled {
+	if !workspace && !rt.Enabled {
 		response.NotFound(c, "Model plaza is not enabled")
 		return
 	}
@@ -124,7 +141,13 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 		return
 	}
 
-	groups, err := h.plazaService.ListGroups(c.Request.Context())
+	var groups []service.PlazaGroup
+	var err error
+	if workspace {
+		groups, err = h.plazaService.ListWorkspaceGroups(c.Request.Context(), h.workspaceModelIDs)
+	} else {
+		groups, err = h.plazaService.ListGroups(c.Request.Context())
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -159,6 +182,19 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 		Description: rt.Description,
 		Groups:      out,
 	})
+}
+
+// workspaceModelIDs 沿用网关模型列表的映射、默认目录与白名单，不调用模型上游。
+func (h *ModelPlazaHandler) workspaceModelIDs(ctx context.Context, group *service.Group) []string {
+	available := h.gatewayService.GetAvailableModels(ctx, &group.ID, group.Platform)
+	defaults := defaultModelIDsForPlatform(group.Platform)
+	if group.ModelAllowlistEnabled() {
+		return group.ModelAllowlist.FilterForListing(modelListingSource(group.Platform, available, defaults))
+	}
+	if len(available) > 0 {
+		return available
+	}
+	return defaults
 }
 
 // filterPlazaVisibleGroups 按登录态裁剪分组可见性。

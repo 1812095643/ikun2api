@@ -3,6 +3,7 @@ import { RouterView, useRouter, useRoute } from 'vue-router'
 import { computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import Toast from '@/components/common/Toast.vue'
 import NavigationProgress from '@/components/common/NavigationProgress.vue'
+import UserOnboarding from '@/components/Guide/UserOnboarding.vue'
 import AdminComplianceDialog from '@/components/admin/AdminComplianceDialog.vue'
 import { resolveRouteDocumentTitle } from '@/router/title'
 import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
@@ -164,6 +165,7 @@ onMounted(async () => {
 <template>
   <NavigationProgress />
   <RouterView />
+  <UserOnboarding v-if="authStore.isAuthenticated" />
   <Toast />
   <AnnouncementPopup />
   <AdminComplianceDialog />

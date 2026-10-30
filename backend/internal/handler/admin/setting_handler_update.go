@@ -397,7 +397,8 @@ type UpdateSettingsRequest struct {
 	AuthSourceGooglePlatformQuotas   map[string]*service.DefaultPlatformQuotaSetting `json:"auth_source_default_google_platform_quotas"`
 	AuthSourceDingTalkPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"auth_source_default_dingtalk_platform_quotas"`
 
-	AllowUserViewErrorRequests *bool `json:"allow_user_view_error_requests"`
+	AllowUserViewErrorRequests *bool  `json:"allow_user_view_error_requests"`
+	UsageOutputRateMode        string `json:"usage_output_rate_mode"`
 }
 
 // UpdateSettings 更新系统设置
@@ -622,6 +623,16 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		adminRechargeRebateEnabled = *req.AdminRechargeRebateEnabled
 	}
 	// 通用表格配置：兼容旧客户端未传字段时保留当前值。
+	if req.UsageOutputRateMode == "" {
+		req.UsageOutputRateMode = previousSettings.UsageOutputRateMode
+	}
+	if req.UsageOutputRateMode == "" {
+		req.UsageOutputRateMode = "generation"
+	}
+	if req.UsageOutputRateMode != "generation" && req.UsageOutputRateMode != "total" {
+		response.BadRequest(c, "usage_output_rate_mode must be total or generation")
+		return
+	}
 	if req.TableDefaultPageSize <= 0 {
 		req.TableDefaultPageSize = previousSettings.TableDefaultPageSize
 	}
@@ -1689,6 +1700,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		MaxClaudeCodeVersion:                   req.MaxClaudeCodeVersion,
 		AllowUngroupedKeyScheduling:            req.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     req.BackendModeEnabled,
+		UsageOutputRateMode:                    req.UsageOutputRateMode,
 		AllowUserViewErrorRequests: func() bool {
 			if req.AllowUserViewErrorRequests != nil {
 				return *req.AllowUserViewErrorRequests
@@ -2503,6 +2515,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		CyberSessionBlockTTLSeconds: updatedSettings.CyberSessionBlockTTLSeconds,
 		AccountSchedulingThresholds: updatedSettings.AccountSchedulingThresholds,
 		AllowUserViewErrorRequests:  updatedSettings.AllowUserViewErrorRequests,
+		UsageOutputRateMode:         updatedSettings.UsageOutputRateMode,
 	}
 	if fastPolicy, err := h.settingService.GetOpenAIFastPolicySettings(c.Request.Context()); err != nil {
 		slog.Error("openai_fast_policy_settings_get_failed", "error", err)

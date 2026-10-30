@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
 	"github.com/MACOS-DO/sub4api/internal/handler/dto"
@@ -588,7 +589,7 @@ func (h *AuthHandler) ValidateInvitationCode(c *gin.Context) {
 
 // ForgotPasswordRequest 忘记密码请求
 type ForgotPasswordRequest struct {
-	Email                 string `json:"email" binding:"required,email"`
+	Email                 string `json:"email" binding:"required,email,max=254"`
 	TurnstileToken        string `json:"turnstile_token"`
 	TencentCaptchaTicket  string `json:"tencent_captcha_ticket"`
 	TencentCaptchaRandstr string `json:"tencent_captcha_randstr"`
@@ -602,6 +603,18 @@ type ForgotPasswordResponse struct {
 // ForgotPassword 请求密码重置
 // POST /api/v1/auth/forgot-password
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	started := time.Now()
+	defer func() {
+		if remaining := 200*time.Millisecond - time.Since(started); remaining > 0 {
+			timer := time.NewTimer(remaining)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+			case <-c.Request.Context().Done():
+			}
+		}
+	}()
 	var req ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -635,9 +648,9 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 
 // ResetPasswordRequest 重置密码请求
 type ResetPasswordRequest struct {
-	Email       string `json:"email" binding:"required,email"`
-	Token       string `json:"token" binding:"required"`
-	NewPassword string `json:"new_password" binding:"required,min=6"`
+	Email       string `json:"email" binding:"required,email,max=254"`
+	Token       string `json:"token" binding:"required,len=64,hexadecimal"`
+	NewPassword string `json:"new_password" binding:"required,min=6,max=72"`
 }
 
 // ResetPasswordResponse 重置密码响应
@@ -648,6 +661,7 @@ type ResetPasswordResponse struct {
 // ResetPassword 重置密码
 // POST /api/v1/auth/reset-password
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	var req ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())

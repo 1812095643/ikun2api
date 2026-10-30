@@ -271,7 +271,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		}
 		responsesLite := isOpenAIResponsesLiteWebSocketPayload(normalized)
 		reasoningBeforeCompatibility := gjson.GetBytes(normalized, "reasoning")
-		if compatibilityBody, compatibilityChanged, compatibilityErr := normalizeOpenAIResponsesWebSocketCompatibilityBody(normalized, account, responsesLite); compatibilityErr != nil {
+		if compatibilityBody, compatibilityChanged, compatibilityErr := normalizeOpenAIResponsesWebSocketCompatibilityBodyWithConfig(s.cfg, normalized, account, responsesLite); compatibilityErr != nil {
 			return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", compatibilityErr)
 		} else if compatibilityChanged {
 			normalized = compatibilityBody
@@ -830,10 +830,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	if account.UsesOpenAICodexProtocol() {
 		projectCodexOutboundHeaders(wsHeaders, true)
 	}
+	poolExecutionScope, _ := resolveOpenAIWSExecutionScope(c, firstPayload.rawForHash, getAPIKeyIDFromContext(c))
 	baseAcquireReq := openAIWSAcquireRequest{
 		Account:          account,
 		WSURL:            wsURL,
 		Headers:          wsHeaders,
+		ExecutionScope:   poolExecutionScope,
 		ObserveHandshake: s.codexTicketHandshakeObserver(ctx, ticket),
 		HeadersFactory: func(factoryCtx context.Context, headers http.Header) (http.Header, error) {
 			return s.refreshOpenAIWSAuthHeaders(factoryCtx, account, headers)
@@ -1086,6 +1088,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			if eventType == "error" || eventType == "response.failed" {
 				markOpenAICyberPolicyEvent(c, upstreamMessage, http.StatusOK, &usage)
 			}
+			if messageText, expired := openAIWSFailedConnectionLimit(eventType, upstreamMessage); expired {
+				lease.MarkBroken()
+				if !wroteDownstream {
+					return nil, wrapOpenAIWSIngressTurnError("ws_connection_limit_reached", errors.New(messageText), false)
+				}
+			}
 			if eventType == "error" {
 				s.handleOpenAIWSErrorEventTransientFailure(ctx, account, mappedModel, lease.HandshakeHeaders(), upstreamMessage)
 				errCodeRaw, errTypeRaw, errMsgRaw := parseOpenAIWSErrorEventFields(upstreamMessage)
@@ -1115,6 +1123,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				}
 				s.persistOpenAIWSRateLimitSignal(ctx, account, lease.HandshakeHeaders(), upstreamMessage, errCodeRaw, errTypeRaw, errMsgRaw, mappedModel)
 				fallbackReason, _ := classifyOpenAIWSErrorEventFromRaw(errCodeRaw, errTypeRaw, errMsgRaw)
+				if fallbackReason == "ws_connection_limit_reached" {
+					lease.MarkBroken()
+					if !wroteDownstream {
+						return nil, wrapOpenAIWSIngressTurnError("ws_connection_limit_reached", errors.New(errMsgRaw), false)
+					}
+				}
 				if fallbackReason == openAIWSFallbackReasonInvalidEncryptedContent {
 					// 记录被上游拒绝的密文摘要；错误照旧透传，下一轮进场时按摘要预剥离。
 					if digests := collectOpenAIEncryptedContentDigestsRaw(payload); len(digests) > 0 {
@@ -1299,6 +1313,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					Duration:                      time.Since(turnStart),
 					FirstTokenMs:                  firstTokenMs,
 				}
+				result.wsAccountFailoverReplayInput = replayCollector.AllItems()
 				if replayInput := replayCollector.Items(); len(replayInput) > 0 {
 					result.wsReplayInput = replayInput
 					result.wsReplayInputExists = true
@@ -1391,6 +1406,10 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	var lastTurnStrictState *openAIWSIngressPreviousTurnStrictState
 	lastTurnReplayInput := []json.RawMessage(nil)
 	lastTurnReplayInputExists := false
+	searchReplayComplete := firstPayload.previousResponseID == ""
+	var lastSearchReplayInput []json.RawMessage
+	lastSearchReplayInputExists := false
+	searchInitFallback := false
 	currentTurnReplayInput := []json.RawMessage(nil)
 	currentTurnReplayInputExists := false
 	skipBeforeTurn := false
@@ -1411,6 +1430,25 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		sessionLease = nil
 		sessionConnID = ""
 		preferredConnID = ""
+	}
+	renewSessionLease := func() error {
+		previousID := openAIWSPayloadStringFromRaw(currentPayload, "previous_response_id")
+		if storeDisabled && previousID != "" {
+			if previousID != lastTurnResponseID || !lastTurnReplayInputExists {
+				return NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "continuation history unavailable; resend the complete conversation", errOpenAIWSPreferredConnUnavailable)
+			}
+			replay, safe, err := buildOpenAIWSCurrentTurnRetryPayload(currentPayload, currentTurnReplayInput, currentTurnReplayInputExists, currentOriginalModel)
+			if err != nil {
+				return err
+			}
+			if !safe {
+				return NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "tool continuation history unavailable; resend the complete conversation", errOpenAIWSPreferredConnUnavailable)
+			}
+			currentPayload = replay
+			currentPayloadBytes = len(replay)
+		}
+		resetSessionLease(true)
+		return nil
 	}
 	recoverIngressPrevResponseNotFound := func(relayErr error, turn int, connID string) bool {
 		if !isOpenAIWSIngressPreviousResponseNotFound(relayErr) {
@@ -1530,6 +1568,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			if lastTurnReplayInputExists {
 				lastTurnReplayInput, _ = stripOpenAIInvalidEncryptedContentFromReplayItems(lastTurnReplayInput, invalidDigests)
 			}
+			if lastSearchReplayInputExists {
+				lastSearchReplayInput, _ = stripOpenAIInvalidEncryptedContentFromReplayItems(lastSearchReplayInput, invalidDigests)
+			}
 		}
 		boundaryPayload, contextWindowBoundary, boundaryErr := normalizeOpenAIWSContextWindowBoundary(
 			currentPayload,
@@ -1552,6 +1593,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			)
 		}
 		currentPreviousResponseID := openAIWSPayloadStringFromRaw(currentPayload, "previous_response_id")
+		searchTurnComplete := currentPreviousResponseID == "" || (searchReplayComplete && currentPreviousResponseID == lastTurnResponseID)
+		searchTurnInput, searchTurnInputExists, searchInputErr := buildOpenAIWSReplayInputSequence(lastSearchReplayInput, lastSearchReplayInputExists, currentPayload, currentPreviousResponseID != "")
+		if searchInputErr != nil {
+			searchTurnComplete = false
+		}
+
 		expectedPrev := strings.TrimSpace(lastTurnResponseID)
 		if contextWindowBoundary.Changed {
 			// A context-window rollover is a new Responses root. Do not infer a
@@ -1598,6 +1645,20 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					truncateOpenAIWSLogValue(sessionConnID, openAIWSIDValueMaxLen),
 					truncateOpenAIWSLogValue(expectedPrev, openAIWSIDValueMaxLen),
 				)
+			}
+		}
+		knownPreviousID := ""
+		if lastTurnReplayInputExists && !contextWindowBoundary.Changed {
+			knownPreviousID = expectedPrev
+		}
+		if account.IsOpenAIOAuthLike() {
+			repaired, changed, repairErr := completeOpenAICodexContinuationTools(currentPayload, lastTurnReplayInput, knownPreviousID)
+			if repairErr != nil {
+				return fmt.Errorf("complete websocket tool outputs: %w", repairErr)
+			}
+			if changed {
+				currentPayload, currentPayloadBytes = repaired, len(repaired)
+				hasFunctionCallOutput = openAIWSRawPayloadHasToolCallOutput(repaired)
 			}
 		}
 		nextReplayInput, nextReplayInputExists, replayInputErr := buildOpenAIWSReplayInputSequence(
@@ -1707,6 +1768,13 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					}
 				}
 			}
+		}
+		// ingress 会跨轮次持有租约，必须在下一轮开始前主动退休到龄连接。
+		if sessionLease != nil && sessionLease.conn.age(time.Now()) >= openAIWSConnMaxAge {
+			if err := renewSessionLease(); err != nil {
+				return err
+			}
+			currentPreviousResponseID = openAIWSPayloadStringFromRaw(currentPayload, "previous_response_id")
 		}
 		forcePreferredConn := isStrictAffinityTurn(currentPayload)
 		if sessionLease == nil {
@@ -1829,6 +1897,66 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				}
 			}
 		}
+		if account.IsOpenAIOAuthLike() && sessionLease.missingHostedTools(openAIWSHostedToolsDeclared(currentPayload)) != 0 {
+			if currentPreviousResponseID != "" {
+				if !searchTurnComplete || !searchTurnInputExists {
+					return openAIWSHostedHistoryUnavailable()
+				}
+				full, safe, replayErr := buildOpenAIWSCurrentTurnRetryPayload(currentPayload, searchTurnInput, true, openAIWSPayloadStringFromRaw(currentPayload, "model"))
+				if replayErr != nil {
+					return replayErr
+				}
+				if !safe {
+					return openAIWSHostedHistoryUnavailable()
+				}
+				currentPayload, currentPayloadBytes = full, len(full)
+				currentPreviousResponseID = ""
+			}
+			resetSessionLease(true)
+			acquiredLease, acquireErr := acquireTurnLease(turn, "", false, true)
+			if acquireErr != nil {
+				return acquireErr
+			}
+			sessionLease = acquiredLease
+			sessionConnID = strings.TrimSpace(sessionLease.ConnID())
+			if storeDisabled {
+				pinSessionConn(sessionConnID)
+			}
+			logOpenAIWSModeInfo("ingress_hosted_tool_activation_reconnect account_id=%d turn=%d", account.ID, turn)
+		}
+		if !searchInitFallback && account.IsOpenAIOAuthLike() && s.cfg != nil && s.cfg.Gateway.OpenAIWS.SearchInitEnabled && !sessionLease.responseCreateInitialized() && openAIWSHostedToolsDeclared(currentPayload) == 0 {
+			var initPayload map[string]any
+			if err := json.Unmarshal(currentPayload, &initPayload); err != nil {
+				return err
+			}
+			fallback, initErr := s.initializeOpenAIWSSearch(ctx, sessionLease, initPayload, account)
+			if initErr != nil {
+				if !fallback {
+					if hooks != nil && hooks.AfterTurn != nil {
+						hooks.AfterTurn(turn, nil, initErr)
+					}
+					var failure *openAIWSSearchUpstreamError
+					if errors.As(initErr, &failure) {
+						writeCtx, cancel := newOpenAIWSDownstreamWriteContext(ctx, hooks, s.openAIWSWriteTimeout())
+						_ = clientConn.Write(writeCtx, coderws.MessageText, failure.Event)
+						cancel()
+					}
+					return initErr
+				}
+				searchInitFallback = true
+				resetSessionLease(true)
+				acquiredLease, acquireErr := acquireTurnLease(turn, "", false, true)
+				if acquireErr != nil {
+					return acquireErr
+				}
+				sessionLease = acquiredLease
+				sessionConnID = strings.TrimSpace(sessionLease.ConnID())
+				if storeDisabled {
+					pinSessionConn(sessionConnID)
+				}
+				logOpenAIWSModeInfo("ingress_search_initialization_fallback account_id=%d turn=%d", account.ID, turn)
+			}
+		}
 		connID := sessionConnID
 		if currentPreviousResponseID != "" {
 			chainedFromLast := expectedPrev != "" && currentPreviousResponseID == expectedPrev
@@ -1866,6 +1994,15 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				skipBeforeTurn = true
 				continue
 			}
+			var lifetimeErr *openAIWSIngressTurnError
+			if errors.As(relayErr, &lifetimeErr) && lifetimeErr.stage == "ws_connection_limit_reached" && !lifetimeErr.wroteDownstream && turnRetry < 1 {
+				if err := renewSessionLease(); err != nil {
+					return err
+				}
+				turnRetry++
+				skipBeforeTurn = true
+				continue
+			}
 			if recoverIngressPrevResponseNotFound(relayErr, turn, connID) {
 				continue
 			}
@@ -1893,6 +2030,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			return errors.New("websocket turn result is nil")
 		}
 		responseID := strings.TrimSpace(result.RequestID)
+		searchReplayComplete = searchTurnComplete
+		lastSearchReplayInput, lastSearchReplayInputExists = searchTurnInput, searchTurnInputExists
+		if len(result.wsAccountFailoverReplayInput) > 0 {
+			lastSearchReplayInput = combineOpenAIWSReplayItems(lastSearchReplayInput, result.wsAccountFailoverReplayInput)
+			lastSearchReplayInputExists = true
+		}
 		lastTurnResponseID = responseID
 		if contextWindowBoundary.WindowID != "" {
 			lastTurnWindowID = contextWindowBoundary.WindowID

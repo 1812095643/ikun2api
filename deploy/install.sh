@@ -276,6 +276,9 @@ check_dependencies() {
         missing+=("tar")
     fi
 
+    for dependency in openssl sha256sum base64; do
+        command -v "$dependency" >/dev/null || missing+=("$dependency")
+    done
     if [ ${#missing[@]} -gt 0 ]; then
         print_error "$(msg 'missing_deps'): ${missing[*]}"
         print_info "$(msg 'install_deps_first')"
@@ -414,14 +417,17 @@ download_and_extract() {
     TEMP_DIR=$(mktemp -d)
     trap "rm -rf $TEMP_DIR" EXIT
 
-    if ! curl -sL "$download_url" -o "$TEMP_DIR/$archive_name"; then
+    if ! curl -q -fsSL --proto '=https' --connect-timeout 15 --max-time 900 "$download_url" -o "$TEMP_DIR/$archive_name"; then
         print_error "$(msg 'download_failed')"
         exit 1
     fi
 
     print_info "$(msg 'verifying_checksum')"
-    if curl -sL "$checksum_url" -o "$TEMP_DIR/checksums.txt" 2>/dev/null; then
-        local expected_checksum=$(grep "$archive_name" "$TEMP_DIR/checksums.txt" | awk '{print $1}')
+    if curl -q -fsSL --proto '=https' --connect-timeout 15 --max-time 90 "$checksum_url" -o "$TEMP_DIR/checksums.txt" 2>/dev/null; then
+        curl -q -fsSL --proto '=https' --connect-timeout 15 --max-time 90 "$checksum_url.sig" | base64 -d > "$TEMP_DIR/checksums.sig"
+        printf '%s' 'MCowBQYDK2VwAyEAFjAf8K7CSX0LstSKwFGX2sL03GcQ14tUXsbNAAsrGnc=' | base64 -d > "$TEMP_DIR/release-public.der"
+        openssl pkeyutl -verify -pubin -keyform DER -inkey "$TEMP_DIR/release-public.der" -rawin -in "$TEMP_DIR/checksums.txt" -sigfile "$TEMP_DIR/checksums.sig" >/dev/null
+        local expected_checksum=$(awk -v name="$archive_name" '$2 == name {print $1}' "$TEMP_DIR/checksums.txt")
         local actual_checksum=$(sha256sum "$TEMP_DIR/$archive_name" | awk '{print $1}')
 
         if [ "$expected_checksum" != "$actual_checksum" ]; then
@@ -432,7 +438,8 @@ download_and_extract() {
         fi
         print_success "$(msg 'checksum_verified')"
     else
-        print_warning "$(msg 'checksum_not_found')"
+        print_error "$(msg 'checksum_not_found')"
+        exit 1
     fi
 
     print_info "$(msg 'extracting')"
@@ -440,7 +447,8 @@ download_and_extract() {
 
     mkdir -p "$INSTALL_DIR"
 
-    cp "$TEMP_DIR/ikun2api" "$INSTALL_DIR/ikun2api"
+    install -m 0755 "$TEMP_DIR/ikun2api" "$INSTALL_DIR/.ikun2api.new"
+    mv -f "$INSTALL_DIR/.ikun2api.new" "$INSTALL_DIR/ikun2api"
     chmod +x "$INSTALL_DIR/ikun2api"
 
     if [ -d "$TEMP_DIR/deploy" ]; then
@@ -499,7 +507,7 @@ Type=simple
 User=ikun2api
 Group=ikun2api
 WorkingDirectory=/opt/ikun2api
-ExecStart=/opt/ikun2api/ikun2api
+ExecStart=/opt/ikun2api/ikun2api --supervise
 Restart=always
 RestartSec=5
 StandardOutput=journal

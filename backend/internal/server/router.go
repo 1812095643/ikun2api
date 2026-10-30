@@ -115,6 +115,7 @@ func registerRoutes(
 ) {
 	// 通用路由（健康检查、状态等）
 	routes.RegisterCommonRoutes(r)
+	routes.RegisterClaudeTelemetryRoutes(r, h.Gateway, apiKeyAuth)
 
 	// API v1
 	v1 := r.Group("/api/v1")
@@ -126,6 +127,10 @@ func registerRoutes(
 	// 注册各模块路由
 	routes.RegisterAuthRoutes(v1, h, jwtAuth, auditLog, redisClient, settingService, panelRateLimiter)
 	routes.RegisterUserRoutes(v1, h, jwtAuth, auditLog, settingService, panelRateLimiter)
+	if h.Workspace != nil {
+		h.Workspace.Register(v1, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth), gin.HandlerFunc(auditLog), middleware2.BackendModeUserGuard(settingService), panelRateLimiter.Global(), gin.HandlerFunc(stepUpAuth))
+		v1.GET("/workspace/models", gin.HandlerFunc(jwtAuth), middleware2.BackendModeUserGuard(settingService), panelRateLimiter.Global(), h.ModelPlaza.GetWorkspace)
+	}
 	routes.RegisterModelPlazaRoutes(v1, h, optionalJWTAuth, settingService, panelRateLimiter)
 	routes.RegisterAdminRoutes(v1, h, adminAuth, auditLog, stepUpAuth, settingService, panelRateLimiter)
 	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, compositeResolver, cfg)

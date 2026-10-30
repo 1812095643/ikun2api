@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
 	"github.com/MACOS-DO/sub4api/internal/pkg/ctxkey"
 	"github.com/MACOS-DO/sub4api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,8 @@ const requestIDHeader = "X-Request-ID"
 // RequestLogger 在请求入口注入 request-scoped logger。
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request == nil {
+		// 遥测不写客户端路径、关联头或载荷到访问日志，只记录脱敏后的出站接收状态。
+		if c.Request == nil || claude.IsTelemetryPath(c.Request.URL.Path) {
 			c.Next()
 			return
 		}

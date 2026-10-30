@@ -38,12 +38,16 @@ func ProvideOpenAIGatewayService(
 		openAITokenProvider, grokTokenProvider, resolver, channelService, balanceNotifyService,
 		settingService, userPlatformQuotaRepo)
 	s.SetCodexTicketHistory(history)
+	// 运行时封住旧配置：即使数据库或环境变量仍开启，也不打票、不注入票据。
+	s.openaiCodexTicketSuspended = !CodexTicketFeatureEnabled
 	if settingService != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		_ = settingService.LoadModelTraceBank(ctx)
 		cancel()
 	}
-	s.StartOpenAICodexTicketHarvester()
+	if CodexTicketFeatureEnabled {
+		s.StartOpenAICodexTicketHarvester()
+	}
 	return s
 }
 

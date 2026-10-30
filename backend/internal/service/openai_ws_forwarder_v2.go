@@ -234,12 +234,14 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		Account:          account,
 		WSURL:            wsURL,
 		Headers:          wsHeaders,
+		ExecutionScope:   executionScope,
 		ObserveHandshake: s.codexTicketHandshakeObserver(ctx, ticket),
 		HeadersFactory: func(factoryCtx context.Context, headers http.Header) (http.Header, error) {
 			return s.refreshOpenAIWSAuthHeaders(factoryCtx, account, headers)
 		},
-		PreferredConnID: preferredConnID,
-		ForceNewConn:    forceNewConn,
+		PreferredConnID:    preferredConnID,
+		ForceNewConn:       forceNewConn,
+		ForcePreferredConn: storeDisabled && previousResponseID != "" && preferredConnID != "",
 		ProxyURL: func() string {
 			if account.ProxyID != nil && account.Proxy != nil {
 				return account.Proxy.URL()
@@ -249,6 +251,10 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	}
 	lease, err := s.acquireOpenAIWSWithAuthRecovery(acquireCtx, s.getOpenAIWSConnPool(), &acquireRequest)
 	if err != nil {
+		// 已知续接连接消失时使用现有完整上下文恢复，不向其他连接发送失效锚点。
+		if previousResponseID != "" && errors.Is(err, errOpenAIWSPreferredConnUnavailable) {
+			return nil, wrapOpenAIWSFallback("previous_response_not_found", err)
+		}
 		var agentDialErr *openAIWSDialError
 		if s.isAgentIdentityAccount(ctx, account) && errors.As(err, &agentDialErr) && isAgentIdentityTaskInvalidWSDialError(agentDialErr) && agentTaskRecoveryTried != nil && !*agentTaskRecoveryTried {
 			*agentTaskRecoveryTried = true
@@ -291,11 +297,70 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	// 因此 defer 中只需处理正常退出时不 MarkBroken 即可。
 	cleanExit := false
 	defer func() {
-		if !cleanExit {
-			lease.MarkBroken()
+		if lease != nil {
+			if !cleanExit {
+				lease.MarkBroken()
+			}
+			lease.Release()
 		}
-		lease.Release()
 	}()
+	replaceHostedToolLease := func() error {
+		lease.MarkBroken()
+		lease.Release()
+		lease = nil
+		acquireRequest.PreferredConnID = ""
+		acquireRequest.ForcePreferredConn = false
+		acquireRequest.ForceNewConn = true
+		replacementCtx, cancel := context.WithTimeout(ctx, s.openAIWSAcquireTimeout())
+		defer cancel()
+		var acquireErr error
+		lease, acquireErr = s.acquireOpenAIWSWithAuthRecovery(replacementCtx, s.getOpenAIWSConnPool(), &acquireRequest)
+		return acquireErr
+	}
+	hostedWindow, _ := ctx.Value(openAIWSHostedWindowContextKey{}).(string)
+	hostedReplayInput, hostedReplayComplete := s.prepareOpenAIWSHostedReplay(account, executionScope, payload, hostedWindow)
+	if hostedReplayComplete {
+		if digests := s.sessionInvalidEncryptedContentDigests(groupID, sessionHash); len(digests) > 0 {
+			hostedReplayInput, _ = stripOpenAIInvalidEncryptedContentFromReplayItems(hostedReplayInput, digests)
+		}
+	}
+	if account.IsOpenAIOAuthLike() && lease.missingHostedTools(openAIWSHostedToolsDeclaredMap(payload)) != 0 {
+		if previousResponseID != "" {
+			if !hostedReplayComplete {
+				cleanExit = true // no frame was sent on the healthy borrowed socket
+				return nil, openAIWSHostedHistoryUnavailable()
+			}
+			full, safe, replayErr := buildOpenAIWSCurrentTurnRetryPayload(payloadAsJSONBytes(payload), hostedReplayInput, true, mappedModel)
+			if replayErr != nil {
+				return nil, replayErr
+			}
+			if !safe {
+				cleanExit = true
+				return nil, openAIWSHostedHistoryUnavailable()
+			}
+			var rebuilt map[string]any
+			if err := decodeOpenAIJSONUseNumber(full, &rebuilt); err != nil {
+				return nil, err
+			}
+			payload, reqBody = rebuilt, rebuilt
+			previousResponseID = ""
+			payloadBytes = -1
+		}
+		if err := replaceHostedToolLease(); err != nil {
+			return nil, err
+		}
+		logOpenAIWSModeInfo("hosted_tool_activation_reconnect account_id=%d", account.ID)
+	}
+	searchInitFallback, searchInitErr := s.initializeOpenAIWSSearch(ctx, lease, payload, account)
+	if searchInitErr != nil {
+		if !searchInitFallback {
+			return nil, searchInitErr
+		}
+		if err := replaceHostedToolLease(); err != nil {
+			return nil, err
+		}
+		logOpenAIWSModeInfo("search_initialization_fallback account_id=%d", account.ID)
+	}
 	connID := strings.TrimSpace(lease.ConnID())
 	logOpenAIWSModeDebug(
 		"connected account_id=%d account_type=%s transport=%s conn_id=%s conn_reused=%v conn_idle_ms=%d conn_age_ms=%d upstream_pings=%d conn_pick_ms=%d queue_wait_ms=%d has_previous_response_id=%v",
@@ -358,18 +423,20 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		}
 	}
 
-	if err := s.performOpenAIWSGeneratePrewarm(
-		ctx,
-		lease,
-		decision,
-		payload,
-		previousResponseID,
-		reqBody,
-		account,
-		stateStore,
-		groupID,
-	); err != nil {
-		return nil, err
+	if !searchInitFallback {
+		if err := s.performOpenAIWSGeneratePrewarm(
+			ctx,
+			lease,
+			decision,
+			payload,
+			previousResponseID,
+			reqBody,
+			account,
+			stateStore,
+			groupID,
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := lease.WriteJSONWithContextTimeout(ctx, payload, s.openAIWSWriteTimeout()); err != nil {
@@ -395,6 +462,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	}
 
 	usage := &OpenAIUsage{}
+	hostedReplayCollector := &openAIWSToolCallReplayCollector{}
 	imageCounter := newOpenAIImageOutputCounter()
 	var firstTokenMs *int
 	responseID := ""
@@ -660,6 +728,9 @@ readLoop:
 		if eventType == "" {
 			continue
 		}
+		if hostedReplayComplete {
+			hostedReplayCollector.AddEvent(eventType, message)
+		}
 		responseModelObserver.ObserveOpenAI(message, eventType)
 		eventCount++
 		if firstEventType == "" {
@@ -717,6 +788,12 @@ readLoop:
 			markOpenAICyberPolicyEvent(c, message, http.StatusOK, usage)
 		}
 
+		if messageText, expired := openAIWSFailedConnectionLimit(eventType, message); expired {
+			lease.MarkBroken()
+			if !wroteDownstream {
+				return nil, wrapOpenAIWSFallback("ws_connection_limit_reached", errors.New(messageText))
+			}
+		}
 		if eventType == "error" {
 			s.handleOpenAIWSErrorEventTransientFailure(ctx, account, mappedModel, lease.HandshakeHeaders(), message)
 			errCodeRaw, errTypeRaw, errMsgRaw := parseOpenAIWSErrorEventFields(message)
@@ -897,6 +974,10 @@ readLoop:
 		clientDisconnected,
 	)
 
+	if hostedReplayComplete && (upstreamTerminalEvent == "response.completed" || upstreamTerminalEvent == "response.done") {
+		completeInput := combineOpenAIWSReplayItems(hostedReplayInput, hostedReplayCollector.AllItems())
+		s.saveOpenAIWSHostedReplay(account, executionScope, responseID, hostedWindow, completeInput)
+	}
 	result := resultWithUsage()
 	result.ImageCount = imageCounter.Count()
 	result.ImageOutputSizes = imageCounter.Sizes()

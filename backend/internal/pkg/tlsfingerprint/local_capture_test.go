@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
 	"io"
 	"net"
 	"os"
@@ -17,7 +18,7 @@ import (
 
 // 参考包来自服务器运行官方客户端的真实回环采集，不由待测模板生成。
 func TestLocalDefaultMatchesNativeClientHello(t *testing.T) {
-	reference, err := os.ReadFile("testdata/claude-linux-2.1.299-clienthello.bin")
+	reference, err := os.ReadFile("testdata/" + claude.EffectiveClientProfile().TLSSampleID + ".bin")
 	if err != nil {
 		t.Fatal(err)
 	}

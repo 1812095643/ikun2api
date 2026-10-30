@@ -877,7 +877,7 @@ func ValidateClaudeOAuthSystemPromptBlocksConfig(raw string) error {
 func extractSystemTextAndCacheControl(system any) (string, any) {
 	switch v := system.(type) {
 	case string:
-		return strings.TrimSpace(v), nil
+		return strings.TrimSpace(stripClaudePrivacySystemText(v)), nil
 	case []any:
 		var parts []string
 		var cacheControl any
@@ -887,7 +887,12 @@ func extractSystemTextAndCacheControl(system any) (string, any) {
 				continue
 			}
 			text, ok := m["text"].(string)
-			if !ok || strings.TrimSpace(text) == "" {
+			if !ok {
+				continue
+			}
+			// 原 system 可能迁移进 messages，必须先清理附加信息，避免绕过出站 system 过滤。
+			text = stripClaudePrivacySystemText(text)
+			if strings.TrimSpace(text) == "" {
 				continue
 			}
 			parts = append(parts, text)
