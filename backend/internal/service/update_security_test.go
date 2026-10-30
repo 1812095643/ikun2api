@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -74,5 +75,20 @@ func TestUpdateExtractRejectsArchiveSymlinkAndNestedBinary(t *testing.T) {
 		require.NoError(t, f.Close())
 		svc := &UpdateService{}
 		require.Error(t, svc.extractBinary(path, filepath.Join(t.TempDir(), "out")))
+	}
+}
+
+func TestUpdateJournalRejectsPathsOutsideBackupRoot(t *testing.T) {
+	root := t.TempDir()
+	binary := filepath.Join(root, "ikun2api")
+	journal := UpgradeJournal{BackupDirectory: filepath.Join(root, "upgrade-backups", "one"), PreviousBinary: binary + ".backup", PreviousSHA256: strings.Repeat("a", 64), CandidateSHA256: strings.Repeat("b", 64)}
+	require.NoError(t, WriteUpgradeJournal(binary, journal))
+	_, err := ReadUpgradeJournal(binary)
+	require.NoError(t, err)
+	for _, path := range []string{root, filepath.Join(root, "other"), filepath.Join(root, "upgrade-backups", "..", "escape")} {
+		journal.BackupDirectory = path
+		require.NoError(t, WriteUpgradeJournal(binary, journal))
+		_, err = ReadUpgradeJournal(binary)
+		require.Error(t, err)
 	}
 }

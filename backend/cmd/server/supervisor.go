@@ -38,7 +38,19 @@ func runSupervisor() error {
 		}
 		if j != nil {
 			h, e := service.UpgradeFileHash(binary)
-			if e != nil || h != j.CandidateSHA256 {
+			if e != nil {
+				return e
+			}
+			if h == j.PreviousSHA256 {
+				// The process stopped after recording intent but before atomic swap.
+				if err := os.Remove(service.UpgradeJournalPath(binary)); err != nil {
+					return err
+				}
+				_ = os.Remove(service.UpgradeJournalPath(binary) + ".ready")
+				log.Println("Interrupted before executable swap; continuing the previous version")
+				continue
+			}
+			if h != j.CandidateSHA256 {
 				return fmt.Errorf("candidate executable no longer matches upgrade journal")
 			}
 			if _, err := os.Stat(filepath.Join(j.BackupDirectory, "COMPLETE")); err != nil {
