@@ -12,7 +12,13 @@ export function useSystemUpdate() {
   async function check(force = false) {
     if (busy.value) return
     phase.value = 'checking'; error.value = ''
-    try { info.value = await checkUpdates(force); phase.value = 'idle' }
+    try {
+      info.value = await checkUpdates(force)
+      const status = await getUpdateStatus()
+      if (status.phase === 'failed') { error.value = status.error || '上次更新未完成，请查看服务器日志。'; phase.value = 'failed' }
+      else if (['downloading', 'validating', 'backing_up', 'restarting'].includes(status.phase)) { phase.value = status.phase === 'restarting' ? 'restarting' : 'updating'; void watchUpdate().catch(e => { error.value = errorMessage(e); phase.value = 'failed' }) }
+      else phase.value = 'idle'
+    }
     catch (e) { error.value = errorMessage(e); phase.value = 'failed' }
   }
   async function restart() {
