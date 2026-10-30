@@ -42,8 +42,8 @@ export function useSystemUpdate() {
       await new Promise(resolve => setTimeout(resolve, 2000))
       try {
         const version = await getVersion()
-        if (version.version && version.version !== previous) { window.location.reload(); return }
         const status = await getUpdateStatus()
+        if (version.version && version.version !== previous && !status.active && status.phase === 'idle') { window.location.reload(); return }
         if (status.phase === 'failed') { error.value = status.error || '更新失败，现有程序仍保留。'; phase.value = 'failed'; return }
         if (status.phase === 'restarting') phase.value = 'restarting'
         if (status.phase === 'idle') { phase.value = 'idle'; await check(true); return }

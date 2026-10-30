@@ -29,6 +29,13 @@ func SetUpgradePhase(phase, message string) {
 	upgradeState.Error = message
 }
 func UpgradeStatus() any {
+	upgradeMu.Lock()
+	idle := upgradeState.Phase == "idle"
+	upgradeMu.Unlock()
+	if idle && upgradeMaintenanceMarkerExists() {
+		return map[string]any{"phase": "restarting", "active": true}
+	}
+
 	if binary, err := os.Executable(); err == nil {
 		if b, err := os.ReadFile(binary + ".upgrade-result.json"); err == nil {
 			var result map[string]any

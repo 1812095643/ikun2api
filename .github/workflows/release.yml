@@ -147,7 +147,7 @@ jobs:
           path: dist/release/ikun2api_image_*.tar.gz
           retention-days: 7
 
-  publish:
+  assemble:
     needs: [verify, binaries, images]
     runs-on: ubuntu-latest
     permissions:
@@ -181,6 +181,40 @@ jobs:
           name: verified-release
           path: dist/release/*
           retention-days: 14
+
+  compose-rehearsal:
+    needs: [verify, assemble]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          path: dist/release
+      - name: 从官方版本带数据切换并验证重建持久性
+        run: sudo -E env PATH="$PATH" python3 scripts/release/rehearse-compose.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compose-rehearsal-report
+          path: dist/release/compose-rehearsal.json
+
+  publish:
+    needs: [verify, assemble, compose-rehearsal]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          path: dist/release
       - name: 发布正式 GitHub Release
         if: github.ref_type == 'tag' || inputs.dry_run == false
         env:
