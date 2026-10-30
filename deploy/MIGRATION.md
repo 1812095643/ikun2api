@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/1812095643/ikun2api/main/deploy/mig
 curl -fsSL https://raw.githubusercontent.com/1812095643/ikun2api/main/deploy/migrate.sh | sudo bash -s -- --mode compose --compose-file ./docker-compose.yml --compose-service sub2api
 ```
 
-可多次传入 `--compose-file`，顺序与原部署一致。`--check` 只下载校验并做只读兼容检查，不停服。`--version v1.3.16` 可固定版本。
+可多次传入 `--compose-file`，顺序与原部署一致。`--check` 只下载校验并做只读兼容检查，不停服。`--version v1.3.17` 可固定版本。
 
 ## 切换顺序
 

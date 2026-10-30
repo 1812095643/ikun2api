@@ -1,6 +1,6 @@
 # IKUN2api
 
-**版本 1.3.16** · AI 账号与请求网关
+**版本 1.3.17** · AI 账号与请求网关
 
 提供 Claude、OpenAI / Codex、Gemini、Grok 等平台的账号、代理、分组、额度、用量与请求管理，包含 Vue 管理界面和 Go 服务端。
 

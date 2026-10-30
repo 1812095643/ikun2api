@@ -32,3 +32,14 @@ func TestUpgradePreflightReadsWithoutMutation(t *testing.T) {
 		})
 	}
 }
+
+func TestUpgradeKnownIKUNMigrationLineEndingCompatibility(t *testing.T) {
+	const name = "259_claude_device_identities.sql"
+	const lf = "b82daf89494264508194b8a5261ad6adeb321a85fce4dd27f42a297aca94ceb5"
+	const crlf = "1aec38250cfa0b97d9c7556e8127881096672da2e50fc0f46fe16e2349abb213"
+	require.True(t, isMigrationChecksumCompatible(name, crlf, lf))
+	require.True(t, isMigrationChecksumCompatible(name, lf, crlf))
+	require.False(t, isMigrationChecksumCompatible(name, "unknown", lf))
+	require.False(t, isMigrationChecksumCompatible(name, crlf, "modified-sql"))
+	require.False(t, isMigrationChecksumCompatible("260_workspace_upstream_balances.sql", crlf, lf))
+}
