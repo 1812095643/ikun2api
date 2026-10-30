@@ -22,6 +22,9 @@ type SettingHandler struct {
 
 // NewSettingHandler 创建公开设置处理器
 func NewSettingHandler(settingService *service.SettingService, version string) *SettingHandler {
+	if settingService != nil {
+		settingService.SetVersion(version)
+	}
 	return &SettingHandler{
 		settingService: settingService,
 		version:        version,

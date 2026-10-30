@@ -155,3 +155,26 @@ func TestSettingHandler_GetPublicSettings_ExposesWeChatOAuthModeCapabilities(t *
 	require.True(t, resp.Data.WeChatOAuthOpenEnabled)
 	require.True(t, resp.Data.WeChatOAuthMPEnabled)
 }
+
+func TestSettingHandlerVersionMatchesHTMLInjection(t *testing.T) {
+	repo := &settingHandlerPublicRepoStub{values: map[string]string{}}
+	svc := service.NewSettingService(repo, &config.Config{})
+	h := NewSettingHandler(svc, "1.3.18")
+	raw, err := svc.GetPublicSettingsForInjection(context.Background())
+	require.NoError(t, err)
+	payload, ok := raw.(*service.PublicSettingsInjectionPayload)
+	require.True(t, ok)
+	require.Equal(t, "1.3.18", payload.Version)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/settings/public", nil)
+	h.GetPublicSettings(c)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response struct {
+		Data struct {
+			Version string `json:"version"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, payload.Version, response.Data.Version)
+}

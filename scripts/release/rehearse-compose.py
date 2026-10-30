@@ -76,10 +76,15 @@ def main():
             newcommand=command+['-f',str(work/'ikun2api.override.yml')];container=run(newcommand+['ps','-q','sub2api']);hostport=json.loads(run(['docker','inspect',container]))[0]['NetworkSettings']['Ports']['8080/tcp'][0]['HostPort'];url='http://127.0.0.1:'+hostport
             ready();token=api('/api/v1/auth/login',{'email':'migration-fixture@example.invalid','password':'MigrationFixtureOnly!23'})['access_token'];ack=api('/api/v1/admin/compliance',token=token);api('/api/v1/admin/compliance/accept',{'phrase':ack['ack_phrase_zh'],'language':'zh'},token)
             assert api('/api/v1/admin/system/version',token=token)['version']==VERSION;assert fingerprint()==before
+            with opener.open(url+'/admin/upstream-balances',timeout=10) as response:html=response.read().decode()
+            marker='window.__APP_CONFIG__ = '
+            if marker not in html:marker='window.__APP_CONFIG__='
+            injected,_=json.JSONDecoder().raw_decode(html.split(marker,1)[1]);assert injected['version']==VERSION
+
             # The updated runtime survives both a restart and a same-image recreate.
             for action in [['restart','sub2api'],['up','-d','--no-deps','--force-recreate','sub2api']]:
                 run(newcommand+action);container=run(newcommand+['ps','-q','sub2api']);hostport=json.loads(run(['docker','inspect',container]))[0]['NetworkSettings']['Ports']['8080/tcp'][0]['HostPort'];url='http://127.0.0.1:'+hostport;ready();assert fingerprint()==before
-            report.update(isolated=True,official_binary='0.2.19',login_preserved=True,restart_and_recreate_preserve_data=True,provider_model_requests_sent=0)
+            report.update(isolated=True,official_binary='0.2.19',login_preserved=True,html_injected_version_visible=True,restart_and_recreate_preserve_data=True,provider_model_requests_sent=0)
             (bundle/'compose-rehearsal.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
         finally:
             # Only disposable containers/volumes belonging to the random QA project.

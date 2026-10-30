@@ -61,7 +61,7 @@ jobs:
         run: pnpm install --frozen-lockfile && pnpm exec vitest run src/components/common/__tests__/SystemUpdateDialog.spec.ts src/views/auth/__tests__/ResetPasswordView.spec.ts && pnpm build
       - name: 更新、安全与备份回归
         working-directory: backend
-        run: go test -tags unit ./internal/service ./internal/repository ./internal/handler/admin ./internal/server/middleware -run 'Test(Update|Upgrade|SystemHandler|CompareVersions|ParseVersion|ValidateDownload|GitHubRelease|PgDumper)' -count=1 -timeout=180s
+        run: go test -tags unit ./internal/service ./internal/repository ./internal/handler/admin ./internal/server/middleware -run 'Test(Update|Upgrade|SystemHandler|CompareVersions|ParseVersion|ValidateDownload|GitHubRelease|PgDumper)' -count=1 -timeout=180s && go test -tags unit ./internal/handler -run '^TestSettingHandlerVersionMatchesHTMLInjection$' -count=1
       - name: 发布脚本检查
         run: |
           python3 -m py_compile deploy/switch-from-sub2api.py scripts/release/build.py scripts/release/sign.py
