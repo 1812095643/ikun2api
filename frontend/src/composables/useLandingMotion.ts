@@ -13,6 +13,25 @@ export function useLandingMotion(root: Ref<HTMLElement | null>) {
   const progress = shallowRef(0)
   const pointerX = shallowRef(0)
   const pointerY = shallowRef(0)
+  const scrollHintVisible = shallowRef(false)
+  let hintTimer: ReturnType<typeof setTimeout> | undefined
+  let interacted = false
+  let hintRoot: HTMLElement | null = null
+
+  function dismissHint() {
+    interacted = true
+    scrollHintVisible.value = false
+    if (hintTimer !== undefined) clearTimeout(hintTimer)
+    hintTimer = undefined
+  }
+
+  function interaction(event: Event) {
+    // Let the hint button complete its own click/keyboard activation before removal.
+    if ((event.type === 'pointerdown' || event.type === 'touchstart' || event.type === 'keydown') &&
+      event.target instanceof Element && event.target.closest('.scroll-cue') &&
+      (event.type !== 'keydown' || ['Enter', ' '].includes((event as KeyboardEvent).key))) return
+    dismissHint()
+  }
 
   function paint() {
     const style = root.value?.style
@@ -57,6 +76,7 @@ export function useLandingMotion(root: Ref<HTMLElement | null>) {
   }
 
   function scroll() {
+    if (window.scrollY > rootTop + 4) dismissHint()
     target.scroll = Math.min(1, Math.max(0, (window.scrollY - rootTop) / (viewHeight * 1.8)))
     request()
   }
@@ -93,6 +113,7 @@ export function useLandingMotion(root: Ref<HTMLElement | null>) {
   }
 
   function explore() {
+    dismissHint()
     root.value?.querySelector<HTMLElement>('#home-explore')?.scrollIntoView({
       behavior: reduced?.matches ? 'instant' : 'smooth', block: 'start'
     })
@@ -107,11 +128,25 @@ export function useLandingMotion(root: Ref<HTMLElement | null>) {
     document.addEventListener('visibilitychange', visibility)
     root.value?.addEventListener('pointermove', move, { passive: true })
     root.value?.addEventListener('pointerleave', resetPointer)
+    hintRoot = root.value
+    hintRoot?.addEventListener('wheel', interaction, { passive: true })
+    hintRoot?.addEventListener('touchstart', interaction, { passive: true })
+    hintRoot?.addEventListener('pointerdown', interaction, { passive: true })
+    document.addEventListener('keydown', interaction)
     measure()
+    hintTimer = setTimeout(() => {
+      hintTimer = undefined
+      if (!interacted && window.scrollY <= rootTop + 4) scrollHintVisible.value = true
+    }, 1400)
   })
 
   onUnmounted(() => {
     stop()
+    if (hintTimer !== undefined) clearTimeout(hintTimer)
+    hintRoot?.removeEventListener('wheel', interaction)
+    hintRoot?.removeEventListener('touchstart', interaction)
+    hintRoot?.removeEventListener('pointerdown', interaction)
+    document.removeEventListener('keydown', interaction)
     reduced?.removeEventListener?.('change', motionPreference)
     window.removeEventListener('scroll', scroll)
     window.removeEventListener('resize', measure)
@@ -120,5 +155,5 @@ export function useLandingMotion(root: Ref<HTMLElement | null>) {
     root.value?.removeEventListener('pointerleave', resetPointer)
   })
 
-  return { explore, progress, pointerX, pointerY }
+  return { explore, progress, pointerX, pointerY, scrollHintVisible }
 }

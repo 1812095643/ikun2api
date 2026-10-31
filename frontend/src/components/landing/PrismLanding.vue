@@ -17,7 +17,7 @@ defineProps<{
 }>()
 const { t } = useI18n()
 const root = shallowRef<HTMLElement | null>(null)
-const { explore, progress, pointerX, pointerY } = useLandingMotion(root)
+const { explore, progress, pointerX, pointerY, scrollHintVisible } = useLandingMotion(root)
 </script>
 
 <template>
@@ -48,10 +48,14 @@ const { explore, progress, pointerX, pointerY } = useLandingMotion(root)
       </main>
 
       <div class="hero-providers"><ProviderStrip :to="modelsTo" /></div>
-      <button class="scroll-cue" type="button" aria-controls="home-explore" @click="explore">
-        <Icon name="arrowDown" size="lg" aria-hidden="true" />
-        <span>{{ t('home.prism.scroll') }}</span>
-      </button>
+      <Transition name="scroll-hint">
+        <button v-if="scrollHintVisible" class="scroll-cue" type="button" aria-controls="home-explore" @click="explore">
+          <span class="scroll-cue-content">
+            <Icon name="arrowDown" size="lg" aria-hidden="true" />
+            <span>{{ t('home.prism.scroll') }}</span>
+          </span>
+        </button>
+      </Transition>
     </section>
 
     <div class="camera-journey" aria-hidden="true"></div>
@@ -113,6 +117,11 @@ const { explore, progress, pointerX, pointerY } = useLandingMotion(root)
 .explore-link :deep(svg) { width: 15px; height: 15px; }
 .hero-providers { position: absolute; bottom: 11.9%; left: 0; width: 100%; }
 .scroll-cue { position: absolute; bottom: 4.35%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 3px 15px; color: #c9d5e5; font-size: 14px; font-weight: 400; line-height: 1.5; }
+.scroll-cue-content { display: flex; flex-direction: column; align-items: center; gap: inherit; animation: scroll-cue-breathe 3.2s ease-in-out infinite; }
+@keyframes scroll-cue-breathe { 0%, 100% { opacity: .45; transform: translateY(0); } 50% { opacity: 1; transform: translateY(4px); } }
+.scroll-hint-enter-active { transition: opacity 400ms ease-out; }
+.scroll-hint-leave-active { transition: opacity 220ms ease-out; pointer-events: none; }
+.scroll-hint-enter-from, .scroll-hint-leave-to { opacity: 0; }
 .scroll-cue :deep(svg) { width: 20px; height: 30px; stroke-width: .8; transition: transform 180ms ease; }
 .scroll-cue:hover :deep(svg) { transform: translateY(4px); }
 .prism-landing :is(a, button):focus-visible { outline: 2px solid #b9ddff; outline-offset: 5px; }
@@ -162,6 +171,7 @@ const { explore, progress, pointerX, pointerY } = useLandingMotion(root)
   .next-text > span { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .scroll-cue-content { animation: none; }
   .camera-journey { height: 0; }
   .scene-shade { opacity: 0; }
   .explore-section { background: rgb(6 20 38 / 80%); }
