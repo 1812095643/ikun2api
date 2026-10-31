@@ -441,6 +441,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				_ = resp.Body.Close()
 
 				if s.shouldRectifySignatureError(ctx, account, respBody, reqModel) {
+					signatureRetryStart := time.Now()
 					appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 						ProxyID:            opsUpstreamProxyID(account),
 						ProxyName:          opsUpstreamProxyName(account),
@@ -470,8 +471,10 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 							strings.Contains(m, "function_response")
 					}
 
-					// 避免在重试预算已耗尽时再发起额外请求
-					if time.Since(retryStart) >= maxRetryElapsed {
+					// 签名整流是收到明确 400 后的一次兼容修复，不能消耗首发的
+					// 10 秒通用重试预算；长上下文常在该预算之后才返回签名错误。
+					// 客户端取消后不再发起修复，也不为成功的长流附加新截止时间。
+					if ctx.Err() != nil {
 						resp.Body = io.NopCloser(bytes.NewReader(respBody))
 						break
 					}
@@ -523,7 +526,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 									}(),
 								})
 								msg2 := extractUpstreamErrorMessage(retryRespBody)
-								if looksLikeToolSignatureError(msg2) && time.Since(retryStart) < maxRetryElapsed {
+								if looksLikeToolSignatureError(msg2) && ctx.Err() == nil && time.Since(signatureRetryStart) < maxRetryElapsed {
 									logger.LegacyPrintf("service.gateway", "Account %d: signature retry still failing and looks tool-related, retrying with tool blocks downgraded", account.ID)
 									filteredBody2 := FilterSignatureSensitiveBlocksForRetry(body, reqModel)
 									retryCtx2, releaseRetryCtx2 := detachStreamUpstreamContext(ctx, reqStream)

@@ -64,7 +64,7 @@ jobs:
         run: go test -tags unit ./internal/service ./internal/repository ./internal/handler/admin ./internal/server/middleware -run 'Test(Update|Upgrade|SystemHandler|CompareVersions|ParseVersion|ValidateDownload|GitHubRelease|PgDumper)' -count=1 -timeout=180s && go test -tags unit ./internal/handler -run '^TestSettingHandlerVersionMatchesHTMLInjection$' -count=1
       - name: Claude 隐私过滤与遥测回归
         working-directory: backend
-        run: go test -tags unit ./internal/service ./internal/handler ./internal/server/routes ./internal/server/middleware ./internal/pkg/claude -run 'Test(ClaudePrivacy|ClaudeTelemetry|GatewayClaude|ParseClaudeTelemetry|BuildClaudeTelemetry|SanitizeClaude|Telemetry)' -count=1 -timeout=180s
+        run: go test -tags unit ./internal/service ./internal/handler ./internal/server/routes ./internal/server/middleware ./internal/pkg/claude -run 'Test(ClaudePrivacy|ClaudeTelemetry|GatewayClaude|GatewayService_ForwardSignatureRepair|ParseClaudeTelemetry|BuildClaudeTelemetry|SanitizeClaude|Telemetry)' -count=1 -timeout=180s
       - name: 发布脚本检查
         run: |
           python3 -m py_compile deploy/switch-from-sub2api.py scripts/release/build.py scripts/release/sign.py
