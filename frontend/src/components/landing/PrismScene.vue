@@ -62,6 +62,7 @@ onUnmounted(() => {
 
 <style scoped>
 .prism-scene, .scene-art, .depth-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.prism-scene { filter: brightness(.92); }
 .scene-art { object-fit: cover; object-position: center; }
 .depth-canvas { opacity: 0; pointer-events: none; }
 </style>

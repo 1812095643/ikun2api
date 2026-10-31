@@ -99,16 +99,16 @@ const { explore, progress, pointerX, pointerY } = useLandingMotion(root)
 .camera-journey { height: 80svh; pointer-events: none; }
 .landing-screen { position: relative; width: 100%; height: 100svh; min-height: 540px; }
 .hero-copy { position: absolute; top: 23.9%; left: 50%; width: min(880px, 90%); text-align: center; transform: translateX(-50%); }
-.hero-eyebrow { margin: 0; color: #b4dcfa; font-size: clamp(12px, .9vw, 17px); line-height: 1.5; letter-spacing: .24em; font-weight: 400; }
-.hero-title { display: flex; flex-direction: column; margin: 12px 0 21px; font-size: clamp(44px, 4.9vw, 94px); line-height: 1.13; letter-spacing: .012em; font-weight: 700; color: #f5f8ff; text-shadow: 0 3px 18px rgb(5 16 32 / 12%); }
-.hero-title > span { transform: translateX(.38em); }
-.hero-title-second { color: #d5e9ff; }
-.hero-description { margin: 0; color: #d8e0ef; font-size: clamp(16px, 1.44vw, 27px); line-height: 1.65; font-weight: 400; letter-spacing: .015em; }
-.hero-actions { display: flex; align-items: center; justify-content: center; gap: 35px; margin-top: 30px; }
-.start-button { min-height: 62px; min-width: 190px; display: inline-flex; align-items: center; justify-content: center; gap: 17px; padding: 15px 30px; background: #fff9f1; border: 1px solid rgb(255 255 255 / 70%); border-radius: 999px; color: #111c2c; font-size: 18px; line-height: 1.5; font-weight: 600; text-decoration: none; box-shadow: 0 8px 35px rgb(137 185 255 / 8%); transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease; }
+.hero-eyebrow { margin: 0; color: #b4dcfa; font-size: clamp(12px, .86vw, 16px); line-height: 1.5; letter-spacing: .21em; font-weight: 400; }
+.hero-title { display: flex; flex-direction: column; margin: 14px 0 17px; font-size: clamp(44px, 4.9vw, 94px); line-height: 1.13; letter-spacing: .012em; font-weight: 600; color: #f5f8ff; text-shadow: 0 3px 18px rgb(5 16 32 / 12%); }
+.hero-title > span { display: block; transform: none; }
+.hero-title-second { color: #d5e9ff; background: linear-gradient(180deg, #f3faff 8%, #b9dafa 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero-description { margin: 0; color: #d8e0ef; font-size: clamp(16px, 1.4vw, 26px); line-height: 1.65; font-weight: 400; letter-spacing: .015em; }
+.hero-actions { display: flex; align-items: center; justify-content: center; gap: 35px; margin-top: 31px; }
+.start-button { min-height: clamp(48px, 3.71vw, 68px); min-width: clamp(152px, 11.36vw, 218px); display: inline-flex; align-items: center; justify-content: center; gap: 17px; padding: clamp(11px, .9vw, 17px) clamp(24px, 1.8vw, 34px); background: #fff9f1; border: 1px solid rgb(255 255 255 / 70%); border-radius: 999px; color: #111c2c; font-size: clamp(14px, 1.077vw, 20px); line-height: 1.5; font-weight: 600; text-decoration: none; box-shadow: 0 8px 35px rgb(137 185 255 / 8%); transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease; }
 .start-button :deep(svg) { width: 19px; height: 19px; }
 .start-button:hover { transform: translateY(-3px); background: #fff; box-shadow: 0 8px 36px rgb(157 204 255 / 22%); }
-.explore-link { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; color: #f2f6ff; font-size: 18px; font-weight: 500; text-decoration: none; transition: color 180ms ease; }
+.explore-link { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; color: #f2f6ff; font-size: clamp(14px, 1.077vw, 20px); font-weight: 500; text-decoration: none; transition: color 180ms ease; }
 .explore-link:hover { color: #b6dcff; }
 .explore-link :deep(svg) { width: 15px; height: 15px; }
 .hero-providers { position: absolute; bottom: 11.9%; left: 0; width: 100%; }
@@ -131,7 +131,7 @@ const { explore, progress, pointerX, pointerY } = useLandingMotion(root)
 .landing-footer { position: absolute; bottom: 30px; left: 5%; right: 5%; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #afc0d6; font-size: 12px; }
 .footer-tutorial { display: inline-flex; align-items: center; gap: 7px; }
 @media (min-width: 1800px) { .hero-title { margin-top: 28px; } .hero-actions { margin-top: 38px; } }
-@media (max-height: 760px) and (min-width: 701px) {
+@media (max-height: 620px) and (min-width: 701px) {
   .hero-copy { top: 22%; }
   .hero-title { font-size: min(5vw, 9.1svh); line-height: 1.13; margin: 12px 0 10px; }
   .hero-description { font-size: 19px; }
@@ -155,7 +155,6 @@ const { explore, progress, pointerX, pointerY } = useLandingMotion(root)
   .hero-providers { bottom: 12%; }
   .scroll-cue { bottom: 3.5%; font-size: 12px; gap: 5px; }
   .scroll-cue :deep(svg) { height: 24px; }
-  .hero-title > span { transform: translateX(.25em); }
   .explore-section { min-height: 100svh; padding: 80px 24px 100px; }
   .next-links { margin-top: 32px; }
   .next-link { gap: 15px; padding: 24px 0; }

@@ -45,7 +45,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', closeOutside))
 </template>
 
 <style scoped>
-.landing-header { position: absolute; z-index: 3; top: 0; left: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 4.85%; border-bottom: 1px solid rgb(215 234 255 / 10%); background: rgb(15 30 50 / 8%); backdrop-filter: blur(8px) saturate(120%); -webkit-backdrop-filter: blur(8px) saturate(120%); box-shadow: 0 4px 24px rgb(0 8 24 / 4%), inset 0 1px 0 rgb(255 255 255 / 5%); }
+.landing-header { position: absolute; z-index: 3; top: 0; left: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 4.85%; border-bottom: 1px solid transparent; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
 .landing-brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; max-width: 48%; font-size: clamp(23px, 1.6vw, 29px); line-height: 1.2; font-weight: 600; letter-spacing: -.4px; color: #f7f7fa; text-decoration: none; }
 .brand-logo { width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; object-fit: contain; }
 .brand-name { min-width: 0; overflow-wrap: anywhere; }
