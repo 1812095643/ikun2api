@@ -45,9 +45,9 @@ onUnmounted(() => document.removeEventListener('pointerdown', closeOutside))
 </template>
 
 <style scoped>
-.landing-header { position: absolute; z-index: 3; top: 0; left: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: clamp(22px, 3.2svh, 36px) 4.85%; border-bottom: 1px solid rgb(215 234 255 / 10%); background: rgb(15 30 50 / 8%); backdrop-filter: blur(8px) saturate(120%); -webkit-backdrop-filter: blur(8px) saturate(120%); box-shadow: 0 4px 24px rgb(0 8 24 / 4%), inset 0 1px 0 rgb(255 255 255 / 5%); }
-.landing-brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; max-width: 48%; font-size: clamp(24px, 1.92vw, 36px); line-height: 1.2; font-weight: 600; letter-spacing: -.4px; color: #f7f7fa; text-decoration: none; }
-.brand-logo { width: 40px; height: 40px; flex-shrink: 0; border-radius: 9px; object-fit: contain; }
+.landing-header { position: absolute; z-index: 3; top: 0; left: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 4.85%; border-bottom: 1px solid rgb(215 234 255 / 10%); background: rgb(15 30 50 / 8%); backdrop-filter: blur(8px) saturate(120%); -webkit-backdrop-filter: blur(8px) saturate(120%); box-shadow: 0 4px 24px rgb(0 8 24 / 4%), inset 0 1px 0 rgb(255 255 255 / 5%); }
+.landing-brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; max-width: 48%; font-size: clamp(23px, 1.6vw, 29px); line-height: 1.2; font-weight: 600; letter-spacing: -.4px; color: #f7f7fa; text-decoration: none; }
+.brand-logo { width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; object-fit: contain; }
 .brand-name { min-width: 0; overflow-wrap: anywhere; }
 .landing-nav { display: flex; align-items: center; gap: clamp(22px, 2.55vw, 46px); font-size: clamp(14px, .96vw, 18px); line-height: 1.4; font-weight: 500; }
 .nav-link { color: #f5f6fa; white-space: nowrap; text-decoration: none; padding-block: 8px; transition: color 160ms ease; }
@@ -58,7 +58,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', closeOutside))
 .landing-header :is(a, button):focus-visible { outline: 2px solid #b7d9ff; outline-offset: 5px; }
 .mobile-menu { display: none; }
 @media (max-width: 700px) {
-  .landing-header { padding: 18px; gap: 12px; flex-wrap: nowrap; }
+  .landing-header { padding: 9px 18px; gap: 12px; flex-wrap: nowrap; }
   .landing-brand { font-size: 21px; max-width: none; flex: 1; gap: 9px; }
   .brand-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .brand-logo { width: 32px; height: 32px; border-radius: 7px; }
