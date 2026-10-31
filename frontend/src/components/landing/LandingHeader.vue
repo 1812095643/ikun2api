@@ -46,10 +46,10 @@ onUnmounted(() => document.removeEventListener('pointerdown', closeOutside))
 
 <style scoped>
 .landing-header { position: absolute; z-index: 3; top: 0; left: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 4.85%; border-bottom: 1px solid transparent; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
-.landing-brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; max-width: 48%; font-size: clamp(23px, 1.6vw, 29px); line-height: 1.2; font-weight: 600; letter-spacing: -.4px; color: #f7f7fa; text-decoration: none; }
+.landing-brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; max-width: 48%; font-size: calc((clamp(23px, 1.6vw, 29px)) * var(--landing-type-scale, 1)); line-height: 1.2; font-weight: 600; letter-spacing: -.4px; color: #f7f7fa; text-decoration: none; }
 .brand-logo { width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; object-fit: contain; }
 .brand-name { min-width: 0; overflow-wrap: anywhere; }
-.landing-nav { display: flex; align-items: center; gap: clamp(22px, 2.55vw, 46px); font-size: clamp(14px, .96vw, 18px); line-height: 1.4; font-weight: 500; }
+.landing-nav { display: flex; align-items: center; gap: clamp(22px, 2.55vw, 46px); font-size: calc((clamp(14px, .96vw, 18px)) * var(--landing-type-scale, 1)); line-height: 1.4; font-weight: 500; }
 .nav-link { color: #f5f6fa; white-space: nowrap; text-decoration: none; padding-block: 8px; transition: color 160ms ease; }
 .nav-link:hover { color: #adceff; }
 .tutorial-link :deep(svg) { display: none; }
@@ -59,16 +59,16 @@ onUnmounted(() => document.removeEventListener('pointerdown', closeOutside))
 .mobile-menu { display: none; }
 @media (max-width: 700px) {
   .landing-header { padding: 9px 18px; gap: 12px; flex-wrap: nowrap; }
-  .landing-brand { font-size: 21px; max-width: none; flex: 1; gap: 9px; }
+  .landing-brand { font-size: calc((21px) * var(--landing-type-scale, 1)); max-width: none; flex: 1; gap: 9px; }
   .brand-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .brand-logo { width: 32px; height: 32px; border-radius: 7px; }
-  .landing-nav { gap: 8px; font-size: 13px; flex-shrink: 0; }
+  .landing-nav { gap: 8px; font-size: calc((13px) * var(--landing-type-scale, 1)); flex-shrink: 0; }
   .login-link { min-width: 64px; min-height: 38px; padding: 7px 13px; }
   .model-link, .tutorial-link { display: none; }
   .mobile-menu { display: block; position: relative; }
   .menu-button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgb(221 237 255 / 30%); border-radius: 50%; background: rgb(11 28 48 / 16%); color: #fff; }
   .mobile-links { position: absolute; top: 50px; right: 0; width: 188px; padding: 8px; border: 1px solid rgb(230 242 255 / 24%); border-radius: 16px; background: rgb(20 40 64 / 76%); backdrop-filter: blur(20px) saturate(140%); box-shadow: 0 14px 40px rgb(0 9 25 / 18%); }
-  .mobile-links :deep(a) { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 45px; padding: 10px 13px; color: #f6f9ff; font-size: 14px; border-radius: 10px; }
+  .mobile-links :deep(a) { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 45px; padding: 10px 13px; color: #f6f9ff; font-size: calc((14px) * var(--landing-type-scale, 1)); border-radius: 10px; }
   .mobile-links :deep(a:hover) { background: rgb(225 241 255 / 12%); }
   .mobile-links :deep(a:last-child svg) { display: none; }
 }
