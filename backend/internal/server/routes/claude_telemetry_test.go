@@ -32,7 +32,7 @@ func telemetryTestRouter() *gin.Engine {
 
 func TestClaudeTelemetryRoutesDropAllUntrustedPayloads(t *testing.T) {
 	r := telemetryTestRouter()
-	for _, path := range []string{"/api/event_logging/batch", "/api/event_logging/v2/batch", "/api/event_logging/future", "/v1/api/event_logging/v2/batch", "/api/claude_code/metrics", "/api/v2/rum", "/v1/logs", "/v1/metrics", "/v1/traces"} {
+	for _, path := range []string{"/api/event_logging/batch", "/api/event_logging/v2/batch", "/api/event_logging/future", "/v1/api/event_logging/v2/batch", "/api/claude_code/metrics", "/v1/api/claude_code/metrics", "/api/v2/rum", "/v1/api/v2/rum", "/api/v2/logs", "/v1/api/v2/logs", "/v1/logs", "/v1/metrics", "/v1/traces"} {
 		t.Run(path, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"git_remote_url":"private-canary","head_sha":"hash-canary","email":"email-canary"}`))
 			req.Header.Set("x-claude-code-wiggly-dove", "private-canary")

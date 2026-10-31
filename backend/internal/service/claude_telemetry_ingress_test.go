@@ -33,7 +33,12 @@ func TestClaudeTelemetryRejectsAmbiguousAndOversizedInput(t *testing.T) {
 }
 
 func TestClaudeTelemetryOnlyRecognizesObservedEventKinds(t *testing.T) {
-	for _, name := range []string{"tengu_api_success", "tengu_api_error", "tengu_init", "tengu_git_info", "unknown"} {
+	for _, name := range []string{
+		"tengu_api_success", "tengu_api_error", "tengu_init", "tengu_git_info",
+		"tengu_safety_event", "safety_event", "tengu_remote_reported_cwd",
+		"tengu_memory_low", "tengu_memory_drain", "tengu_tool_cgroup",
+		"tengu_api_tools_used_header", "tengu_feature_ok", "unknown",
+	} {
 		batch := telemetryTestBatch(t, name)
 		want := 0
 		if name == "tengu_api_success" || name == "tengu_api_error" {

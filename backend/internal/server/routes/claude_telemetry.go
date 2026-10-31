@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/MACOS-DO/sub4api/internal/handler"
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
 	"github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -34,7 +35,7 @@ func RegisterClaudeTelemetryRoutes(r *gin.Engine, h *handler.GatewayHandler, api
 			}
 		})
 	}
-	for _, path := range []string{"/api/claude_code/metrics", "/api/v2/rum", "/v1/logs", "/v1/metrics", "/v1/traces"} {
+	for _, path := range claude.DiscardedTelemetryPaths() {
 		r.POST(path, limit, h.DiscardClaudeTelemetry)
 	}
 }
