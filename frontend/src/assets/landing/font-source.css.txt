@@ -1,0 +1,28 @@
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/l/font?kit=k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxVnvUwfPKtSLeIl8EO7Eq1mMXxAufUben2tQBt4hakYMO1P7L7ZyLMN-A5a6BjrIvnYl6aG3p8Vi7z12ek7ocgMxuotLphdVi-qs4oloYTVsfcg0iVuBZnq5ZvR80uWzmkYXDVzgF7CJbcuBYGhiPfBwp9sgbNVlPJBsbv4QWiCjyRsd5Q_IApvLoO7WePvPXrioMqEmCcRhtc4Ywsi_asZb_onE5lWYW1dM2c9hr22HvpkQmAip_U6rUODMCqxgpasKypJq3eqFEJEh3BVzdVctlEqLeoZzoNjbdx4pkD-V7EynWFeIp540Za7j3VKfLGxgp2JYy_1_M&skey=cf0bb10b5602fdc3&v=v41) format('truetype');
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/l/font?kit=k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG-3FnYxVnvUwfPKtSLeIl8EO7Eq1mMXxAufUben2tQBt4hakYMO1P7L7ZyLMN-A5a6BjrIvnYl6aG3p8Vi7z12ek7ocgMxuotLphdVi-qs4oloYTVsfcg0iVuBZnq5ZvR80uWzmkYXDVzgF7CJbcuBYGhiPfBwp9sgbNVlPJBsbv4QWiCjyRsd5Q_IApvLoO7WePvPXrioMqEmCcRhtc4Ywsi_asZb_onE5lWYW1dM2c9hr22HvpkQmAip_U6rUODMCqxgpasKypJq3eqFEJEh3BVzdVctlEqLeoZzoNjbdx4pkD-V7EynWFeIp540Za7j3VKfLGxgp2JYy_1_M&skey=cf0bb10b5602fdc3&v=v41) format('truetype');
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/l/font?kit=k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaGwHCnYxVnvUwfPKtSLeIl8EO7Eq1mMXxAufUben2tQBt4hakYMO1P7L7ZyLMN-A5a6BjrIvnYl6aG3p8Vi7z12ek7ocgMxuotLphdVi-qs4oloYTVsfcg0iVuBZnq5ZvR80uWzmkYXDVzgF7CJbcuBYGhiPfBwp9sgbNVlPJBsbv4QWiCjyRsd5Q_IApvLoO7WePvPXrioMqEmCcRhtc4Ywsi_asZb_onE5lWYW1dM2c9hr22HvpkQmAip_U6rUODMCqxgpasKypJq3eqFEJEh3BVzdVctlEqLeoZzoNjbdx4pkD-V7EynWFeIp540Za7j3VKfLGxgp2JYy_1_M&skey=cf0bb10b5602fdc3&v=v41) format('truetype');
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/l/font?kit=k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaGzjCnYxVnvUwfPKtSLeIl8EO7Eq1mMXxAufUben2tQBt4hakYMO1P7L7ZyLMN-A5a6BjrIvnYl6aG3p8Vi7z12ek7ocgMxuotLphdVi-qs4oloYTVsfcg0iVuBZnq5ZvR80uWzmkYXDVzgF7CJbcuBYGhiPfBwp9sgbNVlPJBsbv4QWiCjyRsd5Q_IApvLoO7WePvPXrioMqEmCcRhtc4Ywsi_asZb_onE5lWYW1dM2c9hr22HvpkQmAip_U6rUODMCqxgpasKypJq3eqFEJEh3BVzdVctlEqLeoZzoNjbdx4pkD-V7EynWFeIp540Za7j3VKfLGxgp2JYy_1_M&skey=cf0bb10b5602fdc3&v=v41) format('truetype');
+}

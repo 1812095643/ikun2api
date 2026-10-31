@@ -5,6 +5,14 @@ export default {
   },
   // Home Page
   home: {
+    prism: {
+      navigation: 'Home navigation', menu: 'Navigation menu', theme: 'Theme', models: 'Models', tutorial: 'Getting started',
+      titleFirst: 'Connect intelligence.', titleSecond: 'Create what’s next.',
+      description: 'One API for leading global and Chinese AI models.',
+      start: 'Get started', exploreModels: 'Explore models', more: 'More', scroll: 'Scroll to explore',
+      nextTitle: 'Start here.', modelsDescription: 'Find your model. Explore capabilities and pricing.',
+      tutorialDescription: 'Learn about signup, balance, API keys, and client setup.', tutorialNewTab: 'Getting started (opens in a new tab)',
+    },
     viewOnGithub: 'View on GitHub',
     viewDocs: 'View Documentation',
     docs: 'Docs',

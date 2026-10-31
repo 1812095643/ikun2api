@@ -5,6 +5,14 @@ export default {
   },
   // Home Page
   home: {
+    prism: {
+      navigation: '首页导航', menu: '导航菜单', theme: '主题', models: '模型广场', tutorial: '新手教程',
+      titleFirst: '连接智能，', titleSecond: '让创造发生。',
+      description: '一个 API，接入全球与国产主流模型。',
+      start: '开始使用', exploreModels: '探索模型', more: '更多', scroll: '向下探索',
+      nextTitle: '从这里开始。', modelsDescription: '选择适合你的模型，查看能力与价格。',
+      tutorialDescription: '了解注册、充值、密钥创建和客户端配置。', tutorialNewTab: '新手教程（新标签页打开）',
+    },
     viewOnGithub: '在 GitHub 上查看',
     viewDocs: '查看文档',
     docs: '文档',

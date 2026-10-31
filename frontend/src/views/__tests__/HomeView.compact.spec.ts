@@ -33,7 +33,7 @@ vi.mock('vue-i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-i18n')>()
   return {
     ...actual,
-    useI18n: () => ({ t: (key: string) => key }),
+    useI18n: () => ({ t: (key: string) => key === 'home.prism.tutorial' ? '新手教程' : key }),
   }
 })
 
@@ -50,6 +50,7 @@ function mountHome(settings: Record<string, unknown> = {}) {
         RouterLink: RouterLinkStub,
         LocaleSwitcher: { template: '<div data-testid="locale-switcher" />' },
         Icon: { template: '<span data-testid="icon" />' },
+        PrismScene: { template: '<div data-testid="scene" />' },
       },
     },
   })
@@ -108,7 +109,7 @@ describe('HomeView compact mode', () => {
     const wrapper = mountHome(settings)
 
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
-    expect(wrapper.find('.terminal-container').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="prism-landing"]').exists()).toBe(true)
   })
 
   it('links unauthenticated visitors to login', () => {
@@ -180,6 +181,45 @@ describe('HomeView compact mode', () => {
     })
 
     expect(modelPlazaDestination(wrapper)).toBeUndefined()
+  })
+
+  it('keeps a working native model entry when the optional official plaza is disabled', () => {
+    const wrapper = mountHome({ model_plaza_enabled: false })
+    const targets = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
+    expect(targets).toContain('/model-square')
+    expect(targets).not.toContain('/model-plaza')
+    wrapper.unmount()
+  })
+
+  it('uses the configured site name and logo in the landing header', () => {
+    const wrapper = mountHome({ site_name: '示例站点', site_logo: '/custom-brand.png' })
+    expect(wrapper.get('.landing-brand').text()).toBe('示例站点')
+    expect(wrapper.get('.brand-logo').attributes('src')).toBe('/custom-brand.png')
+    expect(wrapper.find('.theme-switch').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each(['dark', 'light'])('preserves the %s theme without showing a landing theme control', (theme) => {
+    localStorage.setItem('theme', theme)
+    const wrapper = mountHome()
+    expect(document.documentElement.classList.contains('dark')).toBe(theme === 'dark')
+    expect(wrapper.find('button[aria-label="home.switchToDark"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="home.switchToLight"]').exists()).toBe(false)
+    expect(wrapper.get('.brand-logo').attributes('src')).toBe('/logo.svg')
+    wrapper.unmount()
+  })
+
+  it('opens the mobile navigation and closes it with Escape', async () => {
+    const wrapper = mountHome()
+    const button = wrapper.get('button[aria-controls="landing-mobile-links"]')
+    expect(button.attributes('aria-expanded')).toBe('false')
+    await button.trigger('click')
+    expect(button.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.get('#landing-mobile-links a[href="/tutorial"]').attributes('target')).toBe('_blank')
+    await wrapper.get('.mobile-menu').trigger('keydown', { key: 'Escape' })
+    expect(button.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('#landing-mobile-links').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it.each([
