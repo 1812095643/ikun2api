@@ -3,12 +3,12 @@ import { getUpdateStatus, checkUpdates, performUpdate, restartService, getVersio
 
 export function useSystemUpdate() {
   const info = shallowRef<VersionInfo | null>(null)
-  const phase = shallowRef<'idle' | 'checking' | 'updating' | 'restarting' | 'failed'>('idle')
+  const phase = shallowRef<'idle' | 'checking' | 'draining' | 'updating' | 'restarting' | 'failed'>('idle')
   const error = shallowRef('')
   const needRestart = shallowRef(false)
   let disposed = false
   onUnmounted(() => { disposed = true })
-  const busy = computed(() => ['checking', 'updating', 'restarting'].includes(phase.value))
+  const busy = computed(() => ['checking', 'draining', 'updating', 'restarting'].includes(phase.value))
   async function check(force = false) {
     if (busy.value) return
     phase.value = 'checking'; error.value = ''
@@ -16,7 +16,10 @@ export function useSystemUpdate() {
       info.value = await checkUpdates(force)
       const status = await getUpdateStatus()
       if (status.phase === 'failed') { error.value = status.error || '上次更新未完成，请查看服务器日志。'; phase.value = 'failed' }
-      else if (['downloading', 'validating', 'backing_up', 'restarting'].includes(status.phase)) { phase.value = status.phase === 'restarting' ? 'restarting' : 'updating'; void watchUpdate().catch(e => { error.value = errorMessage(e); phase.value = 'failed' }) }
+      else if (['draining', 'downloading', 'validating', 'backing_up', 'restarting'].includes(status.phase)) {
+        phase.value = status.phase === 'restarting' ? 'restarting' : status.phase === 'draining' ? 'draining' : 'updating'
+        void watchUpdate().catch(e => { error.value = errorMessage(e); phase.value = 'failed' })
+      }
       else phase.value = 'idle'
     }
     catch (e) { error.value = errorMessage(e); phase.value = 'failed' }
@@ -38,7 +41,8 @@ export function useSystemUpdate() {
   }
   async function watchUpdate() {
     const previous = info.value?.current_version
-    for (let i = 0; i < 450 && !disposed; i++) {
+    // Cover the backend 20-minute task deadline plus restart/status recovery.
+    for (let i = 0; i < 630 && !disposed; i++) {
       await new Promise(resolve => setTimeout(resolve, 2000))
       try {
         const version = await getVersion()
@@ -46,6 +50,8 @@ export function useSystemUpdate() {
         if (version.version && version.version !== previous && !status.active && status.phase === 'idle') { window.location.reload(); return }
         if (status.phase === 'failed') { error.value = status.error || '更新失败，现有程序仍保留。'; phase.value = 'failed'; return }
         if (status.phase === 'restarting') phase.value = 'restarting'
+        else if (status.phase === 'draining') phase.value = 'draining'
+        else if (['downloading', 'validating', 'backing_up'].includes(status.phase)) phase.value = 'updating'
         if (status.phase === 'idle') { phase.value = 'idle'; await check(true); return }
       } catch (e) {
         void e

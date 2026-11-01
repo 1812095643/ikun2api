@@ -6,7 +6,7 @@ const props = defineProps<{ show: boolean; version?: string }>()
 const emit = defineEmits<{ close: [] }>()
 const { info, phase, error, needRestart, busy, check, update, restart } = useSystemUpdate()
 const current = computed(() => info.value?.current_version || props.version || '—')
-const progress = computed(() => ({ checking: '正在检查更新…', updating: '正在下载、校验并备份数据，请稍候…', restarting: '更新已安装，正在重启服务…', failed: '', idle: '' }[phase.value]))
+const progress = computed(() => ({ checking: '正在检查更新…', draining: '正在等待当前请求完成…', updating: '正在下载、校验并备份数据，请稍候…', restarting: '更新已安装，正在重启服务…', failed: '', idle: '' }[phase.value]))
 watch(() => props.show, show => { if (show && !info.value) void check() })
 </script>
 

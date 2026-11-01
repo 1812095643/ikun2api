@@ -24,10 +24,9 @@ type SystemHandler struct {
 }
 
 // systemUpdateTimeout bounds a full in-place update or rollback: the release
-// manifest fetch plus a large binary download over slow links. It must stay
-// above the GitHub download client timeout (10 minutes) so the download owns
-// its own deadline.
-const systemUpdateTimeout = 15 * time.Minute
+// manifest fetch, download, compatibility check and request draining. Allow
+// room for the 10-minute download timeout and the 5-minute drain window.
+const systemUpdateTimeout = 20 * time.Minute
 
 // systemUpdateContext detaches a long-running update/rollback from the HTTP
 // request lifetime. Browsers and reverse proxies commonly abort idle requests

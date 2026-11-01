@@ -19,6 +19,12 @@ type UpgradeSafety interface {
 }
 type upgradeSafety struct{}
 
+// upgradeDrainTimeout gives already-running business requests enough time to
+// finish while newly arriving requests are rejected by UpgradeMaintenance.
+// Read-only monitoring sockets are closed by their own maintenance signal and
+// therefore do not consume this window.
+const upgradeDrainTimeout = 5 * time.Minute
+
 func NewUpgradeSafety() UpgradeSafety { return &upgradeSafety{} }
 
 func (s *upgradeSafety) Prepare(ctx context.Context, binary, backupDir string) error {
@@ -31,7 +37,7 @@ func (s *upgradeSafety) Prepare(ctx context.Context, binary, backupDir string) e
 		return fmt.Errorf("candidate compatibility check failed: %s", boundedUpgradeOutput(out))
 	}
 	SetUpgradePhase("draining", "")
-	drainCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	drainCtx, cancel := context.WithTimeout(ctx, upgradeDrainTimeout)
 	defer cancel()
 	if err := BeginUpgradeMaintenance(drainCtx); err != nil {
 		return err

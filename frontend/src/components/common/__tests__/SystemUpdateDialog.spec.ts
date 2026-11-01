@@ -1,5 +1,5 @@
 import { mount, flushPromises } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import SystemUpdateDialog from '../SystemUpdateDialog.vue'
 import { useSystemUpdate } from '@/composables/useSystemUpdate'
@@ -7,6 +7,7 @@ const api = vi.hoisted(() => ({checkUpdates:vi.fn(),performUpdate:vi.fn(),getUpd
 vi.mock('@/api/admin/system',()=>api)
 const release = {current_version:'1.3.16',latest_version:'1.3.17',has_update:true,supports_self_update:true,cached:false,build_type:'release',release_info:{name:'Next',body:'<img src=x onerror=alert(1)>',html_url:'',published_at:''}}
 const dialog = defineComponent({props:['show'],template:'<div v-if="show"><slot/><slot name="footer"/></div>'})
+afterEach(()=>vi.useRealTimers())
 beforeEach(()=>{vi.clearAllMocks();api.checkUpdates.mockResolvedValue(release);api.getUpdateStatus.mockResolvedValue({phase:'idle',active:false})})
 describe('version update controls',()=>{
  it('loads release details on opening and renders notes as escaped text',async()=>{
@@ -31,5 +32,28 @@ describe('version update controls',()=>{
   const wrapper=mount(defineComponent({setup(){update=useSystemUpdate();return{}},template:'<div/>'}))
   await update!.check();const pending=update!.update();await flushPromises();await update!.update();expect(api.performUpdate).toHaveBeenCalledOnce();await vi.advanceTimersByTimeAsync(2100);await pending
   expect(update!.phase.value).toBe('failed');expect(update!.error.value).toBe('备份失败，已恢复');expect(api.restartService).not.toHaveBeenCalled();wrapper.unmount();vi.useRealTimers()
+ })
+ it('keeps polling after the former 15-minute frontend deadline',async()=>{
+  vi.useFakeTimers()
+  api.performUpdate.mockResolvedValue({started:true,need_restart:false})
+  api.getVersion.mockResolvedValue({version:'1.3.16'})
+  api.getUpdateStatus.mockResolvedValueOnce({phase:'idle',active:false}).mockResolvedValue({phase:'draining',active:true})
+  let update:ReturnType<typeof useSystemUpdate>
+  const wrapper=mount(defineComponent({setup(){update=useSystemUpdate();return{}},template:'<div/>'}))
+  await update!.check();const pending=update!.update();await flushPromises()
+  await vi.advanceTimersByTimeAsync(15*60*1000+2100)
+  expect(update!.busy.value).toBe(true);expect(update!.error.value).toBe('')
+  api.getUpdateStatus.mockResolvedValue({phase:'failed',active:false,error:'等待请求超时，更新已安全停止'})
+  await vi.advanceTimersByTimeAsync(2100);await pending
+  expect(update!.phase.value).toBe('failed');expect(update!.error.value).toBe('等待请求超时，更新已安全停止')
+  wrapper.unmount()
+ })
+ it('keeps the dialog busy when reopened during request draining',async()=>{
+  api.getUpdateStatus.mockResolvedValue({phase:'draining',active:true})
+  const wrapper=mount(SystemUpdateDialog,{props:{show:false},global:{stubs:{BaseDialog:dialog}}})
+  await wrapper.setProps({show:true});await flushPromises()
+  expect(wrapper.text()).toContain('正在等待当前请求完成')
+  expect(wrapper.findAll('button').some(b=>b.text()==='备份并一键更新')).toBe(false)
+  wrapper.unmount()
  })
 })
