@@ -176,6 +176,39 @@ function mountView() {
 }
 
 describe('GroupsView duplicate action', () => {
+  it('loads and saves the Desktop exception in the Claude group editor', async () => {
+    const group = { ...sourceGroup, platform: 'anthropic', claude_code_only: true, allow_claude_desktop: true }
+    listGroups.mockResolvedValue({ items: [group], total: 1, page: 1, page_size: 20, pages: 1 })
+    updateGroup.mockResolvedValue(group)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    const exception = wrapper.get('[data-testid="claude-desktop-access"] [role="switch"]')
+    expect(exception.attributes('aria-checked')).toBe('true')
+    await exception.trigger('click')
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({ claude_code_only: true, allow_claude_desktop: false }))
+    wrapper.unmount()
+  })
+
+  it('hides and clears the Desktop exception when its parent restriction is disabled', async () => {
+    const group = { ...sourceGroup, platform: 'anthropic', claude_code_only: true, allow_claude_desktop: true }
+    listGroups.mockResolvedValue({ items: [group], total: 1, page: 1, page_size: 20, pages: 1 })
+    updateGroup.mockResolvedValue(group)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    await wrapper.get('#edit-group-form [aria-label="admin.groups.claudeCode.enabled"]').trigger('click')
+    expect(wrapper.find('[data-testid="claude-desktop-access"]').exists()).toBe(false)
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({ claude_code_only: false, allow_claude_desktop: false }))
+    wrapper.unmount()
+  })
+
   beforeEach(() => {
     authState.isSimpleMode = false
     localStorage.clear()

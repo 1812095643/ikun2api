@@ -42,6 +42,19 @@ func gatewayStreamHasOnlyHeartbeats(c *gin.Context) bool {
 // claudeCodeValidator is a singleton validator for Claude Code client detection
 var claudeCodeValidator = service.NewClaudeCodeValidator()
 
+// Reject disallowed clients before account selection, billing or upstream work.
+// Explicitly configured fallback groups continue through the existing resolver.
+func (h *GatewayHandler) rejectClaudeClientRestriction(c *gin.Context, apiKey *service.APIKey) bool {
+	if platform, forced := middleware2.GetForcePlatformFromContext(c); forced && platform != "" {
+		return false
+	}
+	if apiKey == nil || apiKey.Group == nil || apiKey.Group.FallbackGroupID != nil || apiKey.Group.AllowsClaudeClient(c.Request.Context()) {
+		return false
+	}
+	h.errorResponse(c, http.StatusForbidden, "permission_error", apiKey.Group.ClaudeClientRestrictionMessage())
+	return true
+}
+
 // SetClaudeCodeClientContext 检查请求是否来自 Claude Code 客户端，并设置到 context 中
 // 返回更新后的 context
 func SetClaudeCodeClientContext(c *gin.Context, body []byte, parsedReq *service.ParsedRequest) {
@@ -52,6 +65,7 @@ func SetClaudeCodeClientContext(c *gin.Context, body []byte, parsedReq *service.
 	// Fast path：非 Claude CLI UA 直接判定 false，避免热路径二次 JSON 反序列化。
 	if !claudeCodeValidator.ValidateUserAgent(ua) {
 		ctx := service.SetClaudeCodeClient(c.Request.Context(), false)
+		ctx = service.SetClaudeDesktopClient(ctx, false)
 		c.Request = c.Request.WithContext(ctx)
 		return
 	}
@@ -71,6 +85,7 @@ func SetClaudeCodeClientContext(c *gin.Context, body []byte, parsedReq *service.
 
 	// 更新 request context
 	ctx := service.SetClaudeCodeClient(c.Request.Context(), isClaudeCode)
+	ctx = service.SetClaudeDesktopClient(ctx, isClaudeCode && service.IsClaudeDesktopUserAgent(ua))
 
 	// 仅在确认为 Claude Code 客户端时提取版本号写入 context
 	if isClaudeCode {

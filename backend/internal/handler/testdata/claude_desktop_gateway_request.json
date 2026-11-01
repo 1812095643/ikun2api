@@ -1,0 +1,36 @@
+{
+  "evidence": "Unmodified official CLI 2.1.314 with Desktop 4.4212.0 launcher entrypoint against a local-only sink; synthetic credentials and workspace. Request fields minimized for the client gate test.",
+  "headers": {
+    "Content-Type": "application/json",
+    "User-Agent": "claude-cli/2.1.314 (external, claude-desktop-3p)",
+    "anthropic-beta": "claude-code-20250219,interleaved-thinking-2025-05-14,context-management-2025-06-27,thinking-token-count-2026-05-13,advanced-tool-use-2025-11-20,effort-2025-11-24",
+    "anthropic-version": "2023-06-01",
+    "x-app": "cli"
+  },
+  "body": {
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 32000,
+    "system": [
+      {
+        "type": "text",
+        "text": "x-anthropic-billing-header: cc_version=2.1.314.98d; cc_entrypoint=claude-desktop-3p;"
+      },
+      {
+        "type": "text",
+        "text": "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
+        "cache_control": {
+          "type": "ephemeral"
+        }
+      }
+    ],
+    "metadata": {
+      "user_id": "{\"device_id\":\"ec632b1eae7accc02f3740d9c43f476d0a74d01cd6e8f38013a9c292cb6649e6\",\"account_uuid\":\"\",\"session_id\":\"8279bdb5-294e-4259-b4d5-46d059ff53e8\"}"
+    },
+    "messages": [
+      {
+        "role": "user",
+        "content": "LOCAL_TEST_ONLY"
+      }
+    ]
+  }
+}

@@ -389,6 +389,7 @@ func TestAPIContracts(t *testing.T) {
 						"video_rate_independent": false,
 						"video_rate_multiplier": 0,
 						"claude_code_only": false,
+						"allow_claude_desktop": false,
 						"allow_messages_dispatch": false,
 						"allow_live": false,
 						"fallback_group_id": null,
@@ -973,6 +974,7 @@ func TestAPIContracts(t *testing.T) {
 						"rules": []
 					},
 					"custom_menu_items": [],
+					"menu_visibility": {},
 					"custom_endpoints": [],
 					"payment_enabled": false,
 					"payment_min_amount": 0,
@@ -1212,6 +1214,7 @@ func TestAPIContracts(t *testing.T) {
 					"auth_source_default_wechat_platform_quotas": null,
 					"auth_source_default_dingtalk_platform_quotas": null,
 					"custom_menu_items": [],
+					"menu_visibility": {},
 					"custom_endpoints": [],
 					"default_concurrency": 0,
 					"default_balance": 0,

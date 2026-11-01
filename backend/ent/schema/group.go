@@ -202,6 +202,9 @@ func (Group) Fields() []ent.Field {
 		field.Bool("claude_code_only").
 			Default(false).
 			Comment("是否仅允许 Claude Code 客户端"),
+		field.Bool("allow_claude_desktop").
+			Default(false).
+			Comment("Claude Code 限制开启时额外允许 Claude Desktop"),
 		field.Int64("fallback_group_id").
 			Optional().
 			Nillable().

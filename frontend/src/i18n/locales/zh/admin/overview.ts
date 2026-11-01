@@ -1222,13 +1222,15 @@ export default {
         }
       },
       claudeCode: {
-        title: 'Claude Code 客户端限制',
+        title: 'Claude 客户端限制',
         tooltip:
-          '启用后，此分组仅允许 Claude Code 官方客户端访问。非 Claude Code 请求将被拒绝或降级到指定分组。',
+          '启用后仅允许 Claude Code；可额外放行 Claude Desktop。其他客户端将被拒绝，或使用下方配置的降级分组。',
         enabled: '仅限 Claude Code',
+        allowDesktop: '额外允许 Claude Desktop',
+        allowDesktopHint: '开启后允许 Claude Code 和 Claude Desktop，其他客户端仍受限制。',
         disabled: '允许所有客户端',
         fallbackGroup: '降级分组',
-        fallbackHint: '非 Claude Code 请求将使用此分组，留空则直接拒绝',
+        fallbackHint: '未获准的客户端使用此分组，留空则直接拒绝',
         noFallback: '不降级（直接拒绝）'
       },
       openaiMessages: {

@@ -1225,12 +1225,14 @@ export default {
         }
       },
       claudeCode: {
-        title: 'Claude Code Client Restriction',
-        tooltip: 'When enabled, this group only allows official Claude Code clients. Non-Claude Code requests will be rejected or fallback to the specified group.',
+        title: 'Claude Client Restriction',
+        tooltip: 'Restrict access to Claude Code, with an optional exception for Claude Desktop. Other clients are rejected or use the configured fallback group.',
         enabled: 'Claude Code Only',
+        allowDesktop: 'Also allow Claude Desktop',
+        allowDesktopHint: 'Allow Claude Code and Claude Desktop. Other clients remain restricted.',
         disabled: 'Allow All Clients',
         fallbackGroup: 'Fallback Group',
-        fallbackHint: 'Non-Claude Code requests will use this group. Leave empty to reject directly.',
+        fallbackHint: 'Clients not allowed here use this group. Leave empty to reject directly.',
         noFallback: 'No Fallback (Reject)'
       },
       openaiMessages: {

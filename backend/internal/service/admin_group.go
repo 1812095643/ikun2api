@@ -611,6 +611,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		AudioTTSPricePerMillionChars:    audioTTSPricePerMillionChars,
 		AudioSTTPricePerHour:            audioSTTPricePerHour,
 		ClaudeCodeOnly:                  input.ClaudeCodeOnly,
+		AllowClaudeDesktop:              platform == PlatformAnthropic && input.ClaudeCodeOnly && input.AllowClaudeDesktop,
 		FallbackGroupID:                 input.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: fallbackOnInvalidRequest,
 		ModelRouting:                    input.ModelRouting,
@@ -952,6 +953,10 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.ClaudeCodeOnly != nil {
 		group.ClaudeCodeOnly = *input.ClaudeCodeOnly
 	}
+	if input.AllowClaudeDesktop != nil {
+		group.AllowClaudeDesktop = *input.AllowClaudeDesktop
+	}
+	group.AllowClaudeDesktop = group.Platform == PlatformAnthropic && group.ClaudeCodeOnly && group.AllowClaudeDesktop
 	if input.FallbackGroupID != nil {
 		// 校验降级分组
 		if *input.FallbackGroupID > 0 {
