@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -114,7 +113,7 @@ func (b *claudeTelemetryBuffer) prune(now time.Time) {
 	}
 }
 
-func (b *claudeTelemetryBuffer) remember(apiKeyID int64, session string, delivery claudeTelemetryDelivery, now time.Time) {
+func (b *claudeTelemetryBuffer) remember(apiKeyID int64, session string, delivery claudeTelemetryDelivery, now time.Time, intervals ...time.Duration) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.prune(now)
@@ -125,7 +124,11 @@ func (b *claudeTelemetryBuffer) remember(apiKeyID int64, session string, deliver
 	if _, exists := b.observed[key]; !exists && len(b.observed) >= claudeTelemetryMaxEntries {
 		return
 	}
-	readyAt := now.Add(claudeTelemetryInterval)
+	interval := claudeTelemetryInterval
+	if len(intervals) > 0 {
+		interval = intervals[0]
+	}
+	readyAt := now.Add(interval)
 	if previous, exists := b.observed[key]; exists {
 		// 连续请求更新摘要时保留原定发送时间，避免活跃会话始终无法到期。
 		readyAt = previous.readyAt
@@ -214,7 +217,7 @@ func (b *claudeTelemetryBuffer) claim(apiKeyID int64, trigger claudeTelemetryTri
 // RelayClaudeTelemetry 不转发客户端事件；触发仅能领取同一已鉴权 Key 的实际出站摘要。
 // 返回值只是进入本地有界发送队列的数量，供应商是否接收另按 accepted_count 确认。
 func (s *GatewayService) RelayClaudeTelemetry(apiKeyID int64, batch *ClaudeTelemetryBatch) int {
-	if s == nil || s.httpUpstream == nil || apiKeyID <= 0 || batch == nil || os.Getenv("SUB6_CLAUDE_TELEMETRY_ENABLED") != "true" {
+	if s == nil || s.httpUpstream == nil || apiKeyID <= 0 || batch == nil || !s.telemetrySettings().Enabled {
 		return 0
 	}
 	var deliveries []claudeTelemetryDelivery

@@ -1,6 +1,21 @@
 export default {
     settings: {
       title: '系统设置',
+      telemetry: {
+        title: 'Claude 遥测',
+        description: '内置发送真实请求的脱敏摘要，复用账号代理，最多同时发送一批。',
+        enabled: '启用遥测发送',
+        privacyHint: '关闭后仍拦截原始遥测和隐私字段。修改设置会清空待发摘要并取消在途发送。',
+        flushInterval: '定时延迟（秒）',
+        minSendGap: '批次间隔（秒）',
+        timeout: '发送超时（秒）',
+        save: '保存遥测设置',
+        retry: '重新加载',
+        saved: '遥测设置已生效',
+        invalid: '请输入范围内的整数',
+        loadFailed: '遥测设置加载失败',
+        saveFailed: '遥测设置保存失败',
+      },
       description: '管理注册、邮箱验证、默认值和 SMTP 设置',
       tabs: {
         menus: '菜单管理',

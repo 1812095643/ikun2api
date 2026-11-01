@@ -1,6 +1,21 @@
 export default {
     settings: {
       title: 'System Settings',
+      telemetry: {
+        title: 'Claude telemetry',
+        description: 'Sends sanitized summaries of real requests through the account proxy, one batch at a time.',
+        enabled: 'Enable telemetry delivery',
+        privacyHint: 'Raw telemetry and private fields remain blocked when disabled. Changing settings discards queued summaries and cancels in-flight delivery.',
+        flushInterval: 'Flush delay (seconds)',
+        minSendGap: 'Batch interval (seconds)',
+        timeout: 'Send timeout (seconds)',
+        save: 'Save telemetry settings',
+        retry: 'Reload',
+        saved: 'Telemetry settings applied',
+        invalid: 'Enter whole numbers within the displayed ranges',
+        loadFailed: 'Unable to load telemetry settings',
+        saveFailed: 'Unable to save telemetry settings',
+      },
       description: 'Manage registration, email verification, default values, and SMTP settings',
       tabs: {
         menus: 'Menus',

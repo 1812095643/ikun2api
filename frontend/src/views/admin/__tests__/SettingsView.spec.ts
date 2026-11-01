@@ -13,6 +13,11 @@ vi.mock('@/utils/featureFlags', async (importOriginal) => ({
 
 beforeEach(() => { ticketFeature.enabled = true; });
 
+vi.mock('@/api/admin/claudeTelemetry', () => ({
+  getClaudeTelemetrySettings: vi.fn().mockResolvedValue({ enabled: true, flush_interval_seconds: 10, min_send_gap_seconds: 2, timeout_seconds: 10 }),
+  updateClaudeTelemetrySettings: vi.fn().mockImplementation(async value => value),
+}));
+
 const {
   getSettings,
   updateSettings,

@@ -12,17 +12,26 @@ const claudeTelemetryMinSendGap = 2 * time.Second
 var claudeTelemetrySender = claudeTelemetrySerialSender{slot: make(chan struct{}, 1)}
 
 type claudeTelemetrySerialSender struct {
-	slot   chan struct{}
-	nextAt time.Time
+	slot         chan struct{}
+	nextAt       time.Time
+	lastFinished time.Time
 }
 
-func (s *claudeTelemetrySerialSender) acquire(ctx context.Context) (func(), error) {
+func (s *claudeTelemetrySerialSender) acquire(ctx context.Context, gaps ...time.Duration) (func(), error) {
+	gap := claudeTelemetryMinSendGap
+	if len(gaps) > 0 && gaps[0] >= claudeTelemetryMinSendGap {
+		gap = gaps[0]
+	}
 	select {
 	case s.slot <- struct{}{}:
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-	if delay := time.Until(s.nextAt); delay > 0 {
+	nextAt := s.nextAt
+	if updated := s.lastFinished.Add(gap); updated.After(nextAt) {
+		nextAt = updated
+	}
+	if delay := time.Until(nextAt); delay > 0 {
 		timer := time.NewTimer(delay)
 		defer timer.Stop()
 		select {
@@ -38,7 +47,8 @@ func (s *claudeTelemetrySerialSender) acquire(ctx context.Context) (func(), erro
 	}
 	return func() {
 		// 从上一批结束开始留出间隔；失败也不能立即密集重发。
-		s.nextAt = time.Now().Add(claudeTelemetryMinSendGap)
+		s.lastFinished = time.Now()
+		s.nextAt = s.lastFinished.Add(gap)
 		<-s.slot
 	}, nil
 }

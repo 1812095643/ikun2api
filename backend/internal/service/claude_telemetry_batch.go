@@ -22,7 +22,7 @@ func decodeClaudeTelemetryPayload(body []byte) (claudeTelemetryPayload, error) {
 
 // 只合并相同本地身份、上游账号和出站配置；令牌或代理变化时必须分批。
 func sameClaudeTelemetryOrigin(a, b claudeTelemetryDelivery) bool {
-	return a.apiKeyID == b.apiKeyID && a.userID == b.userID && a.groupID == b.groupID &&
+	return a.generation == b.generation && a.apiKeyID == b.apiKeyID && a.userID == b.userID && a.groupID == b.groupID &&
 		a.accountID == b.accountID && a.authorization == b.authorization &&
 		a.proxyURL == b.proxyURL && a.userAgent == b.userAgent && a.concurrency == b.concurrency &&
 		reflect.DeepEqual(a.profile, b.profile) &&

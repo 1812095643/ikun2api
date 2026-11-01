@@ -163,6 +163,7 @@
 
         <!-- Tab: Gateway -->
         <div v-show="activeTab === 'gateway'" class="space-y-6">
+          <ClaudeTelemetrySettings />
           <!-- Overload Cooldown (529) Settings -->
           <div class="card">
             <div
@@ -8898,6 +8899,7 @@ import {
   stepUpBlockReason,
 } from "@/composables/useStepUp";
 import AdminAccessKeysSettings from "@/components/admin/settings/AdminAccessKeysSettings.vue";
+import ClaudeTelemetrySettings from "@/components/admin/settings/ClaudeTelemetrySettings.vue";
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";

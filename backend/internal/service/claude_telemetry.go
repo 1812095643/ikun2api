@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -41,6 +40,7 @@ type claudeTelemetryDelivery struct {
 	apiKeyID      int64
 	userID        int64
 	groupID       int64
+	generation    uint64
 }
 
 // 结构已核对本机 Claude Code 2.1.301 的事件序列化器；只填写网关实际观测到的值。
@@ -139,8 +139,13 @@ func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Accou
 }
 
 func (s *GatewayService) rememberClaudeTelemetry(c *gin.Context, clientSession string, req *http.Request, wireBody []byte, account *Account, result *ForwardResult, forwardErr error, started time.Time, status, attempts int, proxyURL string, profile *tlsfingerprint.Profile) {
-	if s == nil || s.httpUpstream == nil || os.Getenv("SUB6_CLAUDE_TELEMETRY_ENABLED") != "true" || c == nil || c.Request == nil || req == nil || account == nil || !account.IsAnthropicOAuthOrSetupToken() || account.IsCustomBaseURLEnabled() || req.URL == nil || req.URL.Scheme != "https" || req.URL.Host != "api.anthropic.com" || req.URL.User != nil || req.URL.Path != "/v1/messages" {
+	settings := s.telemetrySettings()
+	if s == nil || s.httpUpstream == nil || !settings.Enabled || c == nil || c.Request == nil || req == nil || account == nil || !account.IsAnthropicOAuthOrSetupToken() || account.IsCustomBaseURLEnabled() || req.URL == nil || req.URL.Scheme != "https" || req.URL.Host != "api.anthropic.com" || req.URL.User != nil || req.URL.Path != "/v1/messages" {
 		return
+	}
+	generation := uint64(0)
+	if s.claudeTelemetryScheduler != nil {
+		generation = s.claudeTelemetryScheduler.observationGeneration()
 	}
 	keyValue, _ := c.Get("api_key")
 	apiKey, ok := keyValue.(*APIKey)
@@ -175,17 +180,19 @@ func (s *GatewayService) rememberClaudeTelemetry(c *gin.Context, clientSession s
 	if apiKey.GroupID != nil {
 		delivery.groupID = *apiKey.GroupID
 	}
-	s.claudeTelemetry.remember(apiKey.ID, clientSession, delivery, time.Now())
 	if s.claudeTelemetryScheduler != nil {
+		s.claudeTelemetryScheduler.remember(apiKey.ID, clientSession, delivery, generation)
 		select {
 		case s.claudeTelemetryScheduler.wake <- struct{}{}:
 		default:
 		}
+	} else {
+		s.claudeTelemetry.remember(apiKey.ID, clientSession, delivery, time.Now(), time.Duration(settings.FlushIntervalSeconds)*time.Second)
 	}
 }
 
 func (s *GatewayService) dispatchClaudeTelemetry(delivery claudeTelemetryDelivery) bool {
-	if s == nil || os.Getenv("SUB6_CLAUDE_TELEMETRY_ENABLED") != "true" {
+	if s == nil || !s.telemetrySettings().Enabled {
 		return false
 	}
 	select {
@@ -197,7 +204,7 @@ func (s *GatewayService) dispatchClaudeTelemetry(delivery claudeTelemetryDeliver
 	parent := context.Background()
 	if s.claudeTelemetryScheduler != nil {
 		var ok bool
-		parent, ok = s.claudeTelemetryScheduler.beginDelivery()
+		parent, ok = s.claudeTelemetryScheduler.beginDelivery(delivery.generation)
 		if !ok {
 			<-claudeTelemetryPendingSlots
 			return false
@@ -211,12 +218,16 @@ func (s *GatewayService) dispatchClaudeTelemetry(delivery claudeTelemetryDeliver
 			}
 		}()
 		// 定时与客户端触发共享同一个出口；排队时间不占用 HTTP 超时。
-		release, err := claudeTelemetrySender.acquire(parent)
+		settings := s.telemetrySettings()
+		if !settings.Enabled {
+			return
+		}
+		release, err := claudeTelemetrySender.acquire(parent, time.Duration(settings.MinSendGapSeconds)*time.Second)
 		if err != nil {
 			return
 		}
 		defer release()
-		ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+		ctx, cancel := context.WithTimeout(parent, time.Duration(s.telemetrySettings().TimeoutSeconds)*time.Second)
 		defer cancel()
 		responseStatus, accepted, sendErr := s.sendClaudeTelemetry(ctx, delivery)
 		if sendErr != nil {
@@ -236,6 +247,9 @@ func claudeTelemetryUUID(value string) bool {
 func (s *GatewayService) sendClaudeTelemetry(ctx context.Context, delivery claudeTelemetryDelivery) (int, int, error) {
 	if s == nil || s.httpUpstream == nil {
 		return 0, 0, fmt.Errorf("遥测传输尚未配置")
+	}
+	if !s.telemetrySettings().Enabled || ctx.Err() != nil {
+		return 0, 0, fmt.Errorf("遥测发送已关闭或取消")
 	}
 	if strings.TrimSpace(delivery.proxyURL) == "" {
 		return 0, 0, fmt.Errorf("遥测缺少账号代理，禁止直连")
