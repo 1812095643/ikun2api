@@ -198,3 +198,7 @@ backend/ikun2api
 # Keep private history and local work out of the public snapshot.
 /ikun2api
 /work/
+
+# Generated standalone studio bundle (built into the main executable).
+/frontend/public/image-studio/
+/frontend/studio/tsconfig.tsbuildinfo

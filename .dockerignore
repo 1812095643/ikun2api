@@ -16,6 +16,7 @@ docs/
 # Docker build context even though docs/ is otherwise excluded.
 !docs/legal/
 !docs/legal/*.md
+!frontend/studio/CHANGELOG.md
 
 # IDE
 .idea/
@@ -34,6 +35,8 @@ build/
 # Node modules (will be installed in container)
 frontend/node_modules/
 node_modules/
+**/node_modules/
+frontend/public/image-studio/
 
 # Go build cache (will be built in container)
 backend/vendor/

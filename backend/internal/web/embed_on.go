@@ -93,6 +93,9 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		if s.serveStandaloneStudio(c) {
+			return
+		}
 
 		cleanPath := strings.TrimPrefix(path, "/")
 		if cleanPath == "" {

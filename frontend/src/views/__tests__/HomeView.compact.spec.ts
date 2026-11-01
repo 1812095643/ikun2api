@@ -57,13 +57,13 @@ function mountHome(settings: Record<string, unknown> = {}) {
 }
 
 function compactDestination(wrapper: ReturnType<typeof mountHome>) {
-  return wrapper.get('[data-testid="compact-home"]').findComponent(RouterLinkStub).props('to')
+  return wrapper.findAllComponents(RouterLinkStub).find(link => link.attributes('data-testid') === 'compact-entry')?.props('to')
 }
 
 function modelPlazaDestination(wrapper: ReturnType<typeof mountHome>) {
   return wrapper
     .findAllComponents(RouterLinkStub)
-    .find((link) => link.props('to') === '/model-plaza')
+    .find((link) => link.props('to') === '/model-square')
     ?.props('to')
 }
 
@@ -104,6 +104,19 @@ describe('HomeView compact mode', () => {
     expect(wrapper.get('[data-testid="compact-home"]').text()).toContain('Test site')
   })
 
+  it('renders the legacy Sub2 homepage when selected', () => {
+    const wrapper = mountHome({ home_mode: 'legacy' })
+    expect(wrapper.find('[data-testid=\"legacy-home\"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid=\"prism-landing\"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('renders custom HTML only when the custom mode is selected', () => {
+    const wrapper = mountHome({ home_mode: 'custom', home_content: '<section id=\"custom-home\">Custom</section>' })
+    expect(wrapper.get('#custom-home').text()).toBe('Custom')
+    wrapper.unmount()
+  })
+
   it.each([undefined, false])('selects the default home when compact mode is %s', (enabled) => {
     const settings = enabled === undefined ? {} : { compact_home_enabled: enabled }
     const wrapper = mountHome(settings)
@@ -132,52 +145,53 @@ describe('HomeView compact mode', () => {
     expect(appStore.fetchPublicSettings).not.toHaveBeenCalled()
   })
 
-  it('shows the model plaza link to anonymous visitors when public access is enabled', () => {
-    const wrapper = mountHome({
-      compact_home_enabled: true,
-      model_plaza_enabled: true,
-      model_plaza_require_auth: false,
-    })
-
-    expect(modelPlazaDestination(wrapper)).toBe('/model-plaza')
-  })
-
-  it('hides the model plaza link from anonymous visitors when sign-in is required', () => {
-    const wrapper = mountHome({
-      compact_home_enabled: true,
-      model_plaza_enabled: true,
-      model_plaza_require_auth: true,
-    })
-
-    expect(modelPlazaDestination(wrapper)).toBeUndefined()
-  })
-
-  it('shows the model plaza link to authenticated visitors when sign-in is required', () => {
-    authStore.isAuthenticated = true
-
-    const wrapper = mountHome({
-      compact_home_enabled: true,
-      model_plaza_enabled: true,
-      model_plaza_require_auth: true,
-    })
-
-    expect(modelPlazaDestination(wrapper)).toBe('/model-plaza')
-  })
-
-  it('shows the model plaza link in the default home header', () => {
-    const wrapper = mountHome({
-      model_plaza_enabled: true,
-      model_plaza_require_auth: false,
-    })
-
-    expect(modelPlazaDestination(wrapper)).toBe('/model-plaza')
-  })
-
-  it('hides the model plaza link when the feature is disabled', () => {
+  it('shows the native model square link to anonymous visitors', () => {
     const wrapper = mountHome({
       compact_home_enabled: true,
       model_plaza_enabled: false,
       model_plaza_require_auth: false,
+    })
+
+    expect(modelPlazaDestination(wrapper)).toBe('/model-square')
+  })
+
+  it('keeps the native model square link independent of the retired official plaza switch', () => {
+    const wrapper = mountHome({
+      compact_home_enabled: true,
+      model_plaza_enabled: false,
+      model_plaza_require_auth: true,
+    })
+
+    expect(modelPlazaDestination(wrapper)).toBe('/model-square')
+  })
+
+  it('keeps the native model square link for authenticated visitors', () => {
+    authStore.isAuthenticated = true
+
+    const wrapper = mountHome({
+      compact_home_enabled: true,
+      model_plaza_enabled: false,
+      model_plaza_require_auth: true,
+    })
+
+    expect(modelPlazaDestination(wrapper)).toBe('/model-square')
+  })
+
+  it('shows the native model square link in the default home header', () => {
+    const wrapper = mountHome({
+      model_plaza_enabled: false,
+      model_plaza_require_auth: false,
+    })
+
+    expect(modelPlazaDestination(wrapper)).toBe('/model-square')
+  })
+
+  it('hides the model square link when menu visibility is off', () => {
+    const wrapper = mountHome({
+      compact_home_enabled: true,
+      model_plaza_enabled: false,
+      model_plaza_require_auth: false,
+      menu_visibility: { '/model-square': false },
     })
 
     expect(modelPlazaDestination(wrapper)).toBeUndefined()

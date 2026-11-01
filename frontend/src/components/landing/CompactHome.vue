@@ -5,7 +5,7 @@ import Icon from '@/components/icons/Icon.vue'
 import TutorialLink from '@/components/common/TutorialLink.vue'
 defineProps<{
   siteName: string; siteLogo: string; siteSubtitle: string; isAuthenticated: boolean;
-  dashboardPath: string; showModelPlazaEntry: boolean; isDark: boolean
+  dashboardPath: string; showModelPlazaEntry: boolean; showTutorialEntry: boolean; isDark: boolean
 }>()
 const emit = defineEmits<{ theme: [] }>()
 const { t } = useI18n()
@@ -31,10 +31,10 @@ const currentYear = new Date().getFullYear()
         </div>
         <div class="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
           <LocaleSwitcher />
-          <TutorialLink class="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-800" />
+          <TutorialLink v-if="showTutorialEntry" class="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-800" />
           <router-link
             v-if="showModelPlazaEntry"
-            to="/model-plaza"
+            to="/model-square"
             class="flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
             :title="t('nav.modelPlaza')"
           >
@@ -50,6 +50,7 @@ const currentYear = new Date().getFullYear()
             <Icon v-else name="moon" size="md" />
           </button>
           <router-link
+            data-testid="compact-entry"
             :to="isAuthenticated ? dashboardPath : '/login'"
             class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
           >
@@ -75,7 +76,7 @@ const currentYear = new Date().getFullYear()
           >
             {{ isAuthenticated ? t('home.goToDashboard') : t('home.login') }}
           </router-link>
-          <TutorialLink class="btn btn-secondary px-5 py-2.5" />
+          <TutorialLink v-if="showTutorialEntry" class="btn btn-secondary px-5 py-2.5" />
         </div>
       </div>
     </main>

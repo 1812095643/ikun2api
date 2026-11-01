@@ -3,6 +3,7 @@ export default {
       title: '系统设置',
       description: '管理注册、邮箱验证、默认值和 SMTP 设置',
       tabs: {
+        menus: '菜单管理',
         general: '通用设置',
         agreement: '登录条款',
         features: '功能开关',
@@ -12,6 +13,16 @@ export default {
         email: '邮件设置',
         backup: '数据备份',
         payment: '支付设置',
+      },
+      menus: {
+        title: '菜单显示',
+        hint: '控制页面入口的显示，不改变账号权限或功能开关。',
+        search: '搜索页面',
+        empty: '没有匹配的页面',
+        nativeReplacement: '已由系统页面替代',
+        visible: '显示',
+        urlPlaceholder: '/status-detection/ 或 https://example.com/page',
+        noCustomPages: '暂无自定义页面',
       },
       features: {
         channelMonitor: {
@@ -704,6 +715,12 @@ export default {
           '自定义首页内容，支持 Markdown/HTML。如果输入的是链接（以 http:// 或 https:// 开头），则会使用该链接作为 iframe 的 src 属性，这允许你设置任意网页作为首页。设置后首页的状态信息将不再显示。',
         homeContentIframeWarning:
           '⚠️ iframe 模式提示：部分网站设置了 X-Frame-Options 或 CSP 安全策略，禁止被嵌入到 iframe 中。如果页面显示空白或报错，请确认目标网站允许被嵌入，或考虑使用 HTML 模式自行构建页面内容。',
+        homeMode: '首页模式',
+        homeModePrism: '新版玻璃首页',
+        homeModeLegacy: 'Sub2 旧版首页',
+        homeModeCompact: '简洁首页',
+        homeModeCustom: '自定义 HTML / iframe',
+        homeModeHint: '自定义 HTML/URL 仅在选择自定义模式时显示；旧版与新版可以随时切换。',
         compactHome: '简洁首页',
         compactHomeHint: '未设置自定义首页内容时，展示简洁的站点信息页面。',
         hideCcsImportButton: '隐藏 CCS 导入按钮',

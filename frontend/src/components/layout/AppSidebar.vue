@@ -206,6 +206,8 @@
 
 <script setup lang="ts">
 import { nativeMenuIDs, imageStudioUrl } from '@/router/workspace'
+import { filterVisibleMenus } from '@/config/menuPages'
+import { useMenuVisibility } from '@/composables/useMenuVisibility'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -263,6 +265,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
+const { visibility: menuVisibility, menuVisible } = useMenuVisibility()
 const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
@@ -797,7 +800,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
 
 // finalizeNav 合并三重过滤：featureFlag 过滤 + simple 模式过滤。
 function finalizeNav(items: NavItem[]): NavItem[] {
-  const visible = applyFeatureFlags(items)
+  const visible = filterVisibleMenus(applyFeatureFlags(items), menuVisibility.value)
   return authStore.isSimpleMode ? visible.filter(item => !item.hideInSimpleMode) : visible
 }
 
@@ -813,13 +816,13 @@ const personalNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems
 const customMenuItemsForUser = computed(() => {
   const items = appStore.cachedPublicSettings?.custom_menu_items ?? []
   return items
-    .filter((item) => item.visibility === 'user' && !nativeMenuIDs.has(item.id))
+    .filter((item) => item.visibility === 'user' && !nativeMenuIDs.has(item.id) && menuVisible(`/custom/${item.id}`))
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
 const customMenuItemsForAdmin = computed(() => {
   return adminSettingsStore.customMenuItems
-    .filter((item) => item.visibility === 'admin' && !nativeMenuIDs.has(item.id))
+    .filter((item) => item.visibility === 'admin' && !nativeMenuIDs.has(item.id) && menuVisible(`/custom/${item.id}`))
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
@@ -907,14 +910,14 @@ const adminNavItems = computed((): NavItem[] => {
     for (const cm of customMenuItemsForAdmin.value) {
       filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
     }
-    return filtered
+    return filterVisibleMenus(filtered, menuVisibility.value)
   }
 
   visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
   for (const cm of customMenuItemsForAdmin.value) {
     visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
   }
-  return visible
+  return filterVisibleMenus(visible, menuVisibility.value)
 })
 
 function toggleSidebar() {

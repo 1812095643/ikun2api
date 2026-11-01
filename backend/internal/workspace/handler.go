@@ -156,6 +156,7 @@ func (h *Handler) setRuntime(ctx context.Context, key string, value any) error {
 func (h *Handler) Register(v1 *gin.RouterGroup, jwt, admin, audit, backendGuard, limit, stepUp gin.HandlerFunc) {
 	h.startBackground()
 	user := v1.Group("/workspace", jwt, backendGuard, limit, audit)
+	user.GET("/image", h.imageRelay)
 	user.GET("/navigation", h.navigation)
 	user.POST("/navigation/read", h.readNavigation)
 	user.GET("/tickets", h.listTickets)

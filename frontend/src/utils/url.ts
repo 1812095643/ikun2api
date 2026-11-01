@@ -16,7 +16,12 @@ export function sanitizeUrl(value: string, options: SanitizeOptions = {}): strin
   }
 
   if (options.allowRelative && trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-    return trimmed
+    try {
+      const local = new URL(trimmed, 'https://local.invalid')
+      return local.origin === 'https://local.invalid' && !/[\\\r\n\t]/.test(trimmed) ? trimmed : ''
+    } catch {
+      return ''
+    }
   }
 
   // 允许 data:image/ 开头的 data URL（仅限图片类型）
@@ -40,4 +45,14 @@ export function sanitizeUrl(value: string, options: SanitizeOptions = {}): strin
   } catch {
     return ''
   }
+}
+
+/**
+ * 计算当前安装对外提供的 API 根地址（不含 /v1），供教程与首页接入示例共用
+ * @param configured 后台配置的 API 地址，可为空
+ * @param origin 当前页面来源，配置为空或无效时使用
+ * @returns 去掉末尾斜杠与 /v1 的根地址
+ */
+export function resolveApiBase(configured: string, origin: string): string {
+  return (sanitizeUrl(configured || '') || origin).replace(/\/+$/, '').replace(/\/v1$/, '')
 }

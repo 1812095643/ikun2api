@@ -160,6 +160,7 @@ type UpdateSettingsRequest struct {
 	ContactInfo                 string                `json:"contact_info"`
 	DocURL                      string                `json:"doc_url"`
 	HomeContent                 string                `json:"home_content"`
+	HomeMode                    string                `json:"home_mode"`
 	CompactHomeEnabled          bool                  `json:"compact_home_enabled"`
 	HideCcsImportButton         bool                  `json:"hide_ccs_import_button"`
 	PurchaseSubscriptionEnabled *bool                 `json:"purchase_subscription_enabled"`
@@ -167,6 +168,7 @@ type UpdateSettingsRequest struct {
 	TableDefaultPageSize        int                   `json:"table_default_page_size"`
 	TablePageSizeOptions        []int                 `json:"table_page_size_options"`
 	CustomMenuItems             *[]dto.CustomMenuItem `json:"custom_menu_items"`
+	MenuVisibility              *map[string]bool      `json:"menu_visibility"`
 	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
 	// 默认配置
@@ -511,6 +513,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	auditReq := settingsAuditRequest(req)
 	omitted := omittedSettingKeys(sentFields)
+	if req.MenuVisibility == nil {
+		omitted[service.SettingKeyMenuVisibility] = struct{}{}
+	}
 	if req.OpenAICodexTicketPromptTemplate == nil {
 		// Keep omitted templates out of the write, including concurrent partial saves.
 		omitted[service.SettingKeyOpenAICodexTicketPromptTemplate] = struct{}{}
@@ -1296,6 +1301,20 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		maxMenuItemIDLen      = 32
 	)
 
+	menuVisibilityJSON := previousSettings.MenuVisibility
+	if req.MenuVisibility != nil {
+		if err := service.ValidateMenuVisibility(*req.MenuVisibility); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		raw, err := json.Marshal(*req.MenuVisibility)
+		if err != nil {
+			response.BadRequest(c, "Invalid menu visibility")
+			return
+		}
+		menuVisibilityJSON = string(raw)
+	}
+
 	customMenuJSON := previousSettings.CustomMenuItems
 	if req.CustomMenuItems != nil {
 		items := *req.CustomMenuItems
@@ -1329,8 +1348,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 					response.BadRequest(c, "Custom menu item URL is too long (max 2048 characters)")
 					return
 				}
-				if err := config.ValidateAbsoluteHTTPURL(urlTrimmed); err != nil {
-					response.BadRequest(c, "Custom menu item URL must be an absolute http(s) URL or md:<slug>")
+				if err := validateCustomPageURL(urlTrimmed); err != nil {
+					response.BadRequest(c, "Custom menu item URL must be a local /path, absolute http(s) URL or md:<slug>")
 					return
 				}
 			}
@@ -1672,6 +1691,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ContactInfo:                            req.ContactInfo,
 		DocURL:                                 req.DocURL,
 		HomeContent:                            req.HomeContent,
+		HomeMode:                               req.HomeMode,
 		CompactHomeEnabled:                     req.CompactHomeEnabled,
 		HideCcsImportButton:                    req.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:            purchaseEnabled,
@@ -1679,6 +1699,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                   req.TableDefaultPageSize,
 		TablePageSizeOptions:                   req.TablePageSizeOptions,
 		CustomMenuItems:                        customMenuJSON,
+		MenuVisibility:                         menuVisibilityJSON,
 		CustomEndpoints:                        customEndpointsJSON,
 		DefaultConcurrency:                     req.DefaultConcurrency,
 		DefaultBalance:                         req.DefaultBalance,
@@ -2362,6 +2383,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ContactInfo:                                            updatedSettings.ContactInfo,
 		DocURL:                                                 updatedSettings.DocURL,
 		HomeContent:                                            updatedSettings.HomeContent,
+		HomeMode:                                               updatedSettings.HomeMode,
 		CompactHomeEnabled:                                     updatedSettings.CompactHomeEnabled,
 		HideCcsImportButton:                                    updatedSettings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:                            updatedSettings.PurchaseSubscriptionEnabled,
@@ -2369,6 +2391,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                                   updatedSettings.TableDefaultPageSize,
 		TablePageSizeOptions:                                   updatedSettings.TablePageSizeOptions,
 		CustomMenuItems:                                        dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
+		MenuVisibility:                                         service.ParseMenuVisibility(updatedSettings.MenuVisibility),
 		CustomEndpoints:                                        dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		DefaultConcurrency:                                     updatedSettings.DefaultConcurrency,
 		DefaultBalance:                                         updatedSettings.DefaultBalance,

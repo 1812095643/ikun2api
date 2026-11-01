@@ -119,6 +119,9 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 
 	return func(c *gin.Context) {
 		finalPolicy := policy
+		if c.Request.URL.Path == "/image-studio" || strings.HasPrefix(c.Request.URL.Path, "/image-studio/") {
+			finalPolicy = standaloneStudioCSP(finalPolicy)
+		}
 		if getFrameSrcOrigins != nil {
 			for _, origin := range getFrameSrcOrigins() {
 				if origin != "" {
@@ -149,6 +152,20 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 		}
 		c.Next()
 	}
+}
+
+// The standalone studio runs user-authored model adapters and can connect to a
+// local canvas agent. Keep those capabilities scoped to this page; the console
+// retains its existing non-eval policy and endpoint restrictions.
+func standaloneStudioCSP(policy string) string {
+	policy = addToDirective(policy, "script-src", "'unsafe-eval'")
+	for _, origin := range []string{"http://127.0.0.1:*", "http://localhost:*", "ws://127.0.0.1:*", "ws://localhost:*", "wss:"} {
+		policy = addToDirective(policy, "connect-src", origin)
+	}
+	for _, source := range []string{"'self'", "data:", "blob:", "https:"} {
+		policy = addToDirective(policy, "media-src", source)
+	}
+	return policy
 }
 
 func isAPIRoutePath(c *gin.Context) bool {

@@ -3,9 +3,11 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import WorkspaceDialog from '@/components/workspace/WorkspaceDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { createLotteryPoster } from '@/utils/lotteryPoster'
+import { useAppStore } from '@/stores/app'
 import type { LotteryWin } from '@/api/lottery'
 const props = defineProps<{ win: LotteryWin | null }>()
 const emit = defineEmits<{ close: [] }>()
+const appStore = useAppStore()
 const url = ref(''),
   message = ref(''),
   busy = ref(false)
@@ -25,7 +27,7 @@ watch(
     if (!win) return
     busy.value = true
     try {
-      const image = await createLotteryPoster(win)
+      const image = await createLotteryPoster(win, appStore.siteName)
       if (current !== generation) return
       blob = image
       url.value = URL.createObjectURL(image)
@@ -56,7 +58,7 @@ function save() {
   if (!url.value || !props.win) return
   const a = document.createElement('a')
   a.href = url.value
-  a.download = `IKUN2api-中奖-${props.win.id}.png`
+  a.download = `${appStore.siteName.replace(/[\\/:*?"<>|]/g, "_")}-中奖-${props.win.id}.png`
   a.click()
 }
 onBeforeUnmount(() => {

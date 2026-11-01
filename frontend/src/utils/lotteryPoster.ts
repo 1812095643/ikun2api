@@ -13,7 +13,7 @@ function lines(ctx: CanvasRenderingContext2D, value: string, width: number) {
   return result
 }
 
-export async function createLotteryPoster(win: LotteryWin): Promise<Blob> {
+export async function createLotteryPoster(win: LotteryWin, siteName = 'IKUN2api'): Promise<Blob> {
   await document.fonts.ready
   const canvas = document.createElement('canvas')
   canvas.width = 1080
@@ -35,7 +35,7 @@ export async function createLotteryPoster(win: LotteryWin): Promise<Blob> {
   ctx.fillRect(52, 52, 976, 108)
   ctx.font = '600 27px sans-serif'
   ctx.fillStyle = '#f8f5ee'
-  ctx.fillText('IKUN2api', 104, 119)
+  ctx.fillText(siteName, 104, 119, 590)
   ctx.textAlign = 'right'
   ctx.font = '22px monospace'
   ctx.fillText(`LUCKY NO. ${String(win.id).padStart(6, '0')}`, 976, 117)

@@ -12,3 +12,6 @@ dist/
 # 忽略缓存
 .cache/
 .vite/
+
+# Standalone React studio uses its own TypeScript project.
+studio/

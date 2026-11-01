@@ -1,6 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
-export const imageStudioUrl = 'https://subapi.xiaoye.lol/image-studio/'
+export const imageStudioUrl = '/image-studio/'
 
 export const nativeMenuIDs = new Set([
   'tutorial',

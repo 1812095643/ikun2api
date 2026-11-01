@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { nextTick, reactive, ref } from 'vue'
+import { useAppStore } from '@/stores/app'
 import type { ReloginOptions, ReloginSettings } from '@/api/relogin'
 const props = defineProps<{ settings: ReloginSettings; options: ReloginOptions; busy: boolean; error?: string }>()
 const emit = defineEmits<{ save: [settings: ReloginSettings] }>()
+const appStore = useAppStore()
 const draft = reactive<ReloginSettings>(JSON.parse(JSON.stringify(props.settings)))
 const recipients = ref(props.settings.recipients.join('\n'))
 const activeTab = ref('auto')
@@ -153,7 +155,7 @@ function save() {
           class="ws-input"
           rows="3"
           placeholder="每行一个邮箱"
-        /><small>沿用 IKUN2api 中配置的邮件服务。只在额度跨过阈值时发送提醒。</small></label
+        /><small>沿用 {{ appStore.siteName }} 中配置的邮件服务。只在额度跨过阈值时发送提醒。</small></label
       >
     </section>
     </fieldset>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import claude from '@/assets/landing/claude.png'
 import openai from '@/assets/landing/openai.png'
 import gemini from '@/assets/landing/gemini.png'
@@ -7,7 +8,7 @@ import deepseek from '@/assets/landing/deepseek.png'
 import glm from '@/assets/landing/glm.png'
 import qwen from '@/assets/landing/qwen.png'
 
-defineProps<{ to: string }>()
+defineProps<{ to: string; linked?: boolean }>()
 const { t } = useI18n()
 const providers = [
   { name: 'Claude', image: claude }, { name: 'GPT', image: openai },
@@ -18,11 +19,11 @@ const providers = [
 
 <template>
   <nav class="provider-strip" :aria-label="t('home.prism.models')">
-    <RouterLink v-for="provider in providers" :key="provider.name" :to="to" class="provider-link">
+    <component :is="linked === false ? 'span' : RouterLink" v-for="provider in providers" :key="provider.name" :to="linked === false ? undefined : to" class="provider-link">
       <img :src="provider.image" :alt="`${provider.name} logo`" width="38" height="38" />
       <span>{{ provider.name }}</span>
-    </RouterLink>
-    <RouterLink :to="to" class="provider-link provider-more">{{ t('home.prism.more') }}</RouterLink>
+    </component>
+    <RouterLink v-if="linked !== false" :to="to" class="provider-link provider-more">{{ t('home.prism.more') }}</RouterLink>
   </nav>
 </template>
 

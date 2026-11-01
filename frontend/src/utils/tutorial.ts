@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify'
 import content from '@/data/tutorial.json'
 import siteContent from '@/data/tutorial-site.json'
-import { sanitizeUrl } from '@/utils/url'
+import { resolveApiBase } from '@/utils/url'
 
 export interface TutorialDocument {
   id: string
@@ -51,9 +51,7 @@ export function tutorialHref(id = 'start', section = ''): string {
   return `/tutorial/${encodeURIComponent(id)}${section ? `#${encodeURIComponent(section)}` : ''}`
 }
 
-export function tutorialApiBase(configured: string, origin: string): string {
-  return (sanitizeUrl(configured) || origin).replace(/\/+$/, '').replace(/\/v1$/, '')
-}
+export const tutorialApiBase = resolveApiBase
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({
@@ -84,7 +82,10 @@ export function tutorialHtml(html: string, apiBase: string, siteName: string): s
       if (sitePages.has(localPath)) {
         anchor.setAttribute('href', localPath)
       } else if (pathname === '/tutorial/ccswitch-claude-desktop') {
-        anchor.setAttribute('href', 'https://subapi.xiaoye.lol/tutorial/ccswitch-claude-desktop/')
+        // Older copies of the guide referenced an article that is not part of
+        // the current bundled docs. Keep the link on this installation and
+        // fall back to the tutorial index instead of another operator's host.
+        anchor.setAttribute('href', tutorialHref('desktop'))
       }
     }
     const destination = anchor.getAttribute('href') || ''

@@ -3,6 +3,7 @@ export default {
       title: 'System Settings',
       description: 'Manage registration, email verification, default values, and SMTP settings',
       tabs: {
+        menus: 'Menus',
         general: 'General',
         agreement: 'Agreement',
         features: 'Feature Switches',
@@ -12,6 +13,16 @@ export default {
         email: 'Email',
         backup: 'Backup',
         payment: 'Payment',
+      },
+      menus: {
+        title: 'Menu visibility',
+        hint: 'Show or hide navigation entries without changing permissions or feature settings.',
+        search: 'Search pages',
+        empty: 'No matching pages',
+        nativeReplacement: 'Replaced by a built-in page',
+        visible: 'Visible',
+        urlPlaceholder: '/status-detection/ or https://example.com/page',
+        noCustomPages: 'No custom pages',
       },
       features: {
         channelMonitor: {
@@ -709,6 +720,12 @@ export default {
         homeContentPlaceholder: 'Enter custom content for the home page. Supports Markdown & HTML. If a URL is entered, it will be displayed as an iframe.',
         homeContentHint: 'Customize the home page content. Supports Markdown/HTML. If you enter a URL (starting with http:// or https://), it will be used as an iframe src to embed an external page. When set, the default status information will no longer be displayed.',
         homeContentIframeWarning: '⚠️ iframe mode note: Some websites have X-Frame-Options or CSP security policies that prevent embedding in iframes. If the page appears blank or shows an error, please verify the target website allows embedding, or consider using HTML mode to build your own content.',
+        homeMode: 'Home page mode',
+        homeModePrism: 'New glass homepage',
+        homeModeLegacy: 'Sub2 legacy homepage',
+        homeModeCompact: 'Compact homepage',
+        homeModeCustom: 'Custom HTML / iframe',
+        homeModeHint: 'Custom HTML/URL is used only in custom mode; switch between the new and legacy pages at any time.',
         compactHome: 'Compact Home Page',
         compactHomeHint: 'Show a restrained site identity page when no custom home page content is set.',
         hideCcsImportButton: 'Hide CCS Import Button',

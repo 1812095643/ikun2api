@@ -16,12 +16,13 @@ class ReleaseTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        for target in ['backend/scripts', 'backend/cmd/server', 'changelog/0.2.7', 'dist', 'deploy', 'backend/resources', 'bin']:
+        for target in ['backend/scripts', 'backend/cmd/server', 'changelog/0.2.7', 'dist', 'deploy', 'backend/resources', 'frontend/studio', 'bin']:
             (self.root / target).mkdir(parents=True)
         shutil.copy(ROOT / 'backend/scripts/resolve-version.sh', self.root / 'backend/scripts')
         (self.root / 'backend/cmd/server/VERSION').write_text('0.2.7\n')
         (self.root / 'changelog/0.2.7/CHANGELOG.md').write_text('# v0.2.7\n\n## \u65b0\u589e\u529f\u80fd\n\n- \u5b9e\u9645\u66f4\u65b0\n')
         (self.root / 'LICENSE').write_text('fixture')
+        (self.root / 'frontend/studio/LICENSE').write_text('MIT fixture')
         (self.root / 'COPYING.GPL').write_text('fixture')
         (self.root / 'NOTICE.md').write_text('fixture')
         (self.root / 'README.md').write_text('fixture')

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useMenuVisibility } from '@/composables/useMenuVisibility'
 import TutorialLink from '@/components/common/TutorialLink.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useI18n } from 'vue-i18n'
@@ -12,6 +13,7 @@ defineProps<{
   modelsTo: string
 }>()
 const { t } = useI18n()
+const { menuVisible } = useMenuVisibility()
 const menuOpen = shallowRef(false)
 const menu = shallowRef<HTMLElement | null>(null)
 function closeOutside(event: PointerEvent) {
@@ -23,21 +25,21 @@ onUnmounted(() => document.removeEventListener('pointerdown', closeOutside))
 
 <template>
   <header class="landing-header">
-    <RouterLink to="/home" class="landing-brand" :aria-label="siteName">
+    <RouterLink :to="menuVisible('/home') ? '/home' : entryTo" class="landing-brand" :aria-label="siteName">
       <img class="brand-logo" :src="siteLogo || '/logo.svg'" alt="" width="40" height="40" />
       <span class="brand-name">{{ siteName }}</span>
     </RouterLink>
     <nav class="landing-nav" :aria-label="t('home.prism.navigation')">
-      <RouterLink :to="modelsTo" class="nav-link model-link">{{ t('home.prism.models') }}</RouterLink>
-      <TutorialLink class="nav-link tutorial-link" />
+      <RouterLink v-if="menuVisible('/model-square')" :to="modelsTo" class="nav-link model-link">{{ t('home.prism.models') }}</RouterLink>
+      <TutorialLink v-if="menuVisible('/tutorial')" class="nav-link tutorial-link" />
       <RouterLink :to="entryTo" class="login-link" data-testid="landing-login">{{ entryLabel }}</RouterLink>
-      <div ref="menu" class="mobile-menu" @keydown.esc="menuOpen = false">
+      <div v-if="menuVisible('/model-square') || menuVisible('/tutorial')" ref="menu" class="mobile-menu" @keydown.esc="menuOpen = false">
         <button type="button" class="menu-button" :aria-label="t('home.prism.menu')" :aria-expanded="menuOpen" aria-controls="landing-mobile-links" @click="menuOpen = !menuOpen">
           <Icon :name="menuOpen ? 'x' : 'menu'" size="md" aria-hidden="true" />
         </button>
         <div v-if="menuOpen" id="landing-mobile-links" class="mobile-links" @click="menuOpen = false">
-          <RouterLink :to="modelsTo">{{ t('home.prism.models') }}<Icon name="chevronRight" size="sm" aria-hidden="true" /></RouterLink>
-          <TutorialLink />
+          <RouterLink v-if="menuVisible('/model-square')" :to="modelsTo">{{ t('home.prism.models') }}<Icon name="chevronRight" size="sm" aria-hidden="true" /></RouterLink>
+          <TutorialLink v-if="menuVisible('/tutorial')" />
         </div>
       </div>
     </nav>

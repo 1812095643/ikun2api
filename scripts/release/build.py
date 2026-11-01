@@ -13,6 +13,8 @@ def build(target,version,commit,output):
   subprocess.run([os.environ.get('GO_BINARY','go'),'build','-trimpath','-tags=embed','-ldflags',f'-s -w -X main.Version={version} -X main.Commit={commit} -X main.Date={date} -X main.BuildType=release','-o',str(binary),'./cmd/server'],cwd=ROOT/'backend',env=env,check=True)
   shutil.copytree(ROOT/'deploy',stage/'deploy',ignore=shutil.ignore_patterns('__pycache__','*.pyc','config.yaml','.env'))
   shutil.copytree(ROOT/'backend/resources',stage/'resources')
+  (stage/'third-party-licenses').mkdir()
+  shutil.copy2(ROOT/'frontend/studio/LICENSE',stage/'third-party-licenses/image-studio-MIT.txt')
   for file in ['LICENSE','COPYING.GPL','NOTICE.md','README.md']:
    if (ROOT/file).exists():shutil.copy2(ROOT/file,stage/file)
   (stage/'build-info.json').write_text(json.dumps({'version':version,'commit':commit,'target':target,'built_at':date},indent=2))
