@@ -30,6 +30,7 @@ func (s *upgradeSafety) Prepare(ctx context.Context, binary, backupDir string) e
 	if err != nil {
 		return fmt.Errorf("candidate compatibility check failed: %s", boundedUpgradeOutput(out))
 	}
+	SetUpgradePhase("draining", "")
 	drainCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	if err := BeginUpgradeMaintenance(drainCtx); err != nil {

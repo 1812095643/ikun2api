@@ -425,6 +425,7 @@ func handleQPSWebSocket(parentCtx context.Context, conn *websocket.Conn) {
 
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
+	maintenanceStarted := service.UpgradeMaintenanceStarted()
 
 	var closeOnce sync.Once
 	closeConn := func() {
@@ -493,6 +494,15 @@ func handleQPSWebSocket(parentCtx context.Context, conn *websocket.Conn) {
 
 	for {
 		select {
+		case <-maintenanceStarted:
+			// This socket only reads monitoring data. End it normally for a
+			// service restart instead of blocking the update until timeout.
+			sendClose(websocket.FormatCloseMessage(websocket.CloseServiceRestart, "upgrade_maintenance"))
+			cancel()
+			closeConn()
+			wg.Wait()
+			return
+
 		case <-pushTicker.C:
 			msg := qpsWSCache.getPayload()
 			if msg == nil {
