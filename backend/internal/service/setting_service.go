@@ -155,6 +155,7 @@ type SettingService struct {
 	panelRateLimitSF    singleflight.Group
 
 	claudeTelemetrySettingsMu      sync.Mutex
+	claudeTelemetryUpdateMu        sync.Mutex
 	claudeTelemetrySettingsCache   atomic.Pointer[cachedClaudeTelemetrySettings]
 	claudeTelemetrySettingsChanged func(ClaudeTelemetrySettings)
 

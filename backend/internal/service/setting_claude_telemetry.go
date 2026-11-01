@@ -83,6 +83,10 @@ func (s *SettingService) SetClaudeTelemetrySettings(ctx context.Context, setting
 	if err := settings.Validate(); err != nil {
 		return err
 	}
+	// Every persisted transition must reach the scheduler before the next write.
+	// In particular, concurrent off/on saves cannot skip the cancellation step.
+	s.claudeTelemetryUpdateMu.Lock()
+	defer s.claudeTelemetryUpdateMu.Unlock()
 	data, err := json.Marshal(settings)
 	if err != nil {
 		return err

@@ -45,6 +45,36 @@ func TestClaudeTelemetryConfiguredGapCannotBeBypassed(t *testing.T) {
 	require.Zero(t, len(sender.slot))
 }
 
+func TestClaudeTelemetryConcurrentSavesCannotSkipDisable(t *testing.T) {
+	t.Setenv("SUB6_CLAUDE_TELEMETRY_ENABLED", "true")
+	s := NewSettingService(&panelRateLimitSettingRepo{}, &config.Config{})
+	entered, release := make(chan struct{}), make(chan struct{})
+	s.claudeTelemetrySettingsChanged = func(settings ClaudeTelemetrySettings) {
+		if !settings.Enabled {
+			close(entered)
+			<-release
+		}
+	}
+	off := DefaultClaudeTelemetrySettings()
+	off.Enabled = false
+	first := make(chan error, 1)
+	go func() { first <- s.SetClaudeTelemetrySettings(context.Background(), off) }()
+	<-entered
+	second := make(chan error, 1)
+	go func() { second <- s.SetClaudeTelemetrySettings(context.Background(), DefaultClaudeTelemetrySettings()) }()
+	select {
+	case err := <-second:
+		close(release)
+		t.Fatalf("enable overtook disable callback: %v", err)
+	case <-time.After(30 * time.Millisecond):
+	}
+	require.False(t, s.claudeTelemetrySettings(context.Background()).Enabled)
+	close(release)
+	require.NoError(t, <-first)
+	require.NoError(t, <-second)
+	require.True(t, s.claudeTelemetrySettings(context.Background()).Enabled)
+}
+
 func TestClaudeTelemetrySettingsDefaultsLegacyAndPersistence(t *testing.T) {
 	t.Setenv("SUB6_CLAUDE_TELEMETRY_ENABLED", "")
 	repo := &panelRateLimitSettingRepo{}
