@@ -864,6 +864,7 @@ type GatewayService struct {
 	userPlatformQuotaRepo UserPlatformQuotaRepository
 
 	claudeTelemetryScheduler *ClaudeTelemetryScheduler
+	claudeThinkingRecovery   claudeThinkingRecoveryCache
 }
 
 // NewGatewayService creates a new GatewayService

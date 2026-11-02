@@ -135,10 +135,13 @@ func TestGatewayService_ForwardSignatureRepairAfterSlowInitialResponse(t *testin
 				require.NotNil(t, result)
 				require.Equal(t, "repaired-request", result.RequestID)
 				require.NotContains(t, string(u.bodies[1]), "opaque-signed-history")
-				require.Contains(t, string(u.bodies[1]), "prior reasoning")
+				// Native Claude signature recovery follows the CLI: discard the old
+				// thinking block without exposing its text as ordinary assistant prose.
+				require.NotContains(t, string(u.bodies[1]), "prior reasoning")
+				require.Equal(t, "adaptive", gjson.GetBytes(u.bodies[1], "thinking.type").String())
 				require.Contains(t, string(u.bodies[1]), "Continue the task.")
-				require.Equal(t, "tool_use", gjson.GetBytes(u.bodies[1], "messages.0.content.1.type").String())
-				require.Equal(t, "9007199254740993", gjson.GetBytes(u.bodies[1], "messages.0.content.1.input.n").Raw)
+				require.Equal(t, "tool_use", gjson.GetBytes(u.bodies[1], "messages.0.content.0.type").String())
+				require.Equal(t, "9007199254740993", gjson.GetBytes(u.bodies[1], "messages.0.content.0.input.n").Raw)
 				require.JSONEq(t, gjson.GetBytes(body, "messages.1").Raw, gjson.GetBytes(u.bodies[1], "messages.1").Raw)
 				require.Equal(t, u.bodies[1], parsed.Body.Bytes())
 			})

@@ -171,6 +171,10 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 
 	body := parsed.Body.Bytes()
+	var thinkingInputDigests map[[32]byte]struct{}
+	if supportsClaudeThinkingHistoryRecovery(account, validationModel) {
+		thinkingInputDigests = claudeThinkingBlockDigests(body)
+	}
 	replaceBody := func(next []byte) error {
 		if err := parsed.ReplaceBody(next); err != nil {
 			return fmt.Errorf("rewrite request body: %w", err)
@@ -378,6 +382,18 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	if err := replaceBody(FilterThinkingBlocks(body, reqModel)); err != nil {
 		return nil, err
 	}
+	thinkingScope, canRememberThinking := claudeThinkingRecoveryScope(c, account, reqModel, telemetryClientSession)
+	if supportsClaudeThinkingHistoryRecovery(account, reqModel) && canRememberThinking {
+		known := s.claudeThinkingRecovery.known(thinkingScope, time.Now())
+		if len(known) > 0 && s.settingService.IsSignatureRectifierEnabled(ctx) {
+			if clean, _, changed := stripClaudeThinkingHistory(body, known); changed {
+				if err := replaceBody(clean); err != nil {
+					return nil, err
+				}
+				logger.LegacyPrintf("service.gateway", "Account %d: reused accepted thinking history recovery", account.ID)
+			}
+		}
+	}
 	// Chinese LLM thinking.type 协议差异补正（如 MiniMax 只接受 adaptive；Anthropic-SDK
 	// 客户端默认发 enabled）。仅对 passback-required 上游生效（claude-* 不会进来）。
 	if ResolveThinkingProtocol(reqModel) == ThinkingProtocolPassbackRequired {
@@ -481,11 +497,24 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 					logger.LegacyPrintf("service.gateway", "[warn] Account %d: thinking blocks have invalid signature, retrying with filtered blocks", account.ID)
 
 					// Conservative two-stage fallback:
-					// 1) Disable thinking + thinking->text (preserve content)
+					// 1) Native Claude invalid-signature: remove rejected history like
+					//    the official CLI. Other supported errors retain the generic
+					//    disable-thinking + thinking-to-text compatibility fallback.
 					// 2) Only if upstream still errors AND error message points to tool/function signature issues:
 					//    also downgrade tool_use/tool_result blocks to text.
 
-					filteredBody := FilterThinkingBlocksForRetry(body, reqModel)
+					var filteredBody []byte
+					var recoveredThinking [][32]byte
+					officialThinkingRecovery := false
+					if supportsClaudeThinkingHistoryRecovery(account, reqModel) && isClaudeInvalidThinkingSignature(respBody) {
+						logClaudeThinkingHistoryRejection(account.ID, thinkingInputDigests, lastWireBody, respBody)
+						if clean, digests, changed := stripClaudeThinkingHistory(body, nil); changed {
+							filteredBody, recoveredThinking, officialThinkingRecovery = clean, digests, true
+						}
+					}
+					if !officialThinkingRecovery {
+						filteredBody = FilterThinkingBlocksForRetry(body, reqModel)
+					}
 					retryCtx, releaseRetryCtx := detachStreamUpstreamContext(ctx, reqStream)
 					retryReq, retryWireBody, buildErr := s.buildUpstreamRequest(retryCtx, c, account, filteredBody, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
 					releaseRetryCtx()
@@ -499,7 +528,14 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 									_ = retryResp.Body.Close()
 									return nil, err
 								}
-								logger.LegacyPrintf("service.gateway", "Account %d: thinking block retry succeeded (blocks downgraded)", account.ID)
+								if officialThinkingRecovery {
+									if canRememberThinking {
+										s.claudeThinkingRecovery.remember(thinkingScope, recoveredThinking, time.Now())
+									}
+									logger.LegacyPrintf("service.gateway", "Account %d: thinking block retry succeeded (historical thinking removed)", account.ID)
+								} else {
+									logger.LegacyPrintf("service.gateway", "Account %d: thinking block retry succeeded (blocks downgraded)", account.ID)
+								}
 								resp = retryResp
 								break
 							}
