@@ -48,6 +48,7 @@ export default {
 
   // Announcements Page
   announcements: {
+    timeline: { all: 'All notices', back: 'Back to timeline', filter: 'Filter announcements' },
     title: 'Announcements',
     description: 'View system announcements',
     unreadOnly: 'Show unread only',

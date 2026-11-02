@@ -47,6 +47,7 @@ export default {
 
   // Announcements Page
   announcements: {
+    timeline: { all: '全部公告', back: '返回时间线', filter: '公告筛选' },
     title: '公告',
     description: '查看系统公告',
     unreadOnly: '仅显示未读',

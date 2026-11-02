@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import type { ModelSummary } from './upstreamModels'
 
 export interface BalanceAccount { id: number; name: string; platform: string }
 export interface BalanceMonitorConfig {
@@ -34,6 +35,7 @@ export interface BalanceSnapshot {
   error?: string
 }
 export interface UpstreamBalance {
+  models?: ModelSummary
   id: string
   url: string
   name: string

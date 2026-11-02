@@ -116,11 +116,15 @@ func (h *Handler) syncUpstreamBalances(ctx context.Context, groups []upstreamBal
 		if err != nil {
 			return err
 		}
+		if _, err = h.db.ExecContext(ctx, `INSERT INTO workspace_upstream_models(upstream_id) VALUES($1) ON CONFLICT DO NOTHING`, g.ID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 type upstreamBalanceRecord struct {
+	Models          upstreamModelSummary     `json:"models"`
 	ID              string                   `json:"id"`
 	URL             string                   `json:"url"`
 	Name            string                   `json:"name"`
@@ -202,5 +206,8 @@ func (h *Handler) prepareUpstreamBalances(ctx context.Context) ([]upstreamBalanc
 		return nil, nil, err
 	}
 	records, err := h.loadUpstreamBalanceRecords(ctx, groups)
+	if err == nil {
+		err = h.attachModelSummaries(ctx, groups, records)
+	}
 	return groups, records, err
 }

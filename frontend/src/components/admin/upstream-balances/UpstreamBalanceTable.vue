@@ -4,12 +4,13 @@ import Icon from '@/components/icons/Icon.vue'
 import { balanceComparisonLabel, balanceKindLabel, balanceScopeLabel, formatBalanceTime, formatUpstreamBalance, type UpstreamBalance } from '@/api/upstreamBalances'
 
 defineProps<{ items: UpstreamBalance[]; loading: boolean; refreshing: string | null }>()
-const emit = defineEmits<{ edit: [item: UpstreamBalance]; details: [item: UpstreamBalance]; refresh: [id: string] }>()
+const emit = defineEmits<{ edit: [item: UpstreamBalance]; details: [item: UpstreamBalance]; refresh: [id: string]; models: [item: UpstreamBalance] }>()
 const columns = [
   { key: 'name', label: '供应商', sortable: true },
   { key: 'balance', label: '余额' },
   { key: 'comparison', label: 'Key 校验' },
   { key: 'monitor', label: '余额监控' },
+  { key: 'models', label: '模型变更' },
   { key: 'last_checked_at', label: '最近查询', sortable: true },
   { key: 'actions', label: '操作' }
 ]
@@ -47,6 +48,7 @@ function rowKind(row: UpstreamBalance) {
       <div v-if="row.config.monitor_enabled" class="min-w-[100px] text-xs text-gray-500 dark:text-dark-400"><span class="badge badge-primary mb-1">已启用</span><div>{{ row.config.interval_minutes }} 分钟 / 次</div><div>低于 {{ row.config.threshold }} {{ row.snapshot.unit }}</div><div v-if="row.alert.error" class="mt-1 max-w-[150px] text-amber-600 dark:text-amber-400" :title="row.alert.error">{{ row.alert.error.includes('邮件') ? '邮件发送异常' : '请检查监控来源' }}</div></div>
       <span v-else class="text-sm text-gray-400 dark:text-dark-500">未启用</span>
     </template>
+    <template #cell-models="{ row }"><button type="button" class="text-left text-sm" @click="emit('models', row)"><span v-if="row.models?.checking || row.models?.queued" class="text-primary-600 dark:text-primary-400">{{ row.models?.checking ? '检测中' : '已排队' }}</span><span v-else-if="row.models?.pending" class="badge badge-warning">{{ row.models.pending }} 项待处理</span><span v-else class="text-gray-500 hover:underline dark:text-dark-400">{{ row.models?.checked_at ? '无变更' : '未检测' }}</span><span class="mt-1 block text-xs text-gray-400">{{ row.models?.enabled ? '定时检测已开启' : '查看模型' }}<span v-if="row.models?.errors"> · {{ row.models.errors }} 个异常</span></span></button></template>
     <template #cell-last_checked_at="{ row }"><div class="whitespace-nowrap text-xs text-gray-500 dark:text-dark-400" :title="row.last_checked_at || ''">{{ formatBalanceTime(row.last_checked_at) }}</div></template>
     <template #cell-actions="{ row }"><div class="flex flex-wrap items-center gap-1.5"><button type="button" class="btn btn-secondary btn-sm" :disabled="!!refreshing || row.checking || row.queued" @click="emit('refresh', row.id)">查询</button><button type="button" class="btn btn-secondary btn-sm" @click="emit('edit', row)">设置</button><button type="button" class="btn btn-ghost btn-sm" @click="emit('details', row)">明细</button></div></template>
     <template #empty><div class="flex flex-col items-center py-6"><Icon name="server" size="xl" class="mb-3 text-gray-400 dark:text-dark-500" /><p class="font-medium text-gray-700 dark:text-dark-200">暂无 API Key 上游</p><p class="mt-1 text-sm text-gray-500 dark:text-dark-400">账号管理中配置的 API Key 上游将在此汇总。</p><RouterLink to="/admin/accounts" class="btn btn-secondary mt-4">账号管理</RouterLink></div></template>

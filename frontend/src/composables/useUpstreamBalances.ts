@@ -19,11 +19,11 @@ export function useUpstreamBalances() {
   const filtered = computed(() => {
     const query = search.value.trim().toLowerCase()
     return items.value.filter(row => (!query || `${row.name} ${row.url} ${row.accounts.map(a => a.name).join(' ')}`.toLowerCase().includes(query)) &&
-      (filter.value === 'all' || (filter.value === 'low' && row.alert.low) || (filter.value === 'monitored' && row.config.monitor_enabled) ||
+      (filter.value === 'all' || (filter.value === 'models' && (row.models?.pending || 0) > 0) || (filter.value === 'low' && row.alert.low) || (filter.value === 'monitored' && row.config.monitor_enabled) ||
       (filter.value === 'error' && !!row.last_checked_at && (row.snapshot.successful < row.snapshot.total || !!row.snapshot.error))))
   })
   const visible = computed(() => filtered.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
-  const busy = computed(() => items.value.some(row => row.checking || row.queued))
+  const busy = computed(() => items.value.some(row => row.checking || row.queued || row.models?.checking || row.models?.queued))
   watch([search, filter, pageSize], () => { page.value = 1 })
   function schedule() {
     clearTimeout(timer)
