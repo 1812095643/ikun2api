@@ -288,7 +288,7 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 		}
 		if event.Type == "content_block_delta" && event.Delta != nil && finalResp != nil && event.Index != nil {
 			idx := *event.Index
-			if idx < len(finalResp.Content) {
+			if idx >= 0 && idx < len(finalResp.Content) {
 				switch event.Delta.Type {
 				case "text_delta":
 					finalResp.Content[idx].Text += event.Delta.Text
@@ -427,9 +427,6 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 		if event == nil {
 			return
 		}
-		// Drop Anthropic keepalive pings before OpenAI conversion:
-		// leaking `event: ping` frames crashes OpenAI-stream clients.
-		// Error events must still forward — they carry upstream failures.
 		if event.Type == "ping" {
 			return
 		}

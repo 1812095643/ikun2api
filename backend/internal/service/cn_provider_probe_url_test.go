@@ -88,7 +88,8 @@ func TestCNProviderQuotaService_RejectsURLBlockedByPolicy(t *testing.T) {
 
 	_, err := svc.QueryUsage(context.Background(), 1)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "CN_QUOTA_URL_REJECTED")
+	// The strict Kimi host matcher rejects the lookalike before any network request.
+	require.Contains(t, err.Error(), "CN_QUOTA_NOT_CODING_PLAN")
 	require.Zero(t, upstream.calls, "probe must not issue any upstream request when URL policy rejects the target")
 }
 

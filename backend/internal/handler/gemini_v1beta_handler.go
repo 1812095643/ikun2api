@@ -440,11 +440,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	// 2) billing eligibility check (after wait)
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("gemini.billing_eligibility_check_failed", zap.Error(err))
-		status, _, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
-		googleError(c, status, message)
+		googleErrorWithType(c, status, code, "", message)
 		return
 	}
 
@@ -914,7 +914,8 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 				c.Set(service.OpsSkipPassthroughKey, true)
 			}
 
-			googleError(c, respCode, msg)
+			// 按透传规则改写的是上游错误，不登记本地错误类型。
+			googleErrorWithType(c, respCode, "", "", msg)
 			return
 		}
 	}
@@ -953,6 +954,22 @@ func (e *pathParseError) Error() string { return e.msg }
 // 4xx 为客户端请求问题，其余状态码不登记（按平台错误统计）。
 func googleError(c *gin.Context, status int, message string) {
 	googleErrorWithType(c, status, googleClientErrorType(status), "", message)
+}
+
+// googleClientErrorType 返回客户端请求类 4xx 状态码对应的 ops 错误类型；其余状态码返回空串。
+func googleClientErrorType(status int) string {
+	switch status {
+	case http.StatusBadRequest, http.StatusRequestEntityTooLarge:
+		return "invalid_request_error"
+	case http.StatusUnauthorized:
+		return "authentication_error"
+	case http.StatusForbidden:
+		return "permission_error"
+	case http.StatusNotFound:
+		return "not_found_error"
+	default:
+		return ""
+	}
 }
 
 // googleConcurrencyError 以 Google 错误格式回写并发槽获取失败，状态码与文案
@@ -1104,17 +1121,3 @@ func googlePlatformError(c *gin.Context, status int, message string) {
 }
 
 // googleClientErrorType 返回客户端请求类 4xx 状态码对应的 ops 错误类型；其余状态码返回空串。
-func googleClientErrorType(status int) string {
-	switch status {
-	case http.StatusBadRequest, http.StatusRequestEntityTooLarge:
-		return "invalid_request_error"
-	case http.StatusUnauthorized:
-		return "authentication_error"
-	case http.StatusForbidden:
-		return "permission_error"
-	case http.StatusNotFound:
-		return "not_found_error"
-	default:
-		return ""
-	}
-}

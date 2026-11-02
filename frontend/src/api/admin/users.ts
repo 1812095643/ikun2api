@@ -4,7 +4,8 @@
  */
 
 import { apiClient } from '../client'
-import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey } from '@/types'
+import { listPlatformIds } from '@/constants/platformCatalog'
+import type { AccountPlatform, AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey } from '@/types'
 
 export interface AdminBindAuthIdentityChannelRequest {
   channel: string
@@ -332,12 +333,12 @@ export async function bindUserAuthIdentity(
 /**
  * Platform quota types
  */
-// Keep aligned with backend/internal/service/domain_constants.go AllowedQuotaPlatforms.
-export const PLATFORM_QUOTA_PLATFORMS = [
-  'anthropic', 'openai', 'openai_bps', 'gemini', 'antigravity', 'grok',
-  'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'typesafe',
-] as const
-export type PlatformQuotaPlatform = typeof PLATFORM_QUOTA_PLATFORMS[number]
+// Quota platforms share the backend platform catalog, including local BPS.
+export const PLATFORM_QUOTA_PLATFORMS: PlatformQuotaPlatform[] = listPlatformIds()
+export function platformQuotaPlatforms(): PlatformQuotaPlatform[] {
+  return listPlatformIds()
+}
+export type PlatformQuotaPlatform = AccountPlatform
 export type PlatformQuotaWindow = 'daily' | 'weekly' | 'monthly'
 
 export interface PlatformQuotaItem {

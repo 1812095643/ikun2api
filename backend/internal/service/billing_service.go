@@ -428,6 +428,20 @@ func (s *BillingService) initFallbackPricing() {
 		CacheCreation1hPrice:       4e-6,
 		SupportsCacheBreakdown:     true,
 	}
+	// Claude Haiku 5.5（2026-10-07，$0.10/$0.50，prompt 超 100k tokens 整单 5x）。
+	// 长文本阶梯与目录 *_above_100k_tokens 绝对价同口径，缺目录时回退也不丢阶梯。
+	s.fallbackPrices["claude-haiku-5-5"] = &ModelPricing{
+		InputPricePerToken:          0.1e-6,
+		OutputPricePerToken:         0.5e-6,
+		CacheCreationPricePerToken:  0.125e-6,
+		CacheReadPricePerToken:      0.01e-6,
+		CacheCreation5mPrice:        0.125e-6,
+		CacheCreation1hPrice:        0.2e-6,
+		SupportsCacheBreakdown:      true,
+		LongContextInputThreshold:   100000,
+		LongContextInputMultiplier:  5,
+		LongContextOutputMultiplier: 5,
+	}
 	// Claude Fable 5.x uses the same input/output and cache-write prices, while
 	// Fable 5.1 reduces cache reads from $1 to $0.25 per MTok.
 	s.fallbackPrices["claude-fable-5"] = &ModelPricing{
@@ -458,14 +472,15 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown:     false,
 	}
 
-	// Gemini 3.6 Flash (Google AI pricing: $1.50 input / $7.50 output /
-	// $0.15 cached input per MTok). Antigravity's -high/-low/-medium/-tiered
-	// aliases are matched below so unavailable remote pricing never records
-	// token-bearing requests at $0.
+	// Gemini 3.6 Flash (Google AI pricing: $0.75 input / $3.75 output /
+	// $0.075 cached input per MTok, promotional through 2026-12-31; official
+	// rates double to $1.50/$7.50/$0.15 from 2027-01-01). Antigravity's
+	// -high/-low/-medium/-tiered aliases are matched below so unavailable
+	// remote pricing never records token-bearing requests at $0.
 	s.fallbackPrices["gemini-3.6-flash"] = &ModelPricing{
-		InputPricePerToken:     1.5e-6,
-		OutputPricePerToken:    7.5e-6,
-		CacheReadPricePerToken: 0.15e-6,
+		InputPricePerToken:     0.75e-6,
+		OutputPricePerToken:    3.75e-6,
+		CacheReadPricePerToken: 0.075e-6,
 		SupportsCacheBreakdown: false,
 	}
 
@@ -1068,6 +1083,9 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	if claude.IsSonnet55(modelLower) {
 		return s.fallbackPrices["claude-sonnet-5-5"]
 	}
+	if claude.IsHaiku55(modelLower) {
+		return s.fallbackPrices["claude-haiku-5-5"]
+	}
 	if strings.Contains(modelLower, "opus") {
 		// "opus-5" 必须先判：不能用裸 "5" 匹配，否则 claude-opus-4-5 会被误判。
 		if strings.Contains(modelLower, "opus-5") || strings.Contains(modelLower, "opus5") {
@@ -1549,6 +1567,8 @@ type CostInput struct {
 	Resolver                  *ModelPricingResolver // 定价解析器
 	Resolved                  *ResolvedPricing      // 可选：预解析的定价结果（避免重复 Resolve 调用）
 	LongContextBillingEnabled *bool
+	// DisableModelLongContextPricing 豁免模型价卡的长上下文附加费，不改变自定义区间价格。
+	DisableModelLongContextPricing bool
 }
 
 // CalculateCostUnified 统一计费入口，支持三种计费模式。
@@ -1564,7 +1584,7 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 		if err != nil {
 			return nil, err
 		}
-		breakdown := s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongContextBilling)
+		breakdown := s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongContextBilling && !input.DisableModelLongContextPricing)
 		applyCostBreakdownMultiplier(breakdown, reasoningEffortBillingMultiplier(input.ReasoningEffort, pricing.ReasoningEffortMultipliers))
 		return breakdown, nil
 	}
@@ -1650,7 +1670,7 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 	}
 
 	// 官方长上下文阶梯仅在无区间定价时应用（区间定价已包含上下文分层）。
-	applyLongCtx := len(resolved.Intervals) == 0 && contextTierPricingEnabled
+	applyLongCtx := len(resolved.Intervals) == 0 && contextTierPricingEnabled && !input.DisableModelLongContextPricing
 
 	breakdown := s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongCtx)
 	applyCostBreakdownMultiplier(breakdown, resolvedChannelTimeMultiplier(resolved, input.PricingAt))

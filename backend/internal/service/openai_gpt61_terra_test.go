@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
 	"github.com/MACOS-DO/sub4api/internal/pkg/apicompat"
@@ -130,7 +131,7 @@ func TestGPT61TerraChatFallbackRejectsTools(t *testing.T) {
 				case "chat":
 					_, err = service.forwardAsRawChatCompletions(context.Background(), ginContext, account, []byte(body), "")
 				case "responses":
-					_, err = service.forwardResponsesViaRawChatCompletions(context.Background(), ginContext, account, []byte(body))
+					_, err = service.forwardResponsesViaRawChatCompletions(context.Background(), ginContext, account, []byte(body), time.Now())
 				case "messages":
 					_, err = service.forwardAnthropicViaRawChatCompletions(context.Background(), ginContext, account, []byte(body), "")
 				}

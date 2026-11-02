@@ -63,6 +63,13 @@ func (a *Account) IsVertexServiceAccount() bool {
 	return a != nil && a.Type == AccountTypeServiceAccount
 }
 
+// IsVertexAPIKey 判断 Gemini 平台的 Vertex 账号是否使用 API Key 认证（credentials.auth_mode=apikey）。
+// Anthropic 平台的 Vertex 账号只支持 Service Account JSON。
+func (a *Account) IsVertexAPIKey() bool {
+	return a.IsVertexServiceAccount() && a.Platform == PlatformGemini &&
+		strings.TrimSpace(a.GetCredential("auth_mode")) == vertexAuthModeAPIKey
+}
+
 func (a *Account) VertexProjectID() string {
 	if a == nil {
 		return ""
@@ -337,14 +344,12 @@ func buildVertexGeminiURL(projectID, location, model, action string, stream bool
 	if model == "" {
 		return "", errors.New("vertex model is required")
 	}
-	switch action {
-	case "generateContent", "streamGenerateContent", "countTokens":
-	default:
-		return "", fmt.Errorf("unsupported vertex gemini action: %s", action)
+	if err := validateVertexGeminiAction(action); err != nil {
+		return "", err
 	}
 	host := fmt.Sprintf("%s-aiplatform.googleapis.com", location)
 	if location == "global" {
-		host = "aiplatform.googleapis.com"
+		host = vertexGlobalHost
 	}
 	u := fmt.Sprintf(
 		"https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:%s",
@@ -468,10 +473,6 @@ func normalizeVertexAnthropicModelID(model string) string {
 
 // IsVertexAPIKey 判断 Gemini 平台的 Vertex 账号是否使用 API Key 认证（credentials.auth_mode=apikey）。
 // Anthropic 平台的 Vertex 账号只支持 Service Account JSON。
-func (a *Account) IsVertexAPIKey() bool {
-	return a.IsVertexServiceAccount() && a.Platform == PlatformGemini &&
-		strings.TrimSpace(a.GetCredential("auth_mode")) == vertexAuthModeAPIKey
-}
 
 // buildVertexGeminiAccountURL 按账号构造 Vertex Gemini 请求地址：未配置 project_id 的 API Key 账号
 // 走 Express mode 全局端点，其余账号走项目级端点。

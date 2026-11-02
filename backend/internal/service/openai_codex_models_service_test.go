@@ -3800,7 +3800,7 @@ func TestGPT61SolCatalogAdvertisesOfficialReasoningAndToolMode(t *testing.T) {
 	require.JSONEq(t, `true`, string(model["use_responses_lite"]))
 	require.JSONEq(t, `"code_mode_only"`, string(model["tool_mode"]))
 	require.JSONEq(t, `true`, string(model["prefer_websockets"]))
-	require.JSONEq(t, `272000`, string(model["context_window"]))
+	require.JSONEq(t, `500000`, string(model["context_window"]))
 	require.JSONEq(t, `872000`, string(model["max_context_window"]))
 	require.JSONEq(t, `"xhigh"`, string(model["multi_agent_reasoning_effort"]))
 	require.JSONEq(t, `"v2"`, string(model["multi_agent_version"]))

@@ -1298,6 +1298,10 @@ func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *servi
 			return nil, err
 		}
 		fallbackModels := defaultCodexModelIDsForPlatform(service.PlatformComposite)
+		models := availableModels
+		if len(models) == 0 {
+			models = fallbackModels
+		}
 		if group.ModelAllowlistEnabled() {
 			source := availableModels
 			if source == nil {
@@ -1332,7 +1336,10 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 	seen := make(map[string]struct{})
 	models := make([]string, 0)
 	schedulablePlatforms := h.gatewayService.GetSchedulablePlatforms(ctx, groupID)
-	for _, platform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformOpenCodeGo, service.PlatformTypeSafe} {
+	for _, platform := range domain.CompositePrecedencePlatformIDs() {
+		if platform == service.PlatformOpenAIBPS {
+			continue // BPS catalogs use the explicit-route validation below.
+		}
 		if platform == service.PlatformTypeSafe && !includeSystemOne {
 			continue
 		}
@@ -1356,7 +1363,23 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 			models = append(models, model)
 		}
 	}
-	return h.gatewayService.CompleteCompositeBPSModelCatalog(ctx, groupID, models)
+	endpoint := ""
+	if !includeSystemOne {
+		endpoint = service.CompositeRouteEndpointResponses
+	}
+	if routeModels, err := h.gatewayService.GetCompositeRouteModels(ctx, groupID, endpoint, includeSystemOne); err == nil {
+		for _, model := range routeModels {
+			if _, ok := seen[model]; !ok {
+				seen[model] = struct{}{}
+				models = append(models, model)
+			}
+		}
+	}
+	models, err := h.gatewayService.CompleteCompositeBPSModelCatalog(ctx, groupID, models)
+	if err != nil || includeSystemOne || groupID == nil {
+		return models, err
+	}
+	return h.gatewayService.FilterCompositeCodexModels(ctx, *groupID, models)
 }
 
 func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
@@ -1529,10 +1552,13 @@ func defaultModelIDsForPlatform(platform string) []string {
 	case service.PlatformComposite:
 		ids := make([]string, 0)
 		seen := make(map[string]struct{})
-		// TypeSafe is deliberately absent: jev-latest only works through
-		// /v1/systemone, so the static fallback never advertises it to LLM
-		// clients. compositeAvailableModels lists it when the group can serve it.
-		for _, concretePlatform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformOpenCodeGo} {
+		for _, concretePlatform := range domain.CompositePrecedencePlatformIDs() {
+			// TypeSafe is deliberately skipped: jev-latest only works through
+			// /v1/systemone, so the static fallback never advertises it to LLM
+			// clients. compositeAvailableModels lists it when the group can serve it.
+			if concretePlatform == service.PlatformTypeSafe {
+				continue
+			}
 			for _, id := range defaultModelIDsForPlatform(concretePlatform) {
 				if _, ok := seen[id]; ok {
 					continue

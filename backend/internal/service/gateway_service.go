@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
+	"github.com/MACOS-DO/sub4api/internal/domain"
 	"github.com/MACOS-DO/sub4api/internal/pkg/logger"
 	"github.com/MACOS-DO/sub4api/internal/pkg/openai"
 	"github.com/MACOS-DO/sub4api/internal/pkg/xai"
@@ -1575,10 +1576,7 @@ func (s *GatewayService) resolveCompositeModelOwnership(ctx context.Context, gro
 
 	// 归属取决于配置而非运行时健康：限流/临时不可调度不应让同一模型在
 	// 「唯一归属」与「歧义」之间来回翻转，否则配置错误只会间歇暴露。
-	accounts, err := s.accountRepo.ListModelAvailabilityCandidates(ctx, &groupID, []string{
-		PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
-		PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo, PlatformOpenAIBPS, PlatformTypeSafe,
-	}, false)
+	accounts, err := s.accountRepo.ListModelAvailabilityCandidates(ctx, &groupID, domain.ConcretePlatformIDs(), false)
 	if err != nil {
 		return CompositeModelOwnership{}, err
 	}
@@ -1615,6 +1613,21 @@ func explicitModelMappingClaims(account Account, model string) bool {
 	}
 	mapped, ok := stringMappingFromRaw(account.Credentials["model_mapping"])[model]
 	return ok && strings.TrimSpace(mapped) != ""
+}
+
+// GetCompositeRouteModels returns public IDs from enabled exact composite routes.
+func (s *GatewayService) GetCompositeRouteModels(ctx context.Context, groupID *int64, endpoint string, includeSystemOne bool) ([]string, error) {
+	if s == nil || s.compositeResolver == nil || groupID == nil {
+		return nil, nil
+	}
+	return s.compositeResolver.ListExactPublicModels(ctx, *groupID, endpoint, includeSystemOne)
+}
+
+func (s *GatewayService) FilterCompositeCodexModels(ctx context.Context, groupID int64, models []string) ([]string, error) {
+	if s == nil || s.compositeResolver == nil {
+		return models, nil
+	}
+	return s.compositeResolver.FilterCodexModels(ctx, groupID, models)
 }
 
 // GetSchedulablePlatforms returns the concrete platforms that currently have

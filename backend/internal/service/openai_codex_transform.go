@@ -92,6 +92,7 @@ type codexTransformResult struct {
 type codexOAuthTransformOptions struct {
 	IsCodexCLI                          bool
 	IsCompact                           bool
+	ResponsesLite                       bool
 	SkipDefaultInstructions             bool
 	PreserveToolCallIDs                 bool
 	OmitPromotedSystemMessagesFromInput bool
@@ -359,6 +360,10 @@ func applyCodexOAuthTransformWithOptions(reqBody map[string]any, opts codexOAuth
 	} else if changed {
 		result.Modified = true
 	}
+	if !opts.IsCompact && ensureOpenAIOAuthWebSearchToolForHistory(reqBody, opts.ResponsesLite) {
+		result.Modified = true
+	}
+
 	return result
 }
 

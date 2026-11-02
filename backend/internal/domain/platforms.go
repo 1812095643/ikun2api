@@ -47,6 +47,8 @@ var platformList = []PlatformSpec{
 	{ID: PlatformMiniMax, DisplayName: "MiniMax", Gateway: PlatformGatewayOpenAI, CNProvider: true, LiteLLMProvider: "minimax"},
 	{ID: PlatformOpenCodeGo, DisplayName: "OpenCode", Gateway: PlatformGatewayOpenAI, LiteLLMProvider: "opencode-go"},
 	{ID: PlatformTypeSafe, DisplayName: "TypeSafe / Jev", Gateway: PlatformGatewayAnthropic, LiteLLMProvider: "typesafe"},
+	{ID: PlatformCommandCode, DisplayName: "Command Code", Gateway: PlatformGatewayOpenAI},
+	{ID: PlatformCline, DisplayName: "Cline", Gateway: PlatformGatewayOpenAI},
 }
 
 var platformIndex = func() map[string]int {
@@ -101,7 +103,7 @@ func PlatformIDsWhere(match func(PlatformSpec) bool) []string {
 }
 
 // compositePrecedenceHead 是组合分组查找顺序的固定前缀（历史顺序：Gemini 先于 OpenAI）。
-var compositePrecedenceHead = []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI}
+var compositePrecedenceHead = []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo, PlatformOpenAIBPS, PlatformTypeSafe}
 
 // CompositePrecedencePlatformIDs 返回按平台依次回退时的顺序：组合分组在请求目标
 // 解析前逐平台查找定价 / 模型映射（先命中者生效）、拼接默认模型列表，以及调度快照

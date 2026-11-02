@@ -2111,6 +2111,8 @@ describe("admin SettingsView platform quota matrix", () => {
   });
 
   const savedQuotas: DefaultPlatformQuotasMap = {
+    command_code: { daily: null, weekly: null, monthly: null },
+    cline: { daily: null, weekly: null, monthly: null },
     anthropic: { daily: 10, weekly: 50, monthly: 200 },
     openai: { daily: null, weekly: 12.5, monthly: null },
     openai_bps: { daily: 0, weekly: null, monthly: 30 },
