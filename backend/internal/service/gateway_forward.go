@@ -171,6 +171,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 
 	body := parsed.Body.Bytes()
+	thinkingTrace := s.beginClaudeThinkingTrace(c, account, validationModel, telemetryClientSession, body)
 	var thinkingInputDigests map[[32]byte]struct{}
 	if supportsClaudeThinkingHistoryRecovery(account, validationModel) {
 		thinkingInputDigests = claudeThinkingBlockDigests(body)
@@ -507,7 +508,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 					var recoveredThinking [][32]byte
 					officialThinkingRecovery := false
 					if supportsClaudeThinkingHistoryRecovery(account, reqModel) && isClaudeInvalidThinkingSignature(respBody) {
-						logClaudeThinkingHistoryRejection(account.ID, thinkingInputDigests, lastWireBody, respBody)
+						logClaudeThinkingHistoryRejection(c, account.ID, shouldMimicClaudeCode, thinkingInputDigests, thinkingTrace, lastWireBody, respBody)
 						if clean, digests, changed := stripClaudeThinkingHistory(body, nil); changed {
 							filteredBody, recoveredThinking, officialThinkingRecovery = clean, digests, true
 						}

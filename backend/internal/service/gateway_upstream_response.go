@@ -858,6 +858,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 	clientDisconnected := false // 客户端断开标志，断开后继续读取上游以获取完整usage
 	sawTerminalEvent := false
 	useNoopDeltaKeepalive := c != nil && c.Request != nil && shouldUseClaudeCodeNoopDeltaKeepalive(c.GetHeader("User-Agent"))
+	thinkingTrace := claudeThinkingTraceFromContext(c)
 	noopDeltaKeepaliveBlockIndex := -1
 	noopDeltaKeepaliveDeltaType := ""
 
@@ -898,6 +899,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 
 		eventType, _ := decoded["type"].(string)
 		observer.ObserveAnthropic([]byte(dataLine))
+		thinkingTrace.observeEvent([]byte(dataLine))
 		if eventName == "" {
 			eventName = eventType
 		}
@@ -1066,6 +1068,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 							// clientDisconnected 守卫跳过。
 						} else {
 							flusher.Flush()
+							thinkingTrace.commit()
 							lastDataAt = time.Now()
 							resetKeepaliveTimer()
 						}
@@ -1382,6 +1385,8 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 		observer = beginUpstreamResponseModelObservation(c)
 	}
 	observer.ObserveAnthropic(body)
+	thinkingTrace := claudeThinkingTraceFromContext(c)
+	thinkingTrace.observeJSON(body)
 
 	// 解析usage
 	var response struct {
@@ -1445,6 +1450,7 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 
 	// 写入响应
 	c.Data(resp.StatusCode, contentType, body)
+	thinkingTrace.commit()
 
 	return &response.Usage, nil
 }

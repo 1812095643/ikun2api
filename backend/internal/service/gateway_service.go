@@ -865,6 +865,7 @@ type GatewayService struct {
 
 	claudeTelemetryScheduler *ClaudeTelemetryScheduler
 	claudeThinkingRecovery   claudeThinkingRecoveryCache
+	claudeThinkingObserved   claudeThinkingRecoveryCache
 }
 
 // NewGatewayService creates a new GatewayService

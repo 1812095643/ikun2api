@@ -15,7 +15,7 @@ import (
 )
 
 // toolNameRewriteKey 是 gin.Context 上存 ToolNameRewrite 映射的 key。
-// 请求阶段写入，响应阶段读取，用于 bytes 级逆向还原假名 → 真名。
+// 请求阶段写入，响应阶段读取，仅还原协议工具名字段中的假名 → 真名。
 const toolNameRewriteKey = "claude_tool_name_rewrite"
 
 // staticToolNameRewrites 是"静态前缀映射"，与 Parrot src/transform/cc_mimicry.py
@@ -40,11 +40,10 @@ const dynamicToolMapThreshold = 5
 
 // ToolNameRewrite 是单次请求内的工具名混淆映射。
 //   - Forward: real → fake，请求阶段在 body 上应用。
-//   - Reverse: fake → real，响应阶段对每个 chunk 做 bytes.Replace 还原。
+//   - Reverse: fake → real，响应阶段仅对协议工具名字段做精确还原。
 //
-// ReverseOrdered 是按假名长度倒序的 (fake, real) 列表，用于防止短假名是长假名的
-// 子串时 bytes.Replace 先被吃掉（对齐 Parrot _restore_tool_names_in_chunk 的
-// `sorted(..., key=lambda x: len(x[1]), reverse=True)`）。
+// ReverseOrdered 保留已有映射展示顺序；响应处理使用 Reverse 的完整名称查找，
+// 不再对带签名的 thinking、普通文本、ID 或参数做字符串替换。
 type ToolNameRewrite struct {
 	Forward        map[string]string
 	Reverse        map[string]string
@@ -181,7 +180,7 @@ type toolNameSpan struct {
 //   - 改写 $.messages[*].content[*].name（仅当 type == "tool_use"）
 //   - 在 $.tools[last].cache_control 上打 ephemeral 缓存断点
 //
-// 响应侧 bytes.Replace 会连带还原假名 → 真名。
+// 响应侧仅在工具名协议字段还原假名 → 真名。
 func applyToolNameRewriteToBody(body []byte, rw *ToolNameRewrite) []byte {
 	if rw == nil || len(rw.Forward) == 0 {
 		body = applyToolsLastCacheBreakpoint(body)
@@ -327,29 +326,18 @@ func stripDeferredToolCacheControl(body []byte) []byte {
 	return body
 }
 
-// restoreToolNamesInBytes restores only a request-scoped mapping. Static
-// prefix rewriting without that mapping can mutate normal response text,
-// IDs, or tool arguments that were never rewritten on the request path.
+// restoreToolNamesInBytes handles complete JSON responses and complete SSE
+// events (including the data-only lines used by compatibility adapters).
+// Never rewrite opaque signed reasoning or arbitrary strings: doing so breaks
+// the next turn's thinking signature while the original signature still exists.
 func restoreToolNamesInBytes(data []byte, rw *ToolNameRewrite) []byte {
-	if rw == nil {
+	if rw == nil || len(rw.Reverse) == 0 {
 		return data
 	}
-	for _, pair := range rw.ReverseOrdered {
-		fake, real := pair[0], pair[1]
-		if fake == "" || fake == real {
-			continue
-		}
-		data = replaceAllBytes(data, fake, real)
+	if gjson.ValidBytes(data) {
+		return applyToolResponseNameSpans(data, toolResponseNameSpans(data, rw))
 	}
-	return data
-}
-
-// replaceAllBytes 是 bytes.ReplaceAll 的便捷封装，避免每个调用点各自做 []byte 转换。
-func replaceAllBytes(data []byte, from, to string) []byte {
-	if len(data) == 0 || from == to || !strings.Contains(string(data), from) {
-		return data
-	}
-	return []byte(strings.ReplaceAll(string(data), from, to))
+	return restoreSSEToolResponseNames(data, rw)
 }
 
 // toolNameRewriteFromContext 从 gin.Context 取出请求阶段保存的工具名映射。

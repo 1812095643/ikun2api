@@ -29,11 +29,32 @@ API 网关不能改写 Desktop/CLI 的本地会话文件，因此用有界摘要
 
 缓存不包含思考正文、原始签名、用户输入、凭据或完整会话内容。签名错误诊断只记录账号编号、错误位置和该块是否匹配 Forward 入口摘要；匹配证明该块经过 Forward 时未变，不匹配本身不能断言被篡改。
 
+## 1.3.34：从响应环节防止生成坏历史
+
+进一步对照完整流转链，确认旧的 `restoreToolNamesInBytes` 对整段响应执行字符串替换。工具别名出现在 thinking 正文时会被一并还原，签名却保持原值；别名也可能误改参数、ID 或加密内容。这不是需要等待上游失败才能处理的问题。
+
+修复后只在已知 Anthropic、Responses、Chat Completions 工具名字段做完整名称查找。保留既有动态/静态映射、请求侧工具名改写、账号身份与会话隔离，但不触碰任何 thinking、signature、redacted_thinking、encrypted_content、正文、参数或 ID。完整 JSON、SSE 单行/多行 data 与 CRLF 均按原始字节位置替换名称，未改字段保持原始编码。
+
+两轮合成上游回放在旧代码上复现“第一轮修改 thinking → 第二轮签名失败 → 第三次请求兼容重试”；修复后两轮只发两次请求。开启账户身份重映射、会话 masking 和隐私清理后的测试同样通过。这里的合成签名只验证完整性约束，不能冒充 Anthropic 密码学验签或证明原 36 条 Desktop 记录均由此造成；原 Desktop 请求是否进入工具改写分支没有留存证据。
+
+另增加独立来源摘要缓存：记录上游已返回的签名摘要和思考内容摘要，按用户/Key/账号/模型/原始会话隔离，最多 4096 项、1 小时。SSE 只在 block stop 后记完整块，signature_delta 采用官方完整值赋值语义；没有收齐的块不入缓存。该缓存只诊断，不触发清理或改变任何转发策略。
+
+新签名错误的日志可区分：
+
+- `matches_previous_upstream_response`：与此范围内此前观察到的上游内容一致仍被拒绝，需要继续检查上下文/身份绑定。
+- `changed_before_request_forwarding`：同一签名对应的内容在下一轮进入 Forward 前已经变化；不能仅据此归咎客户端，前置转换也需核对。
+- `changed_during_request_forwarding`：同一签名的内容在 Forward 入口与实际出站之间发生变化。
+- `not_observed_in_this_scope` / `unavailable`：缺少历史证据，可能是旧会话、切换范围、重启、过期或容量淘汰，不推定客户端错误。
+
+日志另带本次 `mimic_body`、`tool_name_rewrite` 布尔值，确认分支；不输出签名、思考内容、身份明文或原始摘要。来源判断只比较已观察到的数据，不保证用户完整收到所有输出，也不据此认定官方故障。
+
 ## 合并与验证约束
 
 重点保留 `claude_thinking_recovery.go`、`GatewayService` 的有界缓存，以及 `gateway_forward.go` 的入口摘要、发送前历史清理、明确签名错误分支、成功后的记忆。保留原有 403 策略、慢首发整流预算、取消语义、其他供应商的 passback-required/unknown 行为。
 
 回归至少覆盖首轮 400→恢复、下一轮单次成功、新 thinking 保留、SSE 签名事件原样且有序、失败不记忆、开关关闭、用户/Key/账号/模型/会话隔离、过期、容量上限和并发访问。不要用结构检查冒充密码学验签，也不要用本地模拟成功代替真实线上归因。
+
+响应链同时回归 `TestToolResponseIntegrity*`、`TestForwardToolResponseIntegrity*`、`TestClaudeThinkingTrace*`；禁止重新引入整段响应字符串替换。
 
 官方参考：
 

@@ -43,9 +43,8 @@ func TestSanitizeToolName_DynamicTakesPrecedence(t *testing.T) {
 	require.Equal(t, "analyze_ses00", got, "dynamic mapping wins over static prefix")
 }
 
-func TestRestoreToolNamesInBytes_LongestFirst(t *testing.T) {
-	// 当假名 "abc_12" 是另一个更长假名的子串（真实场景极少但算法必须防御）时，
-	// 长的必须先替换。本测试用显式构造的映射来验证排序不变量。
+func TestRestoreToolNamesInBytes_ExactProtocolFields(t *testing.T) {
+	// 完整名称匹配，不修改短名称前缀或正文中的同名字符串。
 	rw := &ToolNameRewrite{
 		Forward: map[string]string{"foo": "abc_12", "bar": "abc_12_ext"},
 		Reverse: map[string]string{"abc_12": "foo", "abc_12_ext": "bar"},
@@ -55,9 +54,9 @@ func TestRestoreToolNamesInBytes_LongestFirst(t *testing.T) {
 		{"abc_12_ext", "bar"},
 		{"abc_12", "foo"},
 	}
-	data := []byte(`{"tool":"abc_12_ext","other":"abc_12"}`)
+	data := []byte(`{"content":[{"type":"tool_use","name":"abc_12_ext"},{"type":"tool_use","name":"abc_12"},{"type":"text","text":"abc_12_ext"}]}`)
 	restored := string(restoreToolNamesInBytes(data, rw))
-	require.Equal(t, `{"tool":"bar","other":"foo"}`, restored)
+	require.Equal(t, `{"content":[{"type":"tool_use","name":"bar"},{"type":"tool_use","name":"foo"},{"type":"text","text":"abc_12_ext"}]}`, restored)
 }
 
 func TestRestoreToolNamesInBytes_WithoutRequestMappingPreservesData(t *testing.T) {

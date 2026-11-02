@@ -226,7 +226,7 @@ func isClaudeInvalidThinkingSignature(body []byte) bool {
 	return claudeInvalidThinkingSignature.MatchString(extractUpstreamErrorMessage(body))
 }
 
-func logClaudeThinkingHistoryRejection(accountID int64, input map[[32]byte]struct{}, wire, response []byte) {
+func logClaudeThinkingHistoryRejection(c *gin.Context, accountID int64, mimic bool, input map[[32]byte]struct{}, trace *claudeThinkingTrace, wire, response []byte) {
 	position := claudeThinkingErrorPosition.FindStringSubmatch(extractUpstreamErrorMessage(response))
 	if len(position) != 3 {
 		return
@@ -241,5 +241,6 @@ func logClaudeThinkingHistoryRejection(accountID int64, input map[[32]byte]struc
 	_, unchanged := input[digest]
 	// Presence in the snapshot proves preservation of this block through Forward;
 	// absence is inconclusive if a snapshot bound was reached. No raw data is logged.
-	logger.LegacyPrintf("service.gateway", "Claude thinking history rejected account=%d message_index=%d block_index=%d matched_forward_input=%t digest_available=%t", accountID, messageIndex, blockIndex, valid && unchanged, valid)
+	hasToolRewrite := c != nil && toolNameRewriteFromContext(c) != nil
+	logger.LegacyPrintf("service.gateway", "Claude thinking history rejected account=%d message_index=%d block_index=%d matched_forward_input=%t digest_available=%t origin=%s mimic_body=%t tool_name_rewrite=%t", accountID, messageIndex, blockIndex, valid && unchanged, valid, trace.origin(block), mimic, hasToolRewrite)
 }
