@@ -360,5 +360,7 @@ func toolNameRewriteFromContext(c interface {
 func reverseToolNamesIfPresent(c interface {
 	Get(string) (any, bool)
 }, chunk []byte) []byte {
-	return restoreToolNamesInBytes(chunk, toolNameRewriteFromContext(c))
+	rw := toolNameRewriteFromContext(c)
+	chunk = restoreToolNamesInBytes(chunk, rw)
+	return claudeToolTextFromContext(c).renderPayload(chunk, rw)
 }

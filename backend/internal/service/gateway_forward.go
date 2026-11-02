@@ -171,6 +171,13 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 
 	body := parsed.Body.Bytes()
+	if restored := s.prepareClaudeToolText(c, account, claude.NormalizeModelID(validationModel), body); !bytes.Equal(restored, body) {
+		if err := parsed.ReplaceBody(restored); err != nil {
+			return nil, err
+		}
+		body = parsed.Body.Bytes()
+	}
+	defer claudeToolTextFromContext(c).finishAll()
 	thinkingTrace := s.beginClaudeThinkingTrace(c, account, validationModel, telemetryClientSession, body)
 	var thinkingInputDigests map[[32]byte]struct{}
 	if supportsClaudeThinkingHistoryRecovery(account, validationModel) {

@@ -128,6 +128,7 @@ func (s *GatewayService) forwardAsResponsesWithoutHostedWebSearch(
 
 	if shouldMimicClaudeCode {
 		anthropicBody = s.applyClaudeCodeOAuthMimicryToBody(ctx, c, account, anthropicBody, anthropicReq.System, mappedModel)
+		defer claudeToolTextFromContext(c).finishAll()
 	}
 
 	// 7. Enforce cache_control block limit

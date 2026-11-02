@@ -390,6 +390,7 @@ func (s *GatewayService) applyClaudeCodeOAuthMimicryToBody(
 	if account == nil || !account.IsOAuth() || len(body) == 0 {
 		return body
 	}
+	body = s.prepareClaudeToolText(c, account, model, body)
 
 	captureClaudeBillingSource(c, body)
 	systemPromptInjectionEnabled, systemPrompt, systemPromptBlocks := s.claudeOAuthSystemPromptInjectionSettings(ctx)
@@ -421,7 +422,7 @@ func (s *GatewayService) applyClaudeCodeOAuthMimicryToBody(
 	// 对齐 Parrot transform_request 里剩余的字段级改写。顺序有语义约束：
 	//   1) messages cache：仅在配置开启时清除客户端断点并注入代理断点
 	//   2) tool rewrite：最后改 tools[*].name / tool_choice.name 并在 tools[-1]
-	//      上打断点；mapping 存入 gin.Context 供响应侧 bytes.Replace 还原。
+	//      上打断点；mapping 存入 gin.Context，供协议名称与可逆展示还原。
 	body = s.rewriteMessageCacheControlIfEnabled(ctx, body)
 
 	if rw := buildToolNameRewriteFromBody(body); rw != nil {
