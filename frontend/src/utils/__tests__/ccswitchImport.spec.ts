@@ -1,138 +1,107 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CC_SWITCH_USAGE_SCRIPT,
-  GROK_CC_SWITCH_MODEL,
-  OPENAI_CC_SWITCH_CODEX_MODEL,
-  buildCcSwitchImportDeeplink
+  CC_SWITCH_USAGE_SCRIPT, buildCcSwitchImportDeeplink, defaultCcSwitchClient,
+  getCcSwitchClients, getCcSwitchFormats, parseCcSwitchModels,
+  resolveCcSwitchEndpoint, encodeCcSwitchBase64
 } from '@/utils/ccswitchImport'
-import type { GroupPlatform } from '@/types'
+import type { Group } from '@/types'
 
-function paramsFromDeeplink(deeplink: string): URLSearchParams {
-  const query = deeplink.split('?')[1] || ''
-  return new URLSearchParams(query)
+const base = { baseUrl: 'https://api.example.com/', providerName: '我的站 · 测试', apiKey: 'sk-test' }
+const params = (url: string) => new URL(url).searchParams
+const group = (platform: Group['platform'], extras: Partial<Group> = {}) => ({ platform, claude_code_only: false, allow_claude_desktop: false, allow_messages_dispatch: false, default_mapped_model: '', ...extras })
+function link(clientType: Parameters<typeof buildCcSwitchImportDeeplink>[0]['clientType'], apiFormat: Parameters<typeof buildCcSwitchImportDeeplink>[0]['apiFormat'], model = 'test-model', overrides: Partial<Parameters<typeof buildCcSwitchImportDeeplink>[0]> = {}) {
+  return params(buildCcSwitchImportDeeplink({ ...base, clientType, apiFormat, model, ...overrides }))
 }
 
-describe('ccswitchImport utils', () => {
-  it('defaults OpenAI CC Switch imports to the current Codex model', () => {
-    expect(OPENAI_CC_SWITCH_CODEX_MODEL).toBe('gpt-5.5')
-  })
-
-  it('defaults Grok Build imports to the current Grok model', () => {
-    expect(GROK_CC_SWITCH_MODEL).toBe('grok-4.5')
-  })
-
-  const baseInput = {
-    baseUrl: 'https://api.example.com',
-    providerName: 'IKUN2api',
-    apiKey: 'sk-test',
-    usageScript: 'return true'
-  }
-
+describe('CC Switch v4 provider import', () => {
   it.each([
-    ['https://api.example.com', 'https://api.example.com'],
-    ['https://api.example.com/', 'https://api.example.com'],
-    ['https://api.example.com/v1', 'https://api.example.com/v1'],
-    ['https://api.example.com/v1/', 'https://api.example.com/v1']
-  ])('keeps Codex imports on the configured endpoint for base URL %s', (baseUrl, endpoint) => {
-    const params = paramsFromDeeplink(
-      buildCcSwitchImportDeeplink({
-        ...baseInput,
-        baseUrl,
-        platform: 'openai',
-        clientType: 'claude'
-      })
-    )
-
-    expect(params.get('resource')).toBe('provider')
-    expect(params.get('app')).toBe('codex')
-    expect(params.get('endpoint')).toBe(endpoint)
-    expect(params.get('model')).toBe(OPENAI_CC_SWITCH_CODEX_MODEL)
-    expect(atob(params.get('usageScript') || '')).toBe(baseInput.usageScript)
+    ['claude', 'anthropic', 'https://api.example.com', 'claude'],
+    ['codex', 'openai_responses', 'https://api.example.com/v1', 'codex'],
+    ['opencode', 'openai_chat', 'https://api.example.com/v1', 'opencode'],
+    ['opencode', 'anthropic', 'https://api.example.com/v1', 'opencode'],
+    ['pi', 'openai_chat', 'https://api.example.com/v1', 'pi'],
+    ['gemini', 'gemini_native', 'https://api.example.com', 'gemini'],
+    ['grokbuild', 'openai_responses', 'https://api.example.com/v1', 'grokbuild'],
+    ['openclaw', 'openai_responses', 'https://api.example.com/v1', 'openclaw'],
+    ['hermes', 'anthropic', 'https://api.example.com', 'hermes'],
+    ['agy', 'gemini_native', 'https://api.example.com', 'agy']
+  ] as const)('%s uses its own CCS app and SDK endpoint', (client, format, endpoint, app) => {
+    const result = link(client, format)
+    expect(result.get('app')).toBe(app)
+    expect(result.get('apiFormat')).toBe(format)
+    expect(result.get('endpoint')).toBe(endpoint)
+    expect(result.get('model')).toBe('test-model')
+    expect(result.get('resource')).toBe('provider')
   })
-
-  it.each([
-    'https://api.example.com',
-    'https://api.example.com/',
-    'https://api.example.com/v1',
-    'https://api.example.com/v1/'
-  ])('imports Grok Build with one /v1 suffix for base URL %s', (baseUrl) => {
-    const params = paramsFromDeeplink(
-      buildCcSwitchImportDeeplink({
-        ...baseInput,
-        baseUrl,
-        platform: 'grok',
-        clientType: 'claude'
-      })
-    )
-
-    expect(params.get('app')).toBe('grokbuild')
-    expect(params.get('endpoint')).toBe('https://api.example.com/v1')
-    expect(params.get('model')).toBe(GROK_CC_SWITCH_MODEL)
+  it.each(['https://api.example.com', 'https://api.example.com/', 'https://api.example.com/v1', 'https://api.example.com/v1/'])('uses exactly one /v1 on %s', baseUrl => {
+    expect(link('codex', 'openai_responses', 'test-model', { baseUrl }).get('endpoint')).toBe('https://api.example.com/v1')
   })
-
-  it.each([
-    { platform: 'anthropic' as GroupPlatform, clientType: 'claude' as const, app: 'claude' },
-    { platform: 'gemini' as GroupPlatform, clientType: 'gemini' as const, app: 'gemini' }
-  ])('does not add a model parameter for $platform imports', ({ platform, clientType, app }) => {
-    const params = paramsFromDeeplink(
-      buildCcSwitchImportDeeplink({
-        ...baseInput,
-        platform,
-        clientType
-      })
-    )
-
-    expect(params.get('app')).toBe(app)
-    expect(params.get('endpoint')).toBe(baseInput.baseUrl)
-    expect(params.has('model')).toBe(false)
+  it('uses the same-origin catalog and per-key config for Codex', () => {
+    const result = link('codex', 'openai_responses')
+    const config = atob(result.get('config') || '')
+    expect(config).toContain('model_catalog_url = "https://api.example.com/v1/models"')
+    expect(config).toContain('wire_api = "responses"')
+    expect(config).toContain('experimental_bearer_token = "sk-test"')
+    expect(result.get('configFormat')).toBe('toml')
   })
-
-  it('keeps Antigravity imports on the selected client endpoint without a model parameter', () => {
-    const params = paramsFromDeeplink(
-      buildCcSwitchImportDeeplink({
-        ...baseInput,
-        platform: 'antigravity',
-        clientType: 'gemini'
-      })
-    )
-
-    expect(params.get('app')).toBe('gemini')
-    expect(params.get('endpoint')).toBe(`${baseInput.baseUrl}/antigravity`)
-    expect(params.has('model')).toBe(false)
+  it('leaves native Claude model selection to Claude and includes safe config', () => {
+    const result = link('claude', 'anthropic', '', { platform: 'anthropic' })
+    expect(result.has('model')).toBe(false)
+    expect(result.has('sonnetModel')).toBe(false)
+    expect(JSON.parse(atob(result.get('config') || ''))).toEqual({ env: { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' } })
+  })
+  it('maps non-native Claude tiers to the chosen model unless explicitly changed', () => {
+    const result = link('claude', 'openai_responses', 'non-native', { platform: 'openai', opusModel: 'opus-alias' })
+    expect(result.get('haikuModel')).toBe('non-native')
+    expect(result.get('sonnetModel')).toBe('non-native')
+    expect(result.get('opusModel')).toBe('opus-alias')
+  })
+  it('does not pretend Claude Desktop accepts a direct deep link', () => {
+    const result = link('claude-desktop', 'anthropic', '', { platform: 'anthropic' })
+    expect(result.get('app')).toBe('claude')
+    expect(result.get('notes')).toContain('Claude Desktop')
+  })
+  it('uses the Antigravity forced endpoint for both Claude and Gemini', () => {
+    expect(resolveCcSwitchEndpoint('https://api.example.com/sub2api/', 'claude', 'anthropic', 'antigravity')).toBe('https://api.example.com/sub2api/antigravity')
+    expect(resolveCcSwitchEndpoint('https://api.example.com/sub2api/', 'gemini', 'gemini_native', 'antigravity')).toBe('https://api.example.com/sub2api/antigravity')
+  })
+  it('includes a Unicode-safe usage script only for HTTPS', () => {
+    const result = link('pi', 'openai_chat', 'test-model')
+    expect(result.get('usageEnabled')).toBe('true')
+    expect(atob(result.get('usageScript') || '')).toBe(CC_SWITCH_USAGE_SCRIPT)
+    expect(result.get('usageBaseUrl')).toBe('https://api.example.com')
+    expect(encodeCcSwitchBase64('中文')).toBe('5Lit5paH')
+    const local = link('pi', 'openai_chat', 'test-model', { baseUrl: 'http://localhost:8080' })
+    expect(local.get('usageEnabled')).toBe('false')
+    expect(local.has('usageScript')).toBe(false)
+  })
+  it('rejects blank or expandable Pi model values', () => {
+    expect(() => link('pi', 'openai_chat', '')).toThrow('invalidModel')
+    expect(() => link('pi', 'openai_chat', '$SECRET')).toThrow('invalidModel')
+    expect(() => link('pi', 'openai_chat', 'test-model', { apiKey: '!command' })).toThrow('dynamicValue')
+  })
+  it.each(['https://u:p@example.com', 'https://example.com/?key=secret', 'javascript:alert(1)', 'https://example.com/#x'])('rejects unsafe base URL %s', baseUrl => {
+    expect(() => link('pi', 'openai_chat', 'test-model', { baseUrl })).toThrow('invalidEndpoint')
+  })
+  it('does not offer unauthorized clients for a restricted group', () => {
+    const restricted = group('anthropic', { claude_code_only: true, allow_claude_desktop: true })
+    expect(getCcSwitchClients(restricted).map(item => item.value)).toEqual(['claude', 'claude-desktop'])
+    expect(getCcSwitchFormats('codex', restricted)).toEqual([])
+    expect(defaultCcSwitchClient(group('openai'))).toBe('codex')
+    expect(getCcSwitchClients(group('typesafe'))).toEqual([])
+  })
+  it('filters media-only models without inventing IDs', () => {
+    expect(parseCcSwitchModels({ data: [{ id: 'claude-sonnet-4-6' }, { id: 'gpt-image-1' }, { id: 'glm-5' }, { id: '{file:secret}' }] })).toEqual(['claude-sonnet-4-6', 'glm-5'])
   })
 })
 
-describe('CC Switch usage script', () => {
-  // Mirrors CC Switch: substitute the template vars as text, evaluate, read request.url.
-  function usageUrlFor(baseUrl: string): string {
-    const script = CC_SWITCH_USAGE_SCRIPT.split('{{baseUrl}}').join(baseUrl).split('{{apiKey}}').join('sk-test')
-    // eslint-disable-next-line no-new-func
-    const config = new Function(`return ${script}`)() as { request: { url: string } }
-    return config.request.url
-  }
-
-  it.each([
-    'https://api.example.com',
-    'https://api.example.com/',
-    'https://api.example.com/v1',
-    'https://api.example.com/v1/'
-  ])('queries exactly one /v1/usage for base URL %s', (baseUrl) => {
-    expect(usageUrlFor(baseUrl)).toBe('https://api.example.com/v1/usage')
-  })
-
-  it('works against the endpoint every platform import stores', () => {
-    for (const platform of ['anthropic', 'openai', 'grok', 'gemini'] as GroupPlatform[]) {
-      const endpoint = paramsFromDeeplink(
-        buildCcSwitchImportDeeplink({
-          baseUrl: 'https://api.example.com',
-          platform,
-          clientType: platform === 'gemini' ? 'gemini' : 'claude',
-          providerName: 'IKUN2api',
-          apiKey: 'sk-test',
-          usageScript: CC_SWITCH_USAGE_SCRIPT
-        })
-      ).get('endpoint') as string
-      expect(usageUrlFor(endpoint)).toBe('https://api.example.com/v1/usage')
-    }
+describe('CCS balance extraction', () => {
+  // Execute the standalone script as CCS does, including template substitution.
+  const code = CC_SWITCH_USAGE_SCRIPT.replaceAll('{{baseUrl}}', 'https://api.example.com/v1/').replaceAll('{{apiKey}}', 'sk-test')
+  // eslint-disable-next-line no-new-func
+  const config = new Function(`return ${code}`)()
+  it('uses the single same-origin balance endpoint', () => expect(config.request.url).toBe('https://api.example.com/v1/usage'))
+  it('retains subscription details and never displays -1 as a negative balance', () => {
+    expect(config.extractor({ isValid: true, planName: '不限量', remaining: -1, quota: { limit: 20, used: 3 } })).toEqual({ isValid: true, planName: '不限量', unit: 'USD', total: 20, used: 3 })
   })
 })

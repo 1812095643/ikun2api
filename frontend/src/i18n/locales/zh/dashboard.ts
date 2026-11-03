@@ -283,6 +283,36 @@ export default {
     ipRestrictionEnabled: '已配置 IP 限制',
     ccSwitchNotInstalled:
       'CC-Switch 未安装或协议处理程序未注册。请先安装 CC-Switch 或手动复制 API 密钥。',
+    ccsImport: {
+      useModelId: '使用模型 ID',
+      client: '目标客户端', format: '接口格式', name: '供应商名称', model: '默认模型',
+      modelPlaceholder: '搜索或输入完整模型 ID', automaticModel: '跟随客户端默认模型',
+      aliasDefault: '自动（原生 Claude 保留默认，其他模型跟随所选模型）',
+      aliases: 'Claude 模型档位（可选）', aliasHint: '留空使用默认值；非原生 Claude 模型会把三个档位映射到所选模型。',
+      refreshModels: '刷新模型', modelsHint: '读取当前 Key 的模型目录，不发起对话。',
+      modelsLoaded: '当前 Key 提供 {count} 个对话模型，可搜索或手动输入。',
+      modelsFailed: '模型目录暂时不可用，请重试或输入已确认可用的模型 ID。',
+      balance: '导入余额查询（每 30 分钟）', telemetry: '关闭 Claude Code 非必要遥测',
+      httpsUsage: 'CCS 余额查询需要 HTTPS，当前地址不启用自动查询。',
+      restricted: '此分组限制客户端，仅显示管理员允许的选项。',
+      routing: '此组合需要 CCS 本地路由转换格式；使用时请保持 CCS 运行。',
+      unavailable: '此 Key 尚未绑定可用分组，或该分组暂不支持 CCS 导入。',
+      desktopTitle: 'Claude Desktop 需要在 CCS 内完成第二步',
+      desktopStep1: '点击下方按钮，将配置保存到 CCS 的 Claude Code 列表。',
+      desktopStep2: '进入 CCS 的 Claude Desktop 页面，选择“将 Claude Code 中已有的供应商导入”。',
+      desktopStep3: '选择本站供应商并切换，然后完全退出、重新打开 Claude Desktop。',
+      desktopExisting: 'CCS 暂不支持 Desktop 直接深链接。已有 Desktop 配置时，可在该页“添加供应商”中使用同一地址、Key 和模型。',
+      import: '打开 CCS 导入', importDesktop: '第一步：导入到 CCS', copyLink: '复制导入链接',
+      opened: '请在 CCS 中确认导入并启用供应商。没有打开时，可复制链接到系统浏览器，或检查 CCS 安装。',
+      openFailed: '未能打开 CCS，请检查安装或复制导入链接到系统浏览器。',
+      linkHint: '导入链接包含当前 Key，仅供本人使用。',
+      errors: {
+        unavailable: '当前客户端或接口格式不可用。', invalidEndpoint: '站点 API 地址格式不正确，请联系管理员。',
+        invalidName: '请填写有效的供应商名称。', invalidKey: '当前 Key 格式不正确。',
+        invalidModel: '请选择或输入有效的默认模型 ID。', invalidFormat: '该客户端不支持所选接口格式。',
+        dynamicValue: '名称、模型、地址或 Key 含有客户端会解释的变量，请改为普通文本。'
+      }
+    },
     ccsClientSelect: {
       title: '选择客户端',
       description: '请选择您要导入到 CC-Switch 的客户端类型：',

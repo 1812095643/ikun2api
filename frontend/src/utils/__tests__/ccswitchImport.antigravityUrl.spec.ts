@@ -7,16 +7,14 @@ describe('Antigravity CC Switch endpoint', () => {
     ['https://api.example.com/', 'https://api.example.com/antigravity'],
     ['https://api.example.com///', 'https://api.example.com/antigravity'],
     ['https://api.example.com/sub2api/', 'https://api.example.com/sub2api/antigravity']
-  ])('joins the platform path onto %s for both clients', (baseUrl, endpoint) => {
-    for (const clientType of ['claude', 'gemini'] as const) {
+  ])('joins the platform path onto %s for both native clients', (baseUrl, endpoint) => {
+    for (const [clientType, apiFormat] of [['claude', 'anthropic'], ['gemini', 'gemini_native']] as const) {
       const url = new URL(buildCcSwitchImportDeeplink({
-        baseUrl, clientType, platform: 'antigravity', providerName: 'IKUN2api',
-        apiKey: 'sk-test', usageScript: 'return true'
+        baseUrl, clientType, apiFormat, platform: 'antigravity', providerName: 'IKUN2api',
+        apiKey: 'sk-test', model: 'test-model'
       }))
       expect(url.searchParams.get('endpoint')).toBe(endpoint)
       expect(url.searchParams.get('app')).toBe(clientType)
-      expect(url.searchParams.get('homepage')).toBe(baseUrl)
-      expect(url.searchParams.has('model')).toBe(false)
     }
   })
 })
