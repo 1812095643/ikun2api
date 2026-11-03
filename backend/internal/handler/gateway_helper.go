@@ -51,6 +51,7 @@ func (h *GatewayHandler) rejectClaudeClientRestriction(c *gin.Context, apiKey *s
 	if apiKey == nil || apiKey.Group == nil || apiKey.Group.FallbackGroupID != nil || apiKey.Group.AllowsClaudeClient(c.Request.Context()) {
 		return false
 	}
+	c.Set(service.OpsClientRestrictionKey, true)
 	h.errorResponse(c, http.StatusForbidden, "permission_error", apiKey.Group.ClaudeClientRestrictionMessage())
 	return true
 }

@@ -119,6 +119,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	// (checkClaudeCodeRestriction) schedules it in the fallback group; without one
 	// it is rejected here.
 	if apiKey.Group != nil && apiKey.Group.ClaudeCodeOnly && apiKey.Group.FallbackGroupID == nil {
+		c.Set(service.OpsClientRestrictionKey, true)
 		h.responsesErrorResponse(c, http.StatusForbidden, "permission_error",
 			"This group is restricted to Claude Code clients (/v1/messages only)")
 		return

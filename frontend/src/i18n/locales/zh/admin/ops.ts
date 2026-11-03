@@ -747,6 +747,8 @@ export default {
         ignoreNoAvailableAccountsHint: '启用后，"No available accounts" 错误将不会写入错误日志（不推荐，这通常是配置问题）。',
         ignoreInsufficientBalanceErrors: '忽略余额不足错误',
         ignoreInsufficientBalanceErrorsHint: '启用后，账号余额不足（Insufficient balance）的错误将不会写入错误日志。',
+        ignoreClientRestrictionErrors: '忽略客户端接入限制',
+        ignoreClientRestrictionErrorsHint: '启用后，非允许客户端被拒绝的 403 不写入错误日志；接入限制仍生效。',
         autoRefresh: '自动刷新',
         enableAutoRefresh: '启用自动刷新',
         enableAutoRefreshHint: '自动刷新仪表板数据，启用后会定期拉取最新数据。',

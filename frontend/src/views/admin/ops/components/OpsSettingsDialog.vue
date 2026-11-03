@@ -50,6 +50,9 @@ async function loadAllSettings() {
     runtimeSettings.value = runtime
     emailConfig.value = email
     advancedSettings.value = advanced
+    if (advancedSettings.value) {
+      advancedSettings.value.ignore_client_restriction_errors ??= false
+    }
     // 兼容旧 payload：后端未返回该字段时补默认值，保证表单可绑定
     if (advancedSettings.value && !advancedSettings.value.openai_account_quota_auto_pause) {
       advancedSettings.value.openai_account_quota_auto_pause = { default_threshold_5h: 0, default_threshold_7d: 0 }
@@ -580,6 +583,18 @@ async function saveAllSettings() {
                 </p>
               </div>
               <Toggle v-model="advancedSettings.ignore_insufficient_balance_errors" />
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.ops.settings.ignoreClientRestrictionErrors') }}</label>
+                <p class="mt-1 text-xs text-gray-500">{{ t('admin.ops.settings.ignoreClientRestrictionErrorsHint') }}</p>
+              </div>
+              <Toggle
+                v-model="advancedSettings.ignore_client_restriction_errors"
+                :aria-label="t('admin.ops.settings.ignoreClientRestrictionErrors')"
+                data-testid="ops-ignore-client-restriction"
+              />
             </div>
           </div>
 

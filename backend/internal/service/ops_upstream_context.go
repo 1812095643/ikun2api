@@ -54,6 +54,8 @@ const (
 	OpsLocalErrorTypeKey     = "ops_local_error_type"
 	OpsLocalErrorCodeKey     = "ops_local_error_code"
 	OpsRequestScopedErrorKey = "ops_request_scoped_error"
+	// Set only by local client-access gates, never from response text or headers.
+	OpsClientRestrictionKey = "ops_client_restriction"
 
 	OpsClientBusinessLimitedKey                           = "ops_client_business_limited"
 	OpsClientBusinessLimitedReasonKey                     = "ops_client_business_limited_reason"
@@ -166,6 +168,8 @@ type OpsStreamError struct {
 	UpstreamMessage string
 	UpstreamDetail  string
 	UpstreamErrors  []*OpsUpstreamErrorEvent
+	// Immutable, server-owned snapshot for one WS turn. Never persisted/exported.
+	HandledAccountLimits map[int64]bool `json:"-"`
 	// RequestScoped 表示该带内失败是请求级结果（如上游内容策略截停），与本请求此前的
 	// 上游尝试无关：分类不受上游错误上下文影响、不快照也不落库上游归因、不继承透传规则的
 	// skip_monitoring，按业务限制计，落库状态取 IntendedStatus 以便进入错误列表。
@@ -182,6 +186,9 @@ func BeginOpsStreamTurn(c *gin.Context, turn int) {
 		return
 	}
 	c.Set(OpsStreamTurnKey, turn)
+	if c.Request != nil {
+		resetOpsAccountLimits(c.Request.Context())
+	}
 	// Rule and attempt state is turn-scoped on a long-lived WS connection.
 	c.Set(OpsSkipPassthroughKey, false)
 	c.Set(OpsUpstreamErrorsKey, []*OpsUpstreamErrorEvent{})
@@ -235,6 +242,10 @@ func markOpsStreamError(c *gin.Context, streamErr OpsStreamError) {
 		streamErr.SkipMonitoring = currentOpsFailureSkipMonitoring(c)
 	}
 	snapshotOpsStreamErrorContext(c, &streamErr)
+	streamErr.HandledAccountLimits = nil
+	if c.Request != nil && !streamErr.RequestScoped {
+		streamErr.HandledAccountLimits = snapshotOpsAccountLimits(c.Request.Context())
+	}
 	if GetOpenAIClientTransport(c) == OpenAIClientTransportWS {
 		if value, ok := c.Get(OpsStreamTurnKey); ok {
 			streamErr.Turn, _ = value.(int)

@@ -1076,6 +1076,7 @@ func (state *opsCaptureWriterState) shouldCapture() bool {
 // - Streaming errors after the response has started (SSE) may still need explicit logging.
 func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		c.Request = c.Request.WithContext(service.WithOpsAccountLimitTracking(c.Request.Context()))
 		originalWriter := c.Writer
 		w := acquireOpsCaptureWriter(originalWriter)
 		w.setContext(c)
@@ -1110,6 +1111,10 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 		}
 
 		status := c.Writer.Status()
+		if status == http.StatusForbidden && c.GetBool(service.OpsClientRestrictionKey) &&
+			ops.OpsAdvancedSettingsSnapshot().IgnoreClientRestrictionErrors {
+			return
+		}
 		body := w.capturedBytes()
 		parsed := parseOpsErrorResponse(body)
 		if !parsed.StreamFailure {
@@ -1284,7 +1289,9 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 			entry.ClientIP = &clientIP
 		}
 
-		enqueueOpsErrorLog(ops, entry)
+		if !filterOpsHandledAccountLimits(c, entry) {
+			enqueueOpsErrorLog(ops, entry)
+		}
 	}
 }
 
@@ -1400,7 +1407,9 @@ func logOpsRecoveredUpstream(c *gin.Context, ops *service.OpsService, finalStatu
 		entry.ClientIP = &clientIP
 	}
 	applyOpsLatencyFieldsFromContext(c, entry)
-	enqueueOpsErrorLog(ops, entry)
+	if !filterOpsHandledAccountLimits(c, entry) {
+		enqueueOpsErrorLog(ops, entry)
+	}
 }
 
 func opsRequestTypeFromContext(c *gin.Context) *int16 {
@@ -1589,7 +1598,9 @@ func logOpsStreamErrorValue(c *gin.Context, ops *service.OpsService, wireStatus 
 		entry.ClientIP = &clientIP
 	}
 
-	enqueueOpsErrorLog(ops, entry)
+	if !filterOpsHandledAccountLimits(c, entry, streamErr.HandledAccountLimits) {
+		enqueueOpsErrorLog(ops, entry)
+	}
 }
 
 func applyOpsStreamErrorSnapshot(entry *service.OpsInsertErrorLogInput, streamErr service.OpsStreamError) {

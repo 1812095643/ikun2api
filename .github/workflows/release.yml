@@ -80,6 +80,12 @@ jobs:
           go test -tags unit ./internal/service ./internal/handler
           -run 'Test(NormalizeCacheControlTTLOrder|EnforceCacheControlLimit|ValidateClaude55Request_Haiku55|GPT61SolAPIKeyCatalog|OpenAISubscriptionLongContextExempt|OpenAIGatewayServiceRecordUsage_GPT61SolSubscriptionLongContext|OpenAIGatewayService_OAuth.*StreamFalse|BuildPlatformCatalog|FrontendBuiltinPlatformCatalog|OpenAIResponsesWebSocket_GroupRateChange)'
           -count=1 -timeout=180s
+      - name: 运维错误过滤与账号限流回归
+        run: |
+          cd backend
+          go test -tags unit ./internal/handler ./internal/service -run 'Test(Ops|GetOpsAdvancedSettings|UpdateOpsAdvancedSettings|Handle429|HandleUpstreamError_Anthropic|CalculateAnthropic429|Anthropic429|GetRateLimit429|SetRateLimit429)' -count=1 -timeout=180s
+          cd ../frontend
+          pnpm exec vitest run src/views/admin/ops/components/__tests__/OpsSettingsDialog.clientRestriction.spec.ts src/i18n/__tests__/opsLocaleKeys.spec.ts
       - name: 发布脚本检查
         run: |
           python3 -m unittest discover -s scripts/release -p test_release.py
