@@ -31,6 +31,12 @@ type claudeTelemetryTrigger struct {
 	eventName string
 }
 
+// Ingress and egress share the same closed list. Startup, resume, tunnel,
+// connector, experiment and future diagnostic events are never sent.
+func isClaudeTelemetrySummaryEvent(name string) bool {
+	return name == "tengu_api_success" || name == "tengu_api_error"
+}
+
 // 只读取事件种类和本地关联所需的 UUID；所有其他字段，包括 base64 附加元数据，整块丢弃。
 func ParseClaudeTelemetryBatch(body []byte) (*ClaudeTelemetryBatch, error) {
 	invalid := fmt.Errorf("遥测格式不受支持")
@@ -63,7 +69,7 @@ func ParseClaudeTelemetryBatch(body []byte) (*ClaudeTelemetryBatch, error) {
 			return nil, invalid
 		}
 		name := gjson.GetBytes(data, "event_name").String()
-		if name != "tengu_api_success" && name != "tengu_api_error" {
+		if !isClaudeTelemetrySummaryEvent(name) {
 			continue
 		}
 		session, eventID := gjson.GetBytes(data, "session_id"), gjson.GetBytes(data, "event_id")

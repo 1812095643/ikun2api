@@ -82,6 +82,7 @@ jobs:
           -count=1 -timeout=180s
       - name: 发布脚本检查
         run: |
+          python3 -m unittest discover -s scripts/release -p test_release.py
           python3 -m py_compile deploy/switch-from-sub2api.py scripts/release/build.py scripts/release/sign.py
           bash -n deploy/migrate.sh deploy/docker-entrypoint.sh
       - name: CC Switch import regression

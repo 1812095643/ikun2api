@@ -38,6 +38,9 @@ func TestClaudeTelemetryOnlyRecognizesObservedEventKinds(t *testing.T) {
 		"tengu_safety_event", "safety_event", "tengu_remote_reported_cwd",
 		"tengu_memory_low", "tengu_memory_drain", "tengu_tool_cgroup",
 		"tengu_api_tools_used_header", "tengu_feature_ok", "unknown",
+		"tengu_agent_proxy_open_tunnels", "tengu_resume_hook_stopped_batch",
+		"tengu_vscode_start_second_try", "tengu_mcp_gmail_file_reference_upload",
+		"tengu_mcp_drive_download_saved_as_text",
 	} {
 		batch := telemetryTestBatch(t, name)
 		want := 0

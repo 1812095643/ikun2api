@@ -261,7 +261,9 @@ func TestClaudeTelemetryRevalidatesAccountAndProxyBeforeSend(t *testing.T) {
 			keyRepo := &telemetrySchedulerKeyRepo{key: telemetrySchedulerKey()}
 			transport := &localClaudeTelemetryTransport{status: 200, response: `{"accepted_count":1}`}
 			gateway := &GatewayService{httpUpstream: transport, accountRepo: repo, claudeTelemetryScheduler: &ClaudeTelemetryScheduler{keyRepo: keyRepo}}
-			delivery := claudeTelemetryDelivery{body: []byte(fmt.Sprintf(`{"events":[{"event_data":{"auth":{"account_uuid":%q}}}]}`, telemetryTestAccount)), proxyURL: telemetryTestProxy, accountID: 1, apiKeyID: 17, userID: 23}
+			delivery := telemetryBatchDelivery(t, true)
+			delivery.accountID = 1
+			delivery.groupID = 0
 			switch variant {
 			case "account_missing":
 				repo.account = nil

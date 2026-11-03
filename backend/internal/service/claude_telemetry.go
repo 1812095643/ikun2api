@@ -24,6 +24,27 @@ import (
 
 const claudeTelemetryEndpoint = "https://api.anthropic.com/api/event_logging/v2/batch"
 
+// These names follow Claude Code 2.1.317's OTel attributes. They are local
+// additions to our rebuilt event's additional_metadata, not newly required
+// fields of the first-party event_logging schema or a separate OTel export.
+// Pro is the configured default for this gateway, not a discovered entitlement.
+func claudeTelemetrySummaryAttributes() map[string]any {
+	return map[string]any{
+		"anthropic.plan":            "pro",
+		"anthropic.provider":        "firstParty",
+		"anthropic.custom_base_url": false,
+	}
+}
+
+// The attributes describe the gateway's actual upstream leg. Never attach
+// firstParty/false to a custom endpoint or copy the caller's base URL.
+func isClaudeTelemetryOfficialRequest(req *http.Request) bool {
+	return req != nil && req.Method == http.MethodPost && req.URL != nil &&
+		req.URL.Scheme == "https" && req.URL.Host == "api.anthropic.com" &&
+		req.URL.User == nil && req.URL.Opaque == "" && req.URL.Fragment == "" &&
+		req.URL.Path == "/v1/messages"
+}
+
 // 此处只限制等待及发送中的批次数；实际 HTTP 发送统一经过单路出口。
 var claudeTelemetryPendingSlots = make(chan struct{}, 16)
 var claudeTelemetryAgentVersion = regexp.MustCompile(`^claude-cli/(\d{1,3}\.\d{1,3}\.\d{1,4})(?:\s|$)`)
@@ -43,10 +64,10 @@ type claudeTelemetryDelivery struct {
 	generation    uint64
 }
 
-// 结构已核对本机 Claude Code 2.1.301 的事件序列化器；只填写网关实际观测到的值。
+// 事件包络核对自 Claude Code 2.1.301；行为与用量取实际观测，附加属性使用本项目默认值。
 func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Account, result *ForwardResult, forwardErr error, started time.Time, status, attempts int) ([]byte, string, error) {
-	if req == nil || account == nil {
-		return nil, "", fmt.Errorf("遥测缺少实际出站请求")
+	if account == nil || account.IsCustomBaseURLEnabled() || !isClaudeTelemetryOfficialRequest(req) {
+		return nil, "", fmt.Errorf("遥测缺少官方地址的实际出站请求")
 	}
 	identity := ParseMetadataUserID(gjson.GetBytes(wireBody, "metadata.user_id").String())
 	if identity == nil || !claudeTelemetryUUID(identity.SessionID) || !claudeTelemetryUUID(identity.AccountUUID) || len(identity.DeviceID) != 64 {
@@ -76,6 +97,11 @@ func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Accou
 		"attempt":                    attempts,
 		"messageCount":               gjson.GetBytes(wireBody, "messages.#").Int(),
 		"provider":                   "firstParty",
+	}
+	// Only server-owned, fixed attributes are added. In particular, seat type,
+	// client OTel resources, URLs, use-case IDs and arbitrary account data stay out.
+	for key, value := range claudeTelemetrySummaryAttributes() {
+		metadata[key] = value
 	}
 	if result == nil || forwardErr != nil || status >= 400 || result.ClientDisconnect {
 		name = "tengu_api_error"
@@ -140,7 +166,7 @@ func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Accou
 
 func (s *GatewayService) rememberClaudeTelemetry(c *gin.Context, clientSession string, req *http.Request, wireBody []byte, account *Account, result *ForwardResult, forwardErr error, started time.Time, status, attempts int, proxyURL string, profile *tlsfingerprint.Profile) {
 	settings := s.telemetrySettings()
-	if s == nil || s.httpUpstream == nil || !settings.Enabled || c == nil || c.Request == nil || req == nil || account == nil || !account.IsAnthropicOAuthOrSetupToken() || account.IsCustomBaseURLEnabled() || req.URL == nil || req.URL.Scheme != "https" || req.URL.Host != "api.anthropic.com" || req.URL.User != nil || req.URL.Path != "/v1/messages" {
+	if s == nil || s.httpUpstream == nil || !settings.Enabled || c == nil || c.Request == nil || account == nil || !account.IsAnthropicOAuthOrSetupToken() || account.IsCustomBaseURLEnabled() || !isClaudeTelemetryOfficialRequest(req) {
 		return
 	}
 	generation := uint64(0)

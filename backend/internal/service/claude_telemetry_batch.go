@@ -14,8 +14,25 @@ type claudeTelemetryPayload struct {
 
 func decodeClaudeTelemetryPayload(body []byte) (claudeTelemetryPayload, error) {
 	var payload claudeTelemetryPayload
-	if len(body) > MaxClaudeTelemetryBodyBytes || json.Unmarshal(body, &payload) != nil || len(payload.Events) == 0 || len(payload.Events) > claudeTelemetryMaxEvents {
+	if len(body) > MaxClaudeTelemetryBodyBytes {
 		return payload, fmt.Errorf("遥测批次格式或大小不受支持")
+	}
+	if _, err := filterClaudePrivacyObject(body, nil, nil); err != nil ||
+		json.Unmarshal(body, &payload) != nil || len(payload.Events) == 0 || len(payload.Events) > claudeTelemetryMaxEvents {
+		return payload, fmt.Errorf("遥测批次格式或大小不受支持")
+	}
+	// Check every event again before merging or sending, including events after
+	// the first one. Future callers must not bypass the ingress event allowlist.
+	for _, event := range payload.Events {
+		if _, err := filterClaudePrivacyObject(event, nil, nil); err != nil {
+			return payload, fmt.Errorf("遥测批次事件格式不受支持")
+		}
+		data := []byte(gjson.GetBytes(event, "event_data").Raw)
+		if _, err := filterClaudePrivacyObject(data, nil, nil); err != nil ||
+			gjson.GetBytes(event, "event_type").String() != "ClaudeCodeInternalEvent" ||
+			!isClaudeTelemetrySummaryEvent(gjson.GetBytes(data, "event_name").String()) {
+			return payload, fmt.Errorf("遥测批次包含不允许发送的事件")
+		}
 	}
 	return payload, nil
 }

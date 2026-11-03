@@ -44,7 +44,7 @@ func telemetryTestWire() []byte {
 
 func telemetryTestBatch(t *testing.T, name string) *ClaudeTelemetryBatch {
 	t.Helper()
-	body := []byte(fmt.Sprintf(`{"events":[{"event_type":"ClaudeCodeInternalEvent","event_data":{"event_name":%q,"session_id":%q,"event_id":%q,"git_remote_url":"never-upload-git","head_sha":"never-upload-hash","additional_metadata":"bmV2ZXItdXBsb2Fk"}}]}`, name, telemetryClientSession, telemetryTestEvent))
+	body := []byte(fmt.Sprintf(`{"events":[{"event_type":"ClaudeCodeInternalEvent","event_data":{"event_name":%q,"session_id":%q,"event_id":%q,"git_remote_url":"never-upload-git","head_sha":"never-upload-hash","anthropic.plan":"enterprise","anthropic.provider":"gateway","anthropic.custom_base_url":true,"anthropic.seat_type":"premium","program_use_case_id":"never-upload-use-case","additional_metadata":"bmV2ZXItdXBsb2Fk"}}]}`, name, telemetryClientSession, telemetryTestEvent))
 	batch, err := ParseClaudeTelemetryBatch(body)
 	if err != nil {
 		t.Fatal(err)
@@ -128,7 +128,10 @@ func TestLocalClaudeTelemetryRequiresAcknowledgement(t *testing.T) {
 				}
 			}}
 			gateway := &GatewayService{httpUpstream: transport}
-			_, _, err := gateway.sendClaudeTelemetry(context.Background(), claudeTelemetryDelivery{body: []byte(`{"events":[{"event_data":{}}]}`), authorization: "Bearer local-only", userAgent: "claude-cli/2.1.302", proxyURL: "socks5://local-proxy:443", accountID: 2, concurrency: 3, profile: profile})
+			delivery := telemetryBatchDelivery(t, true)
+			delivery.userAgent = "claude-cli/2.1.302"
+			delivery.profile = profile
+			_, _, err := gateway.sendClaudeTelemetry(context.Background(), delivery)
 			if (err == nil) != test.accepted || transport.calls != 1 {
 				t.Fatal("HTTP 200 不能代替遥测接收确认")
 			}
@@ -190,6 +193,7 @@ func TestLocalClaudeTelemetryAcceptsProductionWireHeaders(t *testing.T) {
 				if event.authorization != "Bearer offline-only" || event.beta != "" || event.requestID != "" || strings.Contains(event.body+event.metadata, "never-upload") {
 					t.Fatal("小写认证头必须生效，但任意附加字段和原始遥测不得外发")
 				}
+				assertClaudeTelemetryAttributes(t, []byte(event.body))
 			case <-time.After(claudeTelemetryMinSendGap + 2*time.Second):
 				t.Fatal("生产使用的小写认证头未触发内存测试传输")
 			}
