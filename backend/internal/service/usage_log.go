@@ -172,6 +172,11 @@ type UsageLog struct {
 	AccountRateMultiplier *float64
 	// AccountStatsCost 账号统计定价预计算费用（nil = 使用默认公式 total_cost × account_rate_multiplier）
 	AccountStatsCost *float64
+	// AccountNameSnapshot 是请求计费时刻的账号名称快照。历史行据此稳定展示账号，
+	// 不随账号改名、换绑或删除而漂移；nil 表示该列上线前的历史数据。
+	AccountNameSnapshot *string
+	// AccountPlatformSnapshot 是请求计费时刻的账号平台快照（如 anthropic / openai）。
+	AccountPlatformSnapshot *string
 
 	BillingType        int8
 	RequestType        RequestType

@@ -707,6 +707,7 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		ServiceTier:               l.ServiceTier,
 		ReasoningEffort:           userFacingReasoningEffort(l),
 		InboundEndpoint:           l.InboundEndpoint,
+		AccountNameSnapshot:       service.MaskAccountNameSnapshot(l.AccountNameSnapshot),
 		GroupID:                   l.GroupID,
 		SubscriptionID:            l.SubscriptionID,
 		InputTokens:               l.InputTokens,
@@ -786,6 +787,8 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 		AccountStatsCost:        l.AccountStatsCost,
 		IPAddress:               l.IPAddress,
 		Account:                 AccountSummaryFromService(l.Account),
+		AccountNameSnapshot:     l.AccountNameSnapshot,
+		AccountPlatformSnapshot: l.AccountPlatformSnapshot,
 	}
 }
 

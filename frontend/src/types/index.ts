@@ -1921,6 +1921,10 @@ export interface AdminUsageLog extends UsageLog {
 
   // 最小账号信息（仅管理员接口返回）
   account?: UsageLogAccountSummary
+
+  // 写入时固化的账号名与平台快照：账号改名或被删除后仍可读
+  account_name_snapshot?: string | null
+  account_platform_snapshot?: string | null
 }
 
 export interface UsageCleanupFilters {

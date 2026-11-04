@@ -236,6 +236,19 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'usage.description'
     }
   },
+  // 用户端「实时号池」：与管理员同一个组件，服务端按身份强制脱敏。
+  {
+    path: '/pool',
+    name: 'Pool',
+    component: () => import('@/views/admin/PoolView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Live Account Pool',
+      titleKey: 'admin.pool.user.title',
+      descriptionKey: 'admin.pool.user.description'
+    }
+  },
   {
     path: '/redeem',
     name: 'Redeem',
@@ -633,6 +646,19 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'admin.promptAudit.title',
       descriptionKey: 'admin.promptAudit.description',
       requiresRiskControl: true
+    }
+  },
+  // 「实时号池」是一个页面内两个标签（账号池 / 使用记录），按身份自适应数据源。
+  {
+    path: '/admin/pool',
+    name: 'AdminPool',
+    component: () => import('@/views/admin/PoolView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Live Account Pool',
+      titleKey: 'admin.pool.title',
+      descriptionKey: 'admin.pool.description'
     }
   },
   {

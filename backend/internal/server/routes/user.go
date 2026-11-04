@@ -95,6 +95,17 @@ func RegisterUserRoutes(
 			channels.GET("/available", h.AvailableChannel.List)
 		}
 
+		// 实时号池（用户端脱敏视图）：只看自己的账号与用量，
+		// 与 /admin/pool 同一份数据源，差异在服务层强制钉上 subject.UserID。
+		pool := authenticated.Group("/pool")
+		pool.Use(panelRateLimiter.Heavy())
+		{
+			pool.GET("/overview", h.Pool.Overview)
+			pool.GET("/accounts", h.Pool.Accounts)
+			pool.GET("/accounts/:id/requests", h.Pool.AccountRequests)
+			pool.GET("/usage", h.Pool.Usage)
+		}
+
 		// 使用记录（聚合统计属重查询，叠加更严格的按用户限流）
 		usage := authenticated.Group("/usage")
 		usage.Use(panelRateLimiter.Heavy())

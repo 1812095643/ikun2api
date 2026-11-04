@@ -187,6 +187,8 @@ __pycache__/
 !docs/TELEMETRY_STATUS.md
 !docs/DEPLOYMENT.md
 !docs/CHANGELOG.md
+!docs/realtime-account-pool/
+!docs/realtime-account-pool/*.md
 backend/ikun2api
 /private/
 /captures/

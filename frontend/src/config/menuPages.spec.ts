@@ -6,6 +6,17 @@ describe('menu visibility', () => {
     expect(isMenuVisible('/image-studio/')).toBe(true)
     expect(isMenuVisible('/image-studio/?tab=canvas', { '/image-studio': false })).toBe(false)
   })
+  it('hides both pool entries until explicitly enabled and preserves the saved choice', () => {
+    for (const path of ['/pool', '/admin/pool']) {
+      expect(isMenuVisible(path)).toBe(false)
+      expect(isMenuVisible(path, { '/news': true })).toBe(false)
+      expect(isMenuVisible(path + '/?tab=usage', { [path]: true })).toBe(true)
+      expect(isMenuVisible(path, { [path]: false })).toBe(false)
+    }
+    const items = [{ path: '/usage' }, { path: '/pool' }, { path: '/admin/pool' }]
+    expect(filterVisibleMenus(items)).toEqual([{ path: '/usage' }])
+    expect(filterVisibleMenus(items, { '/pool': true })).toEqual(items.slice(0, 2))
+  })
   it('filters nested admin sections without mutating navigation definitions', () => {
     const input = [{ path: '/admin/channels', children: [{ path: '/admin/channels/pricing' }, { path: '/admin/channels/monitor' }] }]
     const visible = filterVisibleMenus(input, { '/admin/channels/pricing': false })

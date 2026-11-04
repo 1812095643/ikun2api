@@ -8,6 +8,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUsageLogFromService_AccountSnapshotsMaskedForUsers(t *testing.T) {
+	t.Parallel()
+	name, platform := "private-account@example.test", "anthropic"
+	log := &service.UsageLog{AccountID: 9, AccountNameSnapshot: &name, AccountPlatformSnapshot: &platform}
+	userDTO := UsageLogFromService(log)
+	userJSON, err := json.Marshal(userDTO)
+	require.NoError(t, err)
+	require.Equal(t, service.MaskAccountNameSnapshot(&name), userDTO.AccountNameSnapshot)
+	require.NotContains(t, string(userJSON), name)
+	require.Contains(t, string(userJSON), "account_name_snapshot")
+	require.Contains(t, string(userJSON), "***")
+	require.NotContains(t, string(userJSON), "account_platform_snapshot")
+	adminDTO := UsageLogFromServiceAdmin(log)
+	require.Equal(t, &name, adminDTO.AccountNameSnapshot)
+	require.Equal(t, &platform, adminDTO.AccountPlatformSnapshot)
+	require.Equal(t, &name, log.AccountNameSnapshot)
+}
+
 func TestUsageLogFromService_IncludesOpenAIWSMode(t *testing.T) {
 	t.Parallel()
 

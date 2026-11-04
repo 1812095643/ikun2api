@@ -3,7 +3,7 @@ import { computed, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Toggle from '@/components/common/Toggle.vue'
 import CustomMenuSettings from './CustomMenuSettings.vue'
-import { menuPageGroups, type MenuVisibility, type MenuLabels } from '@/config/menuPages'
+import { isMenuVisible, menuPageGroups, type MenuVisibility, type MenuLabels } from '@/config/menuPages'
 import type { CustomMenuItem } from '@/types'
 
 const props = defineProps<{ visibility: MenuVisibility; customItems: CustomMenuItem[]; labels?: MenuLabels }>()
@@ -49,7 +49,7 @@ function setVisible(path: string, visible: boolean) {
               <label :id="'menu-label-' + page.path" class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ page.label }}</label>
               <div class="flex items-center gap-2"><input :value="labels?.[page.path] ?? ''" :placeholder="page.label" :aria-label="page.label + '显示名称'" maxlength="50" class="input min-w-0" @input="setLabel(page.path, ($event.target as HTMLInputElement).value)" /><button class="btn btn-ghost btn-sm shrink-0" type="button" :disabled="!labels?.[page.path]" @click="setLabel(page.path, '')">恢复默认</button></div>
             </div>
-            <Toggle :model-value="visibility[page.path] !== false" :aria-labelledby="`menu-label-${page.path}`" @update:model-value="setVisible(page.path, $event)" />
+            <Toggle :model-value="isMenuVisible(page.path, visibility)" :aria-labelledby="`menu-label-${page.path}`" @update:model-value="setVisible(page.path, $event)" />
           </div>
         </div>
       </section>

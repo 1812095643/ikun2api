@@ -7,6 +7,24 @@ import Toggle from '@/components/common/Toggle.vue'
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ locale: ref('zh'), t: (key: string) => key }) }))
 
 describe('menu management', () => {
+  it('shows optional pool menus disabled by default and enables each independently', async () => {
+    const visibility = { '/news': false }
+    const wrapper = mount(MenuManagementSettings, {
+      props: { visibility, customItems: [] },
+    })
+    await wrapper.get('input[type="search"]').setValue('实时号池')
+    const toggles = wrapper.findAllComponents(Toggle)
+    expect(toggles).toHaveLength(2)
+    expect(toggles.map(toggle => toggle.props('modelValue'))).toEqual([false, false])
+    await toggles[0].trigger('click')
+    expect(wrapper.emitted('update:visibility')?.at(-1)).toEqual([{ '/news': false, '/pool': true }])
+    await wrapper.setProps({ visibility: { ...visibility, '/pool': true } })
+    expect(toggles.map(toggle => toggle.props('modelValue'))).toEqual([true, false])
+    await toggles[1].trigger('click')
+    expect(wrapper.emitted('update:visibility')?.at(-1)).toEqual([{ '/news': false, '/pool': true, '/admin/pool': true }])
+    expect(visibility).toEqual({ '/news': false })
+    wrapper.unmount()
+  })
   it('searches canonical pages and preserves unrelated visibility when toggling', async () => {
     const wrapper = mount(MenuManagementSettings, { props: { visibility: { '/news': false }, customItems: [] } })
     await wrapper.get('input[type="search"]').setValue('生图工作室')

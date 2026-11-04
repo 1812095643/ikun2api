@@ -10,7 +10,8 @@ export const menuPageGroups = [
   ]) },
   { id: 'user', zh: '用户端', en: 'User pages', pages: pages([
     ['/dashboard', '仪表盘', 'Dashboard'], ['/keys', 'API 密钥', 'API keys'],
-    ['/usage', '用量记录', 'Usage'], ['/model-square', '模型广场', 'Model square'],
+    ['/usage', '用量记录', 'Usage'], ['/pool', '实时号池', 'Live account pool'],
+    ['/model-square', '模型广场', 'Model square'],
     ['/image-studio', '生图工作室', 'Image studio'], ['/batch-image', '批量生图', 'Batch images'],
     ['/news', '时事新闻', 'News'], ['/reset-monitor', 'FUCK TIBO', 'FUCK TIBO'],
     ['/tickets', '我的工单', 'My tickets'], ['/lottery', '幸运抽奖', 'Lottery'],
@@ -27,6 +28,7 @@ export const menuPageGroups = [
     ['/admin/channels/monitor', '渠道监控', 'Channel monitor'],
     ['/admin/subscriptions', '订阅管理', 'Subscriptions'], ['/admin/accounts', '账号管理', 'Accounts'],
     ['/admin/account-vault', '账号资料库', 'Account vault'], ['/admin/account-warmup', '自动热身', 'Account warmup'],
+    ['/admin/pool', '实时号池', 'Live account pool'],
     ['/admin/upstream-balances', '上游余额', 'Upstream balances'], ['/admin/relogin', '失效重登', 'Relogin'],
     ['/admin/tickets', '工单管理', 'Tickets'], ['/admin/lottery', '抽奖管理', 'Lottery'],
     ['/admin/checkin', '签到管理', 'Check-in'], ['/admin/plugins', '插件管理', 'Plugins'],
@@ -42,9 +44,12 @@ export const menuPageGroups = [
   ]) },
 ] as const
 
+// New optional pages stay out of navigation until an administrator enables them.
+const defaultMenuVisibility: MenuVisibility = { '/pool': false, '/admin/pool': false }
+
 export function isMenuVisible(path: string, visibility: MenuVisibility = {}): boolean {
   const normalized = path.split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/'
-  return visibility[normalized] !== false
+  return visibility[normalized] ?? defaultMenuVisibility[normalized] ?? true
 }
 
 export function filterVisibleMenus<T extends { path: string; children?: T[] }>(items: T[], visibility: MenuVisibility = {}): T[] {
