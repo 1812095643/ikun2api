@@ -297,6 +297,12 @@ const (
 	// 操作审计日志设置
 	SettingKeyAuditLogRetentionDays = "audit_log_retention_days" // 审计日志保留天数（<=0 永久保留），默认 180
 
+	// 实时号池「用户视图」展示设置
+	SettingKeyPoolUserSyntheticCount    = "pool_user_synthetic_count"    // 用户视图额外展示的合成账号数量（0 关闭）
+	SettingKeyPoolUserSyntheticBanned   = "pool_user_synthetic_banned"   // 其中显示为不可用的数量
+	SettingKeyPoolUserSyntheticPlatform = "pool_user_synthetic_platform" // 合成账号展示的平台
+	SettingKeyPoolUserVisibleGroupID    = "pool_user_visible_group_id"   // 用户端只展示该分组下的真实账号（0 不限）
+
 	// LinuxDo Connect OAuth 登录设置
 	SettingKeyLinuxDoConnectEnabled      = "linuxdo_connect_enabled"
 	SettingKeyLinuxDoConnectClientID     = "linuxdo_connect_client_id"

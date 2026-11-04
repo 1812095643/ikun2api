@@ -67,6 +67,9 @@ export interface PoolAccount {
   groups?: PoolGroupRef[]
 
   today: PoolWindow
+
+  /** 展示层合成账号：仅出现在普通用户视图，不是真实上游账号。 */
+  synthetic?: boolean
 }
 
 /** 号池概览（管理员口径）。 */

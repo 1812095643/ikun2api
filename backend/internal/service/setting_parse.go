@@ -337,6 +337,10 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		SessionBindingEnabled:                  settings[SettingKeySessionBindingEnabled] == "true", // 默认关闭
 		StepUpEnabled:                          settings[SettingKeyStepUpEnabled] == "true",         // 默认关闭
 		AuditLogRetentionDays:                  parseAuditLogRetentionDays(settings[SettingKeyAuditLogRetentionDays]),
+		PoolUserSyntheticCount:                 parsePoolUserSyntheticCount(settings[SettingKeyPoolUserSyntheticCount]),
+		PoolUserSyntheticBanned:                parsePoolUserSyntheticBanned(settings[SettingKeyPoolUserSyntheticBanned]),
+		PoolUserSyntheticPlatform:              parsePoolUserSyntheticPlatform(settings[SettingKeyPoolUserSyntheticPlatform]),
+		PoolUserVisibleGroupID:                 parsePoolUserVisibleGroupID(settings[SettingKeyPoolUserVisibleGroupID]),
 		LoginAgreementEnabled:                  settings[SettingKeyLoginAgreementEnabled] == "true",
 		LoginAgreementMode:                     normalizeLoginAgreementMode(settings[SettingKeyLoginAgreementMode]),
 		LoginAgreementUpdatedAt:                loginAgreementUpdatedAt,

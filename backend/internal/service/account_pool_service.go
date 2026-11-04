@@ -21,6 +21,7 @@ type AccountPoolService struct {
 	accountUsageService *AccountUsageService
 	concurrencyService  *ConcurrencyService
 	usageLogRepo        UsageLogRepository
+	settingService      *SettingService
 }
 
 // NewAccountPoolService 创建号池聚合服务。
@@ -29,12 +30,14 @@ func NewAccountPoolService(
 	accountUsageService *AccountUsageService,
 	concurrencyService *ConcurrencyService,
 	usageLogRepo UsageLogRepository,
+	settingService *SettingService,
 ) *AccountPoolService {
 	return &AccountPoolService{
 		adminService:        adminService,
 		accountUsageService: accountUsageService,
 		concurrencyService:  concurrencyService,
 		usageLogRepo:        usageLogRepo,
+		settingService:      settingService,
 	}
 }
 
@@ -395,6 +398,8 @@ type PoolUserAccount struct {
 	Capacity PoolUserCapacity    `json:"capacity"`
 	FiveHour PoolUserQuotaWindow `json:"five_hour"`
 	SevenDay PoolUserQuotaWindow `json:"seven_day"`
+	// Synthetic 标记该行是展示层合成出来的账号，不是真实上游账号。
+	Synthetic bool `json:"synthetic,omitempty"`
 }
 
 // PoolUserOverview 是普通用户看到的号池概览：只有自己的数字。
@@ -457,7 +462,10 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 		accountIDs = weekIDs
 	}
 
-	overview.AccountCount = int64(len(accountIDs))
+	// 账号数按用户实际可见的口径统计：分组过滤要生效，合成账号也要算进来，
+	// 否则列表行数与概览卡片会对不上，池子大小一眼就穿。
+	overview.AccountCount = 0
+	visibleGroupID := s.poolUserVisibleGroupID(ctx)
 	if len(accountIDs) > 0 {
 		accounts, accErr := s.adminService.GetAccountsByIDs(ctx, accountIDs)
 		if accErr == nil {
@@ -465,6 +473,10 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 				if acc == nil {
 					continue
 				}
+				if visibleGroupID > 0 && !poolAccountGroupMatches(acc, visibleGroupID) {
+					continue
+				}
+				overview.AccountCount++
 				if strings.EqualFold(acc.Status, "active") && acc.Schedulable {
 					overview.ActiveCount++
 				}
@@ -482,6 +494,17 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 	}
 	if stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart); err == nil {
 		overview.Window7d = poolSumUserWindows(stats)
+	}
+
+	// 合成账号只影响用户视图的数目与平台分布，不参与任何真实用量聚合。
+	if plan := s.poolSyntheticPlan(ctx); !plan.empty() {
+		overview.AccountCount += int64(plan.Count)
+		overview.ActiveCount += int64(plan.available())
+		platform := strings.TrimSpace(plan.Platform)
+		if platform == "" {
+			platform = DefaultPoolUserSyntheticPlatform
+		}
+		overview.PlatformCounts[platform] += int64(plan.Count)
 	}
 
 	return overview, nil
@@ -516,12 +539,21 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 
 	dayStart := timezone.Today()
 	weekStart := dayStart.AddDate(0, 0, -6)
+	// 管理员可以限制用户端只看某个分组的真实账号。
+	visibleGroupID := s.poolUserVisibleGroupID(ctx)
+	now := timezone.Now()
+	plan := s.poolSyntheticPlan(ctx)
 
 	accountIDs, err := reader.ListAccountIDsByUser(ctx, userID, weekStart)
 	if err != nil {
 		return nil, err
 	}
 	if len(accountIDs) == 0 {
+		// 没有任何真实用量时仍然展示合成账号：否则管理员一打开合成开关，
+		// 新用户反而看到空列表，与让池子看起来在用的意图相反。
+		items := poolFilterSyntheticUserItems(s.buildSyntheticUserAccounts(ctx, userID, plan, now), filter)
+		result.Total = int64(len(items))
+		result.Items = poolPaginateUserItems(items, result.Page, result.PageSize)
 		return result, nil
 	}
 
@@ -536,7 +568,6 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	}
 
 	search := strings.ToLower(strings.TrimSpace(filter.Search))
-	now := timezone.Now()
 	items := make([]PoolUserAccount, 0, len(accounts))
 	itemIDs := make([]int64, 0, len(accounts))
 	for _, acc := range accounts {
@@ -556,6 +587,9 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 		if search != "" &&
 			!strings.Contains(strings.ToLower(acc.Name), search) &&
 			!strings.Contains(strings.ToLower(displayName), search) {
+			continue
+		}
+		if visibleGroupID > 0 && !poolAccountGroupMatches(acc, visibleGroupID) {
 			continue
 		}
 		capacity := poolCapacityFromAccount(acc)
@@ -593,6 +627,8 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	}
 
 	s.fillUserCapacity(ctx, items, itemIDs)
+	// 合成账号排在真实账号之后：真实数据永远优先，翻页时也不会挤掉真号。
+	items = append(items, poolFilterSyntheticUserItems(s.buildSyntheticUserAccounts(ctx, userID, plan, now), filter)...)
 
 	result.Total = int64(len(items))
 	start := (result.Page - 1) * result.PageSize

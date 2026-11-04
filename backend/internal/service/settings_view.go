@@ -20,11 +20,15 @@ type SystemSettings struct {
 	PasswordResetEnabled                bool
 	FrontendURL                         string
 	InvitationCodeEnabled               bool
-	TotpEnabled                         bool // TOTP 双因素认证
-	PasskeyEnabled                      bool // Passkey 登录
-	SessionBindingEnabled               bool // 会话 IP/UA 绑定（变更即失效）
-	StepUpEnabled                       bool // 敏感操作 step-up 2FA 门控
-	AuditLogRetentionDays               int  // 审计日志保留天数（<=0 永久保留）
+	TotpEnabled                         bool   // TOTP 双因素认证
+	PasskeyEnabled                      bool   // Passkey 登录
+	SessionBindingEnabled               bool   // 会话 IP/UA 绑定（变更即失效）
+	StepUpEnabled                       bool   // 敏感操作 step-up 2FA 门控
+	AuditLogRetentionDays               int    // 审计日志保留天数（<=0 永久保留）
+	PoolUserSyntheticCount              int    // 号池用户视图合成账号数量（0 关闭）
+	PoolUserSyntheticBanned             int    // 合成账号中显示为不可用的数量
+	PoolUserSyntheticPlatform           string // 合成账号展示的平台
+	PoolUserVisibleGroupID              int64  // 用户端只展示该分组下的真实账号（0 不限）
 	LoginAgreementEnabled               bool
 	LoginAgreementMode                  string
 	LoginAgreementUpdatedAt             string

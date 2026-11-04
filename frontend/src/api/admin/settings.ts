@@ -429,6 +429,10 @@ export interface SystemSettings {
   session_binding_enabled: boolean; // 会话 IP/UA 绑定
   step_up_enabled: boolean; // 敏感操作 step-up 2FA
   audit_log_retention_days: number; // 审计日志保留天数
+  pool_user_synthetic_count: number; // 号池用户视图合成账号数量（0 关闭）
+  pool_user_synthetic_banned: number; // 合成账号中显示为不可用的数量
+  pool_user_synthetic_platform: string; // 合成账号展示的平台
+  pool_user_visible_group_id: number; // 用户端只展示该分组下的真实账号（0 不限）
   login_agreement_enabled: boolean;
   login_agreement_mode: "modal" | "checkbox" | string;
   login_agreement_updated_at: string;
@@ -794,6 +798,10 @@ export interface UpdateSettingsRequest {
   session_binding_enabled?: boolean; // 会话 IP/UA 绑定
   step_up_enabled?: boolean; // 敏感操作 step-up 2FA
   audit_log_retention_days?: number; // 审计日志保留天数
+  pool_user_synthetic_count?: number; // 号池用户视图合成账号数量（0 关闭）
+  pool_user_synthetic_banned?: number; // 合成账号中显示为不可用的数量
+  pool_user_synthetic_platform?: string; // 合成账号展示的平台
+  pool_user_visible_group_id?: number; // 用户端只展示该分组下的真实账号（0 不限）
   login_agreement_enabled?: boolean;
   login_agreement_mode?: "modal" | "checkbox" | string;
   login_agreement_updated_at?: string;

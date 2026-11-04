@@ -1,6 +1,22 @@
 export default {
   pool: {
     extra: {
+      synthetic: {
+        title: 'User-facing display',
+        description:
+          'Only affects what regular users see on the pool page. Nothing is written to the database and no scheduling or billing is involved; turn it off to restore real data.',
+        count: 'Synthetic accounts',
+        countHint: 'How many extra accounts to show. 0 disables it. Max 50.',
+        banned: 'Of which banned',
+        bannedHint: 'These accounts are shown as unavailable to mimic a real pool.',
+        platform: 'Synthetic platform',
+        visibleGroup: 'Visible group',
+        visibleGroupHint: 'Only show real accounts in this group to users. Empty means no filter.',
+        save: 'Save settings',
+        loadFailed: 'Failed to load pool display settings',
+        saveFailed: 'Failed to save pool display settings',
+        noRequests: 'Synthetic accounts have no request log',
+      },
       capacity: 'Capacity',
       usageWindow: 'Usage window',
       window5h: '5h',
