@@ -1,0 +1,136 @@
+export default {
+  pool: {
+    title: 'Live Account Pool',
+    navAccounts: 'Account Pool',
+    navUsage: 'Usage Records',
+    description: 'Real-time status, daily usage and recent request flow for every account in the pool. Data comes from the account table and usage logs; there is no write path here.',
+
+    // Regular-user view: only the accounts they actually used, no internal scheduling fields.
+    user: {
+      title: 'My pool usage',
+      description: 'Only the upstream accounts you have called and your own numbers. Internal scheduling details (groups, concurrency, multiplier, priority) are not exposed to regular users.',
+      empty: 'You have not used any pool account yet',
+      overview: {
+        accounts: 'Accounts I used',
+        accountsHint: '{active} currently healthy',
+      },
+    },
+
+    overview: {
+      accounts: 'Accounts',
+      schedulable: 'Schedulable',
+      inUse: 'In flight',
+      todayRequests: 'Requests today',
+      todayTokens: 'Tokens today',
+      todayCost: 'Cost today',
+      weekRequests: 'Requests (7d)',
+      activeHint: 'Active {active} · Error {error} · Disabled {disabled}',
+      schedulableHint: 'Schedulable and not expired',
+      inUseHint: 'Requests currently being processed',
+      weekRequestsHint: 'Includes today',
+    },
+
+    filters: {
+      search: 'Keyword',
+      searchPlaceholder: 'Account name / notes',
+      platform: 'Platform',
+      type: 'Type',
+      status: 'Status',
+      allPlatform: 'All platforms',
+      allType: 'All types',
+      allStatus: 'All statuses',
+    },
+
+    columns: {
+      account: 'Account',
+      platformType: 'Platform / Type',
+      status: 'Status',
+      groups: 'Groups',
+      todayRequests: 'Requests today',
+      todayTokens: 'Tokens today',
+      todayCost: 'Cost today',
+      concurrency: 'In flight',
+      rateMultiplier: 'Multiplier',
+      priority: 'Priority',
+      lastUsed: 'Last used',
+      availability: 'Availability',
+      actions: 'Actions',
+    },
+
+    status: {
+      active: 'Active',
+      disabled: 'Disabled',
+      error: 'Error',
+      unschedulable: 'Not scheduled',
+    },
+
+    availability: {
+      normal: 'Normal',
+      rateLimited: 'Rate limited until {time}',
+      overload: 'Overloaded until {time}',
+      tempUnschedulable: 'Unschedulable until {time}',
+      notScheduled: 'Not participating in scheduling',
+      never: 'Never used',
+      detail: 'Availability detail',
+    },
+
+    actions: {
+      requests: 'Requests',
+    },
+
+    empty: 'No accounts match the current filters',
+    loadFailed: 'Failed to load pool accounts',
+    overviewFailed: 'Failed to load pool overview',
+
+    dialog: {
+      title: 'Recent requests for account #{id}',
+      subtitle: 'Only requests inside the selected time window, sourced from the same table as Usage Records.',
+      empty: 'This account has no requests in the selected time range',
+      loadFailed: 'Failed to load account requests',
+      columns: {
+        time: 'Time',
+        model: 'Model',
+        endpoint: 'Endpoint',
+        tokens: 'In / Out',
+        cost: 'Cost',
+        duration: 'Duration',
+        requestId: 'Request ID',
+      },
+    },
+
+    usage: {
+      title: 'Pool Usage Records',
+      description: 'Same source as Usage Records, plus the account name and platform snapshot captured at write time, so history stays readable after an account is renamed or deleted.',
+      userTitle: 'My pool usage records',
+      userDescription: 'Every request you made through the pool. Admin-assigned accounts, model mappings and upstream details are not shown here.',
+      filters: {
+        accountId: 'Account ID',
+        userId: 'User ID',
+        apiKeyId: 'Key ID',
+        model: 'Model',
+        requestId: 'Request ID',
+        accountPlaceholder: 'Exact match',
+        modelPlaceholder: 'e.g. claude-sonnet-4-5',
+        requestIdPlaceholder: 'Full value or prefix',
+      },
+      columns: {
+        time: 'Time',
+        account: 'Account',
+        platform: 'Platform',
+        model: 'Model',
+        upstreamModel: 'Upstream model',
+        endpoint: 'Endpoint',
+        user: 'User',
+        apiKey: 'Key',
+        tokens: 'In / Out',
+        cost: 'Cost',
+        duration: 'Duration',
+        requestId: 'Request ID',
+      },
+      accountDeleted: 'Account deleted',
+      noSnapshot: 'No snapshot',
+      empty: 'No pool usage records in the selected range',
+      loadFailed: 'Failed to load pool usage records',
+    },
+  },
+}

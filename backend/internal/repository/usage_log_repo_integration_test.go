@@ -1163,6 +1163,7 @@ func (s *UsageLogRepoSuite) TestGetGlobalStats() {
 	s.Require().Equal(int64(2), stats.TotalRequests)
 	s.Require().Equal(int64(25), stats.TotalInputTokens)
 	s.Require().Equal(int64(45), stats.TotalOutputTokens)
+	s.Require().NotNil(stats.TotalAccountCost, "GlobalStats must aggregate account_stats_cost")
 }
 
 func testMaxTime(a, b time.Time) time.Time {

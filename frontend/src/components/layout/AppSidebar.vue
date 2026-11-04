@@ -482,6 +482,21 @@ const RechargeSubscriptionIcon = {
     )
 }
 
+const DatabaseIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125'
+        })
+      ]
+    )
+}
+
 const GlobeIcon = {
   render: () =>
     h(
@@ -772,6 +787,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/pool', label: t('admin.pool.title'), icon: DatabaseIcon, hideInSimpleMode: true },
     { path: '/model-square', label: '模型广场', icon: FolderIcon },
     { path: imageStudioUrl, label: '生图工作室', icon: BatchImageIcon, external: true },
     { path: '/news', label: '时事新闻', icon: BellIcon },
@@ -847,6 +863,8 @@ const adminNavItems = computed((): NavItem[] => {
     // 「仅充值」站点连管理端的「订阅管理」入口也一并收起（路由本身不拦截）。
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, featureFlag: flagSubscription },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
+    // 「实时号池」现在是单页面 + 页内两个标签，菜单不再展开子项。
+    { path: '/admin/pool', label: t('admin.pool.title'), icon: DatabaseIcon },
     { path: '/admin/upstream-balances', label: '上游余额', icon: CreditCardIcon },
     { path: '/admin/relogin', label: '失效重登', icon: KeyIcon },
     { path: '/admin/tickets', label: '工单管理', icon: TicketIcon },

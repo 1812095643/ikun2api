@@ -629,12 +629,14 @@ func (r *usageLogRepository) GetGlobalStats(ctx context.Context, startTime, endT
 			COALESCE(SUM(cache_creation_tokens + cache_read_tokens), 0) as total_cache_tokens,
 			COALESCE(SUM(total_cost), 0) as total_cost,
 			COALESCE(SUM(actual_cost), 0) as total_actual_cost,
+			COALESCE(SUM(account_stats_cost), 0) as total_account_cost,
 			COALESCE(AVG(duration_ms), 0) as avg_duration_ms
 		FROM usage_logs
 		WHERE created_at >= $1 AND created_at < $2
 	`
 
 	stats := &UsageStats{}
+	totalAccountCost := 0.0
 	if err := scanSingleRow(
 		ctx,
 		r.sql,
@@ -646,10 +648,12 @@ func (r *usageLogRepository) GetGlobalStats(ctx context.Context, startTime, endT
 		&stats.TotalCacheTokens,
 		&stats.TotalCost,
 		&stats.TotalActualCost,
+		&totalAccountCost,
 		&stats.AverageDurationMs,
 	); err != nil {
 		return nil, err
 	}
+	stats.TotalAccountCost = &totalAccountCost
 	stats.TotalTokens = stats.TotalInputTokens + stats.TotalOutputTokens + stats.TotalCacheTokens
 	return stats, nil
 }
@@ -1096,4 +1100,123 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 		UpstreamEndpoints: upstreamEndpoints,
 	}
 	return resp, nil
+}
+
+// ListAccountIDsByUser 返回该用户在窗口内实际调用过的账号 ID（去重、升序）。
+// 用于「实时号池」的普通用户视角：用户只能看到自己用过的账号，看不到整池。
+func (r *usageLogRepository) ListAccountIDsByUser(ctx context.Context, userID int64, startTime time.Time) ([]int64, error) {
+	if userID <= 0 {
+		return nil, nil
+	}
+	query := `
+		SELECT DISTINCT account_id
+		FROM usage_logs
+		WHERE user_id = $1 AND created_at >= $2 AND account_id > 0
+		ORDER BY account_id
+	`
+	rows, err := r.sql.QueryContext(ctx, query, userID, startTime)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+// GetUserAccountWindowStatsBatch 批量聚合「某用户 × 指定账号」在窗口内的用量。
+// 与 GetAccountWindowStatsBatch 的区别：多一个 user_id 维度，保证普通用户拿到的
+// 只是自己的那部分，而不是账号在全站的用量。
+func (r *usageLogRepository) GetUserAccountWindowStatsBatch(ctx context.Context, userID int64, accountIDs []int64, startTime time.Time) (map[int64]*usagestats.AccountStats, error) {
+	result := make(map[int64]*usagestats.AccountStats, len(accountIDs))
+	if userID <= 0 || len(accountIDs) == 0 {
+		return result, nil
+	}
+	query := `
+		SELECT
+			account_id,
+			COUNT(*) as requests,
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as tokens,
+			COALESCE(SUM(COALESCE(account_stats_cost, total_cost) * COALESCE(account_rate_multiplier, 1)), 0) as cost,
+			COALESCE(SUM(total_cost), 0) as standard_cost,
+			COALESCE(SUM(actual_cost), 0) as user_cost
+		FROM usage_logs
+		WHERE user_id = $1 AND account_id = ANY($2) AND created_at >= $3
+		GROUP BY account_id
+	`
+	rows, err := r.sql.QueryContext(ctx, query, userID, pq.Array(accountIDs), startTime)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var accountID int64
+		stats := &usagestats.AccountStats{}
+		if err := rows.Scan(
+			&accountID,
+			&stats.Requests,
+			&stats.Tokens,
+			&stats.Cost,
+			&stats.StandardCost,
+			&stats.UserCost,
+		); err != nil {
+			return nil, err
+		}
+		result[accountID] = stats
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, accountID := range accountIDs {
+		if _, ok := result[accountID]; !ok {
+			result[accountID] = &usagestats.AccountStats{}
+		}
+	}
+	return result, nil
+}
+
+// GetPoolGlobalWindowStats 汇总全站账号侧费用，口径与 GetAccountWindowStatsBatch 完全一致：
+// cost = SUM(COALESCE(account_stats_cost, total_cost) * COALESCE(account_rate_multiplier, 1))。
+//
+// 为什么不复用 GetGlobalStats：那个方法返回的 TotalAccountCost 是裸的
+// SUM(account_stats_cost)，不乘账号倍率，放进号池概览会和逐账号卡片对不上账。
+// 号池概览要求「各账号卡片之和 == 概览数字」，所以必须走这条同口径查询。
+func (r *usageLogRepository) GetPoolGlobalWindowStats(ctx context.Context, startTime time.Time) (*usagestats.AccountStats, error) {
+	query := `
+		SELECT
+			COUNT(*) as requests,
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as tokens,
+			COALESCE(SUM(COALESCE(account_stats_cost, total_cost) * COALESCE(account_rate_multiplier, 1)), 0) as cost,
+			COALESCE(SUM(total_cost), 0) as standard_cost,
+			COALESCE(SUM(actual_cost), 0) as user_cost
+		FROM usage_logs
+		WHERE created_at >= $1
+	`
+
+	stats := &usagestats.AccountStats{}
+	if err := scanSingleRow(
+		ctx,
+		r.sql,
+		query,
+		[]any{startTime},
+		&stats.Requests,
+		&stats.Tokens,
+		&stats.Cost,
+		&stats.StandardCost,
+		&stats.UserCost,
+	); err != nil {
+		return nil, err
+	}
+	return stats, nil
 }

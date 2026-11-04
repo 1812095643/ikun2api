@@ -48,6 +48,9 @@ func RegisterAdminRoutes(
 		// 账号管理
 		registerAccountRoutes(admin, h, stepUpAuth)
 
+		// 实时号池（只读聚合视图）
+		registerPoolRoutes(admin, h)
+
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
 
@@ -742,6 +745,16 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 	// 用户下的订阅列表
 	admin.GET("/users/:id/subscriptions", h.Admin.Subscription.ListByUser)
+}
+
+func registerPoolRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	pool := admin.Group("/pool")
+	{
+		pool.GET("/overview", h.Admin.Pool.Overview)
+		pool.GET("/accounts", h.Admin.Pool.Accounts)
+		pool.GET("/accounts/:id/requests", h.Admin.Pool.AccountRequests)
+		pool.GET("/usage", h.Admin.Pool.Usage)
+	}
 }
 
 func registerUsageRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

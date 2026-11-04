@@ -620,6 +620,11 @@ type UsageLog struct {
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.
 	UpstreamEndpoint *string `json:"upstream_endpoint,omitempty"`
 
+	// AccountNameSnapshot 是写入时固化的账号名快照（用户端只读展示用）。
+	// 账号改名或被删除后，用户在自己的使用记录里仍能看到当时的账号名。
+	// 仅暴露名称，不含平台、倍率、渠道等调度信息。
+	AccountNameSnapshot *string `json:"account_name_snapshot,omitempty"`
+
 	GroupID        *int64 `json:"group_id"`
 	SubscriptionID *int64 `json:"subscription_id"`
 
@@ -719,6 +724,11 @@ type AdminUsageLog struct {
 
 	// Account 最小账号信息（避免泄露敏感字段）
 	Account *AccountSummary `json:"account,omitempty"`
+
+	// AccountNameSnapshot / AccountPlatformSnapshot 是写入时固化的账号名与平台快照。
+	// 账号改名或被删除后，历史记录仍能显示当时的账号，不依赖 join。
+	AccountNameSnapshot     *string `json:"account_name_snapshot,omitempty"`
+	AccountPlatformSnapshot *string `json:"account_platform_snapshot,omitempty"`
 }
 
 type UsageCleanupFilters struct {

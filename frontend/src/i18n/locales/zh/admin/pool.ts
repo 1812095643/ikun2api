@@ -1,0 +1,136 @@
+export default {
+  pool: {
+    title: '实时号池',
+    navAccounts: '账号池',
+    navUsage: '使用记录',
+    description: '号池内每个账号的实时状态、今日用量与近期请求流水。数据来自账号表与用量记录，不提供写入入口。',
+
+    // 普通用户视角：只看得到自己用过的账号，且不暴露内部调度字段。
+    user: {
+      title: '我的号池用量',
+      description: '这里只展示你自己调用过的上游账号与用量，内部调度信息（分组、并发、倍率、优先级）不对普通用户开放。',
+      empty: '你还没有使用过任何号池账号',
+      overview: {
+        accounts: '我用过的账号',
+        accountsHint: '其中 {active} 个当前正常',
+      },
+    },
+
+    overview: {
+      accounts: '账号总数',
+      schedulable: '可调度',
+      inUse: '当前并发',
+      todayRequests: '今日请求',
+      todayTokens: '今日 Tokens',
+      todayCost: '今日费用',
+      weekRequests: '近 7 天请求',
+      activeHint: '活跃 {active} · 异常 {error} · 停用 {disabled}',
+      schedulableHint: '参与调度且未过期',
+      inUseHint: '正在处理的请求数',
+      weekRequestsHint: '含今日',
+    },
+
+    filters: {
+      search: '关键字',
+      searchPlaceholder: '账号名称 / 备注',
+      platform: '平台',
+      type: '类型',
+      status: '状态',
+      allPlatform: '全部平台',
+      allType: '全部类型',
+      allStatus: '全部状态',
+    },
+
+    columns: {
+      account: '账号',
+      platformType: '平台 / 类型',
+      status: '状态',
+      groups: '分组',
+      todayRequests: '今日请求',
+      todayTokens: '今日 Tokens',
+      todayCost: '今日费用',
+      concurrency: '并发占用',
+      rateMultiplier: '倍率',
+      priority: '优先级',
+      lastUsed: '最近使用',
+      availability: '可用性',
+      actions: '操作',
+    },
+
+    status: {
+      active: '正常',
+      disabled: '已停用',
+      error: '异常',
+      unschedulable: '不调度',
+    },
+
+    availability: {
+      normal: '正常',
+      rateLimited: '限流至 {time}',
+      overload: '过载至 {time}',
+      tempUnschedulable: '暂不可调度至 {time}',
+      notScheduled: '未参与调度',
+      never: '从未使用',
+      detail: '可用性详情',
+    },
+
+    actions: {
+      requests: '请求流水',
+    },
+
+    empty: '号池中暂无匹配的账号',
+    loadFailed: '加载号池账号失败',
+    overviewFailed: '加载号池概览失败',
+
+    dialog: {
+      title: '账号 #{id} 近期请求',
+      subtitle: '仅展示最近时间窗口内的请求，与「使用记录」同源。',
+      empty: '该账号在所选时间范围内没有请求',
+      loadFailed: '加载账号请求流水失败',
+      columns: {
+        time: '时间',
+        model: '模型',
+        endpoint: '端点',
+        tokens: '输入 / 输出',
+        cost: '费用',
+        duration: '耗时',
+        requestId: '请求 ID',
+      },
+    },
+
+    usage: {
+      title: '号池使用记录',
+      description: '与「使用记录」同源，额外保留写入时固化的账号名与平台快照，账号改名或被删除后历史依然可读。',
+      userTitle: '我的号池使用记录',
+      userDescription: '你在号池侧的全部请求明细。管理员为你指定的账号、模型映射与上游细节不会在此展示。',
+      filters: {
+        accountId: '账号 ID',
+        userId: '用户 ID',
+        apiKeyId: '密钥 ID',
+        model: '模型',
+        requestId: '请求 ID',
+        accountPlaceholder: '精确匹配',
+        modelPlaceholder: '如 claude-sonnet-4-5',
+        requestIdPlaceholder: '完整或前缀',
+      },
+      columns: {
+        time: '时间',
+        account: '账号',
+        platform: '平台',
+        model: '模型',
+        upstreamModel: '上游模型',
+        endpoint: '端点',
+        user: '用户',
+        apiKey: '密钥',
+        tokens: '输入 / 输出',
+        cost: '费用',
+        duration: '耗时',
+        requestId: '请求 ID',
+      },
+      accountDeleted: '账号已删除',
+      noSnapshot: '无快照',
+      empty: '所选范围内没有号池使用记录',
+      loadFailed: '加载号池使用记录失败',
+    },
+  },
+}
