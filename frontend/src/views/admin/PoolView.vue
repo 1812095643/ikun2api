@@ -120,6 +120,15 @@
                       @change="searchAccounts"
                     />
                   </div>
+
+                  <div v-if="isAdmin" class="w-full sm:w-auto sm:min-w-[170px]">
+                    <label class="input-label">{{ t('admin.pool.filters.group') }}</label>
+                    <Select
+                      v-model="accountFilters.group_id"
+                      :options="groupOptions"
+                      @change="searchAccounts"
+                    />
+                  </div>
                 </div>
 
                 <div class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
@@ -265,9 +274,8 @@
               <div class="truncate font-medium text-gray-900 dark:text-white" :title="row.name">
                 {{ row.name || `#${row.id}` }}
               </div>
-              <div class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
-                <span class="font-mono">#{{ row.id }}</span>
-                <span v-if="isAdmin && row.notes" class="truncate" :title="row.notes">· {{ row.notes }}</span>
+              <div v-if="isAdmin && row.notes" class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
+                <span class="truncate" :title="row.notes">{{ row.notes }}</span>
               </div>
             </div>
           </template>
@@ -294,6 +302,71 @@
               <span v-for="g in row.groups" :key="g.id" class="badge badge-gray">{{ g.name }}</span>
             </div>
             <span v-else class="text-gray-400">—</span>
+          </template>
+
+          <template #cell-capacity="{ row }">
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-1 whitespace-nowrap font-mono text-xs tabular-nums">
+                <span :class="capacityClass(row)">{{ row.capacity?.in_use ?? row.in_use ?? 0 }}</span>
+                <span class="text-gray-400">/</span>
+                <span class="text-gray-600 dark:text-gray-300">{{ row.capacity?.concurrency ?? row.concurrency ?? 0 }}</span>
+              </div>
+              <div v-if="isAdmin" class="flex flex-wrap items-center gap-1">
+                <span
+                  v-if="row.capacity?.supports_window_cost && (row.capacity?.window_cost_limit ?? 0) > 0"
+                  class="inline-flex items-center rounded px-1 py-0.5 font-mono text-[11px] text-gray-500 dark:text-gray-400"
+                  :title="t('admin.pool.extra.windowCostLimitHint')"
+                >
+                  ${{ formatCostFixed(row.capacity?.window_cost_used ?? 0) }}/${{ formatCostFixed(row.capacity?.window_cost_limit ?? 0) }}
+                </span>
+                <span
+                  v-if="row.capacity?.supports_quota && (row.capacity?.quota_weekly_limit ?? 0) > 0"
+                  class="inline-flex items-center rounded px-1 py-0.5 font-mono text-[11px] text-gray-500 dark:text-gray-400"
+                >
+                  W {{ formatNumber(row.capacity?.quota_weekly_used ?? 0) }}/{{ formatNumber(row.capacity?.quota_weekly_limit ?? 0) }}
+                </span>
+                <span
+                  v-if="row.capacity?.supports_quota && (row.capacity?.quota_daily_limit ?? 0) > 0"
+                  class="inline-flex items-center rounded px-1 py-0.5 font-mono text-[11px] text-gray-500 dark:text-gray-400"
+                >
+                  D {{ formatNumber(row.capacity?.quota_daily_used ?? 0) }}/{{ formatNumber(row.capacity?.quota_daily_limit ?? 0) }}
+                </span>
+                <span
+                  v-if="row.capacity?.supports_quota && (row.capacity?.quota_limit ?? 0) > 0"
+                  class="inline-flex items-center rounded px-1 py-0.5 font-mono text-[11px] text-gray-500 dark:text-gray-400"
+                >
+                  T {{ formatNumber(row.capacity?.quota_used ?? 0) }}/{{ formatNumber(row.capacity?.quota_limit ?? 0) }}
+                </span>
+              </div>
+              <span
+                v-if="row.capacity?.quota_warning"
+                class="inline-flex w-fit items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                :title="t('admin.pool.extra.quotaWarning.' + row.capacity.quota_warning)"
+              >
+                <svg class="h-3 w-3 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+                </svg>
+                {{ t('admin.pool.extra.quotaWarningShort') }}
+              </span>
+            </div>
+          </template>
+
+          <template #cell-usage_window="{ row }">
+            <div class="flex min-w-[168px] flex-col gap-1.5">
+              <div v-for="w in quotaWindows(row)" :key="w.key" class="flex flex-col gap-0.5">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-gray-500 dark:text-gray-400">{{ w.label }}</span>
+                  <span class="font-mono tabular-nums" :class="w.pctClass">{{ w.pctText }}</span>
+                </div>
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                  <div class="h-full rounded-full transition-all" :class="w.barClass" :style="{ width: w.width }" />
+                </div>
+                <div class="flex items-center justify-between gap-2 text-[11px] text-gray-400">
+                  <span class="truncate font-mono" :title="w.detail">{{ w.detail }}</span>
+                  <span v-if="w.resetText" class="whitespace-nowrap">{{ w.resetText }}</span>
+                </div>
+              </div>
+            </div>
           </template>
 
           <template #cell-today_requests="{ row }">
@@ -387,9 +460,6 @@
               <div class="truncate font-medium text-gray-900 dark:text-white" :title="accountLabel(row)">
                 {{ accountLabel(row) }}
               </div>
-              <div class="mt-0.5 truncate font-mono text-xs text-gray-400">
-                {{ row.account_id ? `#${row.account_id}` : '—' }}
-              </div>
             </div>
           </template>
 
@@ -434,6 +504,39 @@
             >
               {{ row.inbound_endpoint || row.upstream_endpoint || '—' }}
             </span>
+          </template>
+
+          <template #cell-reasoning_effort="{ row }">
+            <span
+              v-if="row.reasoning_effort"
+              class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+            >{{ row.reasoning_effort }}</span>
+            <span v-else class="text-gray-400">—</span>
+          </template>
+
+          <template #cell-group_name="{ row }">
+            <span
+              v-if="row.group?.name"
+              class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+            >{{ row.group.name }}</span>
+            <span v-else class="text-gray-400">—</span>
+          </template>
+
+          <template #cell-stream_type="{ row }">
+            <span class="text-xs text-gray-600 dark:text-gray-300">
+              {{ row.stream ? t('admin.pool.extra.streaming') : t('admin.pool.extra.nonStreaming') }}
+            </span>
+          </template>
+
+          <template #cell-user_agent="{ row }">
+            <span
+              class="inline-block max-w-[150px] truncate align-middle font-mono text-xs text-gray-500 dark:text-gray-400"
+              :title="row.user_agent || ''"
+            >{{ row.user_agent || '—' }}</span>
+          </template>
+
+          <template #cell-ip_address="{ row }">
+            <span class="whitespace-nowrap font-mono text-xs text-gray-500 dark:text-gray-400">{{ row.ip_address || '—' }}</span>
           </template>
 
           <template #cell-user="{ row }">
@@ -640,6 +743,7 @@ import {
   formatTokensK
 } from '@/utils/format'
 import { useAppStore, useAuthStore } from '@/stores'
+import { getAll as listAdminGroups } from '@/api/admin/groups'
 
 type PoolTab = 'accounts' | 'usage'
 
@@ -691,8 +795,12 @@ const accountFilters = reactive({
   search: '',
   platform: '',
   type: '',
-  status: ''
+  status: '',
+  group_id: ''
 })
+
+// 分组下拉：只给管理员用，普通用户看不到任何分组维度。
+const groupOptions = ref<{ value: string; label: string }[]>([])
 
 const platformOptions = computed(() => [
   { value: '', label: t('admin.pool.filters.allPlatform') },
@@ -734,15 +842,89 @@ function windowCost(w: PoolWindow | undefined): number {
   return isAdmin.value ? (w.cost ?? 0) : (w.user_cost ?? 0)
 }
 
+/** 容量列的并发占用配色。 */
+function capacityClass(row: PoolAccount): string {
+  const inUse = row.capacity?.in_use ?? row.in_use ?? 0
+  const max = row.capacity?.concurrency ?? row.concurrency ?? 0
+  if (max > 0 && inUse >= max) return 'text-red-600 dark:text-red-400'
+  if (inUse > 0) return 'text-amber-600 dark:text-amber-400'
+  return 'text-gray-500 dark:text-gray-400'
+}
+
+interface QuotaLike {
+  utilization?: number
+  resets_at?: string
+  remaining_seconds?: number
+  requests?: number
+  tokens?: number
+  cost?: number
+  source?: string
+  enabled?: boolean
+}
+
+interface QuotaWindowView {
+  key: string
+  label: string
+  pctText: string
+  pctClass: string
+  barClass: string
+  width: string
+  detail: string
+  resetText: string
+}
+
+/**
+ * 单个用量窗口的展示读数。
+ *
+ * 进度条只认真数：没有可靠利用率时 pct 为 0、不画条、显示「—」，
+ * 绝不编一个百分比出来。
+ */
+function quotaWindowView(w: QuotaLike | undefined, key: string, label: string): QuotaWindowView {
+  const pct = Math.max(0, Math.min(100, w?.utilization ?? 0))
+  const drawn = pct > 0
+  let barClass = 'bg-emerald-500'
+  let pctClass = 'text-emerald-600 dark:text-emerald-400'
+  if (pct >= 90) {
+    barClass = 'bg-red-500'
+    pctClass = 'text-red-600 dark:text-red-400'
+  } else if (pct >= 70) {
+    barClass = 'bg-amber-500'
+    pctClass = 'text-amber-600 dark:text-amber-400'
+  }
+  if (!drawn) pctClass = 'text-gray-400'
+  const parts: string[] = []
+  if (isAdmin.value && w) {
+    if (w.requests != null) parts.push(t('admin.pool.extra.windowRequests', { n: formatNumber(w.requests) }))
+    if (w.cost != null && w.cost > 0) parts.push(`$${formatCostFixed(w.cost)}`)
+  }
+  return {
+    key,
+    label,
+    pctText: drawn ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : '—',
+    pctClass,
+    barClass,
+    width: `${pct}%`,
+    detail: parts.join(' · '),
+    resetText: w?.resets_at ? t('admin.pool.extra.windowResetsAt', { time: formatRelativeTime(w.resets_at) }) : ''
+  }
+}
+
+function quotaWindows(row: PoolAccount): QuotaWindowView[] {
+  return [
+    quotaWindowView(row.five_hour, '5h', t('admin.pool.extra.window5h')),
+    quotaWindowView(row.seven_day, '7d', t('admin.pool.extra.window7d'))
+  ]
+}
+
 const accountColumns = computed<Column[]>(() => {
   const base: Column[] = [
     { key: 'account', label: t('admin.pool.columns.account') },
     { key: 'platform_type', label: t('admin.pool.columns.platformType') },
-    { key: 'status', label: t('admin.pool.columns.status') }
+    { key: 'capacity', label: t('admin.pool.extra.capacity') },
+    { key: 'status', label: t('admin.pool.columns.status') },
+    { key: 'groups', label: t('admin.pool.columns.groups') },
+    { key: 'usage_window', label: t('admin.pool.extra.usageWindow') }
   ]
-  if (isAdmin.value) {
-    base.push({ key: 'groups', label: t('admin.pool.columns.groups') })
-  }
   base.push(
     { key: 'today_requests', label: t('admin.pool.columns.todayRequests'), class: 'text-right' },
     { key: 'today_tokens', label: t('admin.pool.columns.todayTokens'), class: 'text-right' },
@@ -750,7 +932,6 @@ const accountColumns = computed<Column[]>(() => {
   )
   if (isAdmin.value) {
     base.push(
-      { key: 'concurrency', label: t('admin.pool.columns.concurrency'), class: 'text-right' },
       { key: 'rate_multiplier', label: t('admin.pool.columns.rateMultiplier'), class: 'text-right' },
       { key: 'priority', label: t('admin.pool.columns.priority'), class: 'text-right' },
       { key: 'availability', label: t('admin.pool.columns.availability') }
@@ -903,6 +1084,7 @@ async function fetchAccounts() {
     if (accountFilters.platform) params.platform = accountFilters.platform
     if (accountFilters.type) params.type = accountFilters.type
     if (accountFilters.status) params.status = accountFilters.status
+    if (accountFilters.group_id) params.group_id = accountFilters.group_id
 
     const result: PaginatedResponse<PoolAccount> = await listPoolAccounts(
       params,
@@ -944,6 +1126,7 @@ function resetAccountFilters() {
   accountFilters.platform = ''
   accountFilters.type = ''
   accountFilters.status = ''
+  accountFilters.group_id = ''
   searchAccounts()
 }
 
@@ -993,29 +1176,23 @@ const usageFilters = reactive({
 })
 
 const usageColumns = computed<Column[]>(() => {
-  const base: Column[] = [{ key: 'created_at', label: t('admin.pool.usage.columns.time') }]
+  const base: Column[] = []
   if (isAdmin.value) {
-    base.push(
-      { key: 'account', label: t('admin.pool.usage.columns.account') },
-      { key: 'platform', label: t('admin.pool.usage.columns.platform') },
-      { key: 'model', label: t('admin.pool.usage.columns.model') },
-      { key: 'upstream_model', label: t('admin.pool.usage.columns.upstreamModel') },
-      { key: 'endpoint', label: t('admin.pool.usage.columns.endpoint') },
-      { key: 'user', label: t('admin.pool.usage.columns.user') }
-    )
-  } else {
-    base.push(
-      { key: 'model', label: t('admin.pool.usage.columns.model') },
-      { key: 'endpoint', label: t('admin.pool.usage.columns.endpoint') },
-      { key: 'account', label: t('admin.pool.usage.columns.account') }
-    )
+    base.push({ key: 'user', label: t('admin.pool.usage.columns.user') })
   }
   base.push(
-    { key: 'api_key', label: t('admin.pool.usage.columns.apiKey') },
+    { key: 'account', label: t('admin.pool.usage.columns.account') },
+    { key: 'model', label: t('admin.pool.usage.columns.model') },
+    { key: 'reasoning_effort', label: t('admin.pool.extra.reasoningEffort') },
+    { key: 'endpoint', label: t('admin.pool.usage.columns.endpoint') },
+    { key: 'group_name', label: t('admin.pool.extra.group') },
+    { key: 'stream_type', label: t('admin.pool.extra.type') },
     { key: 'tokens', label: t('admin.pool.usage.columns.tokens'), class: 'text-right' },
     { key: 'cost', label: t('admin.pool.usage.columns.cost'), class: 'text-right' },
     { key: 'duration', label: t('admin.pool.usage.columns.duration'), class: 'text-right' },
-    { key: 'request_id', label: t('admin.pool.usage.columns.requestId') }
+    { key: 'created_at', label: t('admin.pool.usage.columns.time') },
+    { key: 'user_agent', label: t('admin.pool.extra.userAgent') },
+    { key: 'ip_address', label: t('admin.pool.extra.ipAddress') }
   )
   return base
 })
@@ -1172,8 +1349,23 @@ function onRequestPageChange(p: number) {
   loadRequests()
 }
 
+async function loadGroupOptions() {
+  if (!isAdmin.value) return
+  try {
+    const groups = await listAdminGroups()
+    groupOptions.value = [
+      { value: '', label: t('admin.pool.filters.allGroups') },
+      ...(groups ?? []).map(g => ({ value: String(g.id), label: g.name }))
+    ]
+  } catch {
+    // 分组接口不可用时只是少一个筛选器，不影响号池主功能。
+    groupOptions.value = [{ value: '', label: t('admin.pool.filters.allGroups') }]
+  }
+}
+
 onMounted(() => {
   refreshAccounts()
+  void loadGroupOptions()
   if (activeTab.value === 'usage') fetchUsage()
 })
 </script>

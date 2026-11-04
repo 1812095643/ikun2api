@@ -1,5 +1,28 @@
 export default {
   pool: {
+    extra: {
+      capacity: 'Capacity',
+      usageWindow: 'Usage window',
+      window5h: '5h',
+      window7d: '7d',
+      windowRequests: '{n} req',
+      windowResetsAt: 'resets {time}',
+      windowCostLimitHint: '5h window cost limit',
+      group: 'Group',
+      type: 'Type',
+      reasoningEffort: 'Reasoning',
+      userAgent: 'User-Agent',
+      ipAddress: 'IP',
+      streaming: 'Streaming',
+      nonStreaming: 'Non-streaming',
+      quotaWarningShort: 'Limit full but schedulable',
+      quotaWarning: {
+        quota_exceeded_but_schedulable: 'Quota exhausted, yet this account is still being scheduled (quota_* does not gate this account type)',
+        window_cost_exceeded_but_schedulable: '5h window cost is at its limit, yet this account is still being scheduled',
+        window_rejected_but_schedulable: 'Upstream rejected the 5h window, yet this account is still being scheduled',
+        window_exhausted_but_schedulable: 'Upstream 5h usage is exhausted, yet this account is still being scheduled'
+      }
+    },
     title: 'Live Account Pool',
     navAccounts: 'Account Pool',
     navUsage: 'Usage Records',
@@ -39,6 +62,8 @@ export default {
       allPlatform: 'All platforms',
       allType: 'All types',
       allStatus: 'All statuses',
+      group: 'Group',
+      allGroups: 'All groups',
     },
 
     columns: {

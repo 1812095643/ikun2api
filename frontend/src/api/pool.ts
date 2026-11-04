@@ -32,6 +32,10 @@ export interface PoolGroupRef {
 
 /** 号池中的账号视图（管理员口径）。 */
 export interface PoolAccount {
+  capacity?: PoolCapacity
+  five_hour?: PoolQuotaWindow
+  seven_day?: PoolQuotaWindow
+
   id: number
   name: string
   platform: string
@@ -175,3 +179,33 @@ export const poolAPI = {
 }
 
 export default poolAPI
+
+/** 号池单个用量窗口（5 小时 / 7 天）的读数。 */
+export interface PoolQuotaWindow {
+  requests?: number
+  tokens?: number
+  cost?: number
+  utilization: number
+  resets_at?: string
+  remaining_seconds?: number
+  source?: string
+  enabled?: boolean
+}
+
+/** 号池容量视图：并发槽位 + 管理员配置的各类限额。 */
+export interface PoolCapacity {
+  in_use: number
+  concurrency: number
+  load_factor?: number
+  window_cost_used?: number
+  window_cost_limit?: number
+  quota_used?: number
+  quota_limit?: number
+  quota_daily_used?: number
+  quota_daily_limit?: number
+  quota_weekly_used?: number
+  quota_weekly_limit?: number
+  supports_quota?: boolean
+  supports_window_cost?: boolean
+  quota_warning?: string
+}

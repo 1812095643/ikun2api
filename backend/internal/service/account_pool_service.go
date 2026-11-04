@@ -85,6 +85,10 @@ type PoolAccount struct {
 	ParentAccountID *int64         `json:"parent_account_id,omitempty"`
 	Groups          []PoolGroupRef `json:"groups,omitempty"`
 
+	Capacity PoolCapacity    `json:"capacity"`
+	FiveHour PoolQuotaWindow `json:"five_hour"`
+	SevenDay PoolQuotaWindow `json:"seven_day"`
+
 	Today PoolWindow `json:"today"`
 }
 
@@ -182,7 +186,9 @@ func (s *AccountPoolService) ListAccounts(ctx context.Context, filter PoolAccoun
 	ids := make([]int64, 0, len(accounts))
 	for i := range accounts {
 		acc := &accounts[i]
+		capacity := poolCapacityFromAccount(acc)
 		item := PoolAccount{
+			Capacity:                capacity,
 			ID:                      acc.ID,
 			Name:                    acc.Name,
 			Platform:                acc.Platform,
@@ -212,12 +218,24 @@ func (s *AccountPoolService) ListAccounts(ctx context.Context, filter PoolAccoun
 			}
 			item.Groups = append(item.Groups, PoolGroupRef{ID: g.ID, Name: g.Name})
 		}
+		item.FiveHour = poolQuotaWindowFromAccount(acc, poolWindowFiveHour, capacity)
+		item.SevenDay = poolQuotaWindowFromAccount(acc, poolWindowSevenDay, capacity)
 		items = append(items, item)
 		ids = append(ids, acc.ID)
 	}
 
 	s.fillTodayStats(ctx, items, ids)
 	s.fillConcurrency(ctx, items, ids)
+	s.fillCapacity(ctx, items)
+	s.fillWindowStats(ctx, items, ids)
+
+	// 窗口费用回填之后再体检「限额满了还能调度」的不一致，需要用到 window_cost_used。
+	for i := range items {
+		if i >= len(accounts) {
+			break
+		}
+		items[i].Capacity.QuotaWarning = poolQuotaWarning(&accounts[i], items[i])
+	}
 
 	return &PoolAccountList{
 		Items:    items,
@@ -372,6 +390,11 @@ type PoolUserAccount struct {
 	Schedulable bool       `json:"schedulable"`
 	LastUsedAt  *string    `json:"last_used_at"`
 	Today       PoolWindow `json:"today"`
+
+	Groups   []PoolGroupRef      `json:"groups,omitempty"`
+	Capacity PoolUserCapacity    `json:"capacity"`
+	FiveHour PoolUserQuotaWindow `json:"five_hour"`
+	SevenDay PoolUserQuotaWindow `json:"seven_day"`
 }
 
 // PoolUserOverview 是普通用户看到的号池概览：只有自己的数字。
@@ -513,11 +536,14 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	}
 
 	search := strings.ToLower(strings.TrimSpace(filter.Search))
+	now := timezone.Now()
 	items := make([]PoolUserAccount, 0, len(accounts))
+	itemIDs := make([]int64, 0, len(accounts))
 	for _, acc := range accounts {
 		if acc == nil {
 			continue
 		}
+		displayName := poolDisplayAccountNameForUser(acc, userID, now)
 		if filter.Platform != "" && !strings.EqualFold(acc.Platform, filter.Platform) {
 			continue
 		}
@@ -527,17 +553,29 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 		if filter.Status != "" && !strings.EqualFold(acc.Status, filter.Status) {
 			continue
 		}
-		if search != "" && !strings.Contains(strings.ToLower(acc.Name), search) {
+		if search != "" &&
+			!strings.Contains(strings.ToLower(acc.Name), search) &&
+			!strings.Contains(strings.ToLower(displayName), search) {
 			continue
 		}
+		capacity := poolCapacityFromAccount(acc)
 		item := PoolUserAccount{
 			ID:          acc.ID,
-			Name:        acc.Name,
+			Name:        displayName,
 			Platform:    acc.Platform,
 			Type:        acc.Type,
 			Status:      acc.Status,
 			Schedulable: acc.Schedulable,
 			LastUsedAt:  poolFormatTimePtr(acc.LastUsedAt),
+			Capacity:    poolUserCapacityFrom(capacity),
+			FiveHour:    poolUserQuotaWindowFrom(poolQuotaWindowFromAccount(acc, poolWindowFiveHour, capacity)),
+			SevenDay:    poolUserQuotaWindowFrom(poolQuotaWindowFromAccount(acc, poolWindowSevenDay, capacity)),
+		}
+		for _, g := range acc.Groups {
+			if g == nil {
+				continue
+			}
+			item.Groups = append(item.Groups, PoolGroupRef{ID: g.ID, Name: g.Name})
 		}
 		if stats, ok := todayStats[acc.ID]; ok && stats != nil {
 			// 普通用户只看自己实付：cost 与 user_cost 同为实付金额，
@@ -551,7 +589,10 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 			}
 		}
 		items = append(items, item)
+		itemIDs = append(itemIDs, acc.ID)
 	}
+
+	s.fillUserCapacity(ctx, items, itemIDs)
 
 	result.Total = int64(len(items))
 	start := (result.Page - 1) * result.PageSize

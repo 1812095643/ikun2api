@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,38 @@ func NewPoolHandler(poolService *service.AccountPoolService, usageService *servi
 	return &PoolHandler{
 		poolService:  poolService,
 		usageService: usageService,
+	}
+}
+
+// maskUsageAccountNames 把使用记录里的真实账号名换成脱敏名 / 稳定伪名。
+//
+// 为什么必须在 handler 里改：dto.UsageLogFromService 会把 account_name_snapshot
+// 原样带出去，那是账号表的真名，普通用户拿到就是泄漏。
+func (h *PoolHandler) maskUsageAccountNames(ctx context.Context, userID int64, items []*dto.UsageLog) {
+	if h.poolService == nil || len(items) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(items))
+	for _, item := range items {
+		if item == nil || item.AccountID <= 0 {
+			continue
+		}
+		ids = append(ids, item.AccountID)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	names := h.poolService.PoolUsageAccountNames(ctx, userID, ids)
+	for _, item := range items {
+		if item == nil || item.AccountID <= 0 {
+			continue
+		}
+		name, ok := names[item.AccountID]
+		if !ok || name == "" {
+			continue
+		}
+		masked := name
+		item.AccountNameSnapshot = &masked
 	}
 }
 
@@ -135,6 +168,7 @@ func (h *PoolHandler) AccountRequests(c *gin.Context) {
 		// 用户端用 UsageLog（不含 upstream_request_id / 渠道 / 账号倍率等管理端字段）。
 		items = append(items, dto.UsageLogFromService(&records[i]))
 	}
+	h.maskUsageAccountNames(c.Request.Context(), subject.UserID, items)
 	response.Paginated(c, items, result.Total, result.Page, result.PageSize)
 }
 
@@ -208,6 +242,7 @@ func (h *PoolHandler) Usage(c *gin.Context) {
 	for i := range records {
 		items = append(items, dto.UsageLogFromService(&records[i]))
 	}
+	h.maskUsageAccountNames(c.Request.Context(), subject.UserID, items)
 	response.Paginated(c, items, result.Total, result.Page, result.PageSize)
 }
 

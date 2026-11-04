@@ -1,5 +1,28 @@
 export default {
   pool: {
+    extra: {
+      capacity: '容量',
+      usageWindow: '用量窗口',
+      window5h: '5 小时',
+      window7d: '7 天',
+      windowRequests: '{n} 次',
+      windowResetsAt: '重置 {time}',
+      windowCostLimitHint: '5 小时窗口费用限额',
+      group: '分组',
+      type: '类型',
+      reasoningEffort: '推理强度',
+      userAgent: 'User-Agent',
+      ipAddress: 'IP',
+      streaming: '流式',
+      nonStreaming: '非流式',
+      quotaWarningShort: '限额已满仍可调度',
+      quotaWarning: {
+        quota_exceeded_but_schedulable: '配额已用尽，但账号仍在被调度（quota_* 未拦截该账号类型）',
+        window_cost_exceeded_but_schedulable: '5 小时窗口费用已达上限，但账号仍在被调度',
+        window_rejected_but_schedulable: '上游 5 小时窗口已拒绝，但账号仍在被调度',
+        window_exhausted_but_schedulable: '上游 5 小时额度已用满，但账号仍在被调度'
+      }
+    },
     title: '实时号池',
     navAccounts: '账号池',
     navUsage: '使用记录',
@@ -39,6 +62,8 @@ export default {
       allPlatform: '全部平台',
       allType: '全部类型',
       allStatus: '全部状态',
+      group: '分组',
+      allGroups: '全部分组',
     },
 
     columns: {

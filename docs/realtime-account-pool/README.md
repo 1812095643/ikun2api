@@ -5,7 +5,7 @@
 
 - 管理端入口：`/admin/pool`
 - 用户端入口：`/pool`
-- 线上版本：`1.3.39-pool6`
+- 线上版本：`1.3.39-pool9`
 - 首版落地日期：2026-11-04
 
 ## 这个功能解决什么问题
@@ -50,6 +50,7 @@
 | [06-build-deploy.md](06-build-deploy.md) | 无 buildx 环境构建、部署切换、回滚 |
 | [07-verification.md](07-verification.md) | 对账记录、10 项鲁棒性测试、浏览器验收 |
 | [08-changelog.md](08-changelog.md) | 版本演进、已知限制、后续 TODO |
+| [09-quota-and-display.md](09-quota-and-display.md) | 第二轮：5h/7d 真实额度、容量门控、脱敏、列对齐 |
 
 ## 30 秒上手
 
