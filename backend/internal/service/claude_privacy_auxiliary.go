@@ -85,6 +85,11 @@ func sanitizeClaudeCacheArray(value gjson.Result, content bool, depth int) ([]by
 				}
 				return sanitizeClaudeCacheControl(field)
 			}
+			// Only a direct message content block is a protocol tool addition.
+			// A lookalike inside tool_result content is user data, not metadata.
+			if content && depth == 1 && key == "tool" && item.Get("type").String() == "tool_addition" {
+				return sanitizeClaudeToolAddition(field)
+			}
 			if content && key == "content" {
 				return sanitizeClaudeCacheArray(field, true, depth+1)
 			}
@@ -111,7 +116,9 @@ func SanitizeClaudePrivacyAuxiliary(body []byte) ([]byte, error) {
 			return sanitizeClaudeCacheControl(field)
 		case "diagnostics":
 			return sanitizeClaudeDiagnostics(field)
-		case "tools", "system":
+		case "tools":
+			return sanitizeClaudeToolDefinitions(field)
+		case "system":
 			return sanitizeClaudeCacheArray(field, false, 0)
 		case "messages":
 			return sanitizeClaudeCacheArray(field, true, 0)

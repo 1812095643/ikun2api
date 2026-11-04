@@ -64,7 +64,8 @@ type claudeTelemetryDelivery struct {
 	generation    uint64
 }
 
-// 事件包络核对自 Claude Code 2.1.301；行为与用量取实际观测，附加属性使用本项目默认值。
+// 事件包络核对自 Claude Code 2.1.301；2.1.318 新增工具/脚本统计仅采用
+// 可从实际出站请求确认的数量和 API 结果，不重建客户端独有的运行或权限事件。
 func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Account, result *ForwardResult, forwardErr error, started time.Time, status, attempts int) ([]byte, string, error) {
 	if account == nil || account.IsCustomBaseURLEnabled() || !isClaudeTelemetryOfficialRequest(req) {
 		return nil, "", fmt.Errorf("遥测缺少官方地址的实际出站请求")
@@ -97,6 +98,8 @@ func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Accou
 		"attempt":                    attempts,
 		"messageCount":               gjson.GetBytes(wireBody, "messages.#").Int(),
 		"provider":                   "firstParty",
+		"outcome":                    "success",
+		"gatewayRequestSummary":      buildClaudeTelemetryRequestSummary(wireBody),
 	}
 	// Only server-owned, fixed attributes are added. In particular, seat type,
 	// client OTel resources, URLs, use-case IDs and arbitrary account data stay out.
@@ -115,6 +118,10 @@ func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Accou
 		}
 		metadata["errorType"] = errorType
 		metadata["error"] = errorType
+		metadata["outcome"] = errorType
+		if status == http.StatusTooManyRequests && errorType == "upstream_error" {
+			metadata["outcome"] = "rate_limited"
+		}
 	} else {
 		metadata["inputTokens"] = result.Usage.InputTokens
 		metadata["outputTokens"] = result.Usage.OutputTokens

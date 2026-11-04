@@ -1077,6 +1077,12 @@ func sanitizeAnthropicBodyForBetaTokens(body []byte, anthropicBetaHeader string)
 		body, changed = b, true
 	}
 
+	// Tool provenance is capability-specific at both definition locations. Do
+	// not re-enable a beta removed by mimicry, policy or an account override.
+	if b, deleted := stripClaudeToolOwnershipUnlessBeta(body, anthropicBetaHeader); deleted {
+		body, changed = b, true
+	}
+
 	// messages[].output_config：mid-conversation-output-config beta 专属字段。
 	// 顶层 output_config / effort 不受该 beta 约束，本分支只净化消息内字段。
 	if b, deleted := stripAnthropicMessageOutputConfigUnlessBeta(body, anthropicBetaHeader); deleted {

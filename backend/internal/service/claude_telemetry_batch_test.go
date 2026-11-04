@@ -93,13 +93,31 @@ func TestClaudeTelemetryBatchPreservesEventsAndIsolatesOrigins(t *testing.T) {
 
 func TestClaudeTelemetryBatchSplitsAtCountAndByteLimits(t *testing.T) {
 	first := telemetryBatchDelivery(t, true)
+	// Isolate the event-count boundary from the independent byte limit. The
+	// normal summary grows as new safe numeric observations are introduced.
+	compact := first
+	compact.body = []byte(`{"events":[{"event_type":"ClaudeCodeInternalEvent","event_data":{"event_name":"tengu_api_success"}}]}`)
 	items := make([]claudeTelemetryDelivery, 201)
 	for i := range items {
-		items[i] = first
+		items[i] = compact
 	}
 	batches := combineClaudeTelemetryDeliveries(items)
 	if len(batches) != 2 || gjson.GetBytes(batches[0].body, "events.#").Int() != 200 || gjson.GetBytes(batches[1].body, "events.#").Int() != 1 {
 		t.Fatal("单批超过官方默认的 200 条上限")
+	}
+	for i := range items {
+		items[i] = first
+	}
+	total := int64(0)
+	for _, batch := range combineClaudeTelemetryDeliveries(items) {
+		count := gjson.GetBytes(batch.body, "events.#").Int()
+		if count < 1 || count > claudeTelemetryMaxEvents || len(batch.body) > MaxClaudeTelemetryBodyBytes {
+			t.Fatal("完整摘要分批必须同时满足条数和字节限制")
+		}
+		total += count
+	}
+	if total != int64(len(items)) {
+		t.Fatal("完整摘要分批不能丢失事件")
 	}
 	payload, _ := decodeClaudeTelemetryPayload(first.body)
 	var event map[string]any

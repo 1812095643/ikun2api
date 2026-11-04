@@ -28,3 +28,13 @@
 本机 Claude Code 2.1.301 的内嵌 JavaScript、隔离样本及上一轮回放位于任务目录 `outputs/claude-telemetry-audit-20261027`。定时发送回归与部署证据位于 `outputs/claude-telemetry-scheduler-20261027`。本地测试接收器的确认不等于供应商接收，不据此推断账号安全或供应商采集行为。
 
 适当对齐官方 2.1.301 的批量发送形态，不增加事件类别或个人信息字段。客户端 gzip 由条件回调启用，网关维持现有 JSON 发送；官方部分路径在 401 后改为匿名发送，网关继续保留鉴权和无重试限制。批量验证证据位于 `outputs/claude-telemetry-batching-20261027`。
+
+
+## Claude Code 2.1.318 的工具来源与统计适配
+
+- 工具定义与消息顶层 `tool_addition` 的 `ownership_metadata` 只保留已支持的 `verified:false`、`owner:"mcp"`。来源 URL、连接器目录条目和未知附加信息删除；歧义键、错误类型及未知归属语义本地拒绝。业务参数、JSON Schema、工具结果、thinking/signature 不按关键词改写。
+- 新旧 `sandy-plover`、`wiggly-dove`、billing 头，以及 `x-cc-internal-tool-provenance-*` 内部标识均保持禁止出站。共享允许列表的未来扩展不能覆盖这一明确的禁止规则。
+- API 摘要新增 `gatewayRequestSummary`，只包含实际请求的工具定义数、内联定义数、历史工具调用/结果/错误块数和 stream 布尔值；历史计数不是新执行次数。沿用真实耗时与用量，新增固定枚举的 outcome 区分成功、上游错误、传输错误、客户端断开与限流。
+- 不依据客户端遥测生成 Code Mode 启用选择、脚本执行或权限判断；这类原始事件不能领取已有 API 摘要。新增统计无工具名、源码、参数、结果正文、URL 或仓库摘要，仍标明 `ikun2api_gateway` 来源。
+- 没有增加发送任务、并发数或事件种类。上述统计属于本项目摘要扩展，不能据此宣称官方已消费这些属性。
+- 来源对象与最终实际出站 `tool-provenance-2026-10-26` beta 联动：有 beta 时仅保留脱敏归属字段，无 beta 时删除两处协议位置的归属对象。按账号覆写和模型策略后的实际值处理；不自动添加新 beta，计数接口保留自身原有能力策略。

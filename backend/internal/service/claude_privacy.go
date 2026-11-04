@@ -351,12 +351,25 @@ func sanitizeClaudePrivacyHeaders(headers http.Header) {
 	for key := range headers {
 		name := strings.ToLower(key)
 		allowed := allowedHeaders[name] || name == "authorization" || name == "x-api-key" || name == "x-goog-api-key"
-		switch name {
-		case "x-claude-code-agent-id", "x-claude-code-parent-agent-id", "x-claude-code-prompt-id", "x-claude-remote-container-id", "x-claude-remote-session-id":
+		if isClaudePrivacyBlockedHeader(name) {
 			allowed = false
 		}
 		if !allowed {
 			delete(headers, key)
 		}
 	}
+}
+
+// Pin sensitive header families closed even if a future upstream merge broadens
+// the shared allowlist. The contents of old/new sandy-plover are never decoded
+// or rebuilt, so URL, directory_entry and future payload fields stay blocked.
+func isClaudePrivacyBlockedHeader(name string) bool {
+	name = strings.ToLower(name)
+	switch name {
+	case "x-claude-code-agent-id", "x-claude-code-parent-agent-id", "x-claude-code-prompt-id",
+		"x-claude-remote-container-id", "x-claude-remote-session-id",
+		"x-anthropic-billing-header", "x-claude-code-wiggly-dove", "x-claude-code-sandy-plover":
+		return true
+	}
+	return strings.HasPrefix(name, "x-cc-internal-tool-provenance-")
 }
