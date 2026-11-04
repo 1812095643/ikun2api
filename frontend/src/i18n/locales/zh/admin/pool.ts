@@ -1,6 +1,21 @@
 export default {
   pool: {
     extra: {
+      synthetic: {
+        title: '用户视图展示',
+        description: '只影响普通用户在号池页看到什么：不写库、不参与调度与计费，关掉即恢复真实数据。',
+        count: '合成账号数量',
+        countHint: '额外展示多少个账号，0 表示关闭。上限 50。',
+        banned: '其中封禁数量',
+        bannedHint: '这些账号会显示为不可用，用于还原真实号池的样子。',
+        platform: '合成账号平台',
+        visibleGroup: '用户可见分组',
+        visibleGroupHint: '只把该分组下的真实账号展示给用户，留空表示不限。',
+        save: '保存设置',
+        loadFailed: '读取号池展示设置失败',
+        saveFailed: '保存号池展示设置失败',
+        noRequests: '合成账号没有请求流水',
+      },
       capacity: '容量',
       usageWindow: '用量窗口',
       window5h: '5 小时',

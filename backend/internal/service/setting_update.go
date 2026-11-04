@@ -180,6 +180,10 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeySessionBindingEnabled] = strconv.FormatBool(settings.SessionBindingEnabled)
 	updates[SettingKeyStepUpEnabled] = strconv.FormatBool(settings.StepUpEnabled)
 	updates[SettingKeyAuditLogRetentionDays] = strconv.Itoa(settings.AuditLogRetentionDays)
+	updates[SettingKeyPoolUserSyntheticCount] = strconv.Itoa(clampPoolSyntheticCount(settings.PoolUserSyntheticCount))
+	updates[SettingKeyPoolUserSyntheticBanned] = strconv.Itoa(clampPoolSyntheticCount(settings.PoolUserSyntheticBanned))
+	updates[SettingKeyPoolUserSyntheticPlatform] = parsePoolUserSyntheticPlatform(settings.PoolUserSyntheticPlatform)
+	updates[SettingKeyPoolUserVisibleGroupID] = strconv.FormatInt(settings.PoolUserVisibleGroupID, 10)
 	settings.LoginAgreementMode = normalizeLoginAgreementMode(settings.LoginAgreementMode)
 	settings.LoginAgreementUpdatedAt = strings.TrimSpace(settings.LoginAgreementUpdatedAt)
 	if settings.LoginAgreementUpdatedAt == "" {

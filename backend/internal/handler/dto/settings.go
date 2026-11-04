@@ -42,9 +42,13 @@ type SystemSettings struct {
 	PasskeyConfigured                   bool                     `json:"passkey_configured"`
 	PasskeyRPID                         string                   `json:"passkey_rp_id"`
 	PasskeyRPOrigins                    []string                 `json:"passkey_rp_origins"`
-	SessionBindingEnabled               bool                     `json:"session_binding_enabled"`  // 会话 IP/UA 绑定
-	StepUpEnabled                       bool                     `json:"step_up_enabled"`          // 敏感操作 step-up 2FA
-	AuditLogRetentionDays               int                      `json:"audit_log_retention_days"` // 审计日志保留天数
+	SessionBindingEnabled               bool                     `json:"session_binding_enabled"`      // 会话 IP/UA 绑定
+	StepUpEnabled                       bool                     `json:"step_up_enabled"`              // 敏感操作 step-up 2FA
+	AuditLogRetentionDays               int                      `json:"audit_log_retention_days"`     // 审计日志保留天数
+	PoolUserSyntheticCount              int                      `json:"pool_user_synthetic_count"`    // 号池用户视图合成账号数量（0 关闭）
+	PoolUserSyntheticBanned             int                      `json:"pool_user_synthetic_banned"`   // 合成账号中显示为不可用的数量
+	PoolUserSyntheticPlatform           string                   `json:"pool_user_synthetic_platform"` // 合成账号展示的平台
+	PoolUserVisibleGroupID              int64                    `json:"pool_user_visible_group_id"`   // 用户端只展示该分组下的真实账号（0 不限）
 	LoginAgreementEnabled               bool                     `json:"login_agreement_enabled"`
 	LoginAgreementMode                  string                   `json:"login_agreement_mode"`
 	LoginAgreementUpdatedAt             string                   `json:"login_agreement_updated_at"`

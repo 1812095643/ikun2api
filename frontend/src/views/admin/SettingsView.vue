@@ -9572,6 +9572,12 @@ type SettingsForm = Omit<
   | "wechat_connect_mp_enabled"
   | "wechat_connect_mobile_enabled"
   | "openai_oauth_scheduling_rate_multiplier"
+  // 号池展示设置由「实时号池」页独占管理：设置页既不在表单里持有，
+  // 也不会随保存一起提交，避免从这里误覆盖管理员在号池页保存的值。
+  | "pool_user_synthetic_count"
+  | "pool_user_synthetic_banned"
+  | "pool_user_synthetic_platform"
+  | "pool_user_visible_group_id"
 > & {
   /** Form always binds a concrete boolean (SystemSettings marks this optional). */
   channel_monitor_hide_throughput: boolean;

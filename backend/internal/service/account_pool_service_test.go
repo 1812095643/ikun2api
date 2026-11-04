@@ -38,7 +38,7 @@ func (r *poolTestUsageRepo) GetUserAccountWindowStatsBatch(_ context.Context, us
 func TestAccountPoolUserScopeAndMaskedSearch(t *testing.T) {
 	account := &Account{ID: 9, Name: "private-account@example.test", Platform: "anthropic", Type: "oauth", Status: StatusActive}
 	repo := &poolTestUsageRepo{}
-	svc := NewAccountPoolService(poolTestAdmin{accounts: []*Account{account}}, nil, nil, repo)
+	svc := NewAccountPoolService(poolTestAdmin{accounts: []*Account{account}}, nil, nil, repo, nil)
 	result, err := svc.ListAccountsForUser(context.Background(), 42, PoolAccountFilter{})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 1)

@@ -36,6 +36,10 @@ type UpdateSettingsRequest struct {
 	SessionBindingEnabled               *bool                        `json:"session_binding_enabled"`  // 会话 IP/UA 绑定（省略=保持现值）
 	StepUpEnabled                       *bool                        `json:"step_up_enabled"`          // 敏感操作 step-up 2FA（省略=保持现值）
 	AuditLogRetentionDays               int                          `json:"audit_log_retention_days"` // 审计日志保留天数
+	PoolUserSyntheticCount              int                          `json:"pool_user_synthetic_count"`
+	PoolUserSyntheticBanned             int                          `json:"pool_user_synthetic_banned"`
+	PoolUserSyntheticPlatform           string                       `json:"pool_user_synthetic_platform"`
+	PoolUserVisibleGroupID              int64                        `json:"pool_user_visible_group_id"`
 	LoginAgreementEnabled               bool                         `json:"login_agreement_enabled"`
 	LoginAgreementMode                  string                       `json:"login_agreement_mode"`
 	LoginAgreementUpdatedAt             string                       `json:"login_agreement_updated_at"`
@@ -1600,6 +1604,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SessionBindingEnabled:               sessionBindingEnabled,
 		StepUpEnabled:                       stepUpEnabled,
 		AuditLogRetentionDays:               req.AuditLogRetentionDays,
+		PoolUserSyntheticCount:              req.PoolUserSyntheticCount,
+		PoolUserSyntheticBanned:             req.PoolUserSyntheticBanned,
+		PoolUserSyntheticPlatform:           req.PoolUserSyntheticPlatform,
+		PoolUserVisibleGroupID:              req.PoolUserVisibleGroupID,
 		LoginAgreementEnabled:               req.LoginAgreementEnabled,
 		LoginAgreementMode:                  loginAgreementMode,
 		LoginAgreementUpdatedAt:             loginAgreementUpdatedAt,
@@ -2298,6 +2306,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SessionBindingEnabled:                                  updatedSettings.SessionBindingEnabled,
 		StepUpEnabled:                                          updatedSettings.StepUpEnabled,
 		AuditLogRetentionDays:                                  updatedSettings.AuditLogRetentionDays,
+		PoolUserSyntheticCount:                                 updatedSettings.PoolUserSyntheticCount,
+		PoolUserSyntheticBanned:                                updatedSettings.PoolUserSyntheticBanned,
+		PoolUserSyntheticPlatform:                              updatedSettings.PoolUserSyntheticPlatform,
+		PoolUserVisibleGroupID:                                 updatedSettings.PoolUserVisibleGroupID,
 		LoginAgreementEnabled:                                  updatedSettings.LoginAgreementEnabled,
 		LoginAgreementMode:                                     updatedSettings.LoginAgreementMode,
 		LoginAgreementUpdatedAt:                                updatedSettings.LoginAgreementUpdatedAt,

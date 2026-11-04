@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   requests: vi.fn(),
   groups: vi.fn(),
   error: vi.fn(),
+  settings: vi.fn(),
+  saveSettings: vi.fn(),
 }))
 
 vi.mock('vue-i18n', async importOriginal => ({
@@ -33,6 +35,7 @@ vi.mock('@/api/pool', () => ({
   listPoolUsage: mocks.usage,
   listPoolAccountRequests: mocks.requests,
 }))
+vi.mock('@/api/admin/settings', () => ({ getSettings: mocks.settings, updateSettings: mocks.saveSettings, default: {} }))
 vi.mock('@/api/admin/groups', () => ({ getAll: mocks.groups, default: { getAll: mocks.groups } }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({
   default: { template: '<div><slot /></div>' },
@@ -56,6 +59,8 @@ beforeEach(() => {
   mocks.usage.mockResolvedValue({ items: [], total: 0 })
   mocks.requests.mockResolvedValue({ items: [], total: 0 })
   mocks.groups.mockResolvedValue([])
+  mocks.settings.mockResolvedValue({})
+  mocks.saveSettings.mockResolvedValue({})
 })
 
 describe('live account pool page', () => {

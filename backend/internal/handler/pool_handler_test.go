@@ -13,7 +13,7 @@ import (
 
 func newPoolTestRouter(repo *userUsageRepoCapture, authenticated bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	pool := service.NewAccountPoolService(nil, nil, nil, nil)
+	pool := service.NewAccountPoolService(nil, nil, nil, nil, nil)
 	h := NewPoolHandler(pool, service.NewUsageService(repo, nil, nil, nil))
 	router := gin.New()
 	if authenticated {

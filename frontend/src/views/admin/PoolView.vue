@@ -36,6 +36,7 @@ import {
 } from '@/utils/format'
 import { useAppStore, useAuthStore } from '@/stores'
 import { getAll as listAdminGroups } from '@/api/admin/groups'
+import { getSettings, updateSettings } from '@/api/admin/settings'
 
 type PoolTab = 'accounts' | 'usage'
 
@@ -665,9 +666,79 @@ onBeforeUnmount(() => {
   usageAbort?.abort()
 })
 
+// ==================== 管理员：用户视图展示设置 ====================
+
+/** 合成账号配置：只影响普通用户看到的号池，不写库、不参与调度。 */
+const syntheticConfig = ref({
+  count: 0,
+  banned: 0,
+  platform: 'anthropic',
+  visibleGroupId: ''
+})
+const syntheticConfigLoading = ref(false)
+const syntheticConfigSaving = ref(false)
+const syntheticConfigError = ref('')
+
+const syntheticPlatformOptions = [
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'claude', label: 'Claude' }
+]
+
+/** 读取当前的号池展示设置（设置项与 /admin/settings 同源）。 */
+async function loadSyntheticConfig() {
+  if (!isAdmin.value) return
+  syntheticConfigLoading.value = true
+  syntheticConfigError.value = ''
+  try {
+    const settings = await getSettings()
+    syntheticConfig.value = {
+      count: settings.pool_user_synthetic_count ?? 0,
+      banned: settings.pool_user_synthetic_banned ?? 0,
+      platform: settings.pool_user_synthetic_platform || 'anthropic',
+      visibleGroupId: settings.pool_user_visible_group_id
+        ? String(settings.pool_user_visible_group_id)
+        : ''
+    }
+  } catch (error) {
+    console.error('Failed to load pool display settings:', error)
+    syntheticConfigError.value = t('admin.pool.extra.synthetic.loadFailed')
+  } finally {
+    syntheticConfigLoading.value = false
+  }
+}
+
+/** 保存号池展示设置：只提交这四项，其余设置由后端的「省略即保持」兜住。 */
+async function saveSyntheticConfig() {
+  if (!isAdmin.value || syntheticConfigSaving.value) return
+  syntheticConfigSaving.value = true
+  syntheticConfigError.value = ''
+  try {
+    const count = Math.max(0, Math.min(50, Number(syntheticConfig.value.count) || 0))
+    const banned = Math.max(0, Math.min(count, Number(syntheticConfig.value.banned) || 0))
+    const visibleGroupId = Number(syntheticConfig.value.visibleGroupId) || 0
+    await updateSettings({
+      pool_user_synthetic_count: count,
+      pool_user_synthetic_banned: banned,
+      pool_user_synthetic_platform: syntheticConfig.value.platform,
+      pool_user_visible_group_id: visibleGroupId
+    })
+    syntheticConfig.value.count = count
+    syntheticConfig.value.banned = banned
+    refreshAccounts()
+  } catch (error) {
+    console.error('Failed to save pool display settings:', error)
+    syntheticConfigError.value = t('admin.pool.extra.synthetic.saveFailed')
+  } finally {
+    syntheticConfigSaving.value = false
+  }
+}
+
 onMounted(() => {
   refreshAccounts()
   void loadGroupOptions()
+  void loadSyntheticConfig()
   if (activeTab.value === 'usage') fetchUsage()
 })
 </script>
@@ -703,6 +774,81 @@ onMounted(() => {
 
           <!-- ==================== 账号池 ==================== -->
           <template v-if="activeTab === 'accounts'">
+          <!-- 管理员：用户视图展示设置（只影响普通用户看到什么） -->
+          <div v-if="isAdmin" class="card p-4 sm:p-6">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">
+                  {{ t('admin.pool.extra.synthetic.title') }}
+                </h2>
+                <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+                  {{ t('admin.pool.extra.synthetic.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  :disabled="syntheticConfigSaving"
+                  @click="loadSyntheticConfig"
+                >
+                  {{ t('common.refresh') }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  :disabled="syntheticConfigSaving || syntheticConfigLoading"
+                  @click="saveSyntheticConfig"
+                >
+                  {{ t('admin.pool.extra.synthetic.save') }}
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label class="input-label">{{ t('admin.pool.extra.synthetic.count') }}</label>
+                <input
+                  v-model.number="syntheticConfig.count"
+                  type="number"
+                  min="0"
+                  max="50"
+                  class="input"
+                />
+                <p class="mt-1 text-[11px] text-gray-400">
+                  {{ t('admin.pool.extra.synthetic.countHint') }}
+                </p>
+              </div>
+              <div>
+                <label class="input-label">{{ t('admin.pool.extra.synthetic.banned') }}</label>
+                <input
+                  v-model.number="syntheticConfig.banned"
+                  type="number"
+                  min="0"
+                  max="50"
+                  class="input"
+                />
+                <p class="mt-1 text-[11px] text-gray-400">
+                  {{ t('admin.pool.extra.synthetic.bannedHint') }}
+                </p>
+              </div>
+              <div>
+                <label class="input-label">{{ t('admin.pool.extra.synthetic.platform') }}</label>
+                <Select v-model="syntheticConfig.platform" :options="syntheticPlatformOptions" />
+              </div>
+              <div>
+                <label class="input-label">{{ t('admin.pool.extra.synthetic.visibleGroup') }}</label>
+                <Select v-model="syntheticConfig.visibleGroupId" :options="groupOptions" />
+                <p class="mt-1 text-[11px] text-gray-400">
+                  {{ t('admin.pool.extra.synthetic.visibleGroupHint') }}
+                </p>
+              </div>
+            </div>
+            <p v-if="syntheticConfigError" class="mt-3 text-xs text-red-600 dark:text-red-400">
+              {{ syntheticConfigError }}
+            </p>
+          </div>
+
             <!-- 概览条 -->
             <div class="card p-4 sm:p-6">
               <div class="flex flex-wrap items-center justify-between gap-3">
@@ -1097,7 +1243,16 @@ onMounted(() => {
           </template>
 
           <template #cell-actions="{ row }">
+            <span
+              v-if="row.synthetic"
+              class="inline-flex cursor-not-allowed items-center gap-1 whitespace-nowrap font-medium text-gray-400 dark:text-dark-500"
+              :title="t('admin.pool.extra.synthetic.noRequests')"
+            >
+              <Icon name="eye" size="sm" />
+              {{ t('admin.pool.actions.requests') }}
+            </span>
             <button
+              v-else
               type="button"
               class="inline-flex items-center gap-1 whitespace-nowrap font-medium text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
               @click="openRequests(row)"
