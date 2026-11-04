@@ -343,14 +343,24 @@ func (s *GatewayService) sendClaudeTelemetry(ctx context.Context, delivery claud
 	defer resp.Body.Close()
 	var acknowledgement struct {
 		AcceptedCount *int `json:"accepted_count"`
+		RejectedCount *int `json:"rejected_count"`
 	}
 	responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, (16<<10)+1))
 	if readErr != nil || len(responseBody) > 16<<10 {
 		return resp.StatusCode, 0, fmt.Errorf("遥测接收回执无法读取")
 	}
-	responseBody, parseErr := filterClaudePrivacyObject(responseBody, map[string]bool{"accepted_count": true}, nil)
+	responseBody, parseErr := filterClaudePrivacyObject(responseBody, map[string]bool{"accepted_count": true, "rejected_count": true}, nil)
 	if parseErr != nil || json.Unmarshal(responseBody, &acknowledgement) != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 || acknowledgement.AcceptedCount == nil || *acknowledgement.AcceptedCount < 0 || *acknowledgement.AcceptedCount > len(payload.Events) {
 		return resp.StatusCode, 0, fmt.Errorf("遥测服务尚未确认接收")
+	}
+	// Older responses may omit rejected_count. If supplied, both counts must
+	// describe this whole batch; a contradictory or explicit null count leaves
+	// delivery unconfirmed, even when accepted_count alone claims full success.
+	if gjson.GetBytes(responseBody, "rejected_count").Exists() {
+		if acknowledgement.RejectedCount == nil || *acknowledgement.RejectedCount < 0 ||
+			*acknowledgement.RejectedCount != len(payload.Events)-*acknowledgement.AcceptedCount {
+			return resp.StatusCode, 0, fmt.Errorf("遥测接收与拒绝计数不一致")
+		}
 	}
 	if *acknowledgement.AcceptedCount != len(payload.Events) {
 		// 无法确定部分回执对应哪些事件，不重发整批，避免重复上报。

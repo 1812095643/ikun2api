@@ -270,6 +270,7 @@
 import { ref, computed, h, watch, type Component } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { resolveSiteName } from '@/utils/branding'
+import { CLAUDE_PRIVACY_ENV, claudePrivacyShellSettings } from '@/utils/claudeClientPrivacy'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -888,19 +889,19 @@ function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
       path = 'Terminal'
       content = `export ANTHROPIC_BASE_URL="${baseUrl}"
 export ANTHROPIC_AUTH_TOKEN="${apiKey}"
-export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+${claudePrivacyShellSettings('unix')}`
       break
     case 'cmd':
       path = 'Command Prompt'
       content = `set ANTHROPIC_BASE_URL=${baseUrl}
 set ANTHROPIC_AUTH_TOKEN=${apiKey}
-set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+${claudePrivacyShellSettings('cmd')}`
       break
     case 'powershell':
       path = 'PowerShell'
       content = `$env:ANTHROPIC_BASE_URL="${baseUrl}"
 $env:ANTHROPIC_AUTH_TOKEN="${apiKey}"
-$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+${claudePrivacyShellSettings('powershell')}`
       break
     default:
       path = 'Terminal'
@@ -911,14 +912,14 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
     ? '~/.claude/settings.json'
     : '%USERPROFILE%\\.claude\\settings.json'
 
-  const vscodeContent = `{
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "env": {
-    "ANTHROPIC_BASE_URL": "${baseUrl}",
-    "ANTHROPIC_AUTH_TOKEN": "${apiKey}",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
-  }
-}`
+  const vscodeContent = JSON.stringify({
+    $schema: 'https://json.schemastore.org/claude-code-settings.json',
+    env: {
+      ANTHROPIC_BASE_URL: baseUrl,
+      ANTHROPIC_AUTH_TOKEN: apiKey,
+      ...CLAUDE_PRIVACY_ENV
+    }
+  }, null, 2)
 
   return [
     { path, content },
@@ -940,7 +941,7 @@ function generateGrokClaudeFiles(baseUrl: string, apiKey: string): FileConfig[] 
     ANTHROPIC_DEFAULT_HAIKU_MODEL: 'grok-4.5',
     ANTHROPIC_DEFAULT_FABLE_MODEL: 'grok-4.5',
     CLAUDE_CODE_SUBAGENT_MODEL: 'grok-4.5',
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+    ...CLAUDE_PRIVACY_ENV
   }
   let path: string
   let content: string

@@ -1,4 +1,5 @@
 import type { Group, GroupPlatform } from '@/types'
+import { CLAUDE_PRIVACY_ENV } from '@/utils/claudeClientPrivacy'
 
 // Verified against CC Switch v4.0.25 parser.rs/provider.rs and its site integration guide.
 export const CC_SWITCH_VERSION = '4.0.25'
@@ -199,7 +200,7 @@ export function buildCcSwitchImportDeeplink(input: CcSwitchImportDeeplinkInput):
       }
     }
     if (input.disableTelemetry !== false) {
-      entries.push(['configFormat', 'json'], ['config', encodeCcSwitchBase64(JSON.stringify({ env: { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' } }))])
+      entries.push(['configFormat', 'json'], ['config', encodeCcSwitchBase64(JSON.stringify({ env: CLAUDE_PRIVACY_ENV }))])
     }
     if (input.clientType === 'claude-desktop') {
       entries.push(['notes', 'Claude Desktop: import this provider from Claude Code on the Claude Desktop page in CC Switch, then switch and restart Claude Desktop.'])

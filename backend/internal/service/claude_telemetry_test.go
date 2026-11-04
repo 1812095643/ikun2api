@@ -109,6 +109,22 @@ func TestLocalClaudeTelemetryRequiresAcknowledgement(t *testing.T) {
 		accepted       bool
 	}{
 		{"accepted", `{"accepted_count":1}`, 200, true},
+		{"accepted_with_rejected_zero", `{"accepted_count":1,"rejected_count":0}`, 200, true},
+		{"contradictory_counts", `{"accepted_count":1,"rejected_count":1}`, 200, false},
+		{"rejected_negative", `{"accepted_count":1,"rejected_count":-1}`, 200, false},
+		{"rejected_fractional", `{"accepted_count":1,"rejected_count":0.5}`, 200, false},
+		{"rejected_string", `{"accepted_count":1,"rejected_count":"0"}`, 200, false},
+		{"rejected_null", `{"accepted_count":1,"rejected_count":null}`, 200, false},
+		{"rejected_boolean", `{"accepted_count":1,"rejected_count":false}`, 200, false},
+		{"rejected_overflow", `{"accepted_count":1,"rejected_count":9223372036854775808}`, 200, false},
+		{"accepted_null", `{"accepted_count":null,"rejected_count":0}`, 200, false},
+		{"accepted_fractional", `{"accepted_count":0.5,"rejected_count":0}`, 200, false},
+		{"accepted_out_of_range", `{"accepted_count":2,"rejected_count":0}`, 200, false},
+		{"accepted_duplicate", `{"accepted_count":0,"accepted_count":1}`, 200, false},
+		{"rejected_duplicate", `{"accepted_count":1,"rejected_count":1,"rejected_count":0}`, 200, false},
+		{"all_rejected", `{"accepted_count":0,"rejected_count":1}`, 200, false},
+		{"incomplete_counts", `{"accepted_count":0,"rejected_count":0}`, 200, false},
+		{"extra_response_fields", `{"accepted_count":1,"rejected_count":0,"message":"ok"}`, 200, true},
 		{"discarded", `{"accepted_count":0}`, 200, false},
 		{"empty_success", `{}`, 200, false},
 		{"malformed", `not-json`, 200, false},
@@ -154,6 +170,39 @@ func TestLocalClaudeTelemetryScope(t *testing.T) {
 	}
 	if transport.calls != 0 {
 		t.Fatal("不能为 GPT、API Key 或缺少实际会话的请求发送 Claude 遥测")
+	}
+}
+
+func TestLocalClaudeTelemetryBatchAcknowledgementCounts(t *testing.T) {
+	t.Setenv("SUB6_CLAUDE_TELEMETRY_ENABLED", "true")
+	for _, test := range []struct {
+		name, response string
+		accepted       int
+		success        bool
+	}{
+		{"legacy_full", `{"accepted_count":2}`, 2, true},
+		{"full", `{"accepted_count":2,"rejected_count":0}`, 2, true},
+		{"partial", `{"accepted_count":1,"rejected_count":1}`, 1, false},
+		{"legacy_partial", `{"accepted_count":1}`, 1, false},
+		{"unaccounted_event", `{"accepted_count":1,"rejected_count":0}`, 0, false},
+		{"overcounted", `{"accepted_count":1,"rejected_count":2}`, 0, false},
+		{"rejected", `{"accepted_count":0,"rejected_count":2}`, 0, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			transport := &localClaudeTelemetryTransport{response: test.response, status: http.StatusOK}
+			gateway := &GatewayService{httpUpstream: transport}
+			delivery := telemetryBatchDelivery(t, true)
+			if !appendClaudeTelemetryBatch(&delivery, telemetryBatchDelivery(t, true)) {
+				t.Fatal("failed to prepare a two-event batch")
+			}
+			status, accepted, err := gateway.sendClaudeTelemetry(context.Background(), delivery)
+			if status != http.StatusOK || accepted != test.accepted || (err == nil) != test.success {
+				t.Fatalf("unexpected acknowledgement: status=%d accepted=%d err=%v", status, accepted, err)
+			}
+			if transport.calls != 1 {
+				t.Fatal("an ambiguous or partial acknowledgement must not resend the batch")
+			}
+		})
 	}
 }
 

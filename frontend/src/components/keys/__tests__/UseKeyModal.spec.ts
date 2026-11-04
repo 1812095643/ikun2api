@@ -23,6 +23,10 @@ vi.mock('file-saver', () => ({
   saveAs: saveAsMock
 }))
 
+vi.mock('@/stores/app', () => ({
+  useAppStore: () => ({ siteName: 'IKUN2api' })
+}))
+
 import UseKeyModal from '../UseKeyModal.vue'
 
 function readBlobAsText(blob: Blob): Promise<string> {
@@ -98,10 +102,10 @@ describe('UseKeyModal', () => {
       }
     })
 
-    for (const [shell, trafficSetting] of [
-      ['macOS / Linux', 'export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1'],
-      ['Windows CMD', 'set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1'],
-      ['PowerShell', '$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1']
+    for (const [shell, trafficSetting, otelSetting] of [
+      ['macOS / Linux', 'export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1', 'export CLAUDE_CODE_ENABLE_TELEMETRY=0'],
+      ['Windows CMD', 'set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1', 'set CLAUDE_CODE_ENABLE_TELEMETRY=0'],
+      ['PowerShell', '$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1', '$env:CLAUDE_CODE_ENABLE_TELEMETRY=0']
     ]) {
       if (shell !== 'macOS / Linux') {
         const shellTab = wrapper.findAll('button').find(
@@ -118,7 +122,9 @@ describe('UseKeyModal', () => {
 
       expect(allCode).not.toContain('CLAUDE_CODE_ATTRIBUTION_HEADER')
       expect(allCode).toContain(trafficSetting)
+      expect(allCode).toContain(otelSetting)
       expect(settings.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe('1')
+      expect(settings.env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0')
       expect(settings.env).not.toHaveProperty('CLAUDE_CODE_ATTRIBUTION_HEADER')
     }
   })
@@ -266,6 +272,8 @@ describe('UseKeyModal', () => {
     expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_ATTRIBUTION_HEADER')
     expect(codeBlocks.join('\n')).toContain('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')
     expect(parsedSettings.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe('1')
+    expect(parsedSettings.env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0')
+    expect(unixConfig).toContain('export CLAUDE_CODE_ENABLE_TELEMETRY="0"')
     expect(parsedSettings.env).not.toHaveProperty('CLAUDE_CODE_ATTRIBUTION_HEADER')
     expect(wrapper.text()).toContain('keys.useKeyModal.claudeSettingsHint')
     expect(wrapper.text()).toContain('keys.useKeyModal.grok.claudeNote')
@@ -287,6 +295,8 @@ describe('UseKeyModal', () => {
     expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_ATTRIBUTION_HEADER')
     const cmdSettings = JSON.parse(codeBlocks.find((content) => content.includes('"$schema"'))!)
     expect(cmdSettings.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe('1')
+    expect(cmdSettings.env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0')
+    expect(codeBlocks.join('\n')).toContain('set CLAUDE_CODE_ENABLE_TELEMETRY=0')
     expect(cmdSettings.env).not.toHaveProperty('CLAUDE_CODE_ATTRIBUTION_HEADER')
 
     const powershellTab = wrapper.findAll('button').find(
@@ -305,6 +315,8 @@ describe('UseKeyModal', () => {
     expect(codeBlocks.join('\n')).not.toContain('CLAUDE_CODE_ATTRIBUTION_HEADER')
     const powershellSettings = JSON.parse(codeBlocks.find((content) => content.includes('"$schema"'))!)
     expect(powershellSettings.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe('1')
+    expect(powershellSettings.env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0')
+    expect(codeBlocks.join('\n')).toContain('$env:CLAUDE_CODE_ENABLE_TELEMETRY="0"')
     expect(powershellSettings.env).not.toHaveProperty('CLAUDE_CODE_ATTRIBUTION_HEADER')
     expect(wrapper.text()).toContain('%USERPROFILE%\\.claude\\settings.json')
 

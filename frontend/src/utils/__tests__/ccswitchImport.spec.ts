@@ -48,7 +48,10 @@ describe('CC Switch v4 provider import', () => {
     const result = link('claude', 'anthropic', '', { platform: 'anthropic' })
     expect(result.has('model')).toBe(false)
     expect(result.has('sonnetModel')).toBe(false)
-    expect(JSON.parse(atob(result.get('config') || ''))).toEqual({ env: { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' } })
+    expect(JSON.parse(atob(result.get('config') || ''))).toEqual({ env: {
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+      CLAUDE_CODE_ENABLE_TELEMETRY: '0'
+    } })
   })
   it('maps non-native Claude tiers to the chosen model unless explicitly changed', () => {
     const result = link('claude', 'openai_responses', 'non-native', { platform: 'openai', opusModel: 'opus-alias' })
@@ -60,6 +63,12 @@ describe('CC Switch v4 provider import', () => {
     const result = link('claude-desktop', 'anthropic', '', { platform: 'anthropic' })
     expect(result.get('app')).toBe('claude')
     expect(result.get('notes')).toContain('Claude Desktop')
+    expect(JSON.parse(atob(result.get('config') || '')).env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0')
+  })
+  it('respects an explicit choice to keep the existing telemetry configuration', () => {
+    const result = link('claude', 'anthropic', '', { platform: 'anthropic', disableTelemetry: false })
+    expect(result.has('config')).toBe(false)
+    expect(result.has('configFormat')).toBe(false)
   })
   it('uses the Antigravity forced endpoint for both Claude and Gemini', () => {
     expect(resolveCcSwitchEndpoint('https://api.example.com/sub2api/', 'claude', 'anthropic', 'antigravity')).toBe('https://api.example.com/sub2api/antigravity')
