@@ -26,6 +26,7 @@ func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemC
 	created, err := r.client.RedeemCode.Create().
 		SetCode(code.Code).
 		SetType(code.Type).
+		SetSubscriptionSnapshot(code.SubscriptionSnapshot).
 		SetValue(code.Value).
 		SetStatus(code.Status).
 		SetNotes(code.Notes).
@@ -53,6 +54,7 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 		b := r.client.RedeemCode.Create().
 			SetCode(c.Code).
 			SetType(c.Type).
+			SetSubscriptionSnapshot(c.SubscriptionSnapshot).
 			SetValue(c.Value).
 			SetStatus(c.Status).
 			SetNotes(c.Notes).
@@ -64,7 +66,15 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 		builders = append(builders, b)
 	}
 
-	return r.client.RedeemCode.CreateBulk(builders...).Exec(ctx)
+	created, err := r.client.RedeemCode.CreateBulk(builders...).Save(ctx)
+	if err != nil {
+		return err
+	}
+	for i, m := range created {
+		codes[i].ID = m.ID
+		codes[i].CreatedAt = m.CreatedAt
+	}
+	return nil
 }
 
 func (r *redeemCodeRepository) GetByID(ctx context.Context, id int64) (*service.RedeemCode, error) {
@@ -413,18 +423,19 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 		return nil
 	}
 	out := &service.RedeemCode{
-		ID:           m.ID,
-		Code:         m.Code,
-		Type:         m.Type,
-		Value:        m.Value,
-		Status:       m.Status,
-		UsedBy:       m.UsedBy,
-		UsedAt:       m.UsedAt,
-		Notes:        derefString(m.Notes),
-		CreatedAt:    m.CreatedAt,
-		ExpiresAt:    m.ExpiresAt,
-		GroupID:      m.GroupID,
-		ValidityDays: m.ValidityDays,
+		ID:                   m.ID,
+		Code:                 m.Code,
+		Type:                 m.Type,
+		Value:                m.Value,
+		Status:               m.Status,
+		UsedBy:               m.UsedBy,
+		UsedAt:               m.UsedAt,
+		Notes:                derefString(m.Notes),
+		CreatedAt:            m.CreatedAt,
+		ExpiresAt:            m.ExpiresAt,
+		GroupID:              m.GroupID,
+		SubscriptionSnapshot: m.SubscriptionSnapshot,
+		ValidityDays:         m.ValidityDays,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)

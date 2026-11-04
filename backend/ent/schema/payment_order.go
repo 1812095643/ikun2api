@@ -31,6 +31,7 @@ func (PaymentOrder) Annotations() []schema.Annotation {
 
 func (PaymentOrder) Fields() []ent.Field {
 	return []ent.Field{
+		field.JSON("subscription_snapshot", map[string]any{}).Optional(),
 		// 用户信息（冗余存储，避免关联查询）
 		field.Int64("user_id"),
 		field.String("user_email").

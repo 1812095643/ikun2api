@@ -408,28 +408,7 @@
           </template>
 
           <template #cell-subscriptions="{ row }">
-            <div
-              v-if="row.subscriptions && row.subscriptions.length > 0"
-              class="flex flex-wrap gap-1.5"
-            >
-              <GroupBadge
-                v-for="sub in row.subscriptions"
-                :key="sub.id"
-                :name="sub.group?.name || ''"
-                :platform="sub.group?.platform"
-                :subscription-type="sub.group?.subscription_type"
-                :rate-multiplier="sub.group?.rate_multiplier"
-                :days-remaining="sub.expires_at ? getDaysRemaining(sub.expires_at) : null"
-                :title="sub.expires_at ? formatDateTime(sub.expires_at) : ''"
-              />
-            </div>
-            <span
-              v-else
-              class="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-400 dark:bg-dark-700/50 dark:text-dark-500"
-            >
-              <Icon name="ban" size="xs" class="h-3.5 w-3.5" />
-              <span>{{ t('admin.users.noSubscription') }}</span>
-            </span>
+            <RouterLink :to="{ path: '/admin/subscriptions', query: { user_id: String(row.id) } }" class="text-xs text-primary-600 hover:underline dark:text-primary-400">查看通用订阅</RouterLink>
           </template>
 
           <template #cell-balance="{ value, row }">
@@ -813,7 +792,6 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
 import Select from '@/components/common/Select.vue'
 import { buildApiKeyGroupFilterOptions } from './apiKeyGroupFilterOptions'
 import UserAttributesConfigModal from '@/components/user/UserAttributesConfigModal.vue'
@@ -1560,12 +1538,7 @@ const showBalanceHistoryModal = ref(false)
 const balanceHistoryUser = ref<AdminUser | null>(null)
 
 // 计算剩余天数
-const getDaysRemaining = (expiresAt: string): number => {
-  const now = new Date()
-  const expires = new Date(expiresAt)
-  const diffMs = expires.getTime() - now.getTime()
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-}
+
 
 const loadAttributeDefinitions = async () => {
   try {

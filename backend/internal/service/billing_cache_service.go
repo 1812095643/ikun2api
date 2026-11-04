@@ -105,6 +105,7 @@ type subscriptionCacheInvalidationPubSub interface {
 // BillingCacheService 计费缓存服务
 // 负责余额和订阅数据的缓存管理，提供高性能的计费资格检查
 type BillingCacheService struct {
+	universal             *UniversalSubscriptionService
 	cache                 BillingCache
 	userRepo              UserRepository
 	subRepo               UserSubscriptionRepository
@@ -742,6 +743,9 @@ func (s *BillingCacheService) IncrementUserPlatformQuotaUsage(userID int64, plat
 // 订阅模式：检查缓存用量未超过限额（Group限额从参数传入）
 // platform 为请求的目标平台（如 "anthropic"），传空串 "" 时跳过 user × platform quota 检查。
 func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user *User, apiKey *APIKey, group *Group, subscription *UserSubscription, platform string) error {
+	if IsUniversalFunding(apiKey) && s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+		return ErrUniversalUnavailable
+	}
 	// 简易模式默认跳过所有计费检查. An explicit key-window opt-in keeps
 	// balance/subscription/platform checks bypassed while enforcing the three
 	// API-key monetary windows from the database source of truth.
@@ -758,10 +762,15 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 	// 判断计费模式
 	isSubscriptionMode := group != nil && group.IsSubscriptionType() && subscription != nil
 
-	if isSubscriptionMode {
-		if err := s.checkSubscriptionEligibility(ctx, user.ID, group, subscription); err != nil {
+	if IsUniversalFunding(apiKey) {
+		if s.universal == nil {
+			return ErrUniversalUnavailable
+		}
+		if _, err := s.universal.Check(ctx, user.ID); err != nil {
 			return err
 		}
+	} else if isSubscriptionMode {
+		return ErrLegacySubscriptionRetired
 	} else {
 		if err := s.checkBalanceEligibility(ctx, user.ID); err != nil {
 			return err
@@ -800,6 +809,12 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 func (s *BillingCacheService) ReserveFixedCharge(ctx context.Context, user *User, apiKey *APIKey, group *Group, subscription *UserSubscription, amount float64) (*InflightReservation, error) {
 	if user == nil || amount <= 0 || math.IsNaN(amount) || math.IsInf(amount, 0) {
 		return nil, nil
+	}
+	if IsUniversalFunding(apiKey) {
+		if s.universal == nil {
+			return nil, ErrUniversalUnavailable
+		}
+		return s.universal.Reserve(ctx, user.ID, apiKey.ID, amount)
 	}
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		return nil, nil

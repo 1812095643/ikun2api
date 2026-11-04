@@ -124,7 +124,7 @@
                 <!-- Header: platform badge + plan name -->
                 <div class="mb-3 flex flex-wrap items-center gap-2">
                   <span :class="['rounded-md border px-2 py-0.5 text-xs font-medium', planBadgeClass]">
-                    {{ platformLabel(selectedPlan.group_platform || '') }}
+                    {{ selectedPlan.plan_type === 'universal_credit' ? '全站通用' : platformLabel(selectedPlan.group_platform || '') }}
                   </span>
                   <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ selectedPlan.name }}</h3>
                 </div>
@@ -140,12 +140,15 @@
                 <p v-if="selectedPlan.description" class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                   {{ selectedPlan.description }}
                 </p>
+                <div v-if="selectedPlan.plan_type === 'universal_credit'" class="mt-4 rounded-xl bg-primary-50 p-4 text-sm leading-6 text-primary-800 dark:bg-primary-950/30 dark:text-primary-200">
+                  总额度 ${{ selectedPlan.total_credit_usd }}，有效 {{ selectedPlan.validity_days }} 天。跨 Key、分组共用，按实际分组倍率消费。额度用尽、达限或到期停止，不接续余额；已有套餐时排到下一期生效。
+                </div>
                 <!-- Rate + Limits grid -->
                 <div class="mt-3 grid grid-cols-2 gap-3">
                   <div>
                     <span class="text-xs text-gray-400 dark:text-gray-500">{{ t('payment.planCard.rate') }}</span>
                     <div class="flex items-baseline">
-                      <span :class="['text-lg font-bold', planTextClass]">×{{ selectedPlan.rate_multiplier ?? 1 }}</span>
+                      <span :class="['text-sm font-bold', planTextClass]">{{ selectedPlan.plan_type === 'universal_credit' ? '按实际分组倍率' : `×${selectedPlan.rate_multiplier ?? 1}` }}</span>
                     </div>
                   </div>
                   <div v-if="planHasPeakRate(selectedPlan)">

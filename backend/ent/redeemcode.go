@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ type RedeemCode struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int64 `json:"id,omitempty"`
+	// SubscriptionSnapshot holds the value of the "subscription_snapshot" field.
+	SubscriptionSnapshot map[string]interface{} `json:"subscription_snapshot,omitempty"`
 	// Code holds the value of the "code" field.
 	Code string `json:"code,omitempty"`
 	// Type holds the value of the "type" field.
@@ -85,6 +88,8 @@ func (*RedeemCode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case redeemcode.FieldSubscriptionSnapshot:
+			values[i] = new([]byte)
 		case redeemcode.FieldValue:
 			values[i] = new(sql.NullFloat64)
 		case redeemcode.FieldID, redeemcode.FieldUsedBy, redeemcode.FieldGroupID, redeemcode.FieldValidityDays:
@@ -114,6 +119,14 @@ func (_m *RedeemCode) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int64(value.Int64)
+		case redeemcode.FieldSubscriptionSnapshot:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field subscription_snapshot", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.SubscriptionSnapshot); err != nil {
+					return fmt.Errorf("unmarshal field subscription_snapshot: %w", err)
+				}
+			}
 		case redeemcode.FieldCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field code", values[i])
@@ -231,6 +244,9 @@ func (_m *RedeemCode) String() string {
 	var builder strings.Builder
 	builder.WriteString("RedeemCode(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	builder.WriteString("subscription_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SubscriptionSnapshot))
+	builder.WriteString(", ")
 	builder.WriteString("code=")
 	builder.WriteString(_m.Code)
 	builder.WriteString(", ")

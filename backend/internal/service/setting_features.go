@@ -286,11 +286,14 @@ func parseAuditLogRetentionDays(value string) int {
 
 // GetSiteName 获取网站名称
 func (s *SettingService) GetSiteName(ctx context.Context) string {
-	value, err := s.settingRepo.GetValue(ctx, SettingKeySiteName)
-	if err != nil || value == "" {
-		return "IKUN2api"
+	if s == nil || s.settingRepo == nil {
+		return DefaultSiteName
 	}
-	return value
+	value, err := s.settingRepo.GetValue(ctx, SettingKeySiteName)
+	if err != nil {
+		return DefaultSiteName
+	}
+	return siteNameOrDefault(value)
 }
 
 // GetDefaultConcurrency 获取默认并发量

@@ -30,6 +30,18 @@ func (_u *RedeemCodeUpdate) Where(ps ...predicate.RedeemCode) *RedeemCodeUpdate 
 	return _u
 }
 
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (_u *RedeemCodeUpdate) SetSubscriptionSnapshot(v map[string]interface{}) *RedeemCodeUpdate {
+	_u.mutation.SetSubscriptionSnapshot(v)
+	return _u
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (_u *RedeemCodeUpdate) ClearSubscriptionSnapshot() *RedeemCodeUpdate {
+	_u.mutation.ClearSubscriptionSnapshot()
+	return _u
+}
+
 // SetCode sets the "code" field.
 func (_u *RedeemCodeUpdate) SetCode(v string) *RedeemCodeUpdate {
 	_u.mutation.SetCode(v)
@@ -314,6 +326,12 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 			}
 		}
 	}
+	if value, ok := _u.mutation.SubscriptionSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.SubscriptionSnapshotCleared() {
+		_spec.ClearField(redeemcode.FieldSubscriptionSnapshot, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(redeemcode.FieldCode, field.TypeString, value)
 	}
@@ -429,6 +447,18 @@ type RedeemCodeUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *RedeemCodeMutation
+}
+
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (_u *RedeemCodeUpdateOne) SetSubscriptionSnapshot(v map[string]interface{}) *RedeemCodeUpdateOne {
+	_u.mutation.SetSubscriptionSnapshot(v)
+	return _u
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (_u *RedeemCodeUpdateOne) ClearSubscriptionSnapshot() *RedeemCodeUpdateOne {
+	_u.mutation.ClearSubscriptionSnapshot()
+	return _u
 }
 
 // SetCode sets the "code" field.
@@ -744,6 +774,12 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.SubscriptionSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.SubscriptionSnapshotCleared() {
+		_spec.ClearField(redeemcode.FieldSubscriptionSnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(redeemcode.FieldCode, field.TypeString, value)

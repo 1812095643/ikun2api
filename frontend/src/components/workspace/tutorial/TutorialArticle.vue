@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { computed, shallowRef } from 'vue'
 import { useAppStore } from '@/stores/app'
 import Icon from '@/components/icons/Icon.vue'
@@ -15,7 +16,7 @@ const props = defineProps<{
 const appStore = useAppStore()
 const article = shallowRef<HTMLElement | null>(null)
 const { copyToClipboard } = useClipboard()
-const description = computed(() => props.document.description.split('__IKUN_SITE_NAME__').join(appStore.siteName || 'IKUN2api'))
+const description = computed(() => props.document.description.split('__IKUN_SITE_NAME__').join(appStore.siteName || DEFAULT_SITE_NAME))
 </script>
 
 <template>

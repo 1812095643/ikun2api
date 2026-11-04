@@ -1512,6 +1512,9 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 
 		mapping := acc.GetModelMapping()
 		for model := range mapping {
+			if !acc.AllowsConfiguredModel(model) {
+				continue
+			}
 			// Accounts pulled in through mixed scheduling only contribute the
 			// models that belong to the listing platform (e.g. an antigravity
 			// account's claude-* mappings must not surface on a gemini group).

@@ -123,6 +123,8 @@ export interface PaymentOrder {
 // ==================== Plans & Channels ====================
 
 export interface SubscriptionPlan {
+  plan_type?: 'group' | 'universal_credit'
+  total_credit_usd?: number | null
   id: number
   group_id: number
   group_platform?: string

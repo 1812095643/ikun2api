@@ -37,6 +37,8 @@ type UsageBillingCommand struct {
 	ImageCount          int
 	MediaType           string
 
+	UniversalHoldID     string
+	UniversalCost       float64
 	BalanceCost         float64
 	SubscriptionCost    float64
 	APIKeyQuotaCost     float64
@@ -86,6 +88,7 @@ const UsageBillingMonetaryScale = 8
 // 在参数进入 SQL 之前量化一次，两条语句就都拿到已经落在 8 位刻度上的同一个金额，
 // 存储阶段不再发生任何舍入，delta 精确相等。
 func (c *UsageBillingCommand) quantizeMonetaryFields() {
+	c.UniversalCost = QuantizeUsageBillingAmount(c.UniversalCost)
 	c.BalanceCost = QuantizeUsageBillingAmount(c.BalanceCost)
 	c.SubscriptionCost = QuantizeUsageBillingAmount(c.SubscriptionCost)
 	c.APIKeyQuotaCost = QuantizeUsageBillingAmount(c.APIKeyQuotaCost)
@@ -136,6 +139,9 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 	)
 	if payloadHash := strings.TrimSpace(c.RequestPayloadHash); payloadHash != "" {
 		raw += "|" + payloadHash
+	}
+	if c.UniversalHoldID != "" {
+		raw += fmt.Sprintf("|universal:%s:%.10f", c.UniversalHoldID, c.UniversalCost)
 	}
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])

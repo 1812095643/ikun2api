@@ -1,3 +1,4 @@
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import type { DriveStep } from 'driver.js'
 
 export interface UserTourStep extends DriveStep {
@@ -19,13 +20,13 @@ interface PageGuide {
 const pageGuides: PageGuide[] = [
   { path: '/dashboard', title: '查看账户概况', description: '这里可以查看余额、请求量和消费趋势。下方提供最近调用记录，方便确认请求是否到达本站。' },
   { path: '/model-square', title: '先确定模型和分组', description: '搜索模型名称，按服务商和分组筛选。点击模型卡片查看支持分组与计价；创建密钥时请选择相应分组。', target: '.catalog-toolbar' },
-  { path: '/purchase', title: '购买余额或订阅', description: '选择充值金额或订阅套餐，再按页面提供的支付方式付款。先核对套餐额度、有效期和适用分组；引导期间无需下单。' },
+  { path: '/purchase', title: '购买余额或订阅', description: '选择充值金额或订阅套餐，再按页面提供的支付方式付款。先核对套餐总额度、日周月限额和有效期；引导期间无需下单。' },
   { path: '/redeem', title: '使用兑换码', description: '在这里粘贴购买或领取的兑换码，核对后点击兑换。余额、订阅等兑换结果以页面提示和兑换记录为准；无需为完成引导兑换。', target: '#code' },
   { path: '/keys', title: '创建自己的 API 密钥', description: '每个密钥绑定一个分组，客户端通过它使用该分组的模型。下面请实际打开创建窗口，了解名称、服务商和分组的设置。', target: '[data-tour="keys-create-btn"]' },
   { path: '/usage', title: '查询每次调用和消费', description: '按时间、密钥和模型筛选记录，查看输入输出 Token、费用、耗时等详情。客户端报错时，先核对时间范围与对应记录，再联系管理员。' },
   { path: '/available-channels', title: '确认可用渠道', description: '这里列出当前账号可以使用的渠道和分组。先确认模型、计价和额度，再为客户端选择相应密钥。' },
   { path: '/monitor', title: '查看渠道状态', description: '查看渠道可用状态和监测情况。遇到调用异常时，可先检查对应渠道，再到用量记录核对具体请求。' },
-  { path: '/subscriptions', title: '管理我的订阅', description: '这里查看已购买订阅、有效期和额度使用情况。订阅通常对应指定分组，密钥分组也需要与之对应。' },
+  { path: '/subscriptions', title: '管理我的订阅', description: '这里查看已购买订阅、有效期和额度使用情况。通用订阅可跨已授权分组使用；请在密钥中选择订阅计费，额度用尽、达限或到期后会停止。' },
   { path: '/orders', title: '查看购买记录', description: '在订单列表核对金额和支付状态。付款后未到账时，请保留订单号并通过工单联系管理员，避免反复支付。' },
   { path: '/affiliate', title: '邀请好友', description: '复制专属邀请链接或邀请码发给好友。这里可以查看邀请记录、返利和可用收益；转入余额前请先核对金额与规则。' },
   { path: '/checkin', title: '每日签到和盲盒', description: '点击签到可领取当天奖励，方块日历记录每次签到，统计展示累计天数、连续天数和总奖励。下方盲盒需满足当日签到与消费条件；参与前请阅读价格、奖池、概率和开奖时间。' },
@@ -40,10 +41,10 @@ const pageGuides: PageGuide[] = [
 const navSelector = (path: string) => `[data-tour-path="${path.replace(/["\\]/g, '\\$&')}"]`
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
 
-export function getUserSteps(t: (key: string) => string): UserTourStep[] {
+export function getUserSteps(t: (key: string) => string, siteName = DEFAULT_SITE_NAME): UserTourStep[] {
   const steps: UserTourStep[] = [{
     popover: {
-      title: '开始使用 IKUN2api',
+      title: `开始使用 ${escapeHtml(siteName.trim() || DEFAULT_SITE_NAME)}`,
       description: '接下来会带您进入实际页面，重点练习创建密钥和选择分组，再了解充值、用量与其他功能。请点击高亮入口继续，可随时关闭并从头像菜单重新开始。',
       nextBtnText: '开始操作',
     },
@@ -83,7 +84,7 @@ export function getUserSteps(t: (key: string) => string): UserTourStep[] {
         { element: '[data-tour="key-form-group"]', route: '/keys', keyForm: true, action: 'group', section: label,
           popover: { title: '3. 选择一个分组', description: '请展开下拉框并点击一个可用分组。核对模型支持范围、计费倍率和订阅类型，选中后引导会继续。如果没有可用分组，可返回调整服务商或关闭引导联系管理员。', side: 'bottom', showButtons: ['previous', 'close'] } },
         { element: '[data-tour="key-form-submit"]', route: '/keys', keyForm: true, section: label,
-          popover: { title: '4. 确认后创建', description: '名称和分组确认无误后，可点击表单的「创建」保存真实密钥。额度、有效期和 IP 限制按需要设置。若暂时不创建，点击「先了解导入」即可继续。', side: 'top', nextBtnText: '先了解导入' } },
+          popover: { title: '4. 确认后创建', description: '名称和分组确认无误后，选择「普通余额」或「通用订阅」计费。订阅用尽、达限或到期后会停止，不会扣余额。核对后可点击「创建」保存；额度、有效期和 IP 限制按需要设置。若暂时不创建，点击「先了解导入」即可继续。', side: 'top', nextBtnText: '先了解导入' } },
         { element: '[data-tour="keys-connect-help"]', route: '/keys', section: label,
           popover: { title: '5. 将密钥接入客户端', description: '创建成功后，在列表复制自己的 API Key。客户端填写本站提供的 API 地址、API Key 和所选分组支持的模型；需要导入配置时，使用密钥行的配置或导入操作。不同客户端的地址格式请按新手教程设置，不要把密钥发给他人。', side: 'bottom' } },
       )

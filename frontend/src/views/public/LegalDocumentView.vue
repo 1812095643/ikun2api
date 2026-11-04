@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
@@ -120,7 +121,7 @@ marked.setOptions({
 const documentId = computed(() => String(route.params.documentId || ''))
 const isAdminComplianceDocument = computed(() => documentId.value === 'admin-compliance')
 const documents = computed(() => settings.value?.login_agreement_documents ?? [])
-const siteName = computed(() => settings.value?.site_name || 'IKUN2api')
+const siteName = computed(() => settings.value?.site_name || DEFAULT_SITE_NAME)
 const siteLogo = computed(() => sanitizeUrl(settings.value?.site_logo || '', {
   allowRelative: true,
   allowDataUrl: true,

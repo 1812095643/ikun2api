@@ -358,9 +358,29 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 	}
 
 	cmd := buildUsageBillingCommand(requestID, usageLog, p)
+	if cmd != nil && IsUniversalFunding(p.APIKey) {
+		hold := InflightReservationFromContext(ctx)
+		if hold == nil || hold.universalHoldID == "" {
+			return false, ErrUniversalUnavailable
+		}
+		cmd.UniversalHoldID = hold.universalHoldID
+		cmd.UniversalCost = p.Cost.ActualCost
+		cmd.BalanceCost = 0
+		cmd.SubscriptionCost = 0
+		cmd.SubscriptionID = nil
+		cmd.BillingType = BillingTypeSubscription
+		cmd.RequestFingerprint = ""
+		cmd.Normalize()
+		if usageLog != nil {
+			usageLog.BillingType = BillingTypeSubscription
+		}
+	}
 	if cmd == nil || cmd.RequestID == "" || repo == nil {
 		if p.SimpleModeKeyRateLimitOnly {
 			return false, ErrSimpleModeKeyRateLimitBillingUnavailable
+		}
+		if IsUniversalFunding(p.APIKey) {
+			return false, ErrUniversalUnavailable
 		}
 		// The legacy path is only a fallback for standard billing. Simple mode
 		// must retain request-id deduplication and never bill other balances.
@@ -372,6 +392,11 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 	defer cancel()
 
 	result, err := repo.Apply(billingCtx, cmd)
+	if err == nil && IsUniversalFunding(p.APIKey) {
+		if hold := InflightReservationFromContext(ctx); hold != nil {
+			hold.universalUncertain.Store(false)
+		}
+	}
 	if err != nil {
 		return false, err
 	}
@@ -414,7 +439,7 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 		if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
 			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.ActualCost)
 		}
-	} else if p.Cost.ActualCost > 0 && p.User != nil {
+	} else if !IsUniversalFunding(p.APIKey) && p.Cost.ActualCost > 0 && p.User != nil {
 		syncBalanceCacheAfterDeduction(ctx, p, deps, result)
 	}
 
@@ -512,7 +537,7 @@ func notifyBalanceLow(p *postUsageBillingParams, deps *billingDeps, result *Usag
 			slog.Error("panic in notifyBalanceLow", "recover", r)
 		}
 	}()
-	if p.IsSubscriptionBill || p.Cost.ActualCost <= 0 || p.User == nil || deps.balanceNotifyService == nil {
+	if IsUniversalFunding(p.APIKey) || p.IsSubscriptionBill || p.Cost.ActualCost <= 0 || p.User == nil || deps.balanceNotifyService == nil {
 		slog.Debug("notifyBalanceLow: skipped",
 			"is_subscription", p.IsSubscriptionBill,
 			"actual_cost", p.Cost.ActualCost,

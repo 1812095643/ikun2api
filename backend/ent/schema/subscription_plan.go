@@ -30,7 +30,12 @@ func (SubscriptionPlan) Annotations() []schema.Annotation {
 
 func (SubscriptionPlan) Fields() []ent.Field {
 	return []ent.Field{
-		field.Int64("group_id"),
+		field.Int64("group_id").Optional(),
+		field.String("plan_type").MaxLen(32).Default("universal_credit"),
+		field.Float("total_credit_usd").SchemaType(map[string]string{dialect.Postgres: "numeric(20,8)"}).Optional().Nillable(),
+		field.Float("daily_limit_usd").SchemaType(map[string]string{dialect.Postgres: "numeric(20,8)"}).Optional().Nillable(),
+		field.Float("weekly_limit_usd").SchemaType(map[string]string{dialect.Postgres: "numeric(20,8)"}).Optional().Nillable(),
+		field.Float("monthly_limit_usd").SchemaType(map[string]string{dialect.Postgres: "numeric(20,8)"}).Optional().Nillable(),
 		field.String("name").
 			MaxLen(100).
 			NotEmpty(),

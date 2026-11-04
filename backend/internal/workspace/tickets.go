@@ -626,7 +626,7 @@ func (h *Handler) notifyTicket(a actor, id int64, subject, content, userEmail st
 			}
 		}
 		for _, to := range recipients {
-			_ = h.email.SendEmail(ctx, to, "[IKUN2api 工单] "+subject, "<p>"+html.EscapeString(a.Name)+"</p><pre style=\"white-space:pre-wrap\">"+html.EscapeString(content)+"</pre>")
+			_ = h.email.SendEmail(ctx, to, "["+h.settings.GetSiteName(ctx)+" 工单] "+subject, "<p>"+html.EscapeString(a.Name)+"</p><pre style=\"white-space:pre-wrap\">"+html.EscapeString(content)+"</pre>")
 		}
 	}()
 }

@@ -1,5 +1,5 @@
 <template>
-  <AppLayout>
+  <component :is="embedded ? 'div' : AppLayout">
     <div class="space-y-4">
       <!-- Actions -->
       <div class="flex items-center justify-end gap-2">
@@ -14,19 +14,7 @@
         <template #cell-name="{ value, row }">
           <span class="text-sm font-medium" :class="getPlanNameClass(row.group_id)">{{ value }}</span>
         </template>
-        <template #cell-group_id="{ value }">
-          <span v-if="isGroupMissing(value)" class="text-sm">
-            <span class="text-gray-400">#{{ value }}</span>
-            <span class="ml-1 badge badge-danger">{{ t('payment.admin.groupMissing') }}</span>
-          </span>
-          <GroupBadge
-            v-else-if="getGroup(value)"
-            :name="getGroup(value)!.name"
-            :platform="getGroup(value)!.platform"
-            :rate-multiplier="getGroup(value)!.rate_multiplier"
-          />
-          <span v-else class="text-sm text-gray-400">-</span>
-        </template>
+        <template #cell-group_id><span class="badge badge-primary">全站通用</span></template>
         <template #cell-price="{ value, row }">
           <div class="text-sm">
             <span class="font-medium text-gray-900 dark:text-white">{{ planCurrencySymbol(row.currency) }}{{ (value ?? 0).toFixed(2) }}</span>
@@ -35,7 +23,7 @@
           </div>
         </template>
         <template #cell-validity_days="{ value, row }">
-          <span class="text-sm">{{ value }} {{ t('payment.admin.' + (row.validity_unit || 'days')) }}</span>
+          <span class="text-sm">{{ value }} {{ t('payment.admin.' + (row.validity_unit === 'day' ? 'days' : (row.validity_unit || 'days'))) }}</span>
         </template>
         <template #cell-for_sale="{ value, row }">
           <button
@@ -71,7 +59,7 @@
     <PlanEditDialog :show="showPlanDialog" :plan="editingPlan" :groups="groups" :payment-config="paymentConfig" @close="showPlanDialog = false" @saved="loadPlans" />
 
     <ConfirmDialog :show="showDeletePlanDialog" :title="t('payment.admin.deletePlan')" :message="t('payment.admin.deletePlanConfirm')" :confirm-text="t('common.delete')" danger @confirm="handleDeletePlan" @cancel="showDeletePlanDialog = false" />
-  </AppLayout>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -89,11 +77,11 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
 import PlanEditDialog from './PlanEditDialog.vue'
 import { currencySymbol } from '@/components/payment/currency'
 import { platformTextClass } from '@/utils/platformColors'
 
+defineProps<{ embedded?: boolean }>()
 const { t } = useI18n()
 const appStore = useAppStore()
 
@@ -123,9 +111,6 @@ function getGroup(id: number): AdminGroup | undefined {
   return groups.value.find(g => g.id === id)
 }
 
-function isGroupMissing(id: number): boolean {
-  return id > 0 && !groups.value.find(g => g.id === id)
-}
 
 function getPlanNameClass(groupId: number): string {
   const group = getGroup(groupId)
@@ -145,7 +130,11 @@ const deletingPlanId = ref<number | null>(null)
 const planColumns = computed((): Column[] => [
   { key: 'id', label: 'ID' },
   { key: 'name', label: t('payment.admin.planName') },
-  { key: 'group_id', label: t('payment.admin.group') },
+  { key: 'group_id', label: '适用范围' },
+  { key: 'total_credit_usd', label: '总额度（USD）' },
+  { key: 'daily_limit_usd', label: '日上限' },
+  { key: 'weekly_limit_usd', label: '周上限' },
+  { key: 'monthly_limit_usd', label: '月上限' },
   { key: 'price', label: t('payment.admin.price') },
   { key: 'validity_days', label: t('payment.admin.validity') },
   { key: 'for_sale', label: t('payment.admin.forSale') },

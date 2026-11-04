@@ -24,8 +24,8 @@ type SystemHandler struct {
 }
 
 // systemUpdateTimeout bounds a full in-place update or rollback: the release
-// manifest fetch, download, compatibility check and request draining. Allow
-// room for the 10-minute download timeout and the 5-minute drain window.
+// manifest fetch, download and compatibility checks. There is no request-drain
+// stage; the explicit restart action exits the process as in the upstream UI.
 const systemUpdateTimeout = 20 * time.Minute
 
 // systemUpdateContext detaches a long-running update/rollback from the HTTP
@@ -95,9 +95,11 @@ func (h *SystemHandler) PerformUpdate(c *gin.Context) {
 
 		updateCtx, cancel := systemUpdateContext(ctx)
 		defer cancel()
+		service.SetUpgradePhase("downloading", "")
 
 		if err := h.updateSvc.PerformUpdate(updateCtx); err != nil {
 			if errors.Is(err, service.ErrNoUpdateAvailable) {
+				service.SetUpgradePhase("idle", "")
 				info, checkErr := h.updateSvc.CheckUpdate(updateCtx, false)
 				if checkErr != nil {
 					releaseReason = "SYSTEM_UPDATE_FAILED"
@@ -113,10 +115,12 @@ func (h *SystemHandler) PerformUpdate(c *gin.Context) {
 				}, nil
 			}
 			releaseReason = "SYSTEM_UPDATE_FAILED"
+			service.SetUpgradePhase("failed", err.Error())
 			return nil, err
 		}
 		succeeded = true
 
+		service.SetUpgradePhase("ready", "")
 		return gin.H{
 			"message":      "Update completed. Please restart the service.",
 			"need_restart": true,
@@ -186,6 +190,7 @@ func (h *SystemHandler) Rollback(c *gin.Context) {
 		}
 		succeeded = true
 
+		service.SetUpgradePhase("ready", "")
 		return gin.H{
 			"message":      "Rollback completed. Please restart the service.",
 			"need_restart": true,

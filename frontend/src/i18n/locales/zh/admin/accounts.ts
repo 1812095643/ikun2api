@@ -19,7 +19,7 @@ export default {
         credentialStatus: {"unknown": "Token 到期时间未知", "not_expired": "Token 未到期（不代表已通过验证）", "expired": "Token 已过期", "revoked": "Token 已被撤销", "auth_failed": "Token 认证失败"},
 
         saveAndTest: '保存并测试连接',
-        monitorHint: '填写 IKUN2api 地址和 BPS 分组的 API Key，使用 Responses 探活；不提供上游配额查询。',
+        monitorHint: '填写 __SITE_NAME__ 地址和 BPS 分组的 API Key，使用 Responses 探活；不提供上游配额查询。',
         keepToken: "留空保留现有 Token",
         tokenHint: "手动粘贴 ChatGPT Access Token。到期后需在此替换；保存后可在账号列表测试连接。",
         tokenRequired: "请输入 Access Token",
@@ -291,7 +291,7 @@ export default {
         }
       },
       upstreamBilling: {
-        trustWarning: '此倍率由上游站点针对当前 API Key 自行声明。IKUN2api 无法验证该值是否与实际扣费一致；上游站点或中间代理可能返回伪造、过期或被篡改的数据。请结合账单、余额变化和实际用量自行核验。',
+        trustWarning: '此倍率由上游站点针对当前 API Key 自行声明。__SITE_NAME__ 无法验证该值是否与实际扣费一致；上游站点或中间代理可能返回伪造、过期或被篡改的数据。请结合账单、余额变化和实际用量自行核验。',
         autoProbe: '自动探测上游声明倍率',
         autoProbeHint: '启用后按全局周期刷新上游声明倍率；此开关本身不会修改账号倍率。',
         syncRate: '同步上游声明倍率',
@@ -1022,8 +1022,8 @@ export default {
         searchTestHint:
           '独立网页搜索探测（与网关 /v1/web_search 语义一致），不是带 tools 的自由对话。',
         ttsTextLabel: 'TTS 文本',
-        ttsTextPlaceholder: '例如：Hello from IKUN2api connectivity test.',
-        ttsTextDefault: 'Hello from IKUN2api account connectivity test.',
+        ttsTextPlaceholder: '例如：Hello from __SITE_NAME__ connectivity test.',
+        ttsTextDefault: 'Hello from __SITE_NAME__ account connectivity test.',
         ttsTestHint: '独立调用 /v1/tts（language=en）；成功时显示音频字节数。',
         sttTestHint: '独立调用 /v1/stt，使用合成静音 WAV；成功表示接口可达。',
         realtimeTestHint:

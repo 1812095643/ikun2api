@@ -718,7 +718,7 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		system.GET("/check-updates", h.Admin.System.CheckUpdates)
 		system.GET("/update-status", h.Admin.System.UpdateStatus)
 		system.GET("/rollback-versions", h.Admin.System.GetRollbackVersions)
-		system.POST("/update", h.Admin.System.StartUpdate)
+		system.POST("/update", h.Admin.System.PerformUpdate)
 		system.POST("/rollback", h.Admin.System.Rollback)
 		system.POST("/restart", h.Admin.System.RestartService)
 	}
@@ -727,17 +727,23 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	subscriptions := admin.Group("/subscriptions")
 	{
+		subscriptions.GET("/universal", h.Admin.Subscription.UniversalList)
+		subscriptions.POST("/universal/grant", h.Admin.Subscription.UniversalGrant)
+		subscriptions.PUT("/universal/:id", h.Admin.Subscription.UniversalAdjust)
+		subscriptions.POST("/universal/:id/status", h.Admin.Subscription.UniversalManage)
+		subscriptions.GET("/universal/:id/records", h.Admin.Subscription.UniversalRecords)
+		subscriptions.POST("/universal/holds/:hold/resolve", h.Admin.Subscription.UniversalResolveHold)
 		subscriptions.GET("", h.Admin.Subscription.List)
 		subscriptions.GET("/:id", h.Admin.Subscription.GetByID)
 		subscriptions.GET("/:id/progress", h.Admin.Subscription.GetProgress)
-		subscriptions.POST("/assign", h.Admin.Subscription.Assign)
-		subscriptions.POST("/bulk-assign", h.Admin.Subscription.BulkAssign)
-		subscriptions.POST("/bulk-action", h.Admin.Subscription.BulkAction)
-		subscriptions.POST("/:id/extend", h.Admin.Subscription.Extend)
-		subscriptions.POST("/:id/reset-quota", h.Admin.Subscription.ResetQuota)
-		subscriptions.POST("/:id/revoke", h.Admin.Subscription.Revoke)
-		subscriptions.POST("/:id/restore", h.Admin.Subscription.Restore)
-		subscriptions.DELETE("/:id", h.Admin.Subscription.Revoke)
+		subscriptions.POST("/assign", h.Admin.Subscription.LegacyRetired)
+		subscriptions.POST("/bulk-assign", h.Admin.Subscription.LegacyRetired)
+		subscriptions.POST("/bulk-action", h.Admin.Subscription.LegacyRetired)
+		subscriptions.POST("/:id/extend", h.Admin.Subscription.LegacyRetired)
+		subscriptions.POST("/:id/reset-quota", h.Admin.Subscription.LegacyRetired)
+		subscriptions.POST("/:id/revoke", h.Admin.Subscription.LegacyRetired)
+		subscriptions.POST("/:id/restore", h.Admin.Subscription.LegacyRetired)
+		subscriptions.DELETE("/:id", h.Admin.Subscription.LegacyRetired)
 	}
 
 	// 分组下的订阅列表

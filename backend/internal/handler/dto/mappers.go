@@ -82,6 +82,7 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		return nil
 	}
 	out := &APIKey{
+		FundingSource:      k.FundingSource,
 		ID:                 k.ID,
 		UserID:             k.UserID,
 		Key:                k.Key,
@@ -650,19 +651,20 @@ func RedeemCodeFromServiceAdmin(rc *service.RedeemCode) *AdminRedeemCode {
 
 func redeemCodeFromServiceBase(rc *service.RedeemCode) RedeemCode {
 	out := RedeemCode{
-		ID:           rc.ID,
-		Code:         rc.Code,
-		Type:         rc.Type,
-		Value:        rc.Value,
-		Status:       rc.Status,
-		UsedBy:       rc.UsedBy,
-		UsedAt:       rc.UsedAt,
-		CreatedAt:    rc.CreatedAt,
-		ExpiresAt:    rc.ExpiresAt,
-		GroupID:      rc.GroupID,
-		ValidityDays: rc.ValidityDays,
-		User:         UserFromServiceShallow(rc.User),
-		Group:        GroupFromServiceShallow(rc.Group),
+		SubscriptionName: universalRedeemName(rc),
+		ID:               rc.ID,
+		Code:             rc.Code,
+		Type:             rc.Type,
+		Value:            rc.Value,
+		Status:           rc.Status,
+		UsedBy:           rc.UsedBy,
+		UsedAt:           rc.UsedAt,
+		CreatedAt:        rc.CreatedAt,
+		ExpiresAt:        rc.ExpiresAt,
+		GroupID:          rc.GroupID,
+		ValidityDays:     rc.ValidityDays,
+		User:             UserFromServiceShallow(rc.User),
+		Group:            GroupFromServiceShallow(rc.Group),
 	}
 	if rc.IsExpired() {
 		out.Status = service.StatusExpired
@@ -973,4 +975,14 @@ func PromoCodeUsageFromService(u *service.PromoCodeUsage) *PromoCodeUsage {
 		UsedAt:      u.UsedAt,
 		User:        UserFromServiceShallow(u.User),
 	}
+}
+
+func universalRedeemName(rc *service.RedeemCode) string {
+	if rc == nil {
+		return ""
+	}
+	if name, ok := rc.SubscriptionSnapshot["name"].(string); ok {
+		return name
+	}
+	return ""
 }

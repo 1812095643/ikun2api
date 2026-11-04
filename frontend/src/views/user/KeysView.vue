@@ -152,6 +152,7 @@
                 :title="t('keys.ipRestrictionEnabled')"
               />
             </div>
+          <span class="mt-1 block text-[11px] text-gray-500 dark:text-gray-400">{{ row.funding_source === 'universal_subscription' ? '通用订阅' : '普通余额' }}</span>
           </template>
 
           <template #cell-group="{ row }">
@@ -485,6 +486,14 @@
           />
         </div>
 
+        <div class="space-y-2">
+          <label for="key-funding-source" class="input-label">计费来源</label>
+          <select id="key-funding-source" v-model="formData.funding_source" class="input">
+            <option value="balance">普通余额</option>
+            <option value="universal_subscription">通用订阅</option>
+          </select>
+          <p class="text-xs text-gray-500 dark:text-gray-400">通用订阅跨 Key、分组共用额度。用尽、达限或到期后停止调用，不扣普通余额。</p>
+        </div>
         <fieldset v-if="!showEditModal" data-tour="key-form-provider">
           <legend class="input-label">{{ t('keys.providerLabel') }}</legend>
           <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1085,7 +1094,7 @@
       v-if="pendingCcsRow"
       :api-key="pendingCcsRow"
       :base-url="publicSettings?.api_base_url || origin"
-      :site-name="publicSettings?.site_name || 'IKUN2api'"
+      :site-name="publicSettings?.site_name || DEFAULT_SITE_NAME"
       @close="pendingCcsRow = null"
     />
 
@@ -1161,7 +1170,8 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+	import { DEFAULT_SITE_NAME } from '@/utils/branding'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
 	import { useOnboardingStore } from '@/stores/onboarding'
@@ -1405,6 +1415,7 @@ const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance 
 
 const formData = ref({
   name: '',
+    funding_source: 'balance' as 'balance' | 'universal_subscription',
   group_id: null as number | null,
   status: 'active' as 'active' | 'inactive',
   use_custom_key: false,
@@ -1673,6 +1684,7 @@ const editKey = (key: ApiKey) => {
   const hasExpiration = !!key.expires_at
   formData.value = {
     name: key.name,
+    funding_source: key.funding_source || 'balance',
     group_id: key.group_id,
     status: key.status === 'quota_exhausted' || key.status === 'expired' ? 'inactive' : key.status,
     use_custom_key: false,
@@ -1829,6 +1841,7 @@ const handleSubmit = async () => {
   try {
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
+        funding_source: formData.value.funding_source,
         name: formData.value.name,
         group_id: formData.value.group_id,
         ip_whitelist: ipWhitelist,
@@ -1854,7 +1867,8 @@ const handleSubmit = async () => {
         ipBlacklist,
         quota,
         expiresInDays,
-        rateLimitData
+        rateLimitData,
+        formData.value.funding_source
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
@@ -1899,6 +1913,7 @@ const closeModals = () => {
   selectedKey.value = null
   formData.value = {
     name: '',
+    funding_source: 'balance' as 'balance' | 'universal_subscription',
     group_id: null,
     status: 'active',
     use_custom_key: false,

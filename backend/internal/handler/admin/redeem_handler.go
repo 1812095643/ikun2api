@@ -34,6 +34,7 @@ func NewRedeemHandler(adminService service.AdminService, redeemService *service.
 
 // GenerateRedeemCodesRequest represents generate redeem codes request
 type GenerateRedeemCodesRequest struct {
+	PlanID        int64      `json:"plan_id"`
 	Gift          bool       `json:"gift"`
 	Count         int        `json:"count" binding:"required,min=1,max=100"`
 	Type          string     `json:"type" binding:"required,oneof=balance concurrency subscription invitation"`
@@ -143,6 +144,24 @@ func (h *RedeemHandler) Generate(c *gin.Context) {
 		return
 	}
 
+	if req.Type == "subscription" {
+		executeAdminIdempotentJSON(c, "admin.redeem_codes.generate_universal", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+			if req.PlanID <= 0 {
+				return nil, service.ErrLegacySubscriptionRetired
+			}
+			codes, err := h.redeemService.GenerateUniversalCodes(ctx, req.PlanID, req.Count, expiresAt)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]dto.AdminRedeemCode, 0, len(codes))
+			for i := range codes {
+				out = append(out, *dto.RedeemCodeFromServiceAdmin(&codes[i]))
+			}
+			return out, nil
+		})
+		return
+	}
+
 	executeAdminIdempotentJSON(c, "admin.redeem_codes.generate", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		codes, execErr := h.adminService.GenerateRedeemCodes(ctx, &service.GenerateRedeemCodesInput{
 			Gift:         req.Gift,
@@ -185,6 +204,10 @@ func (h *RedeemHandler) CreateAndRedeem(c *gin.Context) {
 		req.Type = "balance"
 	}
 
+	if req.Type == "subscription" {
+		response.ErrorFrom(c, service.ErrLegacySubscriptionRetired)
+		return
+	}
 	if req.Type == "subscription" {
 		if req.GroupID == nil {
 			response.BadRequest(c, "group_id is required for subscription type")

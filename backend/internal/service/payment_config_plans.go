@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	dbent "github.com/MACOS-DO/sub4api/ent"
@@ -129,79 +130,132 @@ func (s *PaymentConfigService) GetGroupInfoMap(ctx context.Context, plans []*dbe
 }
 
 func (s *PaymentConfigService) ListPlans(ctx context.Context) ([]*dbent.SubscriptionPlan, error) {
-	return s.entClient.SubscriptionPlan.Query().Order(subscriptionplan.BySortOrder()).All(ctx)
+	return s.entClient.SubscriptionPlan.Query().Where(subscriptionplan.PlanTypeEQ(UniversalPlanType)).Order(subscriptionplan.BySortOrder()).All(ctx)
 }
 
 func (s *PaymentConfigService) ListPlansForSale(ctx context.Context) ([]*dbent.SubscriptionPlan, error) {
-	return s.entClient.SubscriptionPlan.Query().Where(subscriptionplan.ForSaleEQ(true)).Order(subscriptionplan.BySortOrder()).All(ctx)
+	return s.entClient.SubscriptionPlan.Query().Where(subscriptionplan.ForSaleEQ(true), subscriptionplan.PlanTypeEQ(UniversalPlanType)).Order(subscriptionplan.BySortOrder()).All(ctx)
 }
 
 func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanRequest) (*dbent.SubscriptionPlan, error) {
-	if err := validatePlanRequired(req.Name, req.GroupID, req.Price, req.ValidityDays, req.ValidityUnit, req.OriginalPrice); err != nil {
+	if req.GroupID != 0 || (req.PlanType != "" && req.PlanType != UniversalPlanType) {
+		return nil, ErrLegacySubscriptionRetired
+	}
+	if math.IsNaN(req.Price) || math.IsInf(req.Price, 0) || req.Price < 0.01 || req.Price > 1e9 {
+		return nil, infraerrors.BadRequest("PLAN_PRICE_INVALID", "售价须为大于零的有限金额")
+	}
+	if req.ValidityUnit != "" && req.ValidityUnit != "day" && req.ValidityUnit != "days" {
+		return nil, infraerrors.BadRequest("PLAN_VALIDITY_INVALID", "请使用天数设置有效期")
+	}
+	p := UniversalPlanSnapshot{Name: req.Name, ValidityDays: req.ValidityDays, TotalCreditUSD: req.TotalCreditUSD, DailyLimitUSD: optionalPlanLimit(req.DailyLimitUSD), WeeklyLimitUSD: optionalPlanLimit(req.WeeklyLimitUSD), MonthlyLimitUSD: optionalPlanLimit(req.MonthlyLimitUSD)}
+	if err := p.Validate(); err != nil {
 		return nil, err
 	}
 	currency, err := normalizePlanCurrency(req.Currency)
 	if err != nil {
 		return nil, err
 	}
-	b := s.entClient.SubscriptionPlan.Create().
-		SetGroupID(req.GroupID).SetName(req.Name).SetDescription(req.Description).
-		SetPrice(req.Price).SetCurrency(currency).SetValidityDays(req.ValidityDays).SetValidityUnit(req.ValidityUnit).
-		SetFeatures(req.Features).SetProductName(req.ProductName).
-		SetForSale(req.ForSale).SetSortOrder(req.SortOrder)
-	if req.OriginalPrice != nil {
-		b.SetOriginalPrice(*req.OriginalPrice)
+	if req.OriginalPrice != nil && (math.IsNaN(*req.OriginalPrice) || math.IsInf(*req.OriginalPrice, 0) || *req.OriginalPrice < 0) {
+		return nil, infraerrors.BadRequest("PLAN_ORIGINAL_PRICE_INVALID", "原价无效")
 	}
-	return b.Save(ctx)
+	return s.entClient.SubscriptionPlan.Create().SetPlanType(UniversalPlanType).SetName(strings.TrimSpace(req.Name)).SetDescription(req.Description).SetPrice(req.Price).SetNillableOriginalPrice(req.OriginalPrice).SetCurrency(currency).SetValidityDays(p.ValidityDays).SetValidityUnit("day").SetFeatures(req.Features).SetProductName(req.ProductName).SetForSale(req.ForSale).SetSortOrder(req.SortOrder).SetNillableTotalCreditUsd(p.TotalCreditUSD).SetNillableDailyLimitUsd(p.DailyLimitUSD).SetNillableWeeklyLimitUsd(p.WeeklyLimitUSD).SetNillableMonthlyLimitUsd(p.MonthlyLimitUSD).Save(ctx)
+}
+func optionalPlanLimit(v *float64) *float64 {
+	if v != nil && *v == 0 {
+		return nil
+	}
+	return v
 }
 
 // UpdatePlan updates a subscription plan by ID (patch semantics).
 // NOTE: This function exceeds 30 lines due to per-field nil-check patch update boilerplate
 // plus a validation guard for non-nil fields.
 func (s *PaymentConfigService) UpdatePlan(ctx context.Context, id int64, req UpdatePlanRequest) (*dbent.SubscriptionPlan, error) {
-	if err := validatePlanPatch(req); err != nil {
+	p, err := s.GetPlan(ctx, id)
+	if err != nil {
 		return nil, err
 	}
-	u := s.entClient.SubscriptionPlan.UpdateOneID(id)
+	if p.PlanType != UniversalPlanType {
+		return nil, ErrLegacySubscriptionRetired
+	}
 	if req.GroupID != nil {
-		u.SetGroupID(*req.GroupID)
+		return nil, infraerrors.BadRequest("PLAN_GROUP_NOT_APPLICABLE", "通用订阅不绑定分组")
 	}
 	if req.Name != nil {
-		u.SetName(*req.Name)
+		p.Name = strings.TrimSpace(*req.Name)
 	}
 	if req.Description != nil {
-		u.SetDescription(*req.Description)
+		p.Description = *req.Description
 	}
 	if req.Price != nil {
-		u.SetPrice(*req.Price)
+		p.Price = *req.Price
+	}
+	if math.IsNaN(p.Price) || math.IsInf(p.Price, 0) || p.Price < 0.01 || p.Price > 1e9 {
+		return nil, infraerrors.BadRequest("PLAN_PRICE_INVALID", "售价无效")
 	}
 	if req.OriginalPrice != nil {
-		u.SetOriginalPrice(*req.OriginalPrice)
+		if math.IsNaN(*req.OriginalPrice) || math.IsInf(*req.OriginalPrice, 0) || *req.OriginalPrice < 0 {
+			return nil, infraerrors.BadRequest("PLAN_ORIGINAL_PRICE_INVALID", "原价无效")
+		}
+		p.OriginalPrice = req.OriginalPrice
 	}
 	if req.Currency != nil {
-		currency, err := normalizePlanCurrency(*req.Currency)
+		p.Currency, err = normalizePlanCurrency(*req.Currency)
 		if err != nil {
 			return nil, err
 		}
-		u.SetCurrency(currency)
 	}
 	if req.ValidityDays != nil {
-		u.SetValidityDays(*req.ValidityDays)
+		p.ValidityDays = *req.ValidityDays
 	}
 	if req.ValidityUnit != nil {
-		u.SetValidityUnit(*req.ValidityUnit)
+		if *req.ValidityUnit != "day" && *req.ValidityUnit != "days" {
+			return nil, infraerrors.BadRequest("PLAN_VALIDITY_INVALID", "请使用天数设置有效期")
+		}
+		p.ValidityUnit = *req.ValidityUnit
+	}
+	if req.TotalCreditUSD != nil {
+		p.TotalCreditUsd = req.TotalCreditUSD
+	}
+	if req.DailyLimitUSD != nil {
+		p.DailyLimitUsd = optionalPlanLimit(req.DailyLimitUSD)
+	}
+	if req.WeeklyLimitUSD != nil {
+		p.WeeklyLimitUsd = optionalPlanLimit(req.WeeklyLimitUSD)
+	}
+	if req.MonthlyLimitUSD != nil {
+		p.MonthlyLimitUsd = optionalPlanLimit(req.MonthlyLimitUSD)
+	}
+	if err = UniversalSnapshot(p).Validate(); err != nil {
+		return nil, err
 	}
 	if req.Features != nil {
-		u.SetFeatures(*req.Features)
+		p.Features = *req.Features
 	}
 	if req.ProductName != nil {
-		u.SetProductName(*req.ProductName)
+		p.ProductName = *req.ProductName
 	}
 	if req.ForSale != nil {
-		u.SetForSale(*req.ForSale)
+		p.ForSale = *req.ForSale
 	}
 	if req.SortOrder != nil {
-		u.SetSortOrder(*req.SortOrder)
+		p.SortOrder = *req.SortOrder
+	}
+	u := s.entClient.SubscriptionPlan.UpdateOneID(id).SetName(p.Name).SetDescription(p.Description).SetPrice(p.Price).SetNillableOriginalPrice(p.OriginalPrice).SetCurrency(p.Currency).SetValidityDays(psComputeValidityDays(p.ValidityDays, p.ValidityUnit)).SetValidityUnit("day").SetFeatures(p.Features).SetProductName(p.ProductName).SetForSale(p.ForSale).SetSortOrder(p.SortOrder).SetNillableTotalCreditUsd(p.TotalCreditUsd)
+	if p.DailyLimitUsd == nil {
+		u.ClearDailyLimitUsd()
+	} else {
+		u.SetDailyLimitUsd(*p.DailyLimitUsd)
+	}
+	if p.WeeklyLimitUsd == nil {
+		u.ClearWeeklyLimitUsd()
+	} else {
+		u.SetWeeklyLimitUsd(*p.WeeklyLimitUsd)
+	}
+	if p.MonthlyLimitUsd == nil {
+		u.ClearMonthlyLimitUsd()
+	} else {
+		u.SetMonthlyLimitUsd(*p.MonthlyLimitUsd)
 	}
 	return u.Save(ctx)
 }

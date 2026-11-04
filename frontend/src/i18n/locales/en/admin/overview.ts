@@ -1266,9 +1266,9 @@ export default {
       openaiLive: {
         title: 'OpenAI Live',
         allow: 'Allow Live access',
-        hint: 'When enabled, API keys in this OpenAI group can create and control Live voice sessions. Disabled by default. The IKUN2api server must run on Apple Silicon macOS with the official ChatGPT app installed; client platforms are unrestricted.',
+        hint: 'When enabled, API keys in this OpenAI group can create and control Live voice sessions. Disabled by default. The __SITE_NAME__ server must run on Apple Silicon macOS with the official ChatGPT app installed; client platforms are unrestricted.',
         unsupportedTitle: 'Current server does not support Live',
-        unsupportedMessage: 'This IKUN2api server cannot generate the required Live attestation. Live will not work even if enabled. Continue anyway?',
+        unsupportedMessage: 'This __SITE_NAME__ server cannot generate the required Live attestation. Live will not work even if enabled. Continue anyway?',
         enableAnyway: 'Enable anyway'
       },
       openaiFast: {

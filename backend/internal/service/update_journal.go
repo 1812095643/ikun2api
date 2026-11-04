@@ -44,7 +44,7 @@ func ReadUpgradeJournal(binary string) (*UpgradeJournal, error) {
 	dir := filepath.Clean(j.BackupDirectory)
 	root := filepath.Join(filepath.Dir(binary), "upgrade-backups")
 	rel, e := filepath.Rel(root, dir)
-	if e != nil || rel == "." || rel == ".." || filepath.IsAbs(rel) || len(rel) > 2 && rel[:3] == "../" {
+	if e != nil || rel == "." || !filepath.IsLocal(rel) {
 		return nil, fmt.Errorf("invalid upgrade backup path")
 	}
 	if len(j.PreviousSHA256) != 64 || len(j.CandidateSHA256) != 64 {

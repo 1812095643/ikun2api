@@ -23,6 +23,12 @@ type PaymentOrderCreate struct {
 	conflict []sql.ConflictOption
 }
 
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (_c *PaymentOrderCreate) SetSubscriptionSnapshot(v map[string]interface{}) *PaymentOrderCreate {
+	_c.mutation.SetSubscriptionSnapshot(v)
+	return _c
+}
+
 // SetUserID sets the "user_id" field.
 func (_c *PaymentOrderCreate) SetUserID(v int64) *PaymentOrderCreate {
 	_c.mutation.SetUserID(v)
@@ -722,6 +728,10 @@ func (_c *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec)
 		_spec = sqlgraph.NewCreateSpec(paymentorder.Table, sqlgraph.NewFieldSpec(paymentorder.FieldID, field.TypeInt64))
 	)
 	_spec.OnConflict = _c.conflict
+	if value, ok := _c.mutation.SubscriptionSnapshot(); ok {
+		_spec.SetField(paymentorder.FieldSubscriptionSnapshot, field.TypeJSON, value)
+		_node.SubscriptionSnapshot = value
+	}
 	if value, ok := _c.mutation.UserEmail(); ok {
 		_spec.SetField(paymentorder.FieldUserEmail, field.TypeString, value)
 		_node.UserEmail = value
@@ -902,7 +912,7 @@ func (_c *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec)
 // of the `INSERT` statement. For example:
 //
 //	client.PaymentOrder.Create().
-//		SetUserID(v).
+//		SetSubscriptionSnapshot(v).
 //		OnConflict(
 //			// Update the row with the new values
 //			// the was proposed for insertion.
@@ -911,7 +921,7 @@ func (_c *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec)
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.PaymentOrderUpsert) {
-//			SetUserID(v+v).
+//			SetSubscriptionSnapshot(v+v).
 //		}).
 //		Exec(ctx)
 func (_c *PaymentOrderCreate) OnConflict(opts ...sql.ConflictOption) *PaymentOrderUpsertOne {
@@ -946,6 +956,24 @@ type (
 		*sql.UpdateSet
 	}
 )
+
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (u *PaymentOrderUpsert) SetSubscriptionSnapshot(v map[string]interface{}) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldSubscriptionSnapshot, v)
+	return u
+}
+
+// UpdateSubscriptionSnapshot sets the "subscription_snapshot" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateSubscriptionSnapshot() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldSubscriptionSnapshot)
+	return u
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (u *PaymentOrderUpsert) ClearSubscriptionSnapshot() *PaymentOrderUpsert {
+	u.SetNull(paymentorder.FieldSubscriptionSnapshot)
+	return u
+}
 
 // SetUserID sets the "user_id" field.
 func (u *PaymentOrderUpsert) SetUserID(v int64) *PaymentOrderUpsert {
@@ -1626,6 +1654,27 @@ func (u *PaymentOrderUpsertOne) Update(set func(*PaymentOrderUpsert)) *PaymentOr
 		set(&PaymentOrderUpsert{UpdateSet: update})
 	}))
 	return u
+}
+
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (u *PaymentOrderUpsertOne) SetSubscriptionSnapshot(v map[string]interface{}) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetSubscriptionSnapshot(v)
+	})
+}
+
+// UpdateSubscriptionSnapshot sets the "subscription_snapshot" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateSubscriptionSnapshot() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateSubscriptionSnapshot()
+	})
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (u *PaymentOrderUpsertOne) ClearSubscriptionSnapshot() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearSubscriptionSnapshot()
+	})
 }
 
 // SetUserID sets the "user_id" field.
@@ -2505,7 +2554,7 @@ func (_c *PaymentOrderCreateBulk) ExecX(ctx context.Context) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.PaymentOrderUpsert) {
-//			SetUserID(v+v).
+//			SetSubscriptionSnapshot(v+v).
 //		}).
 //		Exec(ctx)
 func (_c *PaymentOrderCreateBulk) OnConflict(opts ...sql.ConflictOption) *PaymentOrderUpsertBulk {
@@ -2579,6 +2628,27 @@ func (u *PaymentOrderUpsertBulk) Update(set func(*PaymentOrderUpsert)) *PaymentO
 		set(&PaymentOrderUpsert{UpdateSet: update})
 	}))
 	return u
+}
+
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (u *PaymentOrderUpsertBulk) SetSubscriptionSnapshot(v map[string]interface{}) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetSubscriptionSnapshot(v)
+	})
+}
+
+// UpdateSubscriptionSnapshot sets the "subscription_snapshot" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateSubscriptionSnapshot() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateSubscriptionSnapshot()
+	})
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (u *PaymentOrderUpsertBulk) ClearSubscriptionSnapshot() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearSubscriptionSnapshot()
+	})
 }
 
 // SetUserID sets the "user_id" field.

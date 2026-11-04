@@ -106,7 +106,7 @@
                       {{ t('redeem.concurrentRequests') }}
                     </p>
                     <p v-else-if="redeemResult.type === 'subscription'" class="font-medium">
-                      {{ t('redeem.subscriptionAssigned') }}
+                      {{ t('redeem.subscriptionAssigned') }}<span v-if="redeemResult.subscription_name">：{{ redeemResult.subscription_name }} · ${{ redeemResult.value.toFixed(2) }}</span>
                       <span v-if="redeemResult.group_name"> - {{ redeemResult.group_name }}</span>
                       <span v-if="redeemResult.validity_days">
                         ({{
@@ -114,6 +114,7 @@
                         }})</span
                       >
                     </p>
+                    <p v-if="redeemResult.subscription_name" class="text-xs leading-5">已开通通用订阅，已有套餐时自动排到下一期。请到「我的订阅」查看时间，并将 API Key 计费来源设置为通用订阅。</p>
                     <p v-if="redeemResult.new_balance !== undefined">
                       {{ t('redeem.newBalance') }}:
                       <span class="font-semibold">${{ redeemResult.new_balance.toFixed(2) }}</span>
@@ -392,6 +393,7 @@ const redeemResult = ref<{
   new_balance?: number
   new_concurrency?: number
   group_name?: string
+  subscription_name?: string
   validity_days?: number
 } | null>(null)
 const errorMessage = ref('')
@@ -441,7 +443,7 @@ const formatHistoryValue = (item: RedeemHistoryItem) => {
   } else if (isSubscriptionType(item.type)) {
     // 订阅类型显示有效天数和分组名称
     const days = item.validity_days || Math.round(item.value)
-    const groupName = item.group?.name || ''
+    const groupName = item.subscription_name || item.group?.name || ''
     return groupName ? `${days}${t('redeem.days')} - ${groupName}` : `${days}${t('redeem.days')}`
   } else {
     const sign = item.value >= 0 ? '+' : ''

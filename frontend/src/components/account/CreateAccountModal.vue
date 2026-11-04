@@ -3752,6 +3752,7 @@
         />
       </div>
 
+      <ClaudeModelAllowlistField v-if="form.platform === 'anthropic' && (form.type === 'oauth' || form.type === 'setup-token')" v-model="claudeModelAllowlist" />
     </form>
 
     <!-- Step 2: OAuth Authorization -->
@@ -4175,6 +4176,7 @@ import ProxySelector from '@/components/common/ProxySelector.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
+import ClaudeModelAllowlistField, { type AccountModelAllowlist } from '@/components/account/ClaudeModelAllowlistField.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
@@ -4264,6 +4266,9 @@ const oauthStepTitle = computed(() => {
 // 上游ID：直接上游声明请求标识的响应头名，留空不记录。
 const upstreamRequestIdHeader = ref('')
 const withUpstreamRequestIdHeader = <T extends Record<string, unknown> | undefined>(extra: T): T | Record<string, unknown> => {
+  if (form.platform === 'anthropic' && (form.type === 'oauth' || form.type === 'setup-token')) {
+    extra = { ...(extra || {}), model_allowlist: { ...claudeModelAllowlist.value, models: [...claudeModelAllowlist.value.models] } } as unknown as T
+  }
   const name = upstreamRequestIdHeader.value.trim()
   if (!name) return extra
   return { ...(extra || {}), upstream_request_id_header: name }
@@ -4648,6 +4653,7 @@ const modelMappings = ref<ModelMapping[]>([])
 const openAICompactModelMappings = ref<ModelMapping[]>([])
 const modelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
 const allowedModels = ref<string[]>([])
+const claudeModelAllowlist = ref<AccountModelAllowlist>({ enabled: false, models: [] })
 const upstreamModelsPreviewed = ref(false)
 const DEFAULT_POOL_MODE_RETRY_COUNT = 3
 const MAX_POOL_MODE_RETRY_COUNT = 10
@@ -5193,7 +5199,8 @@ watch(
     if (newPlatform === 'typesafe') {
       accountCategory.value = 'apikey'
       // Grok 等平台会把模式切到映射；TypeSafe 只用白名单写入 jev-latest。
-      modelRestrictionMode.value = 'whitelist'
+      claudeModelAllowlist.value = { enabled: false, models: [] }
+  modelRestrictionMode.value = 'whitelist'
       allowedModels.value = ['jev-latest']
     }
     // Antigravity: 默认使用映射模式并填充默认映射
@@ -5676,6 +5683,7 @@ const resetForm = () => {
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
   upstreamRequestIdHeader.value = ''
+  claudeModelAllowlist.value = { enabled: false, models: [] }
   upstreamBillingAutoProbeEnabled.value = true
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null

@@ -454,9 +454,13 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 	switch redeemCode.Type {
 	case RedeemTypeBalance, RedeemTypeConcurrency:
 	case RedeemTypeSubscription:
-		if redeemCode.GroupID == nil {
-			return nil, infraerrors.BadRequest("REDEEM_CODE_INVALID", "invalid subscription redeem code: missing group_id")
+		if len(redeemCode.SubscriptionSnapshot) > 0 {
+			if _, err := DecodeUniversalSnapshot(redeemCode.SubscriptionSnapshot); err != nil {
+				return nil, err
+			}
+			break
 		}
+		return nil, ErrLegacySubscriptionRetired
 	default:
 		return nil, unsupportedRedeemTypeError(redeemCode.Type)
 	}
@@ -515,27 +519,17 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 		}
 
 	case RedeemTypeSubscription:
-		validityDays := redeemCode.ValidityDays
-		if validityDays < 0 {
-			// 负数天数：缩短订阅，减到 0 则取消订阅
-			if err := s.reduceOrCancelSubscription(txCtx, userID, *redeemCode.GroupID, -validityDays, redeemCode.Code); err != nil {
-				return nil, fmt.Errorf("reduce or cancel subscription: %w", err)
-			}
-		} else {
-			if validityDays == 0 {
-				validityDays = 30
-			}
-			_, _, err := s.subscriptionService.AssignOrExtendSubscription(txCtx, &AssignSubscriptionInput{
-				UserID:       userID,
-				GroupID:      *redeemCode.GroupID,
-				ValidityDays: validityDays,
-				AssignedBy:   0, // 系统分配
-				Notes:        fmt.Sprintf("通过兑换码 %s 兑换", redeemCode.Code),
-			})
+		if len(redeemCode.SubscriptionSnapshot) > 0 {
+			p, err := DecodeUniversalSnapshot(redeemCode.SubscriptionSnapshot)
 			if err != nil {
-				return nil, fmt.Errorf("assign or extend subscription: %w", err)
+				return nil, err
 			}
+			if _, err = s.subscriptionService.Universal().Grant(txCtx, userID, p, nil, nil, fmt.Sprintf("redeem:%d", redeemCode.ID), "订阅兑换码"); err != nil {
+				return nil, err
+			}
+			break
 		}
+		return nil, ErrLegacySubscriptionRetired
 
 	default:
 		return nil, unsupportedRedeemTypeError(redeemCode.Type)
@@ -754,4 +748,27 @@ func (s *RedeemService) reduceOrCancelSubscription(ctx context.Context, userID, 
 // GetUserHistoryPaginated returns all redemption types for the authenticated user.
 func (s *RedeemService) GetUserHistoryPaginated(ctx context.Context, userID int64, params pagination.PaginationParams) ([]RedeemCode, *pagination.PaginationResult, error) {
 	return s.redeemRepo.ListByUserPaginated(ctx, userID, params, "")
+}
+
+func (s *RedeemService) GenerateUniversalCodes(ctx context.Context, planID int64, count int, expiresAt *time.Time) ([]RedeemCode, error) {
+	if count < 1 || count > 100 {
+		return nil, infraerrors.BadRequest("INVALID_REDEEM_COUNT", "一次可生成 1 至 100 个兑换码")
+	}
+	p, err := s.subscriptionService.Universal().Plan(ctx, planID)
+	if err != nil {
+		return nil, err
+	}
+	snap := UniversalSnapshot(p).Map()
+	out := make([]RedeemCode, 0, count)
+	for i := 0; i < count; i++ {
+		code, err := GenerateRedeemCode()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, RedeemCode{Code: code, Type: RedeemTypeSubscription, Value: *p.TotalCreditUsd, Status: StatusUnused, ValidityDays: psComputeValidityDays(p.ValidityDays, p.ValidityUnit), ExpiresAt: expiresAt, SubscriptionSnapshot: snap, Notes: "通用订阅：" + p.Name})
+	}
+	if err = s.redeemRepo.CreateBatch(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

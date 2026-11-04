@@ -44,6 +44,7 @@ func (APIKey) Fields() []ent.Field {
 		field.Int64("group_id").
 			Optional().
 			Nillable(),
+		field.String("funding_source").MaxLen(32).Default("balance"),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),

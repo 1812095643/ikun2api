@@ -4,6 +4,8 @@
  */
 
 import { apiClient } from './client'
+import { universalSubscriptionsAPI, type UniversalSubscription } from './universalSubscriptions'
+import type { Group } from '@/types'
 import type { UserSubscription, SubscriptionProgress } from '@/types'
 
 /**
@@ -35,8 +37,13 @@ export async function getMySubscriptions(): Promise<UserSubscription[]> {
  * Get current user's active subscriptions
  */
 export async function getActiveSubscriptions(): Promise<UserSubscription[]> {
-  const response = await apiClient.get<UserSubscription[]>('/subscriptions/active')
-  return response.data
+ const data = await universalSubscriptionsAPI.list()
+ return data.items.filter(x => x.status === 'active').map(universalProgressAdapter)
+}
+function universalProgressAdapter(x: UniversalSubscription): UserSubscription {
+ return { universal_remaining_usd: x.remaining_usd, universal_total_credit_usd: x.total_credit_usd, id: x.id, user_id: x.user_id, group_id: 0, status: 'active', starts_at: x.starts_at, expires_at: x.expires_at, daily_usage_usd: x.daily_used_usd, weekly_usage_usd: x.weekly_used_usd, monthly_usage_usd: x.monthly_used_usd,
+  daily_window_start: x.daily_window_start || null, weekly_window_start: x.weekly_window_start || null, monthly_window_start: x.monthly_window_start || null, created_at: x.starts_at, updated_at: x.starts_at,
+  group: { id: 0, name: x.name, platform: 'composite', subscription_type: 'subscription', rate_multiplier: 1, daily_limit_usd: x.daily_limit_usd, weekly_limit_usd: x.weekly_limit_usd, monthly_limit_usd: x.monthly_limit_usd } as Group }
 }
 
 /**

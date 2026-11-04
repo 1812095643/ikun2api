@@ -213,7 +213,7 @@ export function useOnboardingTour(options: OnboardingOptions = {}) {
       if (token === generation) cleanupTour()
       return
     }
-    steps = getUserSteps(t)
+    steps = getUserSteps(t, app.siteName)
     if (token !== generation || disposed) return
     instance = driver({
       steps,

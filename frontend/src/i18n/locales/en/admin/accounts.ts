@@ -19,7 +19,7 @@ export default {
         credentialStatus: {"unknown": "Token expiration is unknown", "not_expired": "Token has not expired (not verified)", "expired": "Token expired", "revoked": "Token revoked", "auth_failed": "Token authentication failed"},
 
         saveAndTest: 'Save and test connection',
-        monitorHint: 'Use the IKUN2api endpoint and a BPS group API key for Responses probes. Upstream quota queries are unavailable.',
+        monitorHint: 'Use the __SITE_NAME__ endpoint and a BPS group API key for Responses probes. Upstream quota queries are unavailable.',
         keepToken: "Leave blank to keep the existing token",
         tokenHint: "Paste a ChatGPT Access Token. Replace it manually when it expires; test the connection from the account list after saving.",
         tokenRequired: "Access Token is required",
@@ -445,7 +445,7 @@ export default {
         }
       },
       upstreamBilling: {
-        trustWarning: 'This rate is declared by the upstream site for the current API key. IKUN2api cannot verify that it matches actual charges. The upstream site or an intermediary may return forged, stale, or modified data. Verify it against bills, balance changes, and actual usage.',
+        trustWarning: 'This rate is declared by the upstream site for the current API key. __SITE_NAME__ cannot verify that it matches actual charges. The upstream site or an intermediary may return forged, stale, or modified data. Verify it against bills, balance changes, and actual usage.',
         autoProbe: 'Automatically probe upstream declared rate',
         autoProbeHint: 'Refresh the upstream declared rate on the global interval. This switch alone does not change the account rate.',
         syncRate: 'Sync upstream declared rate',
@@ -913,8 +913,8 @@ export default {
         searchTestHint:
           'Standalone web_search probe (same as gateway /v1/web_search). Not a free-form chat with tools.',
         ttsTextLabel: 'TTS text',
-        ttsTextPlaceholder: 'Example: Hello from IKUN2api connectivity test.',
-        ttsTextDefault: 'Hello from IKUN2api account connectivity test.',
+        ttsTextPlaceholder: 'Example: Hello from __SITE_NAME__ connectivity test.',
+        ttsTextDefault: 'Hello from __SITE_NAME__ account connectivity test.',
         ttsTestHint: 'Standalone /v1/tts with language=en; success reports audio byte size.',
         sttTestHint: 'Standalone /v1/stt with a synthetic silent WAV; success means the endpoint is reachable.',
         realtimeTestHint:

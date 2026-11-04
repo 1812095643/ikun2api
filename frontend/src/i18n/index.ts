@@ -1,4 +1,6 @@
 import { createI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores/app'
+import { formatSiteBranding } from '@/utils/branding'
 
 type LocaleCode = 'en' | 'zh'
 
@@ -37,7 +39,8 @@ export const i18n = createI18n({
   messages: {},
   // 禁用 HTML 消息警告 - 引导步骤使用富文本内容（driver.js 支持 HTML）
   // 这些内容是内部定义的，不存在 XSS 风险
-  warnHtmlMessage: false
+  warnHtmlMessage: false,
+  postTranslation: message => typeof message === 'string' ? formatSiteBranding(message, useAppStore().siteName) : message
 })
 
 const loadedLocales = new Set<LocaleCode>()

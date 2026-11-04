@@ -14,6 +14,8 @@ const (
 	Label = "redeem_code"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldSubscriptionSnapshot holds the string denoting the subscription_snapshot field in the database.
+	FieldSubscriptionSnapshot = "subscription_snapshot"
 	// FieldCode holds the string denoting the code field in the database.
 	FieldCode = "code"
 	// FieldType holds the string denoting the type field in the database.
@@ -61,6 +63,7 @@ const (
 // Columns holds all SQL columns for redeemcode fields.
 var Columns = []string{
 	FieldID,
+	FieldSubscriptionSnapshot,
 	FieldCode,
 	FieldType,
 	FieldValue,

@@ -1,3 +1,4 @@
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { lotteryMoney, lotteryTime, prizeNames, type LotteryWin } from '@/api/lottery'
 
 function lines(ctx: CanvasRenderingContext2D, value: string, width: number) {
@@ -13,7 +14,7 @@ function lines(ctx: CanvasRenderingContext2D, value: string, width: number) {
   return result
 }
 
-export async function createLotteryPoster(win: LotteryWin, siteName = 'IKUN2api'): Promise<Blob> {
+export async function createLotteryPoster(win: LotteryWin, siteName = DEFAULT_SITE_NAME): Promise<Blob> {
   await document.fonts.ready
   const canvas = document.createElement('canvas')
   canvas.width = 1080
@@ -139,7 +140,7 @@ export async function createLotteryPoster(win: LotteryWin, siteName = 'IKUN2api'
   ctx.fillText('好运有记录，快乐值得分享。', 104, height - 93)
   ctx.textAlign = 'right'
   ctx.font = '21px monospace'
-  ctx.fillText('IKUN2api / LUCKY CLUB', 976, height - 93)
+  ctx.fillText(`${siteName} / LUCKY CLUB`, 976, height - 93)
   return new Promise((resolve, reject) =>
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error('海报生成未完成，请重试。'))),

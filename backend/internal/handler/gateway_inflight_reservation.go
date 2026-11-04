@@ -58,7 +58,12 @@ func reserveInflightBalance(
 		return inflightNoop, err
 	}
 	c.Request = c.Request.WithContext(ctx)
-	return done, nil
+	return func() {
+		if hold := service.InflightReservationFromContext(ctx); hold != nil && c.Writer.Status() >= 400 && c.Writer.Status() < 500 && c.Writer.Status() != 408 {
+			hold.MarkDefinitiveNoCharge()
+		}
+		done()
+	}, nil
 }
 
 // reserveInflightBalanceCtx 同 reserveInflightBalance，但返回携带预留句柄的新 context
@@ -71,6 +76,20 @@ func reserveInflightBalanceCtx(
 	subscription *service.UserSubscription,
 	req service.InflightEstimateRequest,
 ) (context.Context, func(), error) {
+	if service.IsUniversalFunding(apiKey) {
+		if billing == nil || estimator == nil || apiKey.User == nil {
+			return ctx, inflightNoop, service.ErrUniversalUnavailable
+		}
+		estimate, priced := estimator.EstimateInflightReservation(ctx, apiKey, req)
+		if !priced || estimate < 0 {
+			return ctx, inflightNoop, service.ErrUniversalUnavailable
+		}
+		res, err := billing.ReserveUniversal(ctx, apiKey, estimate)
+		if err != nil {
+			return ctx, inflightNoop, err
+		}
+		return service.WithInflightReservation(ctx, res), res.HandlerDone, nil
+	}
 	if billing == nil || estimator == nil || apiKey == nil || apiKey.User == nil || !billing.InflightReservationEnabled() {
 		return ctx, inflightNoop, nil
 	}

@@ -749,6 +749,7 @@ export interface CompositeRouteDecision {
 }
 
 export interface ApiKey {
+  funding_source?: 'balance' | 'universal_subscription'
   id: number
   user_id: number
   key: string
@@ -781,6 +782,7 @@ export interface ApiKey {
 }
 
 export interface CreateApiKeyRequest {
+  funding_source?: 'balance' | 'universal_subscription'
   name: string
   group_id?: number | null
   custom_key?: string // Optional custom API Key
@@ -794,6 +796,7 @@ export interface CreateApiKeyRequest {
 }
 
 export interface UpdateApiKeyRequest {
+  funding_source?: 'balance' | 'universal_subscription'
   name?: string
   group_id?: number | null
   status?: 'active' | 'inactive'
@@ -1956,6 +1959,7 @@ export interface UsageCleanupTask {
 }
 
 export interface RedeemCode {
+  subscription_name?: string
   id: number
   code: string
   type: RedeemCodeType
@@ -2193,6 +2197,8 @@ export interface ChangePasswordRequest {
 // ==================== User Subscription Types ====================
 
 export interface UserSubscription {
+  universal_remaining_usd?: number
+  universal_total_credit_usd?: number | null
   id: number
   user_id: number
   group_id: number

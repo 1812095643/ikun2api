@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { computed, shallowRef } from 'vue'
 import { useEventListener } from '@vueuse/core'
 import Icon from '@/components/icons/Icon.vue'
@@ -9,7 +10,7 @@ import { sanitizeUrl } from '@/utils/url'
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const isDark = shallowRef(document.documentElement.classList.contains('dark'))
-const siteName = computed(() => appStore.siteName || 'IKUN2api')
+const siteName = computed(() => appStore.siteName || DEFAULT_SITE_NAME)
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '/logo.svg', { allowRelative: true, allowDataUrl: true }))
 const consolePath = computed(() => !authStore.isAuthenticated ? '/login' : authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
 

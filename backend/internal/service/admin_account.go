@@ -423,6 +423,10 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		input.Credentials = creds
 	}
 
+	accountExtra, err = NormalizeAccountModelAllowlistExtra(accountExtra)
+	if err != nil {
+		return nil, err
+	}
 	accountExtra = MergeOpenAICodexTicketExtra(accountExtra, nil)
 	delete(accountExtra, OpenAIBPSCredentialStateExtraKey)
 	if input.Platform == PlatformTypeSafe && input.Type != AccountTypeAPIKey {
@@ -607,6 +611,10 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	var normalizedExtra map[string]any
 	if input.Extra != nil {
 		normalizedExtra, err = normalizeOpenAILongContextBillingUpdateExtra(account, input)
+		if err != nil {
+			return nil, err
+		}
+		normalizedExtra, err = NormalizeAccountModelAllowlistExtra(normalizedExtra)
 		if err != nil {
 			return nil, err
 		}
@@ -1026,6 +1034,11 @@ func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, upd
 // BulkUpdateAccounts updates multiple accounts in one request.
 // It merges credentials/extra keys instead of overwriting the whole object.
 func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error) {
+	var allowlistErr error
+	input.Extra, allowlistErr = NormalizeAccountModelAllowlistExtra(input.Extra)
+	if allowlistErr != nil {
+		return nil, allowlistErr
+	}
 	delete(input.Extra, OpenAIBPSCredentialStateExtraKey)
 	// Managed probe/session state may only enter through dedicated typed endpoints.
 	input.Extra = MergeOpenAICodexTicketExtra(input.Extra, nil)

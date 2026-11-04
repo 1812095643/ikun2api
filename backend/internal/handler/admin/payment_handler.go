@@ -290,6 +290,8 @@ func (h *PaymentHandler) ListPlans(c *gin.Context) {
 }
 
 type AdminSubscriptionPlanResult struct {
+	PlanType        string    `json:"plan_type"`
+	TotalCreditUSD  *float64  `json:"total_credit_usd"`
 	ID              int64     `json:"id"`
 	GroupID         int64     `json:"group_id"`
 	GroupPlatform   string    `json:"group_platform,omitempty"`
@@ -321,8 +323,15 @@ func adminSubscriptionPlansForResponse(plans []*dbent.SubscriptionPlan, groupInf
 			continue
 		}
 		gi := groupInfo[p.GroupID]
+		if p.PlanType == service.UniversalPlanType {
+			gi.Name = "通用订阅"
+			gi.DailyLimitUSD = p.DailyLimitUsd
+			gi.WeeklyLimitUSD = p.WeeklyLimitUsd
+			gi.MonthlyLimitUSD = p.MonthlyLimitUsd
+		}
 		result = append(result, AdminSubscriptionPlanResult{
-			ID:              int64(p.ID),
+			ID:       int64(p.ID),
+			PlanType: p.PlanType, TotalCreditUSD: p.TotalCreditUsd,
 			GroupID:         p.GroupID,
 			GroupPlatform:   gi.Platform,
 			GroupName:       gi.Name,

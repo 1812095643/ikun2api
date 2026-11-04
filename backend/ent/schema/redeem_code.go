@@ -35,6 +35,7 @@ func (RedeemCode) Annotations() []schema.Annotation {
 
 func (RedeemCode) Fields() []ent.Field {
 	return []ent.Field{
+		field.JSON("subscription_snapshot", map[string]any{}).Optional(),
 		field.String("code").
 			MaxLen(32).
 			NotEmpty().

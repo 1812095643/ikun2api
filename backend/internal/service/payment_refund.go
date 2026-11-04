@@ -247,7 +247,19 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 		rr = fmt.Sprintf("refund order:%d", o.ID)
 	}
 	p := &RefundPlan{OrderID: oid, Order: o, RefundAmount: amt, GatewayAmount: ga, Reason: rr, Force: force, DeductBalance: deduct, DeductionType: payment.DeductionTypeNone}
-	if deduct {
+	if len(o.SubscriptionSnapshot) > 0 {
+		if math.Abs(amt-o.Amount) > paymentAmountToleranceForCurrency(orderCurrency) {
+			return nil, nil, infraerrors.BadRequest("UNIVERSAL_PARTIAL_REFUND_UNSUPPORTED", "通用订阅按订单整期退款，请核对使用情况后全额处理")
+		}
+		used, err := s.subscriptionSvc.Universal().RefundState(ctx, o.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if used > 0 && !force {
+			return nil, &RefundResult{Success: false, RequireForce: true, Warning: "此订阅已产生消费；请核对用量后再明确确认退款"}, nil
+		}
+	}
+	if deduct || len(o.SubscriptionSnapshot) > 0 {
 		if er := s.prepDeduct(ctx, o, p, force); er != nil {
 			return nil, er, nil
 		}
@@ -256,6 +268,10 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 }
 
 func (s *PaymentService) prepDeduct(ctx context.Context, o *dbent.PaymentOrder, p *RefundPlan, force bool) *RefundResult {
+	if len(o.SubscriptionSnapshot) > 0 {
+		p.DeductionType = "universal_subscription"
+		return nil
+	}
 	if o.OrderType == payment.OrderTypeSubscription {
 		p.DeductionType = payment.DeductionTypeSubscription
 		if o.SubscriptionGroupID != nil && o.SubscriptionDays != nil {
@@ -311,6 +327,12 @@ func (s *PaymentService) ExecuteRefund(ctx context.Context, p *RefundPlan) (*Ref
 	}
 	if c == 0 {
 		return nil, infraerrors.Conflict("CONFLICT", "order status changed")
+	}
+	if len(p.Order.SubscriptionSnapshot) > 0 {
+		if err := s.subscriptionSvc.Universal().HoldRefund(ctx, p.OrderID, p.Force); err != nil {
+			s.restoreStatus(ctx, p)
+			return nil, err
+		}
 	}
 	if p.DeductionType == payment.DeductionTypeBalance && p.BalanceToDeduct > 0 {
 		// Skip balance deduction on retry if previous attempt already deducted
@@ -552,6 +574,9 @@ func (s *PaymentService) refundFinalizePlan(o *dbent.PaymentOrder) *RefundPlan {
 }
 
 func (s *PaymentService) applyRefundFinalDeduction(ctx context.Context, p *RefundPlan) error {
+	if p.Order != nil && len(p.Order.SubscriptionSnapshot) > 0 {
+		return s.subscriptionSvc.Universal().FinishRefund(ctx, p.OrderID, false)
+	}
 	if p.deductionHeld {
 		// 进入 pending 时扣减已保留，终态成功无需再扣。
 		return nil
@@ -658,6 +683,9 @@ func (s *PaymentService) finalizeRefundFailedTx(ctx context.Context, p *RefundPl
 
 // returnHeldRefundDeduction 归还进入 REFUND_PENDING 时保留的扣减；ctx 携带事务时随事务提交或回滚。
 func (s *PaymentService) returnHeldRefundDeduction(ctx context.Context, p *RefundPlan) error {
+	if p.Order != nil && len(p.Order.SubscriptionSnapshot) > 0 {
+		return s.subscriptionSvc.Universal().FinishRefund(ctx, p.OrderID, true)
+	}
 	if p.DeductionType == payment.DeductionTypeBalance && p.BalanceToDeduct > 0 {
 		if err := s.userRepo.UpdateBalance(ctx, p.Order.UserID, p.BalanceToDeduct); err != nil {
 			return fmt.Errorf("return held balance deduction: %w", err)
@@ -763,6 +791,25 @@ func (s *PaymentService) handleGwFail(ctx context.Context, p *RefundPlan, gErr e
 }
 
 func (s *PaymentService) markRefundOk(ctx context.Context, p *RefundPlan) (*RefundResult, error) {
+	if p.Order != nil && len(p.Order.SubscriptionSnapshot) > 0 {
+		tx, err := s.entClient.Tx(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+		txCtx := dbent.NewTxContext(ctx, tx)
+		if err = s.subscriptionSvc.Universal().FinishRefund(txCtx, p.OrderID, false); err != nil {
+			return nil, err
+		}
+		result, err := s.markRefundOkTx(txCtx, tx.Client(), p)
+		if err != nil {
+			return nil, err
+		}
+		if err = tx.Commit(); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
 	fs := OrderStatusRefunded
 	if p.RefundAmount < p.Order.Amount {
 		fs = OrderStatusPartiallyRefunded
@@ -864,6 +911,9 @@ func refundResponseID(resp *payment.RefundResponse) string {
 }
 
 func (s *PaymentService) RollbackRefund(ctx context.Context, p *RefundPlan, gErr error) bool {
+	if p.Order != nil && len(p.Order.SubscriptionSnapshot) > 0 {
+		return s.subscriptionSvc.Universal().FinishRefund(ctx, p.OrderID, true) == nil
+	}
 	if p.DeductionType == payment.DeductionTypeBalance && p.BalanceToDeduct > 0 {
 		if err := s.userRepo.UpdateBalance(ctx, p.Order.UserID, p.BalanceToDeduct); err != nil {
 			slog.Error("[CRITICAL] rollback failed", "orderID", p.OrderID, "amount", p.BalanceToDeduct, "error", err)

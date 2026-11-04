@@ -93,6 +93,10 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	if parsed == nil {
 		return nil, fmt.Errorf("parse request: empty request")
 	}
+	if account != nil && !account.AllowsConfiguredModel(parsed.Model) {
+		c.JSON(http.StatusForbidden, gin.H{"type": "error", "error": gin.H{"type": "permission_error", "message": "该账号的模型白名单不允许此模型"}})
+		return nil, fmt.Errorf("account model allowlist rejected request")
+	}
 	// 在账号身份重写前提取客户端会话，仅用于本地鉴权后的遥测关联。
 	telemetryClientSession := ""
 	if identity := ParseMetadataUserID(parsed.MetadataUserID); identity != nil {

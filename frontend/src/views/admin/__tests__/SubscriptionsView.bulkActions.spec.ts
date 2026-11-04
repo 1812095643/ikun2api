@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import SubscriptionsView from '../SubscriptionsView.vue'
+import SubscriptionsView from '../LegacySubscriptionsView.vue'
 
 const { list, bulkAction, bulkAssign, listUsers, showError } = vi.hoisted(() => ({
   list: vi.fn(), bulkAction: vi.fn(), bulkAssign: vi.fn(), listUsers: vi.fn(), showError: vi.fn()

@@ -90,6 +90,11 @@ func GroupID(v int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldGroupID, v))
 }
 
+// FundingSource applies equality check predicate on the "funding_source" field. It's identical to FundingSourceEQ.
+func FundingSource(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldFundingSource, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldStatus, v))
@@ -468,6 +473,71 @@ func GroupIDIsNil() predicate.APIKey {
 // GroupIDNotNil applies the NotNil predicate on the "group_id" field.
 func GroupIDNotNil() predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotNull(FieldGroupID))
+}
+
+// FundingSourceEQ applies the EQ predicate on the "funding_source" field.
+func FundingSourceEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldFundingSource, v))
+}
+
+// FundingSourceNEQ applies the NEQ predicate on the "funding_source" field.
+func FundingSourceNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldFundingSource, v))
+}
+
+// FundingSourceIn applies the In predicate on the "funding_source" field.
+func FundingSourceIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldFundingSource, vs...))
+}
+
+// FundingSourceNotIn applies the NotIn predicate on the "funding_source" field.
+func FundingSourceNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldFundingSource, vs...))
+}
+
+// FundingSourceGT applies the GT predicate on the "funding_source" field.
+func FundingSourceGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldFundingSource, v))
+}
+
+// FundingSourceGTE applies the GTE predicate on the "funding_source" field.
+func FundingSourceGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldFundingSource, v))
+}
+
+// FundingSourceLT applies the LT predicate on the "funding_source" field.
+func FundingSourceLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldFundingSource, v))
+}
+
+// FundingSourceLTE applies the LTE predicate on the "funding_source" field.
+func FundingSourceLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldFundingSource, v))
+}
+
+// FundingSourceContains applies the Contains predicate on the "funding_source" field.
+func FundingSourceContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldFundingSource, v))
+}
+
+// FundingSourceHasPrefix applies the HasPrefix predicate on the "funding_source" field.
+func FundingSourceHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldFundingSource, v))
+}
+
+// FundingSourceHasSuffix applies the HasSuffix predicate on the "funding_source" field.
+func FundingSourceHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldFundingSource, v))
+}
+
+// FundingSourceEqualFold applies the EqualFold predicate on the "funding_source" field.
+func FundingSourceEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldFundingSource, v))
+}
+
+// FundingSourceContainsFold applies the ContainsFold predicate on the "funding_source" field.
+func FundingSourceContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldFundingSource, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

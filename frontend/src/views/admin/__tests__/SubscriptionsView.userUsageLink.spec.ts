@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 
-import SubscriptionsView from '../SubscriptionsView.vue'
+import SubscriptionsView from '../LegacySubscriptionsView.vue'
 
 const { listSubscriptions, assignSubscription, getAllGroups, listUsers, searchUsageUsers, showError } = vi.hoisted(() => ({
   listSubscriptions: vi.fn(),

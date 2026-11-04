@@ -170,6 +170,10 @@ func (s *GatewayService) RunAccountWarmup(ctx context.Context, id int64, model, 
 		out.Reason = "账号仍处于限流"
 		return out, nil
 	}
+	if !a.AllowsConfiguredModel(model) {
+		out.Reason = "模型不在账号白名单中"
+		return out, nil
+	}
 	if model == "" || len(model) > 120 || !strings.HasPrefix(model, "claude-") {
 		return out, errors.New("请选择有效 Claude 模型")
 	}

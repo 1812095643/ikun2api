@@ -1262,6 +1262,9 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 
 	// 如果是订阅类型，验证必须有 GroupID
 	if input.Type == RedeemTypeSubscription {
+		return nil, ErrLegacySubscriptionRetired
+	}
+	if input.Type == RedeemTypeSubscription {
 		if input.GroupID == nil {
 			return nil, errors.New("group_id is required for subscription type")
 		}

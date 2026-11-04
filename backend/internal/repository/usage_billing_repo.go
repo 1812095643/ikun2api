@@ -155,7 +155,10 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 		return &service.BatchImageBalanceHoldResult{Applied: false}, nil
 	}
 
-	result, err := apply(ctx, tx, cmd)
+	handled, result, err := service.ApplyUniversalBatchHold(ctx, tx, cmd)
+	if err == nil && !handled {
+		result, err = apply(ctx, tx, cmd)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +175,11 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 }
 
 func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand, result *service.UsageBillingApplyResult) error {
+	if cmd.UniversalHoldID != "" {
+		if err := service.ApplyUniversalCharge(ctx, tx, cmd); err != nil {
+			return err
+		}
+	}
 	if cmd.SubscriptionCost > 0 && cmd.SubscriptionID != nil {
 		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, cmd.SubscriptionCost); err != nil {
 			return err
@@ -642,4 +650,13 @@ func execAccountQuotaIncrement(ctx context.Context, tx *sql.Tx, query string, ac
 		return nil, err
 	}
 	return state, nil
+}
+
+func (r *usageBillingRepository) BatchImageFundingSource(ctx context.Context, batchID string) (string, error) {
+	var source string
+	err := r.db.QueryRowContext(ctx, `SELECT source FROM universal_batch_funding WHERE batch_id=$1`, batchID).Scan(&source)
+	if errors.Is(err, sql.ErrNoRows) {
+		return service.FundingSourceBalance, nil
+	}
+	return source, err
 }

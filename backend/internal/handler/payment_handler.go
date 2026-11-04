@@ -51,7 +51,12 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	}
 	// Enrich plans with group platform for frontend color coding
 	type planWithPlatform struct {
+		DailyLimitUSD      *float64 `json:"daily_limit_usd"`
+		WeeklyLimitUSD     *float64 `json:"weekly_limit_usd"`
+		MonthlyLimitUSD    *float64 `json:"monthly_limit_usd"`
 		ID                 int64    `json:"id"`
+		PlanType           string   `json:"plan_type"`
+		TotalCreditUSD     *float64 `json:"total_credit_usd"`
 		GroupID            int64    `json:"group_id"`
 		GroupPlatform      string   `json:"group_platform"`
 		GroupName          string   `json:"group_name"`
@@ -76,8 +81,16 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	result := make([]planWithPlatform, 0, len(plans))
 	for _, p := range plans {
 		gi := groupInfo[p.GroupID]
+		if p.PlanType == service.UniversalPlanType {
+			gi.Name = "通用订阅"
+			gi.DailyLimitUSD = p.DailyLimitUsd
+			gi.WeeklyLimitUSD = p.WeeklyLimitUsd
+			gi.MonthlyLimitUSD = p.MonthlyLimitUsd
+			gi.RateMultiplier = 1
+		}
 		result = append(result, planWithPlatform{
-			ID: int64(p.ID), GroupID: p.GroupID,
+			DailyLimitUSD: p.DailyLimitUsd, WeeklyLimitUSD: p.WeeklyLimitUsd, MonthlyLimitUSD: p.MonthlyLimitUsd,
+			ID: int64(p.ID), PlanType: p.PlanType, TotalCreditUSD: p.TotalCreditUsd, GroupID: p.GroupID,
 			GroupPlatform: gi.Platform, GroupName: gi.I18n.LocalizeName(c.GetHeader("Accept-Language"), gi.Name),
 			RateMultiplier: gi.RateMultiplier, PeakRateEnabled: gi.PeakRateEnabled,
 			PeakStart: gi.PeakStart, PeakEnd: gi.PeakEnd, PeakRateMultiplier: gi.PeakRateMultiplier,
@@ -124,8 +137,15 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	planList := make([]checkoutPlan, 0, len(plans))
 	for _, p := range plans {
 		gi := groupInfo[p.GroupID]
+		if p.PlanType == service.UniversalPlanType {
+			gi.Name = "通用订阅"
+			gi.DailyLimitUSD = p.DailyLimitUsd
+			gi.WeeklyLimitUSD = p.WeeklyLimitUsd
+			gi.MonthlyLimitUSD = p.MonthlyLimitUsd
+			gi.RateMultiplier = 1
+		}
 		planList = append(planList, checkoutPlan{
-			ID: int64(p.ID), GroupID: p.GroupID,
+			ID: int64(p.ID), PlanType: p.PlanType, TotalCreditUSD: p.TotalCreditUsd, GroupID: p.GroupID,
 			GroupPlatform: gi.Platform, GroupName: gi.I18n.LocalizeName(c.GetHeader("Accept-Language"), gi.Name),
 			RateMultiplier:  gi.RateMultiplier,
 			PeakRateEnabled: gi.PeakRateEnabled, PeakStart: gi.PeakStart,
@@ -181,6 +201,8 @@ type checkoutInfoResponse struct {
 
 type checkoutPlan struct {
 	ID                 int64    `json:"id"`
+	PlanType           string   `json:"plan_type"`
+	TotalCreditUSD     *float64 `json:"total_credit_usd"`
 	GroupID            int64    `json:"group_id"`
 	GroupPlatform      string   `json:"group_platform"`
 	GroupName          string   `json:"group_name"`

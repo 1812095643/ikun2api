@@ -29,6 +29,18 @@ func (_u *PaymentOrderUpdate) Where(ps ...predicate.PaymentOrder) *PaymentOrderU
 	return _u
 }
 
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (_u *PaymentOrderUpdate) SetSubscriptionSnapshot(v map[string]interface{}) *PaymentOrderUpdate {
+	_u.mutation.SetSubscriptionSnapshot(v)
+	return _u
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (_u *PaymentOrderUpdate) ClearSubscriptionSnapshot() *PaymentOrderUpdate {
+	_u.mutation.ClearSubscriptionSnapshot()
+	return _u
+}
+
 // SetUserID sets the "user_id" field.
 func (_u *PaymentOrderUpdate) SetUserID(v int64) *PaymentOrderUpdate {
 	_u.mutation.SetUserID(v)
@@ -872,6 +884,12 @@ func (_u *PaymentOrderUpdate) sqlSave(ctx context.Context) (_node int, err error
 			}
 		}
 	}
+	if value, ok := _u.mutation.SubscriptionSnapshot(); ok {
+		_spec.SetField(paymentorder.FieldSubscriptionSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.SubscriptionSnapshotCleared() {
+		_spec.ClearField(paymentorder.FieldSubscriptionSnapshot, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.UserEmail(); ok {
 		_spec.SetField(paymentorder.FieldUserEmail, field.TypeString, value)
 	}
@@ -1117,6 +1135,18 @@ type PaymentOrderUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *PaymentOrderMutation
+}
+
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (_u *PaymentOrderUpdateOne) SetSubscriptionSnapshot(v map[string]interface{}) *PaymentOrderUpdateOne {
+	_u.mutation.SetSubscriptionSnapshot(v)
+	return _u
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (_u *PaymentOrderUpdateOne) ClearSubscriptionSnapshot() *PaymentOrderUpdateOne {
+	_u.mutation.ClearSubscriptionSnapshot()
+	return _u
 }
 
 // SetUserID sets the "user_id" field.
@@ -1991,6 +2021,12 @@ func (_u *PaymentOrderUpdateOne) sqlSave(ctx context.Context) (_node *PaymentOrd
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.SubscriptionSnapshot(); ok {
+		_spec.SetField(paymentorder.FieldSubscriptionSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.SubscriptionSnapshotCleared() {
+		_spec.ClearField(paymentorder.FieldSubscriptionSnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.UserEmail(); ok {
 		_spec.SetField(paymentorder.FieldUserEmail, field.TypeString, value)

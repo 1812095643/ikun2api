@@ -41,6 +41,7 @@
 </template>
 
 <script setup lang="ts">
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { sanitizeUrl } from '@/utils/url'
@@ -52,7 +53,7 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 
 const settings = computed(() => appStore.cachedPublicSettings)
-const siteName = computed(() => settings.value?.site_name || 'IKUN2api')
+const siteName = computed(() => settings.value?.site_name || DEFAULT_SITE_NAME)
 const siteLogo = computed(() =>
   sanitizeUrl(settings.value?.site_logo || '', { allowRelative: true, allowDataUrl: true })
 )

@@ -273,7 +273,7 @@ func (s *BatchImageSettlementService) recordUsageLog(ctx context.Context, job *B
 		ActualCost:            actualCost,
 		RateMultiplier:        job.GroupRateMultiplier * job.BatchDiscountMultiplier,
 		AccountRateMultiplier: &accountRateMultiplier,
-		BillingType:           BillingTypeBalance,
+		BillingType:           s.batchFundingBillingType(ctx, job.BatchID),
 		RequestType:           RequestTypeSync,
 		BillingMode:           &billingMode,
 		ImageSize:             &imageSize,
@@ -376,4 +376,15 @@ func (r *BatchImageSettlementResult) String() string {
 	}
 	return fmt.Sprintf("batch_id=%s success=%d fail=%d actual_cost=%0.10f already_settled=%t",
 		r.BatchID, r.SuccessCount, r.FailCount, r.ActualCost, r.AlreadySettled)
+}
+
+func (s *BatchImageSettlementService) batchFundingBillingType(ctx context.Context, id string) int8 {
+	if reader, ok := s.BillingRepo.(interface {
+		BatchImageFundingSource(context.Context, string) (string, error)
+	}); ok {
+		if source, err := reader.BatchImageFundingSource(ctx, id); err == nil && source == FundingSourceUniversal {
+			return BillingTypeSubscription
+		}
+	}
+	return BillingTypeBalance
 }

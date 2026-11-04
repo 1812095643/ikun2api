@@ -65,6 +65,10 @@ const (
 // 不再续期，所以最长持有时间受 TTL 约束（计费任务卡死时预留自动过期）。
 // 所有方法对 nil 接收者安全。
 type InflightReservation struct {
+	universalHoldID         string
+	universalSubscriptionID int64
+	universalService        *UniversalSubscriptionService
+	universalUncertain      atomic.Bool
 	// cache 为 nil 表示未登记余额维度的预留。
 	cache     InflightBalanceReservationCache
 	userID    int64
@@ -131,6 +135,9 @@ func (r *InflightReservation) Release() {
 		r.refs.Store(0)
 		relCtx, relCancel := context.WithTimeout(context.Background(), inflightReservationReleaseTimeout)
 		defer relCancel()
+		if r.universalService != nil {
+			_ = r.universalService.release(relCtx, r.universalHoldID, r.universalUncertain.Load())
+		}
 		if r.cache != nil {
 			if err := r.cache.ReleaseInflightBalance(relCtx, r.userID, r.requestID); err != nil {
 				logger.LegacyPrintf("service.billing_cache", "Warning: inflight reservation release failed for user %d (expires by ttl): %v", r.userID, err)

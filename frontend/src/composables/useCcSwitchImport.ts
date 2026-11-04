@@ -1,3 +1,4 @@
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import type { ApiKey } from '@/types'
 import { fetchCcSwitchModels } from '@/api/ccswitch'
@@ -89,7 +90,7 @@ export function useCcSwitchImport(options: {
     model.value = ''; haikuModel.value = ''; sonnetModel.value = ''; opusModel.value = ''
     client.value = defaultCcSwitchClient(group.value)
     format.value = defaultCcSwitchFormat(client.value, group.value)
-    providerName.value = [options.siteName().trim() || 'IKUN2api', row?.name].filter(Boolean).join(' · ').slice(0, 120)
+    providerName.value = [options.siteName().trim() || DEFAULT_SITE_NAME, row?.name].filter(Boolean).join(' · ').slice(0, 120)
     usageEnabled.value = true; disableTelemetry.value = true
     if (row) void refreshModels()
   }, { immediate: true })

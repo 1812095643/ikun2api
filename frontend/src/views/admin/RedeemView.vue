@@ -132,7 +132,7 @@
             <span class="text-sm font-medium text-gray-900 dark:text-white">
               <template v-if="row.type === 'balance'">${{ value.toFixed(2) }}</template>
               <template v-else-if="row.type === 'subscription'">
-                {{ row.validity_days || 30 }} {{ t('admin.redeem.days') }}
+                {{ row.validity_days || 30 }} {{ t('admin.redeem.days') }}<span v-if="row.subscription_name" class="ml-1 text-xs text-gray-500">{{ row.subscription_name }} · ${{ value }}</span>
                 <span v-if="row.group" class="ml-1 text-xs text-gray-500 dark:text-gray-400"
                   >({{ row.group.name }})</span
                 >
@@ -314,48 +314,8 @@
             </div>
             <!-- 订阅类型：显示分组选择和有效天数 -->
             <template v-if="generateForm.type === 'subscription'">
-              <div>
-                <label class="input-label">{{ t('admin.redeem.selectGroup') }}</label>
-                <Select
-                  v-model="generateForm.group_id"
-                  :options="subscriptionGroupOptions"
-                  :placeholder="t('admin.redeem.selectGroupPlaceholder')"
-                >
-                  <template #selected="{ option }">
-                    <GroupBadge
-                      v-if="option"
-                      :name="(option as unknown as GroupOption).label"
-                      :platform="(option as unknown as GroupOption).platform"
-                      :subscription-type="(option as unknown as GroupOption).subscriptionType"
-                      :rate-multiplier="(option as unknown as GroupOption).rate"
-                    />
-                    <span v-else class="text-gray-400">{{
-                      t('admin.redeem.selectGroupPlaceholder')
-                    }}</span>
-                  </template>
-                  <template #option="{ option, selected }">
-                    <GroupOptionItem
-                      :name="(option as unknown as GroupOption).label"
-                      :platform="(option as unknown as GroupOption).platform"
-                      :subscription-type="(option as unknown as GroupOption).subscriptionType"
-                      :rate-multiplier="(option as unknown as GroupOption).rate"
-                      :description="(option as unknown as GroupOption).description"
-                      :selected="selected"
-                    />
-                  </template>
-                </Select>
-              </div>
-              <div>
-                <label class="input-label">{{ t('admin.redeem.validityDays') }}</label>
-                <input
-                  v-model.number="generateForm.validity_days"
-                  type="number"
-                  min="1"
-                  max="36500"
-                  required
-                  class="input"
-                />
-              </div>
+              <div><label class="input-label">通用订阅套餐</label><Select v-model="generatePlanId" :options="universalPlans.map(p => ({ value: p.id, label: `${p.name} · $${p.total_credit_usd} · ${p.validity_days} 天` }))" placeholder="选择通用套餐" /></div>
+              <p class="text-xs text-gray-500">生成时保存套餐规则，兑换后开通通用订阅；已有订阅时自动排期。</p>
             </template>
             <div>
               <label class="input-label">{{ t('admin.redeem.codeExpiry') }}</label>
@@ -613,6 +573,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { adminPaymentAPI } from '@/api/admin/payment'
+import { universalSubscriptionsAPI } from '@/api/universalSubscriptions'
+import type { SubscriptionPlan } from '@/types/payment'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
@@ -628,8 +591,6 @@ import type {
   RedeemCode,
   RedeemCodeType,
   Group,
-  GroupPlatform,
-  SubscriptionType,
   BatchUpdateRedeemCodeFields
 } from '@/types'
 import type { Column } from '@/components/common/types'
@@ -639,8 +600,6 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
-import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
@@ -648,14 +607,7 @@ const appStore = useAppStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 const browserTimeZone = getBrowserTimeZone()
 
-interface GroupOption {
-  value: number
-  label: string
-  description: string | null
-  platform: GroupPlatform
-  subscriptionType: SubscriptionType
-  rate: number
-}
+
 
 const showGenerateDialog = ref(false)
 const showResultDialog = ref(false)
@@ -836,6 +788,8 @@ const redeemCodeExpiryOptions = computed<{ value: RedeemCodeExpiryOption; label:
   { value: 'custom', label: t('admin.redeem.customExpiry') }
 ])
 
+const universalPlans = ref<SubscriptionPlan[]>([])
+const generatePlanId = ref<number | null>(null)
 const generateForm = reactive({
 	 gift: false,
   type: 'balance' as RedeemCodeType,
@@ -1029,7 +983,7 @@ const buildBatchUpdateFields = (): BatchUpdateRedeemCodeFields | null => {
 
 const handleGenerateCodes = async () => {
   // 订阅类型必须选择分组
-  if (generateForm.type === 'subscription' && !generateForm.group_id) {
+  if (generateForm.type === 'subscription' && !generatePlanId.value) {
     appStore.showError(t('admin.redeem.groupRequired'))
     return
   }
@@ -1042,12 +996,14 @@ const handleGenerateCodes = async () => {
 
   generating.value = true
   try {
-    const result = await adminAPI.redeem.generate(
+    const result = generateForm.type === 'subscription'
+      ? await universalSubscriptionsAPI.generateCodes(generatePlanId.value!, generateForm.count, expiresInDays || 0)
+      : await adminAPI.redeem.generate(
       generateForm.count,
       generateForm.type,
       generateForm.value,
-      generateForm.type === 'subscription' ? generateForm.group_id : undefined,
-      generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
+      undefined,
+      undefined,
       expiresInDays,
       generateForm.gift
     )
@@ -1192,6 +1148,7 @@ const loadSubscriptionGroups = async () => {
 onMounted(() => {
   loadCodes()
   loadSubscriptionGroups()
+  adminPaymentAPI.getPlans().then(r => { universalPlans.value = r.data }).catch(() => {})
 })
 
 onUnmounted(() => {

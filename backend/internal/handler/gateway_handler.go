@@ -1205,13 +1205,20 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 
 	// Get available models from account configurations for the selected group platform.
 	availableModels := h.gatewayService.GetAvailableModels(c.Request.Context(), groupID, platform)
+	allowlistedModels, accountRestricted := h.gatewayService.AccountAllowlistedModels(c.Request.Context(), groupID, platform)
+	if accountRestricted {
+		availableModels = allowlistedModels
+	}
 	if apiKey != nil && apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
 		source := modelListingSource(platform, availableModels, defaultModelIDsForPlatform(platform))
+		if accountRestricted {
+			source = availableModels
+		}
 		writeAllowlistedModelsList(c, platform, apiKey.Group.ModelAllowlist.FilterForListing(source))
 		return
 	}
 
-	if len(availableModels) > 0 || (platform == service.PlatformOpenAI && availableModels != nil) {
+	if len(availableModels) > 0 || ((platform == service.PlatformOpenAI || accountRestricted) && availableModels != nil) {
 		writeModelsList(c, platform, availableModels)
 		return
 	}
@@ -1344,7 +1351,11 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 			continue
 		}
 		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
-		if len(platformModels) == 0 && (platform != service.PlatformOpenAI || platformModels == nil) {
+		allowlistedModels, accountRestricted := h.gatewayService.AccountAllowlistedModels(ctx, groupID, platform)
+		if accountRestricted {
+			platformModels = allowlistedModels
+		}
+		if len(platformModels) == 0 && !accountRestricted && (platform != service.PlatformOpenAI || platformModels == nil) {
 			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
 			// default 分支是 Claude 列表），composite 下只暴露账号映射键。
 			if _, ok := schedulablePlatforms[platform]; ok && !service.IsMultiProtocolAPIKeyProvider(platform) {
@@ -1668,6 +1679,24 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 		}
 	}
 
+	if service.IsUniversalFunding(apiKey) {
+		data, err := h.billingCacheService.DescribeUniversalFunding(ctx, apiKey)
+		if err != nil {
+			h.errorResponse(c, http.StatusServiceUnavailable, "billing_unavailable", "订阅计费暂时不可用")
+			return
+		}
+		if usageData != nil {
+			data["usage"] = usageData
+		}
+		if dailyUsage != nil {
+			data["daily_usage"] = dailyUsage
+		}
+		if modelStats != nil {
+			data["model_stats"] = modelStats
+		}
+		c.JSON(http.StatusOK, data)
+		return
+	}
 	// 判断模式: key 有总额度或速率限制 → quota_limited，否则 → unrestricted
 	isQuotaLimited := apiKey.Quota > 0 || apiKey.HasRateLimits()
 
@@ -1842,7 +1871,7 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
 	// 订阅模式
-	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
+	if service.IsUniversalFunding(apiKey) && apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
 		resp := gin.H{
 			"mode":     "unrestricted",
 			"isValid":  true,
@@ -2553,6 +2582,10 @@ func extractQuotaResetSeconds(err error) int {
 }
 
 func billingErrorDetails(err error) (status int, code, message string, retryAfter int) {
+	if service.IsUniversalBillingError(err) {
+		status, code, message = service.UniversalBillingErrorDetails(err)
+		return status, code, message, 0
+	}
 	if errors.Is(err, service.ErrBillingServiceUnavailable) {
 		msg := pkgerrors.Message(err)
 		if msg == "" {

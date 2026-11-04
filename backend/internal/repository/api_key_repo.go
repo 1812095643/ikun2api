@@ -48,6 +48,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetKey(key.Key).
 		SetName(key.Name).
 		SetStatus(key.Status).
+		SetFundingSource(apiKeyFundingSourceOrDefault(key.FundingSource)).
 		SetNillableGroupID(key.GroupID).
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
@@ -134,6 +135,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldID,
 			apikey.FieldUserID,
 			apikey.FieldGroupID,
+			apikey.FieldFundingSource,
 			apikey.FieldName,
 			apikey.FieldStatus,
 			apikey.FieldIPWhitelist,
@@ -300,6 +302,9 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 		} else {
 			builder.ClearWindow7dStart()
 		}
+	}
+	if fields.FundingSource {
+		builder.SetFundingSource(key.FundingSource)
 	}
 	if fields.GroupID {
 		if key.GroupID != nil {
@@ -897,6 +902,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 		GroupID:       m.GroupID,
+		FundingSource: m.FundingSource,
 		Quota:         m.Quota,
 		QuotaUsed:     m.QuotaUsed,
 		ExpiresAt:     m.ExpiresAt,
@@ -1056,4 +1062,11 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func apiKeyFundingSourceOrDefault(value string) string {
+	if value == "" {
+		return service.FundingSourceBalance
+	}
+	return value
 }

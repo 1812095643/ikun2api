@@ -265,3 +265,10 @@ describe('可操作的用户新手引导', () => {
     expect(steps.some(step => step.element === '[data-tour="keys-connect-help"]')).toBe(true)
   })
 })
+
+describe('引导复用自定义站点名', () => {
+ it('escapes a configured name rather than treating it as popover HTML', () => {
+  const steps = getUserSteps(key => key, '青云 <img src=x> & AI')
+  expect(steps[0].popover?.title).toBe('开始使用 青云 &lt;img src=x&gt; &amp; AI')
+ })
+})

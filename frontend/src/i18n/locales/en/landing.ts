@@ -233,8 +233,8 @@ export default {
 
   // Setup Wizard
   setup: {
-    title: 'IKUN2api Setup',
-    description: 'Configure your IKUN2api instance',
+    title: '__SITE_NAME__ Setup',
+    description: 'Configure your __SITE_NAME__ instance',
     database: {
       title: 'Database Configuration',
       description: 'Connect to your PostgreSQL database',

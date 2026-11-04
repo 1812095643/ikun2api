@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
@@ -13,7 +14,7 @@ import { useMenuVisibility } from '@/composables/useMenuVisibility'
 const { t } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'IKUN2api')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || DEFAULT_SITE_NAME)
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))

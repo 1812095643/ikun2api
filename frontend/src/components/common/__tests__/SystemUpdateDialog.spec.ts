@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import SystemUpdateDialog from '../SystemUpdateDialog.vue'
 import { useSystemUpdate } from '@/composables/useSystemUpdate'
-const api = vi.hoisted(() => ({checkUpdates:vi.fn(),performUpdate:vi.fn(),getUpdateStatus:vi.fn(),getVersion:vi.fn(),restartService:vi.fn()}))
+const api = vi.hoisted(() => ({checkUpdates:vi.fn(),performUpdate:vi.fn(),rollback:vi.fn(),getUpdateStatus:vi.fn(),getVersion:vi.fn(),restartService:vi.fn()}))
 vi.mock('@/api/admin/system',()=>api)
 const release = {current_version:'1.3.16',latest_version:'1.3.17',has_update:true,supports_self_update:true,cached:false,build_type:'release',release_info:{name:'Next',body:'<img src=x onerror=alert(1)>',html_url:'',published_at:''}}
 const dialog = defineComponent({props:['show'],template:'<div v-if="show"><slot/><slot name="footer"/></div>'})
@@ -52,7 +52,7 @@ describe('version update controls',()=>{
   api.getUpdateStatus.mockResolvedValue({phase:'draining',active:true})
   const wrapper=mount(SystemUpdateDialog,{props:{show:false},global:{stubs:{BaseDialog:dialog}}})
   await wrapper.setProps({show:true});await flushPromises()
-  expect(wrapper.text()).toContain('正在等待当前请求完成')
+  expect(wrapper.text()).toContain('正在中断当前请求')
   expect(wrapper.findAll('button').some(b=>b.text()==='备份并一键更新')).toBe(false)
   wrapper.unmount()
  })

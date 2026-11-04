@@ -27,6 +27,7 @@ const (
 
 // SubscriptionExpiryService periodically updates expired subscription status.
 type SubscriptionExpiryService struct {
+	universal                *UniversalSubscriptionService
 	userSubRepo              UserSubscriptionRepository
 	settingRepo              SettingRepository
 	notificationEmailService *NotificationEmailService
@@ -136,6 +137,10 @@ func (s *SubscriptionExpiryService) sendExpiryReminders(ctx context.Context) {
 		return
 	}
 	defer release()
+	if s.universal != nil {
+		s.sendUniversalExpiryReminders(ctx)
+		return
+	}
 	for page := 1; ; page++ {
 		subs, pag, err := s.userSubRepo.List(ctx, pagination.PaginationParams{Page: page, PageSize: 200}, nil, nil, SubscriptionStatusActive, "", "expires_at", "asc")
 		if err != nil {
@@ -211,5 +216,34 @@ func (s *SubscriptionExpiryService) sendExpiryReminderIfDue(ctx context.Context,
 		},
 	}); err != nil {
 		log.Printf("[SubscriptionExpiry] Send expiry reminder failed: subscription=%d user=%d err=%v", sub.ID, sub.UserID, err)
+	}
+}
+
+func (s *SubscriptionExpiryService) sendUniversalExpiryReminders(ctx context.Context) {
+	rows, err := s.universal.client.QueryContext(ctx, `SELECT s.id,s.user_id,s.name,s.expires_at,u.email,COALESCE(u.username,'') FROM universal_subscriptions s JOIN users u ON u.id=s.user_id AND u.deleted_at IS NULL WHERE s.status='active' AND NOT s.refund_pending AND s.starts_at<=now() AND s.expires_at>now() AND s.expires_at<=now()+interval '8 days' ORDER BY s.expires_at,s.id LIMIT 200`)
+	if err != nil {
+		return
+	}
+	type reminder struct {
+		id, uid               int64
+		name, email, username string
+		expires               time.Time
+	}
+	items := []reminder{}
+	for rows.Next() {
+		var x reminder
+		if err = rows.Scan(&x.id, &x.uid, &x.name, &x.expires, &x.email, &x.username); err != nil {
+			rows.Close()
+			return
+		}
+		items = append(items, x)
+	}
+	rows.Close()
+	for _, x := range items {
+		days := int((time.Until(x.expires) + 24*time.Hour - 1) / (24 * time.Hour))
+		if days != 7 && days != 3 && days != 1 {
+			continue
+		}
+		_ = s.notificationEmailService.Send(ctx, NotificationEmailSendInput{Event: NotificationEmailEventSubscriptionExpiryReminder, RecipientEmail: x.email, RecipientName: firstNonEmpty(x.username, x.email), UserID: x.uid, SourceType: "universal_subscription", SourceID: strconv.FormatInt(x.id, 10), ReminderKey: fmt.Sprintf("%s:%dd", x.expires.UTC().Format("20060102T150405"), days), Variables: map[string]string{"subscription_group": x.name, "expiry_time": x.expires.Format("2006-01-02 15:04"), "days_remaining": strconv.Itoa(days)}})
 	}
 }

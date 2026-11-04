@@ -1,3 +1,4 @@
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { resolveMenuLabel } from '@/config/menuPages'
 import { i18n } from '@/i18n'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
@@ -9,7 +10,7 @@ import type { SiteBillingMode } from '@/utils/siteBillingMode'
  * 优先使用 titleKey 通过 i18n 翻译，fallback 到静态 routeTitle。
  */
 export function resolveDocumentTitle(routeTitle: unknown, siteName?: string, titleKey?: string): string {
-  const normalizedSiteName = typeof siteName === 'string' && siteName.trim() ? siteName.trim() : 'IKUN2api'
+  const normalizedSiteName = typeof siteName === 'string' && siteName.trim() ? siteName.trim() : DEFAULT_SITE_NAME
 
   if (typeof titleKey === 'string' && titleKey.trim()) {
     const translated = i18n.global.t(titleKey)

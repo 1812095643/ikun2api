@@ -163,7 +163,29 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		defer userReleaseFunc()
 	}
 
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	resumeUniversal := false
+	if endpoint.IsVideoLookupRequest() || endpoint == service.SeedanceEndpointStatus {
+		resumed, pinned, done, matched, e := h.billingCacheService.ResumeMediaFunding(c.Request.Context(), apiKey, requestID)
+		if e != nil {
+			h.errorResponse(c, http.StatusServiceUnavailable, "billing_unavailable", "任务计费信息暂时不可用")
+			return
+		}
+		if matched {
+			c.Request = c.Request.WithContext(resumed)
+			apiKey = pinned
+			resumeUniversal = true
+			defer done()
+		} else if service.IsUniversalFunding(apiKey) {
+			h.errorResponse(c, http.StatusForbidden, "permission_error", "未找到此密钥的已受理订阅任务")
+			return
+		}
+	}
+	if err := func() error {
+		if resumeUniversal {
+			return nil
+		}
+		return h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey))
+	}(); err != nil {
 		reqLog.Info("grok_media.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -174,7 +196,12 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	}
 
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
-	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body))
+	inflightDone, inflightErr := func() (func(), error) {
+		if resumeUniversal {
+			return inflightNoop, nil
+		}
+		return reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body))
+	}()
 	if inflightErr != nil {
 		status, code, message, retryAfter := billingErrorDetails(inflightErr)
 		if retryAfter > 0 {
@@ -489,6 +516,9 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			// Defer billing until status polling observes video.url. Persist create-time
 			// model/duration/resolution so status can still price if upstream omits them.
 			// Retry once: missing pending causes silent underpricing (status omits resolution).
+			if e := h.billingCacheService.StoreMediaFunding(requestCtx, apiKey, result.ResponseID); e != nil {
+				reqLog.Error("grok_media.persist_funding_failed", zap.Error(e))
+			}
 			pending := service.GrokVideoPendingBilling{
 				Model:                requestModel,
 				BillingModel:         firstNonEmptyString(result.BillingModel, requestModel),

@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"runtime"
-	"syscall"
 	"time"
 )
 
@@ -33,13 +32,7 @@ func RestartService() error {
 	// Give a moment for logs to flush and response to be sent
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		process, err := os.FindProcess(os.Getpid())
-		if err == nil {
-			err = process.Signal(syscall.SIGTERM)
-		}
-		if err != nil {
-			log.Printf("Graceful restart failed: %v", err)
-		}
+		os.Exit(0)
 	}()
 
 	return nil
@@ -50,6 +43,6 @@ func RestartService() error {
 func RestartServiceAsync() {
 	if err := RestartService(); err != nil {
 		log.Printf("Service restart failed: %v", err)
-		log.Println("Please restart the service manually: sudo systemctl restart sub2api")
+		log.Println("Please restart the service manually: sudo systemctl restart ikun2api")
 	}
 }

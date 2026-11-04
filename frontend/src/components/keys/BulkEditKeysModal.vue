@@ -17,6 +17,10 @@
 
       <fieldset :disabled="submitting" class="space-y-5">
         <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm font-medium"><input v-model="enabled.funding_source" type="checkbox" class="checkbox" />计费来源</label>
+          <select v-if="enabled.funding_source" v-model="fundingSource" class="input"><option value="balance">普通余额</option><option value="universal_subscription">通用订阅（不接续余额）</option></select>
+        </div>
+        <div class="space-y-2">
           <label class="flex items-center gap-2 text-sm font-medium">
             <input v-model="enabled.group_id" type="checkbox" class="checkbox" data-test="enable-group" />
             {{ t('keys.groupLabel') }}
@@ -160,7 +164,7 @@ import type { ApiKey, Group, UpdateApiKeyRequest } from '@/types'
 type SelectedKey = Pick<ApiKey, 'id' | 'name'>
 type LimitField = 'quota' | 'rate_limit_5h' | 'rate_limit_1d' | 'rate_limit_7d'
 type IPField = 'ip_whitelist' | 'ip_blacklist'
-type EditableField = LimitField | IPField | 'group_id' | 'status' | 'expires_at'
+type EditableField = LimitField | IPField | 'group_id' | 'status' | 'expires_at' | 'funding_source'
 
 const props = defineProps<{
   show: boolean
@@ -178,6 +182,7 @@ const submitting = ref(false)
 const pendingKeys = ref<SelectedKey[]>([])
 const failures = ref<Array<{ id: number; name: string; message: string }>>([])
 const enabled = reactive<Record<EditableField, boolean>>({
+  funding_source: false,
   group_id: false,
   status: false,
   quota: false,
@@ -189,6 +194,7 @@ const enabled = reactive<Record<EditableField, boolean>>({
   ip_blacklist: false
 })
 const groupId = ref<number | null>(null)
+const fundingSource = ref<'balance' | 'universal_subscription'>('balance')
 const status = ref<'active' | 'inactive'>('active')
 const limits = reactive<Record<LimitField, string | number>>({
   quota: '', rate_limit_5h: '', rate_limit_1d: '', rate_limit_7d: ''
@@ -258,6 +264,7 @@ const errorMessage = (error: unknown): string => {
 const submit = async () => {
   if (!canSubmit.value) return
   const updates: UpdateApiKeyRequest = {}
+  if (enabled.funding_source) updates.funding_source = fundingSource.value
   if (enabled.group_id) updates.group_id = groupId.value
   if (enabled.status) updates.status = status.value
   for (const { key } of limitFields) {

@@ -190,7 +190,7 @@ func (s *TotpService) InitiateSetup(ctx context.Context, userID int64, emailCode
 
 	// Generate a new TOTP key
 	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      totpIssuer,
+		Issuer:      s.totpSiteName(ctx),
 		AccountName: user.Email,
 	})
 	if err != nil {
@@ -558,4 +558,12 @@ func (s *TotpService) SendVerifyCode(ctx context.Context, userID int64, locale .
 
 	// Send verification code via queue
 	return s.emailQueueService.EnqueueVerifyCode(user.Email, siteName, firstEmailLocale(locale))
+}
+
+// Existing TOTP secrets do not depend on the display issuer.
+func (s *TotpService) totpSiteName(ctx context.Context) string {
+	if s.settingService != nil {
+		return s.settingService.GetSiteName(ctx)
+	}
+	return totpIssuer
 }

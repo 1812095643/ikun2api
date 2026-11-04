@@ -67,59 +67,25 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 // GetActive handles getting current user's active subscriptions
 // GET /api/v1/subscriptions/active
 func (h *SubscriptionHandler) GetActive(c *gin.Context) {
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not found in context")
+	c.Header("Deprecation", "true")
+	c.Header("Link", "</api/v1/subscriptions/universal>; rel=\"successor-version\"")
+	if _, ok := middleware2.GetAuthSubjectFromContext(c); !ok {
+		response.Unauthorized(c, "请先登录")
 		return
 	}
-
-	subscriptions, err := h.subscriptionService.ListActiveUserSubscriptions(c.Request.Context(), subject.UserID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	out := make([]dto.UserSubscription, 0, len(subscriptions))
-	for i := range subscriptions {
-		out = append(out, *dto.UserSubscriptionFromService(&subscriptions[i]).Localized(c.GetHeader("Accept-Language")))
-	}
-	response.Success(c, out)
+	response.Success(c, []any{})
 }
 
 // GetProgress handles getting subscription progress for current user
 // GET /api/v1/subscriptions/progress
 func (h *SubscriptionHandler) GetProgress(c *gin.Context) {
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not found in context")
+	c.Header("Deprecation", "true")
+	c.Header("Link", "</api/v1/subscriptions/universal>; rel=\"successor-version\"")
+	if _, ok := middleware2.GetAuthSubjectFromContext(c); !ok {
+		response.Unauthorized(c, "请先登录")
 		return
 	}
-
-	// Get all active subscriptions with progress
-	subscriptions, err := h.subscriptionService.ListActiveUserSubscriptions(c.Request.Context(), subject.UserID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	result := make([]SubscriptionProgressInfo, 0, len(subscriptions))
-	for i := range subscriptions {
-		sub := &subscriptions[i]
-		progress, err := h.subscriptionService.GetSubscriptionProgress(c.Request.Context(), sub.ID)
-		if err != nil {
-			// Skip subscriptions with errors
-			continue
-		}
-		if sub.Group != nil {
-			progress.GroupName = sub.Group.I18n.LocalizeName(c.GetHeader("Accept-Language"), progress.GroupName)
-		}
-		result = append(result, SubscriptionProgressInfo{
-			Subscription: dto.UserSubscriptionFromService(sub).Localized(c.GetHeader("Accept-Language")),
-			Progress:     progress,
-		})
-	}
-
-	response.Success(c, result)
+	response.Success(c, []any{})
 }
 
 // GetSummary handles getting a summary of current user's subscription status
@@ -127,65 +93,28 @@ func (h *SubscriptionHandler) GetProgress(c *gin.Context) {
 func (h *SubscriptionHandler) GetSummary(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
-		response.Unauthorized(c, "User not found in context")
+		response.Unauthorized(c, "请先登录")
 		return
 	}
-
-	// Get all active subscriptions
-	subscriptions, err := h.subscriptionService.ListActiveUserSubscriptions(c.Request.Context(), subject.UserID)
+	all, _, err := h.subscriptionService.Universal().List(c.Request.Context(), subject.UserID, 0, 200)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-
-	var totalUsed float64
-	items := make([]SubscriptionSummaryItem, 0, len(subscriptions))
-
-	for _, sub := range subscriptions {
-		item := SubscriptionSummaryItem{
-			ID:             sub.ID,
-			GroupID:        sub.GroupID,
-			Status:         sub.Status,
-			DailyUsedUSD:   sub.DailyUsageUSD,
-			WeeklyUsedUSD:  sub.WeeklyUsageUSD,
-			MonthlyUsedUSD: sub.MonthlyUsageUSD,
+	items := []gin.H{}
+	totalUsed := 0.0
+	for _, sub := range all {
+		if sub.Status != "active" {
+			continue
 		}
-
-		// Add group info if preloaded
-		if sub.Group != nil {
-			item.GroupName = sub.Group.I18n.LocalizeName(c.GetHeader("Accept-Language"), sub.Group.Name)
-			if sub.Group.DailyLimitUSD != nil {
-				item.DailyLimitUSD = *sub.Group.DailyLimitUSD
+		totalUsed += sub.TotalUsedUSD
+		progress := func(used float64, limit *float64) any {
+			if limit == nil {
+				return nil
 			}
-			if sub.Group.WeeklyLimitUSD != nil {
-				item.WeeklyLimitUSD = *sub.Group.WeeklyLimitUSD
-			}
-			if sub.Group.MonthlyLimitUSD != nil {
-				item.MonthlyLimitUSD = *sub.Group.MonthlyLimitUSD
-			}
+			return used / *limit * 100
 		}
-
-		// Format expiration time
-		if !sub.ExpiresAt.IsZero() {
-			formatted := sub.ExpiresAt.Format("2006-01-02T15:04:05Z07:00")
-			item.ExpiresAt = &formatted
-		}
-
-		// Track total usage (use monthly as the most comprehensive)
-		totalUsed += sub.MonthlyUsageUSD
-
-		items = append(items, item)
+		items = append(items, gin.H{"id": sub.ID, "group_name": sub.Name, "status": sub.Status, "daily_used_usd": sub.DailyUsedUSD, "weekly_used_usd": sub.WeeklyUsedUSD, "monthly_used_usd": sub.MonthlyUsedUSD, "daily_limit_usd": sub.DailyLimitUSD, "weekly_limit_usd": sub.WeeklyLimitUSD, "monthly_limit_usd": sub.MonthlyLimitUSD, "daily_progress": progress(sub.DailyUsedUSD, sub.DailyLimitUSD), "weekly_progress": progress(sub.WeeklyUsedUSD, sub.WeeklyLimitUSD), "monthly_progress": progress(sub.MonthlyUsedUSD, sub.MonthlyLimitUSD), "expires_at": sub.ExpiresAt, "remaining_usd": sub.RemainingUSD, "total_credit_usd": sub.TotalCreditUSD})
 	}
-
-	summary := struct {
-		ActiveCount   int                       `json:"active_count"`
-		TotalUsedUSD  float64                   `json:"total_used_usd"`
-		Subscriptions []SubscriptionSummaryItem `json:"subscriptions"`
-	}{
-		ActiveCount:   len(subscriptions),
-		TotalUsedUSD:  totalUsed,
-		Subscriptions: items,
-	}
-
-	response.Success(c, summary)
+	response.Success(c, gin.H{"active_count": len(items), "total_used_usd": totalUsed, "subscriptions": items})
 }

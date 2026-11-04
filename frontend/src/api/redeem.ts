@@ -7,6 +7,7 @@ import { apiClient } from './client'
 import type { PaginatedResponse, RedeemCodeRequest } from '@/types'
 
 export interface RedeemHistoryItem {
+  subscription_name?: string
   id: number
   code: string
   type: string
@@ -34,6 +35,8 @@ export async function redeem(code: string): Promise<{
   message: string
   type: string
   value: number
+  subscription_name?: string
+  validity_days?: number
   new_balance?: number
   new_concurrency?: number
 }> {
@@ -43,7 +46,9 @@ export async function redeem(code: string): Promise<{
     message: string
     type: string
     value: number
-    new_balance?: number
+    subscription_name?: string
+  validity_days?: number
+  new_balance?: number
     new_concurrency?: number
   }>('/redeem', payload)
 

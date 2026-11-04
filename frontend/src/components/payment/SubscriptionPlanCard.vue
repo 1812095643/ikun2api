@@ -44,10 +44,11 @@
       </div>
 
       <!-- Group quota info (compact) -->
+      <p v-if="plan.plan_type === 'universal_credit'" class="mb-3 text-sm font-semibold text-primary-700 dark:text-primary-300">总额度 ${{ plan.total_credit_usd }} · {{ plan.validity_days }} 天</p>
       <div class="mb-3 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-dark-700/50">
         <div class="flex items-center justify-between">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.rate') }}</span>
-          <span class="font-medium text-gray-700 dark:text-gray-300">{{ rateDisplay }}</span>
+          <span class="font-medium text-gray-700 dark:text-gray-300">{{ plan.plan_type === 'universal_credit' ? '按实际分组倍率' : rateDisplay }}</span>
         </div>
         <div v-if="hasPeakRate" class="col-span-2 flex items-center justify-between gap-2">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.peakRate') }}</span>
@@ -141,7 +142,7 @@ const textClass = computed(() => platformTextClass(platform.value))
 const iconClass = computed(() => platformIconClass(platform.value))
 const btnClass = computed(() => platformButtonClass(platform.value))
 const discountClass = computed(() => platformDiscountClass(platform.value))
-const pLabel = computed(() => platformLabel(platform.value))
+const pLabel = computed(() => props.plan.plan_type === 'universal_credit' ? '全站通用' : platformLabel(platform.value))
 
 const discountText = computed(() => {
   if (!props.plan.original_price || props.plan.original_price <= 0) return ''

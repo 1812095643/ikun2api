@@ -110,6 +110,16 @@ func ValidityDays(v int) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldValidityDays, v))
 }
 
+// SubscriptionSnapshotIsNil applies the IsNil predicate on the "subscription_snapshot" field.
+func SubscriptionSnapshotIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldSubscriptionSnapshot))
+}
+
+// SubscriptionSnapshotNotNil applies the NotNil predicate on the "subscription_snapshot" field.
+func SubscriptionSnapshotNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldSubscriptionSnapshot))
+}
+
 // CodeEQ applies the EQ predicate on the "code" field.
 func CodeEQ(v string) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldCode, v))

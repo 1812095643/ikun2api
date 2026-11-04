@@ -50,6 +50,7 @@ const (
 
 // PaymentConfig holds the payment system configuration.
 type PaymentConfig struct {
+	SiteName                  string   `json:"-"`
 	Enabled                   bool     `json:"enabled"`
 	MinAmount                 float64  `json:"min_amount"`
 	MaxAmount                 float64  `json:"max_amount"`
@@ -173,33 +174,42 @@ type UpdateProviderInstanceRequest struct {
 	AllowUserRefund *bool             `json:"allow_user_refund"`
 }
 type CreatePlanRequest struct {
-	GroupID       int64    `json:"group_id"`
-	Name          string   `json:"name"`
-	Description   string   `json:"description"`
-	Price         float64  `json:"price"`
-	OriginalPrice *float64 `json:"original_price"`
-	Currency      string   `json:"currency"`
-	ValidityDays  int      `json:"validity_days"`
-	ValidityUnit  string   `json:"validity_unit"`
-	Features      string   `json:"features"`
-	ProductName   string   `json:"product_name"`
-	ForSale       bool     `json:"for_sale"`
-	SortOrder     int      `json:"sort_order"`
+	PlanType        string   `json:"plan_type"`
+	TotalCreditUSD  *float64 `json:"total_credit_usd"`
+	DailyLimitUSD   *float64 `json:"daily_limit_usd"`
+	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
+	MonthlyLimitUSD *float64 `json:"monthly_limit_usd"`
+	GroupID         int64    `json:"group_id"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	Price           float64  `json:"price"`
+	OriginalPrice   *float64 `json:"original_price"`
+	Currency        string   `json:"currency"`
+	ValidityDays    int      `json:"validity_days"`
+	ValidityUnit    string   `json:"validity_unit"`
+	Features        string   `json:"features"`
+	ProductName     string   `json:"product_name"`
+	ForSale         bool     `json:"for_sale"`
+	SortOrder       int      `json:"sort_order"`
 }
 
 type UpdatePlanRequest struct {
-	GroupID       *int64   `json:"group_id"`
-	Name          *string  `json:"name"`
-	Description   *string  `json:"description"`
-	Price         *float64 `json:"price"`
-	OriginalPrice *float64 `json:"original_price"`
-	Currency      *string  `json:"currency"`
-	ValidityDays  *int     `json:"validity_days"`
-	ValidityUnit  *string  `json:"validity_unit"`
-	Features      *string  `json:"features"`
-	ProductName   *string  `json:"product_name"`
-	ForSale       *bool    `json:"for_sale"`
-	SortOrder     *int     `json:"sort_order"`
+	TotalCreditUSD  *float64 `json:"total_credit_usd"`
+	DailyLimitUSD   *float64 `json:"daily_limit_usd"`
+	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
+	MonthlyLimitUSD *float64 `json:"monthly_limit_usd"`
+	GroupID         *int64   `json:"group_id"`
+	Name            *string  `json:"name"`
+	Description     *string  `json:"description"`
+	Price           *float64 `json:"price"`
+	OriginalPrice   *float64 `json:"original_price"`
+	Currency        *string  `json:"currency"`
+	ValidityDays    *int     `json:"validity_days"`
+	ValidityUnit    *string  `json:"validity_unit"`
+	Features        *string  `json:"features"`
+	ProductName     *string  `json:"product_name"`
+	ForSale         *bool    `json:"for_sale"`
+	SortOrder       *int     `json:"sort_order"`
 }
 
 // PaymentConfigService manages payment configuration and CRUD for
@@ -229,7 +239,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 	keys := []string{
 		SettingPaymentEnabled, SettingMinRechargeAmount, SettingMaxRechargeAmount,
 		SettingDailyRechargeLimit, SettingOrderTimeoutMinutes, SettingMaxPendingOrders,
-		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingSubscriptionUSDToCNYRate, SettingRechargeFeeRate, SettingLoadBalanceStrategy,
+		SettingKeySiteName, SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingSubscriptionUSDToCNYRate, SettingRechargeFeeRate, SettingLoadBalanceStrategy,
 		SettingRechargeBonusTiers, SettingRechargeBonusMode, SettingRechargeBonusNotice,
 		SettingProductNamePrefix, SettingProductNameSuffix,
 		SettingHelpImageURL, SettingHelpText,
@@ -251,6 +261,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 
 func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *PaymentConfig {
 	cfg := &PaymentConfig{
+		SiteName:                  siteNameOrDefault(vals[SettingKeySiteName]),
 		Enabled:                   vals[SettingPaymentEnabled] == "true",
 		MinAmount:                 pcParseFloat(vals[SettingMinRechargeAmount], 1),
 		MaxAmount:                 pcParseFloat(vals[SettingMaxRechargeAmount], 0),

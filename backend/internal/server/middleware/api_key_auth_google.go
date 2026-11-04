@@ -165,40 +165,16 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 
-		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
-		if isSubscriptionType && subscriptionService != nil {
-			subscription, err := subscriptionService.GetActiveSubscription(
-				c.Request.Context(),
-				apiKey.User.ID,
-				apiKey.Group.ID,
-			)
-			if err != nil {
-				abortWithGoogleError(c, 403, "No active subscription found for this group")
+		if service.IsUniversalFunding(apiKey) {
+			if subscriptionService == nil {
+				abortWithGoogleError(c, 503, "订阅计费暂时不可用")
 				return
 			}
-
-			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-			if needsMaintenance {
-				refreshed, maintenanceErr := subscriptionService.EnsureWindowMaintenance(c.Request.Context(), subscription)
-				if maintenanceErr != nil {
-					abortWithGoogleError(c, 500, "Failed to maintain subscription usage windows")
-					return
-				}
-				subscription = refreshed
-				_, err = subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-			}
-			if err != nil {
-				status := 403
-				if errors.Is(err, service.ErrDailyLimitExceeded) ||
-					errors.Is(err, service.ErrWeeklyLimitExceeded) ||
-					errors.Is(err, service.ErrMonthlyLimitExceeded) {
-					status = 429
-				}
-				abortWithGoogleError(c, status, err.Error())
+			if _, err := subscriptionService.Universal().Check(c.Request.Context(), apiKey.User.ID); err != nil {
+				status, _, message := service.UniversalBillingErrorDetails(err)
+				abortWithGoogleError(c, status, message)
 				return
 			}
-
-			c.Set(string(ContextKeySubscription), subscription)
 		} else {
 			if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 				abortWithGoogleError(c, 403, "Insufficient account balance")

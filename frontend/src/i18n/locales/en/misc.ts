@@ -18,6 +18,49 @@ export default {
   },
 
 
+  // Version Badge
+  version: {
+    currentVersion: 'Current Version',
+    latestVersion: 'Latest Version',
+    upToDate: "You're running the latest version.",
+    updateAvailable: 'A new version is available!',
+    releaseNotes: 'Release Notes',
+    noReleaseNotes: 'No release notes',
+    viewUpdate: 'View Update',
+    viewRelease: 'View Release',
+    viewChangelog: 'View Changelog',
+    refresh: 'Refresh',
+    sourceMode: 'Source Build',
+    sourceModeHint: 'This deployment does not support browser updates. Use its original deployment method.',
+    updateNow: 'Update Now',
+    updating: 'Updating...',
+    interrupting: 'Interrupting active requests...',
+    updateHint: 'Restarting disconnects active requests; application and data recovery backups are retained.',
+    updateComplete: 'Update Complete',
+    updateFailed: 'Update Failed',
+    restartRequired: 'Please restart the service to apply the update',
+    restartNow: 'Restart Now',
+    restarting: 'Restarting...',
+    retry: 'Retry',
+    rollback: 'Version Rollback',
+    rollbackSelectVersion: 'Select a version to roll back to (last 3 versions)',
+    rollbackConfirm: 'Roll back to {version}',
+    rollbackWarning: 'Rollback interrupts requests and backs up data. Incompatible database versions are blocked; historical data is retained.',
+    rollingBack: 'Rolling back...',
+    rollbackComplete: 'Rollback Complete',
+    rollbackFailed: 'Rollback Failed',
+    manualRollbackCommand: 'Manual rollback',
+    copyCommand: 'Copy',
+    copied: 'Copied',
+    noRollbackVersions: 'No versions available for rollback',
+    loadVersionsFailed: 'Failed to load versions',
+    rollbackSourceHint: 'This startup mode does not support browser rollback',
+    deployScript: 'Script',
+    deployDocker: 'Docker',
+    dockerEditCompose: 'Edit the image tag in docker-compose.yml',
+    dockerRecreate: 'Recreate the container'
+  },
+
   // Recharge / Subscription Page
   purchase: {
     title: 'Recharge / Subscription',
@@ -116,14 +159,14 @@ export default {
     // Admin tour steps
     admin: {
       welcome: {
-        title: '👋 Welcome to IKUN2api',
-        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">IKUN2api is a powerful AI service gateway platform that helps you easily manage and distribute AI services.</p><p style="margin-bottom: 12px;"><b>🎯 Core Features:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>📦 <b>Group Management</b> - Create service tiers (VIP, Free Trial, etc.)</li><li>🔗 <b>Account Pool</b> - Connect multiple upstream AI service accounts</li><li>🔑 <b>Key Distribution</b> - Generate independent API Keys for users</li><li>💰 <b>Billing Control</b> - Flexible rate and quota management</li></ul><p style="color: #10b981; font-weight: 600;">Let\'s complete the initial setup in 3 minutes →</p></div>',
+        title: '👋 Welcome to __SITE_NAME__',
+        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">__SITE_NAME_HTML__ is a powerful AI service gateway platform that helps you easily manage and distribute AI services.</p><p style="margin-bottom: 12px;"><b>🎯 Core Features:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>📦 <b>Group Management</b> - Create service tiers (VIP, Free Trial, etc.)</li><li>🔗 <b>Account Pool</b> - Connect multiple upstream AI service accounts</li><li>🔑 <b>Key Distribution</b> - Generate independent API Keys for users</li><li>💰 <b>Billing Control</b> - Flexible rate and quota management</li></ul><p style="color: #10b981; font-weight: 600;">Let\'s complete the initial setup in 3 minutes →</p></div>',
         nextBtn: 'Start Setup 🚀',
         prevBtn: 'Skip'
       },
       groupManage: {
         title: '📦 Step 1: Group Management',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>What is a Group?</b></p><p style="margin-bottom: 12px;">Groups are the core concept of IKUN2api, like a "service package":</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 Each group can contain multiple upstream accounts</li><li>💰 Each group has independent billing multiplier</li><li>👥 Can be set as public or exclusive</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Example:</b> You can create "VIP Premium" (high rate) and "Free Trial" (low rate) groups</p><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "Group Management" on the left sidebar</p></div>'
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>What is a Group?</b></p><p style="margin-bottom: 12px;">Groups are the core concept of __SITE_NAME_HTML__, like a "service package":</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 Each group can contain multiple upstream accounts</li><li>💰 Each group has independent billing multiplier</li><li>👥 Can be set as public or exclusive</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Example:</b> You can create "VIP Premium" (high rate) and "Free Trial" (low rate) groups</p><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "Group Management" on the left sidebar</p></div>'
       },
       createGroup: {
         title: '➕ Create New Group',
@@ -216,7 +259,7 @@ export default {
     // User tour steps
     user: {
       welcome: {
-        title: 'Welcome to IKUN2api',
+        title: 'Welcome to __SITE_NAME__',
         description: '<p>Choose a model, add balance, and create an API key to get started in your client.</p><p>This short tour introduces the main tools. Close it anytime or restart it from your profile menu.</p>',
         nextBtn: 'Get started',
         prevBtn: 'Skip'

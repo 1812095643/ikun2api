@@ -172,7 +172,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// generation consumes the key's remaining balance.
 		// 遥测本身不消耗模型额度；最后一次模型调用耗尽余额后仍应允许隐私拦截。
 		telemetryRequest := c.Request.Method == http.MethodPost && claude.IsTelemetryBatchPath(c.Request.URL.Path)
-		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || telemetryRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
+		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || telemetryRequest || (isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path) || isAsyncVideoTaskRead(c.Request.Method, c.Request.URL.Path))
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
@@ -194,25 +194,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// ── 5. 按端点需要加载订阅 ───────────────────────────────────
 
 		var subscription *service.UserSubscription
-		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
-
-		// 倍率自省不需要订阅数据；/v1/usage 仍保留原有订阅读取行为。
-		if isSubscriptionType && subscriptionService != nil && !billingInfoRequest {
-			sub, subErr := subscriptionService.GetActiveSubscription(
-				c.Request.Context(),
-				apiKey.User.ID,
-				apiKey.Group.ID,
-			)
-			if subErr != nil {
-				if !skipBilling {
-					AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
-					return
-				}
-				// skipBilling: 订阅不存在也放行，handler 会返回可用的数据
-			} else {
-				subscription = sub
-			}
-		}
+		// Legacy group-bound subscriptions are archived. FundingSource is authoritative.
 
 		// ── 6. 计费执行（skipBilling 时整块跳过） ────────────────────
 
@@ -238,7 +220,17 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			}
 
 			// 订阅模式：验证订阅限额
-			if subscription != nil {
+			if service.IsUniversalFunding(apiKey) {
+				if subscriptionService == nil {
+					AbortWithError(c, 503, "UNIVERSAL_SUBSCRIPTION_UNAVAILABLE", "订阅计费暂时不可用")
+					return
+				}
+				if _, err := subscriptionService.Universal().Check(c.Request.Context(), apiKey.User.ID); err != nil {
+					status, reason, message := service.UniversalBillingErrorDetails(err)
+					AbortWithError(c, status, reason, message)
+					return
+				}
+			} else if subscription != nil {
 				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
 				if needsMaintenance {
 					refreshed, maintenanceErr := subscriptionService.EnsureWindowMaintenance(c.Request.Context(), subscription)
@@ -432,7 +424,7 @@ func validateAPIKeyGroupAllowed(apiKey *service.APIKey) bool {
 	}
 	group := apiKey.Group
 	if group.IsSubscriptionType() {
-		return true
+		return apiKey.User.CanBindGroup(group.ID, group.IsExclusive)
 	}
 	return apiKey.User.CanBindGroup(group.ID, group.IsExclusive)
 }
@@ -449,4 +441,11 @@ func validateAPIKeyGroupAvailable(apiKey *service.APIKey) (string, string, bool)
 		return "GROUP_DISABLED", "API Key 所属分组已停用", false
 	}
 	return "", "", true
+}
+
+func isAsyncVideoTaskRead(method, path string) bool {
+	if method != http.MethodGet {
+		return false
+	}
+	return strings.HasPrefix(path, "/v1/videos/") || strings.HasPrefix(path, "/videos/") || strings.HasPrefix(path, "/v1/contents/generations/tasks/") || strings.HasPrefix(path, "/contents/generations/tasks/")
 }

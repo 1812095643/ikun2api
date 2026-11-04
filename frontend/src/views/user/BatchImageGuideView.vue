@@ -1031,7 +1031,7 @@ const endpointBase = computed(() => {
   const configured = appStore.apiBaseUrl?.trim()
   if (configured) return configured.replace(/\/+$/, '')
   if (typeof window !== 'undefined') return window.location.origin.replace(/\/+$/, '')
-  return '<你的 IKUN2api API 端点>'
+  return '<本站 API 端点>'
 })
 
 const selectedModelReferenceLimit = computed(() => referenceImageLimitForModel(form.model))

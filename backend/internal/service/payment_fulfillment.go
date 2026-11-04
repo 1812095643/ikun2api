@@ -542,6 +542,18 @@ func (s *PaymentService) sendSubscriptionPurchaseSuccessNotification(ctx context
 	if o.SubscriptionDays != nil {
 		variables["subscription_days"] = strconv.Itoa(*o.SubscriptionDays)
 	}
+	if len(o.SubscriptionSnapshot) > 0 {
+		if p, e := DecodeUniversalSnapshot(o.SubscriptionSnapshot); e == nil {
+			variables["subscription_group"] = p.Name
+		}
+		if subs, _, e := s.subscriptionSvc.Universal().List(ctx, o.UserID, 0, 200); e == nil {
+			for _, sub := range subs {
+				if sub.OrderID != nil && *sub.OrderID == o.ID {
+					variables["expiry_time"] = sub.ExpiresAt.Format("2006-01-02 15:04")
+				}
+			}
+		}
+	}
 	if o.SubscriptionGroupID != nil {
 		if s.groupRepo != nil {
 			if group, err := s.groupRepo.GetByID(ctx, *o.SubscriptionGroupID); err == nil && group != nil && strings.TrimSpace(group.Name) != "" {
@@ -578,6 +590,9 @@ func (s *PaymentService) ExecuteSubscriptionFulfillment(ctx context.Context, oid
 	}
 	if o.Status != OrderStatusPaid && o.Status != OrderStatusFailed && o.Status != OrderStatusRecharging {
 		return infraerrors.BadRequest("INVALID_STATUS", "order cannot fulfill in status "+o.Status)
+	}
+	if len(o.SubscriptionSnapshot) > 0 {
+		return s.fulfillUniversalSubscription(ctx, o)
 	}
 	if o.SubscriptionGroupID == nil || o.SubscriptionDays == nil {
 		return infraerrors.BadRequest("INVALID_STATUS", "missing subscription info")
@@ -949,4 +964,25 @@ func (s *PaymentService) RetryFulfillment(ctx context.Context, oid int64) error 
 	}
 	s.writeAuditLog(ctx, oid, "RECHARGE_RETRY", "admin", map[string]any{"detail": "admin manual retry"})
 	return s.executeFulfillment(ctx, oid)
+}
+
+// The order snapshot, not the editable sales plan, determines fulfillment.
+func (s *PaymentService) fulfillUniversalSubscription(ctx context.Context, o *dbent.PaymentOrder) error {
+	p, err := DecodeUniversalSnapshot(o.SubscriptionSnapshot)
+	if err != nil {
+		return err
+	}
+	lease, err := s.acquirePaymentFulfillmentLease(ctx, o)
+	if err != nil || lease == nil {
+		return err
+	}
+	_, err = s.subscriptionSvc.Universal().Grant(ctx, o.UserID, p, &o.ID, nil, fmt.Sprintf("payment:%d", o.ID), "在线购买")
+	if err == nil {
+		err = s.applyAffiliateRebateForOrder(ctx, o)
+	}
+	if err == nil {
+		return s.markCompleted(ctx, o, lease, "SUBSCRIPTION_SUCCESS")
+	}
+	s.markFailed(ctx, o.ID, lease, err)
+	return err
 }

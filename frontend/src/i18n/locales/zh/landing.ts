@@ -233,8 +233,8 @@ export default {
 
   // Setup Wizard
   setup: {
-    title: 'IKUN2api 安装向导',
-    description: '配置您的 IKUN2api 实例',
+    title: '__SITE_NAME__ 安装向导',
+    description: '配置您的 __SITE_NAME__ 实例',
     database: {
       title: '数据库配置',
       description: '连接到您的 PostgreSQL 数据库',

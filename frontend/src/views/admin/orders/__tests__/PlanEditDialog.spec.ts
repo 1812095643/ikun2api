@@ -169,7 +169,7 @@ describe('PlanEditDialog', () => {
     expect(wrapper.text()).not.toContain('¥71.43')
   })
 
-  it('allows composite subscription groups for payment plans', () => {
+  it('uses shared credit and has no group binding even when legacy groups exist', () => {
     const wrapper = mountDialog({
       groups: [
         groupFixture({
@@ -190,7 +190,8 @@ describe('PlanEditDialog', () => {
 
     const options = wrapper.findAll('option').map(option => option.text())
 
-    expect(options).toContain('OpenAI + Claude + Gemini + Grok — composite (1.2x)')
-    expect(options).not.toContain('Standard OpenAI — openai (1x)')
+    expect(options).toEqual([])
+    expect(wrapper.find('#plan-total').exists()).toBe(true)
+    expect(wrapper.text()).toContain('跨 Key、跨分组使用')
   })
 })

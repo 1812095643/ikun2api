@@ -136,6 +136,7 @@ func (h *SubscriptionHandler) GetProgress(c *gin.Context) {
 // Assign handles assigning a subscription to a user
 // POST /api/v1/admin/subscriptions/assign
 func (h *SubscriptionHandler) Assign(c *gin.Context) {
+
 	var req AssignSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -163,6 +164,7 @@ func (h *SubscriptionHandler) Assign(c *gin.Context) {
 // BulkAssign handles bulk assigning subscriptions to multiple users
 // POST /api/v1/admin/subscriptions/bulk-assign
 func (h *SubscriptionHandler) BulkAssign(c *gin.Context) {
+
 	var req BulkAssignSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -357,4 +359,8 @@ func getAdminIDFromContext(c *gin.Context) int64 {
 		return 0
 	}
 	return subject.UserID
+}
+
+func (h *SubscriptionHandler) LegacyRetired(c *gin.Context) {
+	response.ErrorFrom(c, service.ErrLegacySubscriptionRetired)
 }

@@ -24,6 +24,12 @@ type RedeemCodeCreate struct {
 	conflict []sql.ConflictOption
 }
 
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (_c *RedeemCodeCreate) SetSubscriptionSnapshot(v map[string]interface{}) *RedeemCodeCreate {
+	_c.mutation.SetSubscriptionSnapshot(v)
+	return _c
+}
+
 // SetCode sets the "code" field.
 func (_c *RedeemCodeCreate) SetCode(v string) *RedeemCodeCreate {
 	_c.mutation.SetCode(v)
@@ -313,6 +319,10 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 		_spec = sqlgraph.NewCreateSpec(redeemcode.Table, sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64))
 	)
 	_spec.OnConflict = _c.conflict
+	if value, ok := _c.mutation.SubscriptionSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldSubscriptionSnapshot, field.TypeJSON, value)
+		_node.SubscriptionSnapshot = value
+	}
 	if value, ok := _c.mutation.Code(); ok {
 		_spec.SetField(redeemcode.FieldCode, field.TypeString, value)
 		_node.Code = value
@@ -390,7 +400,7 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 // of the `INSERT` statement. For example:
 //
 //	client.RedeemCode.Create().
-//		SetCode(v).
+//		SetSubscriptionSnapshot(v).
 //		OnConflict(
 //			// Update the row with the new values
 //			// the was proposed for insertion.
@@ -399,7 +409,7 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.RedeemCodeUpsert) {
-//			SetCode(v+v).
+//			SetSubscriptionSnapshot(v+v).
 //		}).
 //		Exec(ctx)
 func (_c *RedeemCodeCreate) OnConflict(opts ...sql.ConflictOption) *RedeemCodeUpsertOne {
@@ -434,6 +444,24 @@ type (
 		*sql.UpdateSet
 	}
 )
+
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (u *RedeemCodeUpsert) SetSubscriptionSnapshot(v map[string]interface{}) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldSubscriptionSnapshot, v)
+	return u
+}
+
+// UpdateSubscriptionSnapshot sets the "subscription_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateSubscriptionSnapshot() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldSubscriptionSnapshot)
+	return u
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (u *RedeemCodeUpsert) ClearSubscriptionSnapshot() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldSubscriptionSnapshot)
+	return u
+}
 
 // SetCode sets the "code" field.
 func (u *RedeemCodeUpsert) SetCode(v string) *RedeemCodeUpsert {
@@ -640,6 +668,27 @@ func (u *RedeemCodeUpsertOne) Update(set func(*RedeemCodeUpsert)) *RedeemCodeUps
 		set(&RedeemCodeUpsert{UpdateSet: update})
 	}))
 	return u
+}
+
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (u *RedeemCodeUpsertOne) SetSubscriptionSnapshot(v map[string]interface{}) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetSubscriptionSnapshot(v)
+	})
+}
+
+// UpdateSubscriptionSnapshot sets the "subscription_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateSubscriptionSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateSubscriptionSnapshot()
+	})
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (u *RedeemCodeUpsertOne) ClearSubscriptionSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearSubscriptionSnapshot()
+	})
 }
 
 // SetCode sets the "code" field.
@@ -966,7 +1015,7 @@ func (_c *RedeemCodeCreateBulk) ExecX(ctx context.Context) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.RedeemCodeUpsert) {
-//			SetCode(v+v).
+//			SetSubscriptionSnapshot(v+v).
 //		}).
 //		Exec(ctx)
 func (_c *RedeemCodeCreateBulk) OnConflict(opts ...sql.ConflictOption) *RedeemCodeUpsertBulk {
@@ -1040,6 +1089,27 @@ func (u *RedeemCodeUpsertBulk) Update(set func(*RedeemCodeUpsert)) *RedeemCodeUp
 		set(&RedeemCodeUpsert{UpdateSet: update})
 	}))
 	return u
+}
+
+// SetSubscriptionSnapshot sets the "subscription_snapshot" field.
+func (u *RedeemCodeUpsertBulk) SetSubscriptionSnapshot(v map[string]interface{}) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetSubscriptionSnapshot(v)
+	})
+}
+
+// UpdateSubscriptionSnapshot sets the "subscription_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateSubscriptionSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateSubscriptionSnapshot()
+	})
+}
+
+// ClearSubscriptionSnapshot clears the value of the "subscription_snapshot" field.
+func (u *RedeemCodeUpsertBulk) ClearSubscriptionSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearSubscriptionSnapshot()
+	})
 }
 
 // SetCode sets the "code" field.

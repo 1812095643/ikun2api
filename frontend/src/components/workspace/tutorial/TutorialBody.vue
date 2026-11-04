@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
@@ -12,7 +13,7 @@ const { copyToClipboard } = useClipboard()
 const safeHtml = computed(() => tutorialHtml(
   props.html,
   tutorialApiBase(appStore.apiBaseUrl, window.location.origin),
-  appStore.siteName || 'IKUN2api'
+  appStore.siteName || DEFAULT_SITE_NAME
 ))
 
 function activateCodeTab(tab: HTMLButtonElement) {

@@ -1420,6 +1420,10 @@
           />
         </div>
       </div>
+      <section v-if="targetSelectedPlatforms.length === 1 && targetSelectedPlatforms[0] === 'anthropic'" class="space-y-3">
+        <label class="flex items-center gap-2 text-sm"><input v-model="applyClaudeAllowlist" type="checkbox" />批量修改 Claude 模型白名单</label>
+        <ClaudeModelAllowlistField v-if="applyClaudeAllowlist" v-model="claudeModelAllowlist" />
+      </section>
     </form>
 
     <template #footer>
@@ -1493,6 +1497,7 @@ import Select from '@/components/common/Select.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
+import ClaudeModelAllowlistField, { type AccountModelAllowlist } from '@/components/account/ClaudeModelAllowlistField.vue'
 import Icon from '@/components/icons/Icon.vue'
 import {
   buildModelMappingObject as buildModelMappingPayload,
@@ -1680,6 +1685,8 @@ const pendingUpdatesForConfirm = ref<Record<string, unknown> | null>(null)
 const baseUrl = ref('')
 const modelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
 const allowedModels = ref<string[]>([])
+const claudeModelAllowlist = ref<AccountModelAllowlist>({ enabled: false, models: [] })
+const applyClaudeAllowlist = ref(false)
 const modelMappings = ref<ModelMapping[]>([])
 const selectedErrorCodes = ref<number[]>([])
 const customErrorCodeInput = ref<number | null>(null)
@@ -2015,6 +2022,7 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
         : openAIResponsesMode.value
   }
 
+  if (applyClaudeAllowlist.value) { ensureExtra().model_allowlist = { ...claudeModelAllowlist.value, models: [...claudeModelAllowlist.value.models] } }
   if (enableModelRestriction.value && !isOpenAIModelRestrictionDisabled.value) {
     // 统一使用 model_mapping 字段
     if (modelRestrictionMode.value === 'whitelist') {
@@ -2388,6 +2396,8 @@ watch(
       openAILongContextBillingEnabled.value = false
       openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
       openAIResponsesMode.value = 'auto'
+      applyClaudeAllowlist.value = false
+      claudeModelAllowlist.value = { enabled: false, models: [] }
       modelRestrictionMode.value = 'whitelist'
       allowedModels.value = []
       modelMappings.value = []

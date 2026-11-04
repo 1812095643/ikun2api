@@ -57,11 +57,12 @@
               </span>
             </div>
 
+            <p v-if="subscription.universal_total_credit_usd != null" class="mb-2 text-xs text-gray-600 dark:text-gray-300">剩余 ${{ (subscription.universal_remaining_usd || 0).toFixed(2) }} / ${{ subscription.universal_total_credit_usd.toFixed(2) }}</p>
             <!-- Progress bars or Unlimited badge -->
             <div class="space-y-1.5">
               <!-- Unlimited subscription badge -->
               <div
-                v-if="isUnlimited(subscription)"
+                v-if="isUnlimited(subscription) && subscription.universal_total_credit_usd == null"
                 class="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 px-2.5 py-1.5 dark:from-emerald-900/20 dark:to-teal-900/20"
               >
                 <span class="text-lg text-emerald-600 dark:text-emerald-400">∞</span>

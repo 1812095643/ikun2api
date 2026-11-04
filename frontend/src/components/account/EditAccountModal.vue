@@ -3383,6 +3383,7 @@
         data-tour="account-form-groups"
       />
 
+      <ClaudeModelAllowlistField v-if="account?.platform === 'anthropic' && (account?.type === 'oauth' || account?.type === 'setup-token')" v-model="claudeModelAllowlist" :account-id="account?.id" />
     </form>
 
     <template #footer>
@@ -3480,6 +3481,7 @@ import ProxySelector from '@/components/common/ProxySelector.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
+import ClaudeModelAllowlistField, { type AccountModelAllowlist } from '@/components/account/ClaudeModelAllowlistField.vue'
 import GrokModelDiagnosticsPanel from '@/components/account/GrokModelDiagnosticsPanel.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
@@ -3901,6 +3903,7 @@ const modelMappings = ref<ModelMapping[]>([])
 const openAICompactModelMappings = ref<ModelMapping[]>([])
 const modelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
 const allowedModels = ref<string[]>([])
+const claudeModelAllowlist = ref<AccountModelAllowlist>({ enabled: false, models: [] })
 const DEFAULT_POOL_MODE_RETRY_COUNT = 3
 const MAX_POOL_MODE_RETRY_COUNT = 10
 const DEFAULT_POOL_MODE_RETRY_STATUS_CODES = [401, 403, 429]
@@ -4729,6 +4732,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	const extra = newAccount.extra as Record<string, unknown> | undefined
 	mixedScheduling.value = extra?.mixed_scheduling === true
 	allowOverages.value = extra?.allow_overages === true
+  const savedAllowlist = extra?.model_allowlist as AccountModelAllowlist | undefined
+  claudeModelAllowlist.value = { enabled: savedAllowlist?.enabled === true, models: [...(savedAllowlist?.models || [])] }
 	upstreamRequestIdHeader.value = readUpstreamRequestIdHeader(extra)
 	openAIImagesUrlToB64JsonEnabled.value = extra?.images_url_to_b64_json === true
 	autoPause5hThreshold.value = typeof extra?.auto_pause_5h_threshold === 'number' ? extra.auto_pause_5h_threshold * 100 : null
@@ -5711,6 +5716,9 @@ const persistGrokMediaEligibility = async (accountID: number, updatedAccount: Ac
 const submitUpdateAccount = async (accountID: number, updatePayload: Record<string, unknown>) => {
   submitting.value = true
   try {
+    if (props.account?.platform === 'anthropic' && (props.account?.type === 'oauth' || props.account?.type === 'setup-token')) {
+      updatePayload.extra = { ...((updatePayload.extra as Record<string, unknown>) || props.account.extra || {}), model_allowlist: { ...claudeModelAllowlist.value, models: [...claudeModelAllowlist.value.models] } }
+    }
     let updatedAccount = await adminAPI.accounts.update(accountID, withAntigravityConfirmFlag(updatePayload))
     updatedAccount = await persistGrokMediaEligibility(accountID, updatedAccount)
     appStore.showSuccess(t('admin.accounts.accountUpdated'))
