@@ -29,6 +29,14 @@ vi.mock('@/stores/app', () => ({
   useAppStore: () => appStore,
 }))
 
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => authStore,
+}))
+
+vi.mock('@/stores/adminSettings', () => ({
+  useAdminSettingsStore: () => ({ menuLabels: {} }),
+}))
+
 vi.mock('vue-i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-i18n')>()
   return {
