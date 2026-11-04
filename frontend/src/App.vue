@@ -29,6 +29,7 @@ function updateDocumentTitle() {
   ]
   document.title = resolveRouteDocumentTitle(route, appStore.siteName, customMenuItems, {
     billingMode: resolveSiteBillingMode(appStore.cachedPublicSettings),
+    menuLabels: { ...appStore.cachedPublicSettings?.menu_labels, ...(authStore.isAdmin ? adminSettingsStore.menuLabels : {}) },
   })
 }
 
@@ -54,6 +55,8 @@ watch(
     () => appStore.cachedPublicSettings?.payment_balance_disabled,
     () => authStore.isAdmin,
     () => adminSettingsStore.customMenuItems,
+    () => adminSettingsStore.menuLabels,
+    () => appStore.cachedPublicSettings?.menu_labels,
   ],
   updateDocumentTitle,
   { deep: true }

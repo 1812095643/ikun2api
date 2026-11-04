@@ -368,6 +368,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	}
 	updates[SettingKeyTablePageSizeOptions] = string(tablePageSizeOptionsJSON)
 	updates[SettingKeyCustomMenuItems] = settings.CustomMenuItems
+	updates[SettingKeyMenuLabels] = settings.MenuLabels
 	updates[SettingKeyMenuVisibility] = settings.MenuVisibility
 	updates[SettingKeyCustomEndpoints] = settings.CustomEndpoints
 

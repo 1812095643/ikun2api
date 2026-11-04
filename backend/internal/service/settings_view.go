@@ -164,6 +164,7 @@ type SystemSettings struct {
 	TableDefaultPageSize        int
 	TablePageSizeOptions        []int
 	CustomMenuItems             string // JSON array of custom menu items
+	MenuLabels                  string
 	MenuVisibility              string
 	CustomEndpoints             string // JSON array of custom endpoints
 
@@ -377,6 +378,7 @@ type PublicSettings struct {
 	TableDefaultPageSize        int
 	TablePageSizeOptions        []int
 	CustomMenuItems             string // JSON array of custom menu items
+	MenuLabels                  string
 	MenuVisibility              string
 	CustomEndpoints             string // JSON array of custom endpoints
 

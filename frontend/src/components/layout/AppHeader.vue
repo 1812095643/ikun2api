@@ -218,6 +218,7 @@
 
 <script setup lang="ts">
 import { useMenuVisibility } from '@/composables/useMenuVisibility'
+import { useMenuLabels } from '@/composables/useMenuLabels'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -288,7 +289,10 @@ const routeMetaKeys = computed(() => resolveRouteMetaKeys(route, {
   billingMode: resolveSiteBillingMode(appStore.cachedPublicSettings),
 }))
 
+const { menuLabel } = useMenuLabels()
 const pageTitle = computed(() => {
+  const override = menuLabel(route.path, '')
+  if (override) return override
   // For custom pages, use the menu item's label instead of generic "自定义页面"
   if (route.name === 'CustomPage') {
     const id = route.params.id as string

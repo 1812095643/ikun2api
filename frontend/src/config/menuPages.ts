@@ -26,6 +26,7 @@ export const menuPageGroups = [
     ['/admin/channels', '渠道管理', 'Channels'], ['/admin/channels/pricing', '渠道定价', 'Channel pricing'],
     ['/admin/channels/monitor', '渠道监控', 'Channel monitor'],
     ['/admin/subscriptions', '订阅管理', 'Subscriptions'], ['/admin/accounts', '账号管理', 'Accounts'],
+    ['/admin/account-vault', '账号资料库', 'Account vault'], ['/admin/account-warmup', '自动热身', 'Account warmup'],
     ['/admin/upstream-balances', '上游余额', 'Upstream balances'], ['/admin/relogin', '失效重登', 'Relogin'],
     ['/admin/tickets', '工单管理', 'Tickets'], ['/admin/lottery', '抽奖管理', 'Lottery'],
     ['/admin/checkin', '签到管理', 'Check-in'], ['/admin/plugins', '插件管理', 'Plugins'],
@@ -53,4 +54,14 @@ export function filterVisibleMenus<T extends { path: string; children?: T[] }>(i
     const children = filterVisibleMenus(item.children, visibility)
     return children.length ? [{ ...item, children }] : []
   })
+}
+
+export type MenuLabels = Record<string, string>
+export function resolveMenuLabel(path: string, fallback: string, labels: MenuLabels = {}): string {
+ const key = path.split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/'
+ return labels[key]?.trim() || fallback
+}
+export function applyMenuLabels<T extends { path: string; label: string; children?: T[] }>(items: T[], labels: MenuLabels): T[] {
+ return items.map(item => ({ ...item, label: resolveMenuLabel(item.path, item.label, labels),
+  ...(item.children ? { children: applyMenuLabels(item.children, labels) } : {}) }))
 }

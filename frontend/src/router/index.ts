@@ -525,6 +525,8 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'admin.accounts.description'
     }
   },
+  { path: '/admin/account-vault', name: 'AdminAccountVault', component: () => import('@/views/admin/AccountVaultView.vue'), meta: { requiresAuth: true, requiresAdmin: true, title: '账号资料库' } },
+  { path: '/admin/account-warmup', name: 'AdminAccountWarmup', component: () => import('@/views/admin/AccountWarmupView.vue'), meta: { requiresAuth: true, requiresAdmin: true, title: '自动热身' } },
   {
     path: '/admin/upstream-balances',
     name: 'AdminUpstreamBalances',
@@ -815,7 +817,7 @@ router.beforeEach(async (to, _from, next) => {
     ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
     ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
   ]
-  document.title = resolveRouteDocumentTitle(to, appStore.siteName, customMenuItems)
+  document.title = resolveRouteDocumentTitle(to, appStore.siteName, customMenuItems, { menuLabels: { ...appStore.cachedPublicSettings?.menu_labels, ...(authStore.isAdmin ? adminSettingsStore.menuLabels : {}) } })
 
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true

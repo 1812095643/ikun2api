@@ -41,3 +41,19 @@ func TestCustomPageURLSupportsLocalDeployments(t *testing.T) {
 		require.Error(t, validateCustomPageURL(value), value)
 	}
 }
+
+func TestMenuLabelsPartialUpdateAndValidation(t *testing.T) {
+	h, repo := newStepUpSwitchTestHandler(t, map[string]string{service.SettingKeyMenuLabels: "{\"/news\":\"资讯\"}", service.SettingKeySiteName: "Keep"})
+	r := doUpdateSettings(t, h, map[string]any{"site_name": "Updated"}, nil)
+	require.Equal(t, http.StatusOK, r.Code)
+	require.Equal(t, "资讯", service.ParseMenuLabels(repo.values[service.SettingKeyMenuLabels])["/news"])
+	r = doUpdateSettings(t, h, map[string]any{"menu_labels": map[string]string{"/admin/accounts": "账号池", "/news": "网站资讯"}}, nil)
+	require.Equal(t, http.StatusOK, r.Code)
+	require.Equal(t, "账号池", service.ParseMenuLabels(repo.values[service.SettingKeyMenuLabels])["/admin/accounts"])
+	for _, bad := range []map[string]string{{"https://evil.example": "x"}, {"/news": "bad\nname"}} {
+		r = doUpdateSettings(t, h, map[string]any{"site_name": "Unexpected", "menu_labels": bad}, nil)
+		require.Equal(t, http.StatusBadRequest, r.Code)
+		require.Equal(t, "Updated", repo.values[service.SettingKeySiteName])
+	}
+	require.Equal(t, map[string]string{"/news": "网站资讯"}, service.PublicMenuLabels(service.ParseMenuLabels(repo.values[service.SettingKeyMenuLabels])))
+}

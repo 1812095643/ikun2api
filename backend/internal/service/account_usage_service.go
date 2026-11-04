@@ -254,7 +254,11 @@ type ClaudeUsageWindow struct {
 
 // ClaudeUsageResponse Anthropic API返回的usage结构
 type ClaudeUsageResponse struct {
-	FiveHour struct {
+	warmupFiveObserved   bool
+	warmupWeekObserved   bool
+	warmupSonnetObserved bool
+	warmupFableObserved  bool
+	FiveHour             struct {
 		Utilization float64 `json:"utilization"`
 		ResetsAt    string  `json:"resets_at"`
 	} `json:"five_hour"`

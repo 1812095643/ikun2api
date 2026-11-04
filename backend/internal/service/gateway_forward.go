@@ -420,6 +420,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	var telemetryWireBody []byte
 	telemetryStatus, telemetryAttempts := 0, 0
 	sendUpstream := func(sendCtx context.Context, req *http.Request, sentBody []byte) (*http.Response, error) {
+		if parsed.warmupBeforeSend != nil {
+			if err := parsed.warmupBeforeSend(); err != nil {
+				return nil, fmt.Errorf("%w: %w", errWarmupSendStopped, err)
+			}
+		}
 		telemetryRequest = req
 		telemetryWireBody = sentBody
 		telemetryAttempts++
@@ -436,7 +441,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 	}()
 	retryStart := time.Now()
-	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
+	attemptLimit := maxRetryAttempts
+	if parsed.warmupBeforeSend != nil {
+		attemptLimit = 1
+	}
+	for attempt := 1; attempt <= attemptLimit; attempt++ {
 		// 构建上游请求（每次重试需要重新构建，因为请求体需要重新读取）
 		upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, reqStream)
 		upstreamReq, wireBody, err := s.buildUpstreamRequest(upstreamCtx, c, account, body, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
@@ -453,13 +462,16 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			if resp != nil && resp.Body != nil {
 				_ = resp.Body.Close()
 			}
+			if errors.Is(err, errWarmupSendStopped) {
+				return nil, err
+			}
 			return nil, s.handleUpstreamTransportError(ctx, c, account, err, OpsUpstreamErrorEvent{
 				UpstreamURL: safeUpstreamURL(upstreamReq.URL.String()),
 			})
 		}
 
 		// 优先检测thinking block签名错误（400）并重试一次
-		if resp.StatusCode == 400 {
+		if resp.StatusCode == 400 && parsed.warmupBeforeSend == nil {
 			respBody, readErr := s.readUpstreamErrorBody(resp)
 			if readErr == nil {
 				_ = resp.Body.Close()
@@ -689,7 +701,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 
 		// 检查是否需要通用重试（排除400，因为400已经在上面特殊处理过了）
 		if resp.StatusCode >= 400 && resp.StatusCode != 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
-			if attempt < maxRetryAttempts {
+			if attempt < attemptLimit {
 				elapsed := time.Since(retryStart)
 				if elapsed >= maxRetryElapsed {
 					break

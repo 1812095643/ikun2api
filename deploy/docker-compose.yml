@@ -112,6 +112,7 @@ services:
       # with 2FA).
       # Generate a secure key: openssl rand -hex 32
       - TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY:-}
+      - ACCOUNT_VAULT_KEY_FILE=${ACCOUNT_VAULT_KEY_FILE:-/app/data/account-vault.key}
 
       # =======================================================================
       # Timezone Configuration

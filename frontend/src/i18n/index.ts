@@ -83,7 +83,7 @@ export async function setLocale(locale: string): Promise<void> {
     ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
     ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
   ]
-  document.title = resolveRouteDocumentTitle(route, appStore.siteName, customMenuItems)
+  document.title = resolveRouteDocumentTitle(route, appStore.siteName, customMenuItems, { menuLabels: { ...appStore.cachedPublicSettings?.menu_labels, ...(authStore.isAdmin ? adminSettingsStore.menuLabels : {}) } })
 }
 
 export function getLocale(): LocaleCode {

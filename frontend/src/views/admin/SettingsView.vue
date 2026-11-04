@@ -6869,7 +6869,7 @@
         <!-- /Tab: General -->
 
 	        <div v-show="activeTab === 'menus'" class="space-y-6">
-          <MenuManagementSettings :visibility="form.menu_visibility ?? {}" @update:visibility="form.menu_visibility = $event" v-model:custom-items="form.custom_menu_items" />
+          <MenuManagementSettings v-model:labels="form.menu_labels" :visibility="form.menu_visibility ?? {}" @update:visibility="form.menu_visibility = $event" v-model:custom-items="form.custom_menu_items" />
         </div>
 
         <!-- Tab: Login Agreement -->
@@ -9704,6 +9704,7 @@ const form = reactive<SettingsForm>({
   payment_alipay_mobile_precreate_deep_link: false,
   table_default_page_size: tablePageSizeDefault,
   table_page_size_options: [10, 20, 50, 100],
+  menu_labels: {} as Record<string, string>,
   menu_visibility: {} as Record<string, boolean>,
   custom_menu_items: [] as Array<{
     id: string;
@@ -11479,6 +11480,7 @@ async function saveSettings() {
       table_default_page_size: form.table_default_page_size,
       table_page_size_options: form.table_page_size_options,
       custom_menu_items: form.custom_menu_items,
+      menu_labels: form.menu_labels,
       menu_visibility: form.menu_visibility,
       custom_endpoints: form.custom_endpoints,
       frontend_url: form.frontend_url,
@@ -11889,6 +11891,7 @@ async function saveSettings() {
     // Save web search emulation config separately (errors handled internally)
     const wsOk = await saveWebSearchConfig();
     // Refresh cached settings so sidebar/header update immediately
+    await adminSettingsStore.fetch(true);
     await appStore.fetchPublicSettings(true);
     await adminSettingsStore.fetch(true);
     if (wsOk) {

@@ -173,6 +173,7 @@ func (h *Handler) runAutomaticRelogin(c *gin.Context) {
 
 func (h *Handler) startBackground() {
 	h.startOnce.Do(func() {
+		h.startWarmupWorker()
 		h.startUpstreamBalanceWorker()
 		h.startUpstreamModelWorker()
 		h.startLotteryWorker()

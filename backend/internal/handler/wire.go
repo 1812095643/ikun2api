@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"github.com/MACOS-DO/sub4api/internal/config"
 	"github.com/MACOS-DO/sub4api/internal/handler/admin"
 	"github.com/MACOS-DO/sub4api/internal/securityaudit"
@@ -252,7 +253,7 @@ func ProvideHandlers(
 
 // ProviderSet is the Wire provider set for all handlers
 var ProviderSet = wire.NewSet(
-	workspace.NewHandler,
+	ProvideWorkspaceHandler,
 	// Top-level handlers
 	NewAuthHandler,
 	NewUserHandler,
@@ -317,3 +318,12 @@ var ProviderSet = wire.NewSet(
 	ProvideAdminHandlers,
 	ProvideHandlers,
 )
+
+func ProvideWorkspaceHandler(db *sql.DB, admin service.AdminService, oauth *service.OpenAIOAuthService,
+	encryptor service.SecretEncryptor, email *service.EmailService, settings *service.SettingService,
+	quota *service.OpenAIQuotaService, invalidator service.TokenCacheInvalidator, cfg *config.Config,
+	gateway *service.GatewayService, usage *service.AccountUsageService, totp *service.TotpService, users *service.UserService) *workspace.Handler {
+	h := workspace.NewHandler(db, admin, oauth, encryptor, email, settings, quota, invalidator, cfg)
+	h.ConfigureAccountTools(gateway, usage, totp, users)
+	return h
+}

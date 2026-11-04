@@ -1,3 +1,6 @@
+# Account-vault local key material
+account-vault.key
+
 # 本地杂项文档、测试数据和外部项目副本
 /docs-local/
 .codex
@@ -138,6 +141,7 @@ vite.config.js
 frontend/config/*.js
 frontend/config/*.d.ts
 docs/*
+!docs/ADMIN_ACCOUNT_TOOLS.md
 !docs/admin-api-keys.md
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md

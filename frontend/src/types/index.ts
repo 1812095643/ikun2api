@@ -247,6 +247,7 @@ export interface PublicSettings {
   table_default_page_size: number
   table_page_size_options: number[]
   custom_menu_items: CustomMenuItem[]
+  menu_labels?: Record<string, string>
   menu_visibility?: Record<string, boolean>
   custom_endpoints: CustomEndpoint[]
   linuxdo_oauth_enabled: boolean

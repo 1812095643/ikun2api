@@ -168,6 +168,7 @@ type UpdateSettingsRequest struct {
 	TableDefaultPageSize        int                   `json:"table_default_page_size"`
 	TablePageSizeOptions        []int                 `json:"table_page_size_options"`
 	CustomMenuItems             *[]dto.CustomMenuItem `json:"custom_menu_items"`
+	MenuLabels                  *map[string]string    `json:"menu_labels"`
 	MenuVisibility              *map[string]bool      `json:"menu_visibility"`
 	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
@@ -513,6 +514,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	auditReq := settingsAuditRequest(req)
 	omitted := omittedSettingKeys(sentFields)
+	if req.MenuLabels == nil {
+		omitted[service.SettingKeyMenuLabels] = struct{}{}
+	}
 	if req.MenuVisibility == nil {
 		omitted[service.SettingKeyMenuVisibility] = struct{}{}
 	}
@@ -1301,6 +1305,19 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		maxMenuItemIDLen      = 32
 	)
 
+	menuLabelsJSON := previousSettings.MenuLabels
+	if req.MenuLabels != nil {
+		if err := service.ValidateMenuLabels(*req.MenuLabels); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		raw, err := json.Marshal(*req.MenuLabels)
+		if err != nil {
+			response.BadRequest(c, "Invalid menu labels")
+			return
+		}
+		menuLabelsJSON = string(raw)
+	}
 	menuVisibilityJSON := previousSettings.MenuVisibility
 	if req.MenuVisibility != nil {
 		if err := service.ValidateMenuVisibility(*req.MenuVisibility); err != nil {
@@ -1699,6 +1716,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                   req.TableDefaultPageSize,
 		TablePageSizeOptions:                   req.TablePageSizeOptions,
 		CustomMenuItems:                        customMenuJSON,
+		MenuLabels:                             menuLabelsJSON,
 		MenuVisibility:                         menuVisibilityJSON,
 		CustomEndpoints:                        customEndpointsJSON,
 		DefaultConcurrency:                     req.DefaultConcurrency,
@@ -2391,6 +2409,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                                   updatedSettings.TableDefaultPageSize,
 		TablePageSizeOptions:                                   updatedSettings.TablePageSizeOptions,
 		CustomMenuItems:                                        dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
+		MenuLabels:                                             service.ParseMenuLabels(updatedSettings.MenuLabels),
 		MenuVisibility:                                         service.ParseMenuVisibility(updatedSettings.MenuVisibility),
 		CustomEndpoints:                                        dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		DefaultConcurrency:                                     updatedSettings.DefaultConcurrency,

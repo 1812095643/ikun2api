@@ -22,25 +22,33 @@ import (
 
 // Handler 将工作台能力注册到现有应用，复用认证、数据库和邮件服务。
 type Handler struct {
-	db           *sql.DB
-	admin        service.AdminService
-	oauth        *service.OpenAIOAuthService
-	encryptor    service.SecretEncryptor
-	email        *service.EmailService
-	settings     *service.SettingService
-	quota        *service.OpenAIQuotaService
-	invalidator  service.TokenCacheInvalidator
-	client       *http.Client
-	feedMu       sync.Mutex
-	feedCache    map[string]cachedFeed
-	feedRequests singleflight.Group
-	runMu        sync.Mutex
-	activeRuns   map[string]bool
-	cfg          *config.Config
-	startOnce    sync.Once
-	background   context.Context
-	stop         context.CancelFunc
-	balanceWake  chan struct{}
+	vaultMu       sync.Mutex
+	vault         *vaultCipher
+	vaultTOTP     *service.TotpService
+	vaultUsers    *service.UserService
+	warmupGateway warmupExecutor
+	warmupUsage   *service.AccountUsageService
+	warmupMu      sync.Mutex
+	warmupCancel  context.CancelFunc
+	db            *sql.DB
+	admin         service.AdminService
+	oauth         *service.OpenAIOAuthService
+	encryptor     service.SecretEncryptor
+	email         *service.EmailService
+	settings      *service.SettingService
+	quota         *service.OpenAIQuotaService
+	invalidator   service.TokenCacheInvalidator
+	client        *http.Client
+	feedMu        sync.Mutex
+	feedCache     map[string]cachedFeed
+	feedRequests  singleflight.Group
+	runMu         sync.Mutex
+	activeRuns    map[string]bool
+	cfg           *config.Config
+	startOnce     sync.Once
+	background    context.Context
+	stop          context.CancelFunc
+	balanceWake   chan struct{}
 }
 
 func NewHandler(db *sql.DB, admin service.AdminService, oauth *service.OpenAIOAuthService, encryptor service.SecretEncryptor, email *service.EmailService, settings *service.SettingService, quota *service.OpenAIQuotaService, invalidator service.TokenCacheInvalidator, cfg *config.Config) *Handler {
@@ -185,6 +193,7 @@ func (h *Handler) Register(v1 *gin.RouterGroup, jwt, admin, audit, backendGuard,
 	user.GET("/blindbox/entries", h.listBlindboxEntries)
 	user.POST("/blindbox/entries/:id/open", h.openBlindbox)
 	manage := v1.Group("/admin/workspace", admin, limit, audit, middleware.AdminComplianceGuard(h.settings), func(c *gin.Context) { c.Set("workspace_admin", true); c.Next() })
+	h.registerAccountTools(manage)
 	manage.GET("/navigation", h.navigation)
 	manage.GET("/upstream-balances", h.listUpstreamBalances)
 	manage.PUT("/upstream-balances/:id", h.saveUpstreamBalance)

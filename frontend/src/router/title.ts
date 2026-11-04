@@ -1,3 +1,4 @@
+import { resolveMenuLabel } from '@/config/menuPages'
 import { i18n } from '@/i18n'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { CustomMenuItem } from '@/types'
@@ -30,6 +31,7 @@ export interface RouteTitleOptions {
    * 仅充值 → 「充值」，仅订阅 → 「订阅」，缺省/两者都有 → 「充值/订阅」。
    */
   billingMode?: SiteBillingMode
+  menuLabels?: Record<string, string>
 }
 
 export interface RouteMetaKeys {
@@ -63,11 +65,13 @@ export function resolveRouteMetaKeys(
 }
 
 export function resolveRouteDocumentTitle(
-  route: Pick<RouteLocationNormalizedLoaded, 'name' | 'params' | 'meta'>,
+  route: Pick<RouteLocationNormalizedLoaded, 'name' | 'params' | 'meta'> & { path?: string },
   siteName: string | undefined,
   customMenuItems: CustomMenuItem[] = [],
   options: RouteTitleOptions = {},
 ): string {
+  const override = resolveMenuLabel(route.path || '', '', options.menuLabels)
+  if (override) return resolveDocumentTitle(override, siteName)
   const id = typeof route.params.id === 'string' ? route.params.id : ''
   const menuItem = route.name === 'CustomPage' && id
     ? customMenuItems.find((item) => item.id === id)

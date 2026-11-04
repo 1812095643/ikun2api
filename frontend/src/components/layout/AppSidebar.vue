@@ -208,6 +208,8 @@
 import { nativeMenuIDs, imageStudioUrl } from '@/router/workspace'
 import { filterVisibleMenus } from '@/config/menuPages'
 import { useMenuVisibility } from '@/composables/useMenuVisibility'
+import { useMenuLabels } from '@/composables/useMenuLabels'
+import { applyMenuLabels, resolveMenuLabel } from '@/config/menuPages'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -266,6 +268,7 @@ const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const { visibility: menuVisibility, menuVisible } = useMenuVisibility()
+const { labels: menuLabels } = useMenuLabels()
 const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
@@ -773,7 +776,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/model-square', label: '模型广场', icon: FolderIcon },
-    { path: imageStudioUrl, label: '生图工作室', icon: BatchImageIcon, external: true },
+    { path: imageStudioUrl, label: resolveMenuLabel('/image-studio', '生图工作室', menuLabels.value), icon: BatchImageIcon, external: true },
     { path: '/news', label: '时事新闻', icon: BellIcon },
     { path: '/reset-monitor', label: 'FUCK TIBO', icon: SignalIcon },
     { path: '/tickets', label: '我的工单', icon: TicketIcon },
@@ -800,7 +803,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
 
 // finalizeNav 合并三重过滤：featureFlag 过滤 + simple 模式过滤。
 function finalizeNav(items: NavItem[]): NavItem[] {
-  const visible = filterVisibleMenus(applyFeatureFlags(items), menuVisibility.value)
+  const visible = filterVisibleMenus(applyMenuLabels(applyFeatureFlags(items), menuLabels.value), menuVisibility.value)
   return authStore.isSimpleMode ? visible.filter(item => !item.hideInSimpleMode) : visible
 }
 
@@ -847,6 +850,8 @@ const adminNavItems = computed((): NavItem[] => {
     // 「仅充值」站点连管理端的「订阅管理」入口也一并收起（路由本身不拦截）。
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, featureFlag: flagSubscription },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
+    { path: '/admin/account-vault', label: '账号资料库', icon: KeyIcon },
+    { path: '/admin/account-warmup', label: '自动热身', icon: SignalIcon },
     { path: '/admin/upstream-balances', label: '上游余额', icon: CreditCardIcon },
     { path: '/admin/relogin', label: '失效重登', icon: KeyIcon },
     { path: '/admin/tickets', label: '工单管理', icon: TicketIcon },
@@ -910,14 +915,14 @@ const adminNavItems = computed((): NavItem[] => {
     for (const cm of customMenuItemsForAdmin.value) {
       filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
     }
-    return filterVisibleMenus(filtered, menuVisibility.value)
+    return applyMenuLabels(filterVisibleMenus(filtered, menuVisibility.value), menuLabels.value)
   }
 
   visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
   for (const cm of customMenuItemsForAdmin.value) {
     visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
   }
-  return filterVisibleMenus(visible, menuVisibility.value)
+  return applyMenuLabels(filterVisibleMenus(visible, menuVisibility.value), menuLabels.value)
 })
 
 function toggleSidebar() {

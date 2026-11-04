@@ -503,6 +503,7 @@ export interface SystemSettings {
   table_page_size_options: number[];
   backend_mode_enabled: boolean;
   custom_menu_items: CustomMenuItem[];
+  menu_labels?: Record<string, string>
   menu_visibility?: Record<string, boolean>;
   custom_endpoints: CustomEndpoint[];
   // SMTP settings
@@ -866,6 +867,7 @@ export interface UpdateSettingsRequest {
   table_page_size_options?: number[];
   backend_mode_enabled?: boolean;
   custom_menu_items?: CustomMenuItem[];
+  menu_labels?: Record<string, string>
   menu_visibility?: Record<string, boolean>;
   custom_endpoints?: CustomEndpoint[];
   smtp_host?: string;
