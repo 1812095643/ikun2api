@@ -99,7 +99,7 @@ jobs:
           bash -n deploy/migrate.sh deploy/docker-entrypoint.sh
       - name: CC Switch import regression
         working-directory: frontend
-        run: pnpm exec vitest run src/utils/__tests__/ccswitchImport.spec.ts src/utils/__tests__/ccswitchImport.antigravityUrl.spec.ts src/components/keys/__tests__/CcSwitchImportDialog.spec.ts src/api/__tests__/ccswitch.spec.ts
+        run: pnpm exec vitest run src/utils/__tests__/ccswitchImport.spec.ts src/utils/__tests__/ccswitchImport.antigravityUrl.spec.ts src/components/keys/__tests__/CcSwitchImportDialog.spec.ts src/components/keys/__tests__/UseKeyModal.spec.ts src/api/__tests__/ccswitch.spec.ts
       - uses: actions/upload-artifact@v4
         with:
           name: embedded-frontend
