@@ -5,7 +5,7 @@ import { accountVaultAPI } from '@/api/accountVault'
 import { isStepUpCancelled } from '@/composables/useStepUp'
 import { useAppStore } from '@/stores/app'
 const props=defineProps<{ protect:<T>(fn:()=>Promise<T>)=>Promise<T> }>()
-const enabled=ref(true),ready=ref(false),busy=ref(false),error=ref('')
+const enabled=ref(false),ready=ref(false),busy=ref(false),error=ref('')
 const app=useAppStore()
 async function load(){
   busy.value=true;error.value=''
@@ -25,7 +25,7 @@ onMounted(load)
 <template>
   <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-dark-300">
     <Toggle :model-value="enabled" :disabled="busy || !ready" aria-label="资料库两步验证保护" @update:model-value="change" />
-    <span title="仅控制资料库导入、查看凭据、编辑与删除的二次验证。关闭时需完成当前保护验证；资料仍加密且仅管理员可访问。">两步验证保护</span>
+    <span title="仅控制资料库导入、查看凭据、编辑与删除的二次验证。开启前需配置并验证两步验证；关闭时也需验证。资料仍加密且仅管理员可访问。">两步验证保护</span>
     <span v-if="busy" class="text-xs text-gray-400">处理中…</span>
     <button v-if="error" type="button" class="text-xs text-red-600 underline dark:text-red-400" @click="load">{{ error }} · 重试</button>
   </div>

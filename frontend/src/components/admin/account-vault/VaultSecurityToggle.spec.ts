@@ -14,10 +14,32 @@ describe('vault protection switch',()=>{
   expect(mocks.protect).toHaveBeenCalledTimes(1);expect(mocks.save).toHaveBeenCalledWith(false)
   expect(w.getComponent(Toggle).props('modelValue')).toBe(false);w.unmount()
  })
- it('does not silently disable protection when loading fails',async()=>{
+ it('keeps the switch unavailable when loading fails',async()=>{
   mocks.security.mockRejectedValue(new Error('offline'))
   const w=shallowMount(VaultSecurityToggle,{props:{protect:mocks.protect as any}});await flushPromises()
-  expect(w.getComponent(Toggle).props('modelValue')).toBe(true)
+  expect(w.getComponent(Toggle).props('modelValue')).toBe(false)
   expect(w.getComponent(Toggle).attributes('disabled')).toBeDefined();expect(mocks.save).not.toHaveBeenCalled();w.unmount()
+ })
+})
+
+describe('vault default protection',()=>{
+ it('starts off and disabled until the policy is loaded',async()=>{
+  let finish!: (policy:{two_factor_enabled:boolean})=>void
+  mocks.security.mockReturnValue(new Promise(resolve=>{finish=resolve}))
+  const w=shallowMount(VaultSecurityToggle,{props:{protect:mocks.protect as any}})
+  expect(w.getComponent(Toggle).props('modelValue')).toBe(false)
+  expect(w.getComponent(Toggle).attributes('disabled')).toBeDefined()
+  finish({two_factor_enabled:false});await flushPromises()
+  expect(w.getComponent(Toggle).props('modelValue')).toBe(false)
+  expect(mocks.save).not.toHaveBeenCalled();w.unmount()
+ })
+ it('stays off when enabling is rejected because TOTP is not configured',async()=>{
+  mocks.security.mockResolvedValue({two_factor_enabled:false})
+  mocks.save.mockRejectedValue({reason:'STEP_UP_TOTP_NOT_ENABLED'})
+  const w=shallowMount(VaultSecurityToggle,{props:{protect:mocks.protect as any}});await flushPromises()
+  w.getComponent(Toggle).vm.$emit('update:modelValue',true);await flushPromises()
+  expect(mocks.save).toHaveBeenCalledWith(true)
+  expect(w.getComponent(Toggle).props('modelValue')).toBe(false)
+  w.unmount()
  })
 })

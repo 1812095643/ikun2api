@@ -17,7 +17,7 @@ type vaultSecuritySettings struct {
 }
 
 func (h *Handler) vaultSecuritySettings(ctx context.Context) (vaultSecuritySettings, error) {
-	settings := vaultSecuritySettings{TwoFactorEnabled: true}
+	settings := vaultSecuritySettings{TwoFactorEnabled: false}
 	if h.db == nil {
 		return settings, errors.New("vault settings unavailable")
 	}
@@ -63,8 +63,8 @@ func (h *Handler) saveVaultSecurity(c *gin.Context) {
 		fail(c, badRequest("请选择是否开启两步验证保护。"))
 		return
 	}
-	// Serialize policy changes. Disabling existing protection still requires the
-	// existing verified admin session; re-enabling does not expose any secrets.
+	// Serialize policy changes. Verify both transitions: enabling must confirm
+	// usable TOTP first, and disabling existing protection still requires step-up.
 	tx, err := h.db.BeginTx(c.Request.Context(), nil)
 	if err != nil {
 		fail(c, err)
@@ -77,7 +77,7 @@ func (h *Handler) saveVaultSecurity(c *gin.Context) {
 	}
 	var raw []byte
 	err = tx.QueryRowContext(c.Request.Context(), "SELECT value FROM workspace_runtime WHERE key=$1", vaultSecurityKey).Scan(&raw)
-	current := vaultSecuritySettings{TwoFactorEnabled: true}
+	current := vaultSecuritySettings{TwoFactorEnabled: false}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		fail(c, err)
 		return
@@ -92,7 +92,7 @@ func (h *Handler) saveVaultSecurity(c *gin.Context) {
 		}
 		current.TwoFactorEnabled = *stored.Enabled
 	}
-	if current.TwoFactorEnabled && !*p.Enabled && !h.enforceVaultStepUp(c) {
+	if current.TwoFactorEnabled != *p.Enabled && !h.enforceVaultStepUp(c) {
 		return
 	}
 	who, err := h.identity(c)
