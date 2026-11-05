@@ -54,8 +54,8 @@ func TestClaudeTelemetryRequestSummaryUsesOnlyObservedCounts(t *testing.T) {
 			for _, name := range []string{"optedIn", "scriptCheck", "permissionMode", "innerExecutedCount", "codeChars", "git_remote", "rh", "cc_prompt_id"} {
 				require.False(t, gjson.GetBytes(data, name).Exists(), name)
 			}
-			require.Equal(t, "ikun2api_gateway", gjson.GetBytes(data, "source").String())
-			require.Equal(t, "ikun2api_gateway", gjson.GetBytes(body, "events.0.event_data.client_type").String())
+			require.False(t, gjson.GetBytes(data, "source").Exists())
+			require.Equal(t, "cli", gjson.GetBytes(body, "events.0.event_data.client_type").String())
 		})
 	}
 }

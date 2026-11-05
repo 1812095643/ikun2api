@@ -24,6 +24,10 @@ import (
 
 const claudeTelemetryEndpoint = "https://api.anthropic.com/api/event_logging/v2/batch"
 
+// Claude Code's regular CLI launch mode uses "cli"; print/SDK mode uses
+// "sdk-cli". Match our controlled CLI request profile, never an inbound field.
+const claudeTelemetryClientType = "cli"
+
 // These names follow Claude Code 2.1.317's OTel attributes. They are local
 // additions to our rebuilt event's additional_metadata, not newly required
 // fields of the first-party event_logging schema or a separate OTel export.
@@ -91,7 +95,6 @@ func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Accou
 		duration = 0
 	}
 	metadata := map[string]any{
-		"source":                     "ikun2api_gateway",
 		"model":                      model,
 		"durationMs":                 duration,
 		"durationMsIncludingRetries": duration,
@@ -151,7 +154,7 @@ func buildClaudeTelemetryBody(req *http.Request, wireBody []byte, account *Accou
 		"model":               metadata["model"],
 		"user_type":           "external",
 		"is_interactive":      false,
-		"client_type":         "ikun2api_gateway",
+		"client_type":         claudeTelemetryClientType,
 		"additional_metadata": base64.StdEncoding.EncodeToString(encodedMetadata),
 		"env":                 map[string]any{"platform": runtime.GOOS, "platform_raw": runtime.GOOS, "arch": arch, "is_claude_ai_auth": true, "deployment_environment": "production"},
 	}

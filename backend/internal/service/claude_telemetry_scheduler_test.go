@@ -128,8 +128,8 @@ func TestClaudeTelemetrySchedulerSendsObservedSummaryAndStops(t *testing.T) {
 				}
 				data := gjson.GetBytes(body, "events.0.event_data")
 				metadata, err := base64.StdEncoding.DecodeString(data.Get("additional_metadata").String())
-				if err != nil || data.Get("client_type").String() != "ikun2api_gateway" || gjson.GetBytes(metadata, "outputTokens").Int() != 7 || strings.Contains(string(body)+string(metadata), "never-upload") {
-					t.Fatal("定时发送必须保留真实用量与网关来源，并丢弃隐私正文")
+				if err != nil || data.Get("client_type").String() != "cli" || gjson.GetBytes(metadata, "source").Exists() || gjson.GetBytes(metadata, "outputTokens").Int() != 7 || strings.Contains(string(body)+string(metadata), "never-upload") || strings.Contains(string(body)+string(metadata), "ikun2api_gateway") {
+					t.Fatal("定时发送必须保留真实用量、使用 CLI 类型，并丢弃隐私正文和旧网关标记")
 				}
 			case <-time.After(claudeTelemetryInterval + 2*time.Second):
 				t.Fatal("没有客户端遥测触发时，定时任务未发送真实摘要")

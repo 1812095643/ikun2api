@@ -30,13 +30,21 @@ func assertClaudeTelemetryAttributes(t *testing.T, body []byte) {
 		if metadata["anthropic.plan"] != "pro" || metadata["anthropic.provider"] != "firstParty" || metadata["anthropic.custom_base_url"] != false || metadata["provider"] != "firstParty" {
 			t.Fatal("服务端属性、旧 provider 或布尔值类型不正确")
 		}
-		for _, key := range []string{"anthropic.seat_type", "program_use_case_id", "base_url", "user.email", "vcs.repository.url.full", "idp_groups"} {
+		for _, key := range []string{"anthropic.seat_type", "program_use_case_id", "base_url", "user.email", "vcs.repository.url.full", "idp_groups", "source"} {
 			if _, exists := metadata[key]; exists {
 				t.Fatalf("未选择的属性 %s 不应进入摘要", key)
 			}
 		}
-		if event.Get("event_data.client_type").String() != "ikun2api_gateway" || metadata["source"] != "ikun2api_gateway" {
-			t.Fatal("新增属性不能隐去服务端重建来源")
+		if event.Get("event_data.client_type").String() != "cli" {
+			t.Fatal("遥测客户端类型必须与受控的 CLI 出站配置一致")
+		}
+		if strings.Contains(string(body)+string(decoded), "ikun2api_gateway") {
+			t.Fatal("出站遥测不能包含旧网关标记")
+		}
+		if event.Get("event_data.device_id").String() != strings.Repeat("a", 64) ||
+			event.Get("event_data.session_id").String() != telemetryTestSession ||
+			event.Get("event_data.auth.account_uuid").String() != telemetryTestAccount {
+			t.Fatal("调整客户端类型不能改动实际出站的设备、会话和账号身份")
 		}
 		if strings.Contains(string(body)+string(decoded), "private-canary") {
 			t.Fatal("原始客户端资料进入了重建摘要")
@@ -51,6 +59,8 @@ func TestClaudeTelemetryAttributesCannotBeOverriddenByClient(t *testing.T) {
 			req.Header.Set("anthropic.provider", "https://private-canary.invalid")
 			req.Header.Set("anthropic.custom_base_url", "true")
 			req.Header.Set("x-claude-code-wiggly-dove", "private-canary")
+			req.Header.Set("client_type", "private-canary")
+			req.Header.Set("source", "private-canary")
 			wire := []byte(strings.Replace(string(telemetryTestWire()), `"messages":`, `"anthropic.plan":"enterprise","anthropic.provider":"gateway","anthropic.custom_base_url":true,"anthropic.seat_type":"premium","program_use_case_id":"private-canary","system":"private-canary","messages":`, 1))
 			account := &Account{Extra: map[string]any{"anthropic.plan": "enterprise", "anthropic.seat_type": "premium", "git_remote": "private-canary"}}
 			var result *ForwardResult
