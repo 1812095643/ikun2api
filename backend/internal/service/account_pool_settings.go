@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -159,18 +162,89 @@ func (s *AccountPoolService) poolUserVisibleGroupID(ctx context.Context) int64 {
 
 // poolDisplayConfiguration reads the four values together. A missing setting
 // uses its original default; a failed read must not expand the visible group.
-func (s *AccountPoolService) poolDisplayConfiguration(ctx context.Context) (PoolSyntheticPlan, int64, error) {
+const SettingKeyPoolUserVisibleGroupIDs = "pool_user_visible_group_ids"
+
+type PoolDisplaySettings struct {
+	Count    int     `json:"pool_user_synthetic_count"`
+	Banned   int     `json:"pool_user_synthetic_banned"`
+	Platform string  `json:"pool_user_synthetic_platform"`
+	GroupIDs []int64 `json:"pool_user_visible_group_ids"`
+}
+
+func (s *AccountPoolService) poolDisplayConfiguration(ctx context.Context) (PoolSyntheticPlan, []int64, error) {
 	if s.settingService == nil {
-		return PoolSyntheticPlan{}, DefaultPoolUserVisibleGroupID, nil
+		return PoolSyntheticPlan{}, []int64{}, nil
 	}
-	values, err := s.settingService.settingRepo.GetMultiple(ctx, []string{
-		SettingKeyPoolUserSyntheticCount, SettingKeyPoolUserSyntheticBanned,
-		SettingKeyPoolUserSyntheticPlatform, SettingKeyPoolUserVisibleGroupID,
-	})
+	values, err := s.settingService.settingRepo.GetMultiple(ctx, []string{SettingKeyPoolUserSyntheticCount, SettingKeyPoolUserSyntheticBanned, SettingKeyPoolUserSyntheticPlatform, SettingKeyPoolUserVisibleGroupID, SettingKeyPoolUserVisibleGroupIDs})
 	if err != nil {
-		return PoolSyntheticPlan{}, 0, poolDataUnavailable(err)
+		return PoolSyntheticPlan{}, nil, poolDataUnavailable(err)
+	}
+	groups := []int64{}
+	if raw, exists := values[SettingKeyPoolUserVisibleGroupIDs]; exists {
+		if strings.TrimSpace(raw) == "null" {
+			return PoolSyntheticPlan{}, nil, poolDataUnavailable(nil)
+		}
+		if err := json.Unmarshal([]byte(raw), &groups); err != nil {
+			return PoolSyntheticPlan{}, nil, poolDataUnavailable(err)
+		}
+		for _, id := range groups {
+			if id <= 0 {
+				return PoolSyntheticPlan{}, nil, poolDataUnavailable(nil)
+			}
+		}
+	} else if id := parsePoolUserVisibleGroupID(values[SettingKeyPoolUserVisibleGroupID]); id > 0 {
+		groups = append(groups, id)
 	}
 	count := parsePoolUserSyntheticCount(values[SettingKeyPoolUserSyntheticCount])
 	plan := PoolSyntheticPlan{Count: count, Banned: min(count, parsePoolUserSyntheticBanned(values[SettingKeyPoolUserSyntheticBanned])), Platform: parsePoolUserSyntheticPlatform(values[SettingKeyPoolUserSyntheticPlatform])}
-	return plan, parsePoolUserVisibleGroupID(values[SettingKeyPoolUserVisibleGroupID]), nil
+	return plan, groups, nil
+}
+func (s *AccountPoolService) UserPoolVisibleGroupIDs(ctx context.Context) ([]int64, error) {
+	_, groups, err := s.poolDisplayConfiguration(ctx)
+	return groups, err
+}
+func (s *AccountPoolService) GetPoolDisplaySettings(ctx context.Context) (*PoolDisplaySettings, error) {
+	plan, groups, err := s.poolDisplayConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &PoolDisplaySettings{Count: plan.Count, Banned: plan.Banned, Platform: plan.Platform, GroupIDs: append([]int64{}, groups...)}, nil
+}
+func (s *AccountPoolService) SavePoolDisplaySettings(ctx context.Context, settings PoolDisplaySettings) (*PoolDisplaySettings, error) {
+	if s.settingService == nil {
+		return nil, poolDataUnavailable(nil)
+	}
+	if len(settings.GroupIDs) > 100 {
+		return nil, infraerrors.BadRequest("INVALID_GROUPS", "分组数量过多")
+	}
+	groups := []int64{}
+	for _, id := range settings.GroupIDs {
+		if id <= 0 {
+			return nil, infraerrors.BadRequest("INVALID_GROUPS", "分组编号无效")
+		}
+		if slices.Contains(groups, id) {
+			continue
+		}
+		if _, err := s.adminService.GetGroup(ctx, id); err != nil {
+			return nil, err
+		}
+		groups = append(groups, id)
+	}
+	slices.Sort(groups)
+	raw, _ := json.Marshal(groups)
+	settings.Count = clampPoolSyntheticCount(settings.Count)
+	settings.Banned = min(settings.Count, clampPoolSyntheticCount(settings.Banned))
+	settings.Platform = parsePoolUserSyntheticPlatform(settings.Platform)
+	if err := s.settingService.settingRepo.SetMultiple(ctx, map[string]string{SettingKeyPoolUserSyntheticCount: strconv.Itoa(settings.Count), SettingKeyPoolUserSyntheticBanned: strconv.Itoa(settings.Banned), SettingKeyPoolUserSyntheticPlatform: settings.Platform, SettingKeyPoolUserVisibleGroupIDs: string(raw)}); err != nil {
+		return nil, poolDataUnavailable(err)
+	}
+	return s.GetPoolDisplaySettings(ctx)
+}
+func poolAccountMatchesGroups(acc *Account, groups []int64) bool {
+	for _, id := range groups {
+		if poolAccountGroupMatches(acc, id) {
+			return true
+		}
+	}
+	return false
 }

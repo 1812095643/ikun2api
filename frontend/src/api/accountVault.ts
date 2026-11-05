@@ -28,6 +28,8 @@ export function emptyVaultEntry(): VaultEntry {
 }
 const base = '/admin/workspace/account-vault'
 export const accountVaultAPI = {
+ security: async () => (await apiClient.get<{ two_factor_enabled: boolean }>(base + '/security')).data,
+ saveSecurity: async (two_factor_enabled: boolean) => (await apiClient.put<{ two_factor_enabled: boolean }>(base + '/security', { two_factor_enabled })).data,
  list: async (params: { page: number; page_size: number; query: string; platform: string; status: string }) => (await apiClient.get<{ items: VaultRecord[]; total: number }>(base, { params })).data,
  preview: async (raw: string) => (await apiClient.post<{ rows: VaultParseRow[] }>(base + '/preview', { raw })).data,
  import: async (batch_id: string, items: VaultEntry[]) => (await apiClient.post<Record<string, number>>(base + '/import', { batch_id, items })).data,

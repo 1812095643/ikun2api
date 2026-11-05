@@ -105,7 +105,7 @@ func validateVaultEntry(s *vaultEntry) error {
 func vaultField(key string) string {
 	k := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(strings.TrimSpace(strings.TrimPrefix(key, "\ufeff"))))
 	switch k {
-	case "邮箱账号", "主邮箱", "邮箱", "email", "emailaccount", "邮箱地址":
+	case "邮箱账号", "主邮箱", "邮箱", "email", "emailaccount", "邮箱地址", "登录邮箱", "账号", "emailaddress":
 		return "email"
 	case "邮箱密码", "密码", "password", "mailpassword":
 		return "password"
@@ -164,6 +164,77 @@ func putVaultField(s *vaultEntry, f, v string) {
 		s.Status = v
 	}
 }
+
+// Recognize only unambiguous column layouts. Password bytes are never trimmed,
+// and unknown layouts must use a header or the explicit column mapping UI.
+func vaultDelimitedEntry(values []string) (vaultEntry, string) {
+	e := vaultEntry{}
+	if len(values) == 0 {
+		return e, "没有识别到资料"
+	}
+	e.Email = strings.TrimSpace(values[0])
+	if _, err := vaultEmail(e.Email); err != nil {
+		return e, "第一列应为主邮箱，请使用表头或自定义列顺序"
+	}
+	if len(values) < 2 {
+		return e, "缺少邮箱密码列"
+	}
+	e.Password = values[1]
+	key := func(value string) bool {
+		if strings.HasPrefix(value, "sk-ant-sid") {
+			e.SessionKey = value
+			return true
+		}
+		if strings.HasPrefix(value, "sk-") {
+			e.APIKey = value
+			return true
+		}
+		return false
+	}
+	switch len(values) {
+	case 2:
+	case 3:
+		if !key(values[2]) {
+			return e, "第三列的 Key 类型不明确，请使用表头或自定义列顺序"
+		}
+	case 4:
+		if _, err := vaultEmail(strings.TrimSpace(values[2])); err != nil {
+			return e, "辅助邮箱列无法识别，请使用表头或自定义列顺序"
+		}
+		e.AuxiliaryEmail = strings.TrimSpace(values[2])
+		e.AuxiliaryPassword = values[3]
+	case 5:
+		if values[2] == "" || key(values[2]) {
+			e.AuxiliaryEmail = strings.TrimSpace(values[3])
+			e.AuxiliaryPassword = values[4]
+		} else if _, err := vaultEmail(strings.TrimSpace(values[2])); err == nil && key(values[4]) {
+			e.AuxiliaryEmail = strings.TrimSpace(values[2])
+			e.AuxiliaryPassword = values[3]
+		} else {
+			return e, "无法确定五列字段顺序，请使用表头或自定义列顺序"
+		}
+	default:
+		return e, "列数无法识别，请使用表头或自定义列顺序，缺项保留空列"
+	}
+	return e, ""
+}
+
+func vaultLooksLikeTable(first string) bool {
+	if strings.Contains(first, "----") {
+		return false
+	}
+	separator := ","
+	if strings.Contains(first, "\t") {
+		separator = "\t"
+	}
+	if !strings.Contains(first, separator) {
+		return false
+	}
+	firstCell := strings.Trim(strings.TrimSpace(strings.SplitN(first, separator, 2)[0]), "\"")
+	_, err := vaultEmail(firstCell)
+	return err == nil || vaultField(firstCell) != ""
+}
+
 func parseVaultImport(raw string) []vaultParseRow {
 	rows := []vaultParseRow{}
 	if len(raw) > 2<<20 {
@@ -210,8 +281,10 @@ func parseVaultImport(raw string) []vaultParseRow {
 		for i, e := range entries {
 			add(i+1, e, "")
 		}
-	} else if first := strings.Split(text, "\n")[0]; !strings.Contains(first, "----") && !strings.ContainsAny(first, ":：") && (strings.Contains(first, "\t") || strings.Contains(first, ",")) {
-		cr := csv.NewReader(strings.NewReader(text))
+	} else if first := strings.Split(text, "\n")[0]; vaultLooksLikeTable(first) {
+		// Trim framing newlines only; trailing spaces may belong to a secret in
+		// the final cell of a headerless paste.
+		cr := csv.NewReader(strings.NewReader(strings.TrimLeft(strings.TrimPrefix(raw, "\ufeff"), "\r\n")))
 		if strings.Contains(first, "\t") {
 			cr.Comma = '\t'
 		}
@@ -222,7 +295,16 @@ func parseVaultImport(raw string) []vaultParseRow {
 		}
 		keys := []string{}
 		seen := map[string]bool{}
+		_, firstEmailErr := vaultEmail(strings.TrimSpace(header[0]))
+		headerless := firstEmailErr == nil
+		if headerless {
+			e, problem := vaultDelimitedEntry(header)
+			add(1, e, problem)
+		}
 		for _, k := range header {
+			if headerless {
+				break
+			}
 			k = vaultField(k)
 			if k == "" || seen[k] {
 				return []vaultParseRow{{Line: 1, Error: "表头存在未知或重复字段，请修改表头"}}
@@ -240,6 +322,11 @@ func parseVaultImport(raw string) []vaultParseRow {
 				break
 			}
 			var e vaultEntry
+			if headerless {
+				entry, problem := vaultDelimitedEntry(values)
+				add(n, entry, problem)
+				continue
+			}
 			if len(values) != len(keys) {
 				add(n, e, "列数与表头不一致")
 				continue
@@ -267,24 +354,16 @@ func parseVaultImport(raw string) []vaultParseRow {
 			if trimmed == "" {
 				continue
 			}
-			if strings.Contains(line, "----") && !strings.HasPrefix(trimmed, "----") {
+			delimiter := "----"
+			if !strings.Contains(line, delimiter) && strings.Contains(line, "\t") {
+				delimiter = "\t"
+			}
+			firstColumn := strings.SplitN(line, delimiter, 2)[0]
+			_, firstEmailErr := vaultEmail(strings.TrimSpace(firstColumn))
+			if strings.Contains(line, delimiter) && firstEmailErr == nil {
 				flush()
-				p := strings.Split(line, "----")
-				var e vaultEntry
-				if len(p) == 5 {
-					e.Email = strings.TrimSpace(p[0])
-					e.Password = p[1]
-					e.SessionKey = p[2]
-					e.AuxiliaryEmail = strings.TrimSpace(p[3])
-					e.AuxiliaryPassword = p[4]
-					add(n+1, e, "")
-				} else if len(p) == 2 {
-					e.Email = strings.TrimSpace(p[0])
-					e.Password = p[1]
-					add(n+1, e, "")
-				} else {
-					add(n+1, e, "分隔格式应为 2 列或 5 列，缺项请保留空列")
-				}
+				e, problem := vaultDelimitedEntry(strings.Split(line, delimiter))
+				add(n+1, e, problem)
 				continue
 			}
 			if strings.Trim(trimmed, "-—_= ") == "" {

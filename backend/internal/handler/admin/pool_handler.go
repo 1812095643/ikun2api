@@ -43,6 +43,28 @@ func (h *PoolHandler) Overview(c *gin.Context) {
 	response.Success(c, overview)
 }
 
+func (h *PoolHandler) DisplaySettings(c *gin.Context) {
+	settings, err := h.poolService.GetPoolDisplaySettings(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, settings)
+}
+func (h *PoolHandler) SaveDisplaySettings(c *gin.Context) {
+	var settings service.PoolDisplaySettings
+	if err := c.ShouldBindJSON(&settings); err != nil {
+		response.BadRequest(c, "Invalid pool display settings")
+		return
+	}
+	result, err := h.poolService.SavePoolDisplaySettings(c.Request.Context(), settings)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 // Accounts 返回号池账号列表（含今日用量、并发占用）。
 func (h *PoolHandler) Accounts(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)

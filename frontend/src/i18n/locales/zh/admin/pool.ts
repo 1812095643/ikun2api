@@ -1,5 +1,18 @@
 export default {
   pool: {
+    groupScopeHint: '勾选用户可见分组，可多选；未勾选时不限制。账号池、使用记录与分享页面统一生效。',
+    visibleAccounts: '可见账号 {count} 个',
+    sharePool: '分享号池',
+    shareInvalid: '分享链接无效、已撤销或已过期。',
+    shareHint: '生成仅能查看号池的只读链接，无需登录。链接有效期 30 天；重新生成或撤销后旧链接立即失效。请只分享给需要查看的人。',
+    shareLink: '分享链接',
+    shareExpires: '有效期至 {time}',
+    revokeShare: '撤销分享',
+    regenerateShare: '重新生成',
+    generateShare: '生成链接',
+    copyLink: '复制链接',
+    linkCopied: '已复制',
+    shareReadOnly: '只读展示 · 不包含账号凭据和用量明细',
     networkError: '网络异常',
     retryHint: '暂时无法读取数据，请稍后重试。',
     lastAvailable: '当前显示上次成功的数据：{time}',
@@ -59,9 +72,9 @@ export default {
 
     // 普通用户视角：只看得到自己用过的账号，且不暴露内部调度字段。
     user: {
-      title: '我的号池用量',
-      description: '查看近期使用过的账号、用量与请求记录。',
-      empty: '你还没有使用过任何号池账号',
+      title: '实时号池',
+      description: '查看可见号池的账号与状态。',
+      empty: '暂无可展示账号',
       overview: {
         accounts: '我用过的账号',
         accountsHint: '其中 {active} 个当前正常',

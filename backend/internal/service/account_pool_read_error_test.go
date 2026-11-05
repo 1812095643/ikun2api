@@ -27,11 +27,11 @@ type poolErrorStats struct {
 	fail bool
 }
 
-func (r *poolErrorStats) GetUserAccountWindowStatsBatch(ctx context.Context, user int64, ids []int64, start time.Time) (map[int64]*usagestats.AccountStats, error) {
+func (r *poolErrorStats) GetUserAccountWindowStatsBatch(ctx context.Context, user int64, ids []int64, start time.Time, groupIDs []int64) (map[int64]*usagestats.AccountStats, error) {
 	if r.fail {
 		return nil, context.DeadlineExceeded
 	}
-	return r.poolTestUsageRepo.GetUserAccountWindowStatsBatch(ctx, user, ids, start)
+	return r.poolTestUsageRepo.GetUserAccountWindowStatsBatch(ctx, user, ids, start, groupIDs)
 }
 func (r *poolErrorStats) GetAccountWindowStatsBatch(context.Context, []int64, time.Time) (map[int64]*usagestats.AccountStats, error) {
 	return nil, context.DeadlineExceeded
@@ -61,7 +61,7 @@ func TestAccountPoolReadFailuresAreUnavailable(t *testing.T) {
 	settings.fail = false
 	plan, group, err := svc.poolDisplayConfiguration(ctx)
 	require.NoError(t, err)
-	require.Equal(t, int64(3), group)
+	require.Equal(t, []int64{3}, group)
 	require.Equal(t, 2, plan.Count)
 	require.Equal(t, 1, plan.Banned)
 	svc.settingService = nil

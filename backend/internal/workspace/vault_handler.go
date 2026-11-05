@@ -47,19 +47,33 @@ func (h *Handler) accountToolsAdmin(c *gin.Context) {
 	c.Next()
 }
 func (h *Handler) vaultSensitive(c *gin.Context) {
-	if h.vaultTOTP == nil || h.vaultUsers == nil {
-		c.AbortWithStatusJSON(503, gin.H{"code": 503, "message": "资料库安全验证暂不可用。"})
+	settings, err := h.vaultSecuritySettings(c.Request.Context())
+	if err != nil {
+		c.AbortWithStatusJSON(503, gin.H{"code": 503, "message": "资料库保护设置暂不可用，请重试。"})
 		return
 	}
-	if !middleware.EnforceStepUpAlways(c, h.vaultTOTP, h.vaultUsers) {
-		c.Abort()
+	if settings.TwoFactorEnabled && !h.enforceVaultStepUp(c) {
 		return
 	}
 	c.Next()
 }
+
+func (h *Handler) enforceVaultStepUp(c *gin.Context) bool {
+	if h.vaultTOTP == nil || h.vaultUsers == nil {
+		c.AbortWithStatusJSON(503, gin.H{"code": 503, "message": "资料库安全验证暂不可用。"})
+		return false
+	}
+	if !middleware.EnforceStepUpAlways(c, h.vaultTOTP, h.vaultUsers) {
+		c.Abort()
+		return false
+	}
+	return true
+}
 func (h *Handler) registerAccountTools(manage *gin.RouterGroup) {
 	v := manage.Group("/account-vault", h.accountToolsAdmin)
 	v.GET("", h.listVault)
+	v.GET("/security", h.getVaultSecurity)
+	v.PUT("/security", h.saveVaultSecurity)
 	v.POST("/preview", h.vaultSensitive, h.previewVault)
 	v.POST("/import", h.vaultSensitive, h.importVault)
 	v.POST("/delete", h.vaultSensitive, h.deleteVault)

@@ -1,18 +1,16 @@
 package handler
 
 import (
-	"context"
+	"github.com/MACOS-DO/sub4api/internal/pkg/pagination"
+	"github.com/MACOS-DO/sub4api/internal/pkg/usagestats"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/MACOS-DO/sub4api/internal/handler/dto"
-	"github.com/MACOS-DO/sub4api/internal/pkg/pagination"
 	"github.com/MACOS-DO/sub4api/internal/pkg/response"
 	"github.com/MACOS-DO/sub4api/internal/pkg/timezone"
-	"github.com/MACOS-DO/sub4api/internal/pkg/usagestats"
 	middleware2 "github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
 )
@@ -37,38 +35,6 @@ func NewPoolHandler(poolService *service.AccountPoolService, usageService *servi
 	}
 }
 
-// maskUsageAccountNames 把使用记录里的真实账号名换成脱敏名 / 稳定伪名。
-//
-// The generic user mapper masks historical snapshots. Preserve those labels;
-// only records without a snapshot need a masked current-name fallback.
-func (h *PoolHandler) maskUsageAccountNames(ctx context.Context, userID int64, items []*dto.UsageLog) {
-	if h.poolService == nil || len(items) == 0 {
-		return
-	}
-	ids := make([]int64, 0, len(items))
-	for _, item := range items {
-		if item == nil || item.AccountID <= 0 || item.AccountNameSnapshot != nil {
-			continue
-		}
-		ids = append(ids, item.AccountID)
-	}
-	if len(ids) == 0 {
-		return
-	}
-	names := h.poolService.PoolUsageAccountNames(ctx, userID, ids)
-	for _, item := range items {
-		if item == nil || item.AccountID <= 0 || item.AccountNameSnapshot != nil {
-			continue
-		}
-		name, ok := names[item.AccountID]
-		if !ok || name == "" {
-			continue
-		}
-		masked := name
-		item.AccountNameSnapshot = &masked
-	}
-}
-
 // Overview 返回当前用户自己的号池概览（脱敏）。
 // GET /api/v1/pool/overview
 func (h *PoolHandler) Overview(c *gin.Context) {
@@ -85,7 +51,7 @@ func (h *PoolHandler) Overview(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, overview)
+	response.Success(c, gin.H{"account_count": overview.AccountCount, "active_count": overview.ActiveCount, "generated_at": overview.GeneratedAt})
 }
 
 // Accounts 返回当前用户用过的账号列表（脱敏 + 本人今日用量）。
@@ -124,64 +90,13 @@ func (h *PoolHandler) Accounts(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Paginated(c, result.Items, result.Total, result.Page, result.PageSize)
+	c.Header("Cache-Control", "no-store")
+	response.Paginated(c, service.PoolPublicAccounts(result.Items), result.Total, result.Page, result.PageSize)
 }
 
 // AccountRequests 返回当前用户在指定账号上的近期请求流水。
 // GET /api/v1/pool/accounts/:id/requests
-func (h *PoolHandler) AccountRequests(c *gin.Context) {
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not authenticated")
-		return
-	}
-	if !userPoolValidateUserID(c, subject.UserID) {
-		return
-	}
-	accountID, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)
-	if err != nil || accountID <= 0 {
-		response.BadRequest(c, "Invalid account id")
-		return
-	}
-
-	params := pagination.PaginationParams{Page: 1, PageSize: 20, SortBy: "created_at", SortOrder: "desc"}
-	if page, pageSize := response.ParsePagination(c); page > 0 && pageSize > 0 {
-		params.Page = page
-		params.PageSize = pageSize
-	}
-
-	startTime, endTime, ok := userPoolParseTimeRange(c)
-	if !ok {
-		return
-	}
-
-	filters := usagestats.UsageLogFilters{
-		UserID:    subject.UserID,
-		AccountID: accountID,
-		StartTime: startTime,
-		EndTime:   endTime,
-	}
-	if model := strings.TrimSpace(c.Query("model")); model != "" {
-		filters.Model = model
-	}
-
-	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, filters)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	items := make([]*dto.UsageLog, 0, len(records))
-	for i := range records {
-		// 用户端用 UsageLog（不含 upstream_request_id / 渠道 / 账号倍率等管理端字段）。
-		items = append(items, dto.UsageLogFromService(&records[i]))
-	}
-	h.maskUsageAccountNames(c.Request.Context(), subject.UserID, items)
-	response.Paginated(c, items, result.Total, result.Page, result.PageSize)
-}
-
-// Usage 返回当前用户自己的号池使用记录（脱敏）。
-// GET /api/v1/pool/usage
+func (h *PoolHandler) AccountRequests(c *gin.Context) { h.userDetailsDisabled(c) }
 func (h *PoolHandler) Usage(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
@@ -191,58 +106,58 @@ func (h *PoolHandler) Usage(c *gin.Context) {
 	if !userPoolValidateUserID(c, subject.UserID) {
 		return
 	}
-	params := pagination.PaginationParams{Page: 1, PageSize: 20, SortBy: "created_at", SortOrder: "desc"}
-	if page, pageSize := response.ParsePagination(c); page > 0 && pageSize > 0 {
-		params.Page = page
-		params.PageSize = pageSize
-	}
-
-	startTime, endTime, ok := userPoolParseTimeRange(c)
-	if !ok {
-		return
-	}
-
-	// 强制钉上本人的 user_id，前端传什么都覆盖不掉。
-	filters := usagestats.UsageLogFilters{
-		UserID:    subject.UserID,
-		StartTime: startTime,
-		EndTime:   endTime,
-	}
-	if raw := strings.TrimSpace(c.Query("account_id")); raw != "" {
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || value <= 0 {
-			response.BadRequest(c, "Invalid account_id")
-			return
-		}
-		filters.AccountID = value
-	}
-	if raw := strings.TrimSpace(c.Query("api_key_id")); raw != "" {
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || value <= 0 {
-			response.BadRequest(c, "Invalid api_key_id")
-			return
-		}
-		filters.APIKeyID = value
-	}
-	if model := strings.TrimSpace(c.Query("model")); model != "" {
-		filters.Model = model
-	}
-	if requestID := strings.TrimSpace(c.Query("request_id")); requestID != "" {
-		filters.RequestID = requestID
-	}
-
-	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, filters)
+	groupIDs, err := h.poolService.UserPoolVisibleGroupIDs(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-
-	items := make([]*dto.UsageLog, 0, len(records))
-	for i := range records {
-		items = append(items, dto.UsageLogFromService(&records[i]))
+	start, end, ok := userPoolParseTimeRange(c)
+	if !ok {
+		return
 	}
-	h.maskUsageAccountNames(c.Request.Context(), subject.UserID, items)
+	page, size := response.ParsePagination(c)
+	if size > 100 {
+		size = 100
+	}
+	filters := usagestats.UsageLogFilters{UserID: subject.UserID, GroupIDs: groupIDs, StartTime: start, EndTime: end, Model: strings.TrimSpace(c.Query("model"))}
+	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), pagination.PaginationParams{Page: page, PageSize: size, SortBy: "created_at", SortOrder: "desc"}, filters)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	type record struct {
+		Name       string    `json:"name"`
+		Model      string    `json:"model"`
+		CreatedAt  time.Time `json:"created_at"`
+		DurationMs *int      `json:"duration_ms"`
+		Stream     bool      `json:"stream"`
+	}
+	items := make([]record, 0, len(records))
+	for _, item := range records {
+		name := "—"
+		if item.AccountNameSnapshot != nil {
+			name = service.MaskAccountName(*item.AccountNameSnapshot)
+		}
+		model := item.RequestedModel
+		if model == "" {
+			model = item.Model
+		}
+		items = append(items, record{Name: name, Model: model, CreatedAt: item.CreatedAt, DurationMs: item.DurationMs, Stream: item.Stream})
+	}
+	c.Header("Cache-Control", "no-store")
 	response.Paginated(c, items, result.Total, result.Page, result.PageSize)
+}
+func (h *PoolHandler) userDetailsDisabled(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	if !userPoolValidateUserID(c, subject.UserID) {
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	response.ErrorWithDetails(c, 403, "用户号池仅提供账号列表，不开放逐账号明细", "POOL_DETAILS_DISABLED", nil)
 }
 
 func userPoolValidateUserID(c *gin.Context, userID int64) bool {

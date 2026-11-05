@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/lib/pq"
 	"strings"
 	"time"
 
@@ -111,6 +112,10 @@ func (r *usageLogRepository) ListWithFilters(ctx context.Context, params paginat
 	if filters.AccountID > 0 {
 		conditions = append(conditions, fmt.Sprintf("account_id = $%d", len(args)+1))
 		args = append(args, filters.AccountID)
+	}
+	if len(filters.GroupIDs) > 0 {
+		conditions = append(conditions, fmt.Sprintf("group_id = ANY($%d::bigint[])", len(args)+1))
+		args = append(args, pq.Array(filters.GroupIDs))
 	}
 	if filters.GroupID > 0 {
 		conditions = append(conditions, fmt.Sprintf("group_id = $%d", len(args)+1))

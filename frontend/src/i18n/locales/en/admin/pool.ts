@@ -1,5 +1,18 @@
 export default {
   pool: {
+    groupScopeHint: 'Select one or more visible groups. An empty selection has no group restriction. Applies to the pool, usage history and shared views.',
+    visibleAccounts: '{count} visible accounts',
+    sharePool: 'Share pool',
+    shareInvalid: 'This link is invalid, revoked or expired.',
+    shareHint: 'Create a read-only pool link that needs no sign-in. Links expire in 30 days. Regenerating or revoking immediately invalidates the old link. Share only with intended viewers.',
+    shareLink: 'Share link',
+    shareExpires: 'Expires {time}',
+    revokeShare: 'Revoke sharing',
+    regenerateShare: 'Regenerate',
+    generateShare: 'Generate link',
+    copyLink: 'Copy link',
+    linkCopied: 'Copied',
+    shareReadOnly: 'Read only · No credentials or usage details',
     networkError: 'Network error',
     retryHint: 'Data is temporarily unavailable. Please try again.',
     lastAvailable: 'Showing the last successful data from {time}',

@@ -17,6 +17,7 @@ func RegisterUserRoutes(
 	settingService *service.SettingService,
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
+	v1.GET("/pool-share/accounts", panelRateLimiter.PublicIP(), h.Pool.ShareAuth, panelRateLimiter.Heavy(), h.Pool.Accounts)
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
@@ -100,6 +101,8 @@ func RegisterUserRoutes(
 		pool := authenticated.Group("/pool")
 		pool.Use(panelRateLimiter.Heavy())
 		{
+			pool.POST("/share-link", h.Pool.CreateShare)
+			pool.DELETE("/share-link", h.Pool.RevokeShare)
 			pool.GET("/overview", h.Pool.Overview)
 			pool.GET("/accounts", h.Pool.Accounts)
 			pool.GET("/accounts/:id/requests", h.Pool.AccountRequests)

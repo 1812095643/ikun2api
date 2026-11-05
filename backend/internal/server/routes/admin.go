@@ -756,6 +756,8 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 func registerPoolRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	pool := admin.Group("/pool")
 	{
+		pool.GET("/display-settings", h.Admin.Pool.DisplaySettings)
+		pool.PUT("/display-settings", h.Admin.Pool.SaveDisplaySettings)
 		pool.GET("/overview", h.Admin.Pool.Overview)
 		pool.GET("/accounts", h.Admin.Pool.Accounts)
 		pool.GET("/accounts/:id/requests", h.Admin.Pool.AccountRequests)

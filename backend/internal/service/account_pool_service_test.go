@@ -22,16 +22,19 @@ func (a poolTestAdmin) GetAccountsByIDs(context.Context, []int64) ([]*Account, e
 
 type poolTestUsageRepo struct {
 	UsageLogRepository
-	users []int64
+	users  []int64
+	groups []int64
 }
 
-func (r *poolTestUsageRepo) ListAccountIDsByUser(_ context.Context, userID int64, _ time.Time) ([]int64, error) {
+func (r *poolTestUsageRepo) ListAccountIDsByUser(_ context.Context, userID int64, _ time.Time, groupIDs []int64) ([]int64, error) {
 	r.users = append(r.users, userID)
+	r.groups = append(r.groups, groupIDs...)
 	return []int64{9}, nil
 }
 
-func (r *poolTestUsageRepo) GetUserAccountWindowStatsBatch(_ context.Context, userID int64, _ []int64, _ time.Time) (map[int64]*usagestats.AccountStats, error) {
+func (r *poolTestUsageRepo) GetUserAccountWindowStatsBatch(_ context.Context, userID int64, _ []int64, _ time.Time, groupIDs []int64) (map[int64]*usagestats.AccountStats, error) {
 	r.users = append(r.users, userID)
+	r.groups = append(r.groups, groupIDs...)
 	return map[int64]*usagestats.AccountStats{9: {Requests: 3, Tokens: 20, Cost: 900, UserCost: 2, StandardCost: 4}}, nil
 }
 

@@ -8,6 +8,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { formatCostFixed, formatNumber, formatRelativeTime, formatTime, formatTokensK } from '@/utils/format'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import UsageProgressBar from '@/components/account/UsageProgressBar.vue'
 const props = defineProps<{ rows: PoolAccount[]; loading: boolean; failed: boolean; isAdmin: boolean }>()
 defineEmits<{ requests: [account: PoolAccount] }>()
 const isAdmin = computed(() => props.isAdmin)
@@ -251,11 +252,10 @@ function availabilityClass(row: PoolAccount): string {
           </template>
 
           <template #cell-usage_window="{ row }">
-            <div class="flex min-w-[180px] flex-col gap-2">
-              <div v-for="w in quotaWindows(row)" :key="w.key" class="flex items-center gap-2 text-xs" :title="[w.detail, w.resetText].filter(Boolean).join(' · ')">
-                <span class="w-10 shrink-0 text-gray-500 dark:text-dark-400">{{ w.label }}</span>
-                <div class="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700"><div class="h-full rounded-full" :class="w.barClass" :style="{ width: w.width }" /></div>
-                <span class="w-10 text-right tabular-nums" :class="w.pctClass">{{ w.pctText }}</span>
+            <div class="space-y-1">
+              <div v-for="w in quotaWindows(row)" :key="w.key" :title="[w.detail,w.resetText].filter(Boolean).join(' · ')">
+                <UsageProgressBar v-if="w.pctText!=='—'" :label="w.key" :utilization="Number(w.width.replace('%',''))" :resets-at="w.key==='5h'?row.five_hour?.resets_at:row.seven_day?.resets_at" :color="w.key==='5h'?'indigo':'emerald'" />
+                <span v-else class="text-xs text-gray-400">{{ w.key }} —</span>
               </div>
             </div>
           </template>

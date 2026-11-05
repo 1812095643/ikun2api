@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -455,8 +456,8 @@ type poolGlobalStatsReader interface {
 }
 
 type userPoolStatsReader interface {
-	ListAccountIDsByUser(ctx context.Context, userID int64, startTime time.Time) ([]int64, error)
-	GetUserAccountWindowStatsBatch(ctx context.Context, userID int64, accountIDs []int64, startTime time.Time) (map[int64]*usagestats.AccountStats, error)
+	ListAccountIDsByUser(ctx context.Context, userID int64, startTime time.Time, groupIDs []int64) ([]int64, error)
+	GetUserAccountWindowStatsBatch(ctx context.Context, userID int64, accountIDs []int64, startTime time.Time, groupIDs []int64) (map[int64]*usagestats.AccountStats, error)
 }
 
 // OverviewForUser 返回该用户的号池概览（只含本人数据）。
@@ -475,8 +476,13 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 		return overview, nil
 	}
 
+	plan, visibleGroupIDs, err := s.poolDisplayConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	dayStart := timezone.Today()
-	accountIDs, err := reader.ListAccountIDsByUser(ctx, userID, dayStart)
+	accountIDs, err := reader.ListAccountIDsByUser(ctx, userID, dayStart, visibleGroupIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +490,7 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 	// 概览需要「今日」与「近 7 天」两个窗口，账号集合按 7 天取，
 	// 否则今天没调用的账号会从卡片里消失。
 	weekStart := dayStart.AddDate(0, 0, -6)
-	weekIDs, weekErr := reader.ListAccountIDsByUser(ctx, userID, weekStart)
+	weekIDs, weekErr := reader.ListAccountIDsByUser(ctx, userID, weekStart, visibleGroupIDs)
 	if weekErr != nil {
 		return nil, poolDataUnavailable(weekErr)
 	}
@@ -495,10 +501,6 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 	// 账号数按用户实际可见的口径统计：分组过滤要生效，合成账号也要算进来，
 	// 否则列表行数与概览卡片会对不上，池子大小一眼就穿。
 	overview.AccountCount = 0
-	plan, visibleGroupID, err := s.poolDisplayConfiguration(ctx)
-	if err != nil {
-		return nil, err
-	}
 	if len(accountIDs) > 0 {
 		accounts, accErr := s.adminService.GetAccountsByIDs(ctx, accountIDs)
 		if accErr != nil {
@@ -509,7 +511,7 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 				if acc == nil {
 					continue
 				}
-				if visibleGroupID > 0 && !poolAccountGroupMatches(acc, visibleGroupID) {
+				if len(visibleGroupIDs) > 0 && !poolAccountMatchesGroups(acc, visibleGroupIDs) {
 					continue
 				}
 				overview.AccountCount++
@@ -525,12 +527,12 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 		}
 	}
 
-	stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart)
+	stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart, visibleGroupIDs)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
 	overview.Today = poolSumUserWindows(stats)
-	stats, err = reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart)
+	stats, err = reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart, visibleGroupIDs)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -580,13 +582,13 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	dayStart := timezone.Today()
 	weekStart := dayStart.AddDate(0, 0, -6)
 	// 管理员可以限制用户端只看某个分组的真实账号。
-	plan, visibleGroupID, err := s.poolDisplayConfiguration(ctx)
+	plan, visibleGroupIDs, err := s.poolDisplayConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
 	now := timezone.Now()
 
-	accountIDs, err := reader.ListAccountIDsByUser(ctx, userID, weekStart)
+	accountIDs, err := reader.ListAccountIDsByUser(ctx, userID, weekStart, visibleGroupIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +606,7 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 		return nil, err
 	}
 
-	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart)
+	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart, visibleGroupIDs)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -630,7 +632,7 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 			!strings.Contains(strings.ToLower(displayName), search) {
 			continue
 		}
-		if visibleGroupID > 0 && !poolAccountGroupMatches(acc, visibleGroupID) {
+		if len(visibleGroupIDs) > 0 && !poolAccountMatchesGroups(acc, visibleGroupIDs) {
 			continue
 		}
 		capacity := poolCapacityFromAccount(acc)
@@ -647,7 +649,7 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 			SevenDay:    poolUserQuotaWindowFrom(poolQuotaWindowFromAccount(acc, poolWindowSevenDay, capacity)),
 		}
 		for _, g := range acc.Groups {
-			if g == nil {
+			if g == nil || (len(visibleGroupIDs) > 0 && !slices.Contains(visibleGroupIDs, g.ID)) {
 				continue
 			}
 			item.Groups = append(item.Groups, PoolGroupRef{ID: g.ID, Name: g.Name})

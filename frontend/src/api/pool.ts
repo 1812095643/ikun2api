@@ -183,6 +183,23 @@ export const poolAPI = {
 
 export default poolAPI
 
+export interface PoolDisplaySettings { pool_user_synthetic_count:number; pool_user_synthetic_banned:number; pool_user_synthetic_platform:string; pool_user_visible_group_ids:number[] }
+export async function getPoolDisplaySettings():Promise<PoolDisplaySettings>{return (await apiClient.get('/admin/pool/display-settings')).data}
+export async function savePoolDisplaySettings(settings:PoolDisplaySettings):Promise<PoolDisplaySettings>{return (await apiClient.put('/admin/pool/display-settings',settings)).data}
+
+export interface UserPoolAccount { name: string; platform: string; status: string; capacity: { in_use:number; concurrency:number }; five_hour: { utilization: number; enabled: boolean }; seven_day: { utilization: number; enabled: boolean } }
+export interface UserPoolUsage { name: string; model: string; created_at: string; duration_ms: number | null; stream: boolean }
+export async function listUserPoolUsage(page: number, signal?: AbortSignal): Promise<PaginatedResponse<UserPoolUsage>> {
+  return (await apiClient.get<PaginatedResponse<UserPoolUsage>>('/pool/usage', { params: { page, page_size: 20 }, signal })).data
+}
+export async function listUserPoolAccounts(page: number, signal?: AbortSignal): Promise<PaginatedResponse<UserPoolAccount>> {
+  return (await apiClient.get<PaginatedResponse<UserPoolAccount>>('/pool/accounts', { params: { page, page_size: 20 }, signal })).data
+}
+export async function createPoolShareLink(): Promise<{ token: string; expires_at: string }> {
+  return (await apiClient.post('/pool/share-link')).data
+}
+export async function revokePoolShareLink(): Promise<void> { await apiClient.delete('/pool/share-link') }
+
 /** 号池单个用量窗口（5 小时 / 7 天）的读数。 */
 export interface PoolQuotaWindow {
   requests?: number

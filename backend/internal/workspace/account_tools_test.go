@@ -75,6 +75,40 @@ func TestVaultJSONAndCSVQuotedPasswords(t *testing.T) {
 		}
 	}
 }
+
+func TestVaultAutomaticBulkLayoutsPreserveFields(t *testing.T) {
+	for _, raw := range []string{
+		"a@example.test\t  pw + :  \tsk-ant-sid02-TEST\tb@example.test\taux!\nc@example.test\tpw2\tsk-ant-sid02-TEST2\td@example.test\taux2",
+		"a@example.test,\"  pw + :  \",sk-ant-sid02-TEST,b@example.test,aux!\nc@example.test,pw2,sk-ant-sid02-TEST2,d@example.test,aux2",
+		"a@example.test----  pw + :  ----b@example.test----aux!----sk-ant-sid02-TEST\nc@example.test----pw2----d@example.test----aux2----sk-ant-sid02-TEST2",
+		"登录邮箱：a@example.test\n邮箱密码：  pw + :  \nSessionKey：sk-ant-sid02-TEST\n辅助邮箱：b@example.test\n辅邮密码：aux!\n登录邮箱：c@example.test\n邮箱密码：pw2\nSessionKey：sk-ant-sid02-TEST2\n辅助邮箱：d@example.test\n辅邮密码：aux2",
+	} {
+		rows := parseVaultImport(raw)
+		if len(rows) != 2 {
+			t.Fatalf("expected two automatic rows, got %d", len(rows))
+		}
+		for _, row := range rows {
+			if row.Error != "" {
+				t.Fatal(row.Error)
+			}
+		}
+		if rows[0].Entry.Email != "a@example.test" || rows[0].Entry.AuxiliaryEmail != "b@example.test" || rows[0].Entry.SessionKey != "sk-ant-sid02-TEST" || rows[0].Entry.AuxiliaryPassword != "aux!" {
+			t.Fatal("bulk fields moved")
+		}
+	}
+	rows := parseVaultImport("邮箱：a@example.test\n密码：keep----literal\n邮箱：b@example.test\n密码：next")
+	if len(rows) != 2 || rows[0].Error != "" || rows[0].Entry.Password != "keep----literal" {
+		t.Fatal("labeled password was treated as a delimiter row")
+	}
+	rows = parseVaultImport("a@example.test----pw----recovery@example.test----aux\nb@example.test----pw----sk-ant-api03-TEST")
+	if len(rows) != 2 || rows[0].Error != "" || rows[1].Error != "" || rows[0].Entry.AuxiliaryPassword != "aux" || rows[1].Entry.APIKey != "sk-ant-api03-TEST" {
+		t.Fatal("unambiguous shorter layouts failed")
+	}
+	rows = parseVaultImport("a@example.test\t keep spaces  ")
+	if len(rows) != 1 || rows[0].Error != "" || rows[0].Entry.Password != " keep spaces  " {
+		t.Fatal("headerless final secret was trimmed")
+	}
+}
 func TestVaultAuthenticatedEncryptionAndIdentityBinding(t *testing.T) {
 	v, err := newVaultCipher(bytes.Repeat([]byte{7}, 32))
 	if err != nil {

@@ -20,6 +20,7 @@ import { workspaceRoutes } from './workspace'
  */
 const routes: RouteRecordRaw[] = [
   ...workspaceRoutes,
+  { path: '/share/pool', name: 'PoolShare', component: () => import('@/views/public/PoolShareView.vue'), meta: { requiresAuth: false, title: 'Live Account Pool', titleKey: 'admin.pool.title' } },
   // ==================== Setup Routes ====================
   {
     path: '/setup',
@@ -240,7 +241,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/pool',
     name: 'Pool',
-    component: () => import('@/views/admin/PoolView.vue'),
+    component: () => import('@/views/user/PoolView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
@@ -805,6 +806,7 @@ const BACKEND_MODE_CALLBACK_PATHS = [
 const BACKEND_MODE_PENDING_AUTH_PATHS = ['/register', '/email-verify']
 
 function isBackendModePublicRouteAllowed(path: string, hasPendingAuthSession: boolean): boolean {
+	if (path === '/share/pool') return true // Data still requires a scoped share token.
   // 欢迎页和使用文档仅展示公开内容；后台模式下也应允许用户先阅读教程。
   if (path === '/home' || path === '/tutorial' || path.startsWith('/tutorial/')) {
     return true

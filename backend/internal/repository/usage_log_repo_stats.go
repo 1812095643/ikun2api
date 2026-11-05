@@ -675,6 +675,10 @@ func (r *usageLogRepository) GetStatsWithFilters(ctx context.Context, filters Us
 		conditions = append(conditions, fmt.Sprintf("account_id = $%d", len(args)+1))
 		args = append(args, filters.AccountID)
 	}
+	if len(filters.GroupIDs) > 0 {
+		conditions = append(conditions, fmt.Sprintf("group_id = ANY($%d::bigint[])", len(args)+1))
+		args = append(args, pq.Array(filters.GroupIDs))
+	}
 	if filters.GroupID > 0 {
 		conditions = append(conditions, fmt.Sprintf("group_id = $%d", len(args)+1))
 		args = append(args, filters.GroupID)
@@ -1104,17 +1108,17 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 
 // ListAccountIDsByUser 返回该用户在窗口内实际调用过的账号 ID（去重、升序）。
 // 用于「实时号池」的普通用户视角：用户只能看到自己用过的账号，看不到整池。
-func (r *usageLogRepository) ListAccountIDsByUser(ctx context.Context, userID int64, startTime time.Time) ([]int64, error) {
+func (r *usageLogRepository) ListAccountIDsByUser(ctx context.Context, userID int64, startTime time.Time, groupIDs []int64) ([]int64, error) {
 	if userID <= 0 {
 		return nil, nil
 	}
 	query := `
 		SELECT DISTINCT account_id
 		FROM usage_logs
-		WHERE user_id = $1 AND created_at >= $2 AND account_id > 0
+		WHERE user_id = $1 AND created_at >= $2 AND account_id > 0 AND (cardinality($3::bigint[]) = 0 OR group_id = ANY($3))
 		ORDER BY account_id
 	`
-	rows, err := r.sql.QueryContext(ctx, query, userID, startTime)
+	rows, err := r.sql.QueryContext(ctx, query, userID, startTime, pq.Array(append([]int64{}, groupIDs...)))
 	if err != nil {
 		return nil, err
 	}
@@ -1137,7 +1141,7 @@ func (r *usageLogRepository) ListAccountIDsByUser(ctx context.Context, userID in
 // GetUserAccountWindowStatsBatch 批量聚合「某用户 × 指定账号」在窗口内的用量。
 // 与 GetAccountWindowStatsBatch 的区别：多一个 user_id 维度，保证普通用户拿到的
 // 只是自己的那部分，而不是账号在全站的用量。
-func (r *usageLogRepository) GetUserAccountWindowStatsBatch(ctx context.Context, userID int64, accountIDs []int64, startTime time.Time) (map[int64]*usagestats.AccountStats, error) {
+func (r *usageLogRepository) GetUserAccountWindowStatsBatch(ctx context.Context, userID int64, accountIDs []int64, startTime time.Time, groupIDs []int64) (map[int64]*usagestats.AccountStats, error) {
 	result := make(map[int64]*usagestats.AccountStats, len(accountIDs))
 	if userID <= 0 || len(accountIDs) == 0 {
 		return result, nil
@@ -1151,10 +1155,10 @@ func (r *usageLogRepository) GetUserAccountWindowStatsBatch(ctx context.Context,
 			COALESCE(SUM(total_cost), 0) as standard_cost,
 			COALESCE(SUM(actual_cost), 0) as user_cost
 		FROM usage_logs
-		WHERE user_id = $1 AND account_id = ANY($2) AND created_at >= $3
+		WHERE user_id = $1 AND account_id = ANY($2) AND created_at >= $3 AND (cardinality($4::bigint[]) = 0 OR group_id = ANY($4))
 		GROUP BY account_id
 	`
-	rows, err := r.sql.QueryContext(ctx, query, userID, pq.Array(accountIDs), startTime)
+	rows, err := r.sql.QueryContext(ctx, query, userID, pq.Array(accountIDs), startTime, pq.Array(append([]int64{}, groupIDs...)))
 	if err != nil {
 		return nil, err
 	}

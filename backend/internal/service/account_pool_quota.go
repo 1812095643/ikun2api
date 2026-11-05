@@ -361,7 +361,7 @@ func poolUserQuotaWindowFrom(window PoolQuotaWindow) PoolUserQuotaWindow {
 		Utilization:      window.Utilization,
 		ResetsAt:         window.ResetsAt,
 		RemainingSeconds: window.RemainingSeconds,
-		Enabled:          window.Utilization > 0,
+		Enabled:          window.Source != "local",
 	}
 }
 
