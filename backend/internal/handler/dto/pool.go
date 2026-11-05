@@ -29,12 +29,7 @@ type UserPoolUsageLog struct {
 }
 
 func UserPoolUsageLogFromService(item *service.UsageLog) UserPoolUsageLog {
-	name := "—"
-	if item.AccountNameSnapshot != nil {
-		name = service.MaskAccountName(*item.AccountNameSnapshot)
-	} else if item.Account != nil {
-		name = service.MaskAccountName(item.Account.Name)
-	}
+	name := service.PoolAccountEmailLabel(item.Account, item.AccountNameSnapshot)
 	model := item.RequestedModel
 	if model == "" {
 		model = item.Model

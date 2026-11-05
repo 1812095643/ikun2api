@@ -144,3 +144,15 @@ func TestPoolHandlerUsageDisplayFieldsKeepPublicAllowlist(t *testing.T) {
 	require.Nil(t, legacy["first_token_ms"])
 	require.Equal(t, &effort, repo.listRows[0].RequestedReasoningEffort)
 }
+
+func TestPoolHandlerUsageUsesSamePrimaryEmailAsAccountList(t *testing.T) {
+	name := "Internal Claude account"
+	repo := &userUsageRepoCapture{listRows: []service.UsageLog{{UserID: 42, AccountID: 9, AccountNameSnapshot: &name, Account: &service.Account{ID: 9, Name: name, Extra: map[string]any{"email_address": "abcdefghi@example.test"}, Credentials: map[string]any{"access_token": "DO_NOT_EXPOSE"}}}}}
+	rec := httptest.NewRecorder()
+	newPoolTestRouter(repo, true).ServeHTTP(rec, httptest.NewRequest("GET", "/pool/usage", nil))
+	require.Equal(t, 200, rec.Code)
+	require.Contains(t, rec.Body.String(), "abc***ghi@example.test")
+	for _, value := range []string{name, "abcdefghi@example.test", "DO_NOT_EXPOSE", "credentials", "email_address"} {
+		require.NotContains(t, rec.Body.String(), value)
+	}
+}

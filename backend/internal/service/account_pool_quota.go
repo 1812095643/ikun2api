@@ -402,25 +402,16 @@ func poolPseudoAccountName(userID, accountID int64, at time.Time) string {
 	return local + "***" + domain
 }
 
-// poolDisplayAccountNameForUser keeps original names partially visible for all
-// account types. Only missing names use a stable anonymous fallback.
-func poolDisplayAccountNameForUser(acc *Account, userID int64, at time.Time) string {
-	if acc == nil {
-		return ""
-	}
-	if name := MaskAccountName(acc.Name); name != "" {
-		return name
-	}
-	return poolPseudoAccountName(userID, acc.ID, at)
+// poolDisplayAccountNameForUser uses the same masked primary email as usage records.
+func poolDisplayAccountNameForUser(acc *Account, _ int64, _ time.Time) string {
+	return PoolAccountEmailLabel(acc, nil)
 }
 
 // PoolUsageAccountNames 批量计算用户端使用记录里展示的账号名。
 //
 // 规则与账号池列表完全一致：
-//   - 所有现存账号 → 原始名称中间以三个星号遮挡；
-//   - 账号名称缺失 → 同 (user, account) 稳定伪名。
-//
-// 账号已被删除但历史快照还在时，用伪名兜底 —— 绝不下发真实快照名。
+//   - 现存账号 → 主邮箱中间以三个星号遮挡；
+//   - 无可用邮箱或已删除账号 → 空标记，不暴露自定义名称。
 func (s *AccountPoolService) PoolUsageAccountNames(ctx context.Context, userID int64, accountIDs []int64) map[int64]string {
 	names := make(map[int64]string, len(accountIDs))
 	if len(accountIDs) == 0 {
@@ -448,7 +439,7 @@ func (s *AccountPoolService) PoolUsageAccountNames(ctx context.Context, userID i
 			names[id] = poolDisplayAccountNameForUser(acc, userID, now)
 			continue
 		}
-		names[id] = poolPseudoAccountName(userID, id, now)
+		names[id] = "—"
 	}
 	return names
 }

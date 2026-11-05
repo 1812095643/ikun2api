@@ -77,7 +77,11 @@ func TestAccountPoolNameMasking(t *testing.T) {
 			require.NotContains(t, masked, "****")
 			require.Equal(t, masked, PoolMaskAccountName(name))
 			for _, kind := range []string{"oauth", "apikey"} {
-				require.Equal(t, masked, poolDisplayAccountNameForUser(&Account{ID: 9, Name: name, Type: kind}, 42, time.Now()))
+				want := "—"
+				if name == "private-account@example.test" {
+					want = masked
+				}
+				require.Equal(t, want, poolDisplayAccountNameForUser(&Account{ID: 9, Name: name, Type: kind}, 42, time.Now()))
 			}
 		})
 	}
