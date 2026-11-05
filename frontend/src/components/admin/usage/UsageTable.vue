@@ -157,42 +157,7 @@
           </div>
           <!-- Token 请求 -->
           <div v-else class="flex items-center gap-1.5">
-            <div class="space-y-1 text-sm">
-              <div class="flex items-center gap-2">
-                <div class="inline-flex items-center gap-1">
-                  <Icon name="arrowDown" size="sm" class="h-3.5 w-3.5 text-emerald-500" />
-                  <span class="font-medium text-gray-900 dark:text-white">{{ row.input_tokens?.toLocaleString() || 0 }}</span>
-                </div>
-                <div class="inline-flex items-center gap-1">
-                  <Icon name="arrowUp" size="sm" class="h-3.5 w-3.5 text-violet-500" />
-                  <span class="font-medium text-gray-900 dark:text-white">{{ row.output_tokens?.toLocaleString() || 0 }}</span>
-                </div>
-              </div>
-              <div v-if="row.cache_read_tokens > 0 || row.cache_creation_tokens > 0" class="flex items-center gap-2">
-                <div v-if="row.cache_read_tokens > 0" class="inline-flex items-center gap-1">
-                  <svg class="h-3.5 w-3.5 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                  <span class="font-medium text-sky-600 dark:text-sky-400">{{ formatCacheTokens(row.cache_read_tokens) }}</span>
-                </div>
-                <div v-if="row.cache_creation_tokens > 0" class="inline-flex items-center gap-1">
-                  <svg class="h-3.5 w-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                  <span class="font-medium text-amber-600 dark:text-amber-400">{{ formatCacheTokens(row.cache_creation_tokens) }}</span>
-                  <span v-if="row.cache_creation_1h_tokens > 0" class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-orange-100 text-orange-600 ring-1 ring-inset ring-orange-200 dark:bg-orange-500/20 dark:text-orange-400 dark:ring-orange-500/30">1h</span>
-                  <span v-if="row.cache_ttl_overridden" :title="t('usage.cacheTtlOverriddenHint')" class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-rose-100 text-rose-600 ring-1 ring-inset ring-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:ring-rose-500/30 cursor-help">R</span>
-                </div>
-              </div>
-              <div v-if="hasImageInputTokens(row)" class="flex items-center gap-2">
-                <div class="inline-flex items-center gap-1">
-                  <svg class="h-3.5 w-3.5 text-fuchsia-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  <span class="font-medium text-fuchsia-600 dark:text-fuchsia-400">{{ row.image_input_tokens.toLocaleString() }}</span>
-                </div>
-              </div>
-              <div v-if="hasImageOutputTokens(row)" class="flex items-center gap-2">
-                <div class="inline-flex items-center gap-1">
-                  <svg class="h-3.5 w-3.5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  <span class="font-medium text-pink-600 dark:text-pink-400">{{ row.image_output_tokens.toLocaleString() }}</span>
-                </div>
-              </div>
-            </div>
+            <UsageTokenCounts :row="row" />
             <!-- Token Detail Tooltip -->
             <div
               class="group relative"
@@ -232,26 +197,8 @@
           </div>
         </template>
 
-        <!-- 合并首字/总耗时的健康度列：左侧色条上端随首字档、下端随总耗时档，中段(40%-60%)短渐变过渡，便于纵向扫视整体健康状况 -->
         <template #cell-latency="{ row }">
-          <div class="flex items-stretch gap-2">
-            <span
-              class="w-1 shrink-0 rounded-full"
-              :class="row.first_token_ms != null
-                ? ['bg-gradient-to-b from-40% to-60%', LATENCY_BAR_FROM_CLASSES[firstTokenSeverity(row.first_token_ms)], LATENCY_BAR_TO_CLASSES[durationSeverity(row.duration_ms ?? 0)]]
-                : LATENCY_BAR_CLASSES[durationSeverity(row.duration_ms ?? 0)]"
-              aria-hidden="true"
-            ></span>
-            <div class="grid grid-cols-[max-content_max-content] items-baseline gap-x-2 gap-y-0.5 text-xs">
-              <span class="text-gray-400 dark:text-gray-500">{{ t('usage.latencyFirstToken') }}</span>
-              <span v-if="row.first_token_ms != null" class="font-medium tabular-nums" :class="LATENCY_TEXT_CLASSES[firstTokenSeverity(row.first_token_ms)]">{{ formatDuration(row.first_token_ms) }}</span>
-              <span v-else class="text-gray-400 dark:text-gray-500">-</span>
-              <span class="text-gray-400 dark:text-gray-500">{{ t('usage.latencyDuration') }}</span>
-              <span class="font-medium tabular-nums" :class="LATENCY_TEXT_CLASSES[durationSeverity(row.duration_ms ?? 0)]">{{ formatDuration(row.duration_ms) }}</span>
-              <span class="text-gray-400 dark:text-gray-500" :title="outputRateHint">tok/s</span>
-              <span class="font-medium tabular-nums text-gray-700 dark:text-gray-200" :title="outputRateTitle(row)" data-testid="usage-output-rate">{{ formatOutputRate(row) }}</span>
-            </div>
-          </div>
+          <UsageLatencyCell :row="row" />
         </template>
 
         <template #cell-created_at="{ value }">
@@ -539,19 +486,12 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { formatDateTime, formatReasoningEffort, reasoningEffortValuesEqual } from '@/utils/format'
-import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
+import { formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'
-import { getOutputRate } from '@/utils/outputRate'
-import {
-  LATENCY_BAR_CLASSES,
-  LATENCY_BAR_FROM_CLASSES,
-  LATENCY_BAR_TO_CLASSES,
-  LATENCY_TEXT_CLASSES,
-  durationSeverity,
-  firstTokenSeverity,
-} from '@/utils/latencyHealth'
+import UsageTokenCounts from '@/components/usage/UsageTokenCounts.vue'
+import UsageLatencyCell from '@/components/usage/UsageLatencyCell.vue'
 import {
   BILLING_MODE_TOKEN,
   getBillingModeLabel,
@@ -625,18 +565,6 @@ const showUpstreamEndpoint = props.showUpstreamEndpoint
 const ipGeoBatchLoading = ref(false)
 
 const showIpGeoToolbar = computed(() => props.columns.some((col) => col.key === 'ip_address'))
-const outputRateMode = computed(() => appStore.cachedPublicSettings?.usage_output_rate_mode === 'total' ? 'total' : 'generation')
-const outputRateHint = computed(() => t(outputRateMode.value === 'generation' ? 'usage.outputRateGenerationHint' : 'usage.outputRateTotalHint'))
-
-function formatOutputRate(row: AdminUsageLog): string {
-  const rate = getOutputRate(row, outputRateMode.value)
-  return rate == null ? '—' : rate.toFixed(1)
-}
-
-function outputRateTitle(row: AdminUsageLog): string {
-  return getOutputRate(row, outputRateMode.value) == null ? t('usage.outputRateUnavailable') : outputRateHint.value
-}
-
 const hasReasoningEffortMapping = (row: AdminUsageLog): boolean => {
   const requested = row.reasoning_effort?.trim() || ''
   const forwarded = row.upstream_reasoning_effort?.trim() || ''
@@ -737,16 +665,6 @@ const getRequestTypeBadgeClass = (row: AdminUsageLog): string => {
 
 const formatUserAgent = (ua: string): string => {
   return ua
-}
-
-// 超过 1 分钟简化为 "Xm Ys"，免去人工换算（超过 1 小时再进位为 "Xh Ym"）
-const formatDuration = (ms: number | null | undefined): string => {
-  if (ms == null) return '-'
-  if (ms < 1000) return `${ms}ms`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(2)}s`
-  const totalSec = Math.round(ms / 1000)
-  if (totalSec < 3600) return `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`
-  return `${Math.floor(totalSec / 3600)}h ${Math.floor((totalSec % 3600) / 60)}m`
 }
 
 // Cost tooltip functions

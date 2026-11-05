@@ -20,6 +20,22 @@ describe('输出速率口径', () => {
     expect(getOutputRate(row, 'total')).toBe(50)
   })
 
+  it.each([1, 5, 0.001])('首字与总耗时只相差 %s 毫秒且超过 3000 时按总耗时重算', gap => {
+    const row = { output_tokens: 500, duration_ms: 10000, first_token_ms: 10000 - gap }
+    expect(getOutputRate(row, 'generation')).toBe(50)
+  })
+
+  it('严格以 3000 为边界，不影响同批正常记录', () => {
+    const rows = [2999, 3000, 3001].map(output_tokens => ({ output_tokens, duration_ms: 2000, first_token_ms: 1000 }))
+    expect(rows.map(row => getOutputRate(row, 'generation'))).toEqual([2999, 3000, 1500.5])
+  })
+
+  it('按总耗时重算后不再人为封顶', () => {
+    const row = { output_tokens: 10000, duration_ms: 2000, first_token_ms: 1999 }
+    expect(getOutputRate(row, 'generation')).toBe(5000)
+    expect(getOutputRate(row, 'total')).toBe(5000)
+  })
+
   it.each([0, -1, null, undefined, NaN, Infinity])('总耗时 %s 不产生无穷或负数速率', duration => {
     expect(getOutputRate({ output_tokens: 100, duration_ms: duration, first_token_ms: 0 }, 'generation')).toBeNull()
   })

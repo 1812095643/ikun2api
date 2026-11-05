@@ -428,7 +428,7 @@ export default {
     outputRateMode: 'tok/s basis',
     outputRateGeneration: 'Exclude first-token wait',
     outputRateTotal: 'Total duration',
-    outputRateGenerationHint: 'Output tokens / (total duration - first-token wait). Uses total duration when first-token timing is missing or equals total duration. Durations are measured in seconds.',
+    outputRateGenerationHint: 'Output tokens / (total duration - first-token wait). Uses total duration for a record when first-token timing is missing, equals total duration, or the result exceeds 3000 tok/s. Durations are measured in seconds.',
     outputRateTotalHint: 'Output tokens / total duration, measured in seconds.',
     outputRateUnavailable: 'Total duration is unavailable or first-token timing is invalid.',
     time: 'Time',

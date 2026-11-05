@@ -15,6 +15,7 @@ import CapacityBadge from '@/components/account/CapacityBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PoolNetworkError from './PoolNetworkError.vue'
+import UserPoolUsageTable from './UserPoolUsageTable.vue'
 const props=defineProps<{ shared?: boolean; token?: string }>()
 const { t }=useI18n()
 const query=usePoolRequest<PaginatedResponse<UserPoolAccount>|null>(null)
@@ -23,7 +24,6 @@ const activeTab=ref<'accounts'|'usage'>('accounts'),usagePage=ref(1)
 const currentQuery=computed(()=>activeTab.value==='usage'&&!props.shared?usageQuery:query)
 const loading=computed(()=>currentQuery.value.loading.value),failed=computed(()=>currentQuery.value.failed.value),updatedAt=computed(()=>currentQuery.value.updatedAt.value)
 const usageRows=computed(()=>usageQuery.data.value?.items??[])
-const usageColumns=computed(()=>[{key:'created_at',label:t('admin.pool.usage.columns.time')},{key:'name',label:t('admin.pool.columns.account')},{key:'model',label:t('admin.pool.usage.columns.model')},{key:'stream',label:t('admin.pool.extra.type')},{key:'duration_ms',label:t('admin.pool.usage.columns.duration')}])
 const page=ref(1),invalid=ref(false),shareVisible=ref(false),shareBusy=ref(false),shareError=ref(''),shareURL=ref(''),expires=ref(''),copied=ref(false)
 const rows=computed(()=>query.data.value?.items??[]),total=computed(()=>query.data.value?.total??0)
 const columns=computed(()=>[{key:'name',label:t('admin.pool.columns.account')},{key:'platform',label:t('admin.pool.filters.platform')},{key:'status',label:t('admin.pool.columns.status')},{key:'capacity',label:t('admin.pool.columns.concurrency')},{key:'usage_window',label:t('admin.pool.extra.usageWindow')}])
@@ -83,12 +83,7 @@ function label(status:string){return t(`admin.pool.status.${['active','error','d
         <template #cell-usage_window="{row}"><div class="space-y-1"><UsageProgressBar v-if="row.five_hour?.enabled" label="5h" :utilization="row.five_hour.utilization" color="indigo" /><span v-else class="text-xs text-gray-400">5h —</span><UsageProgressBar v-if="row.seven_day?.enabled" label="7d" :utilization="row.seven_day.utilization" color="emerald" /><span v-else class="text-xs text-gray-400">7d —</span></div></template>
         <template #empty><p class="py-12 text-center text-sm text-gray-500 dark:text-dark-400">{{ failed?t('admin.pool.networkError'):t('admin.pool.user.empty') }}</p></template>
       </DataTable>
-      <DataTable v-else :columns="usageColumns" :data="usageRows" :loading="loading&&!usageRows.length">
-        <template #cell-created_at="{value}"><span class="whitespace-nowrap">{{ new Date(value).toLocaleString() }}</span></template>
-        <template #cell-stream="{value}">{{ t(value?'admin.pool.extra.streaming':'admin.pool.extra.nonStreaming') }}</template>
-        <template #cell-duration_ms="{value}">{{ value == null ? '—' : value+' ms' }}</template>
-        <template #empty><p class="py-12 text-center text-sm text-gray-500">{{ failed?t('admin.pool.networkError'):t('admin.pool.usage.empty') }}</p></template>
-      </DataTable>
+      <UserPoolUsageTable v-else :rows="usageRows" :loading="loading" :failed="failed" />
     </div>
     <Pagination v-if="currentTotal>20&&!invalid" :total="currentTotal" v-model:page="currentPage" :page-size="20" :show-page-size-selector="false" />
   </section>

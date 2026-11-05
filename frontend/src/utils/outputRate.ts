@@ -14,6 +14,8 @@ export function getOutputRate(row: OutputTiming, mode: OutputRateMode): number |
   const useTotalDuration = mode === 'total' || firstToken == null || firstToken === duration
   const elapsed = useTotalDuration ? duration : duration - firstToken!
   if (elapsed <= 0) return null
-  const rate = tokens / (elapsed / 1000)
+  let rate = tokens / (elapsed / 1000)
+  // 首字与结束时间过于接近会放大速率；仅该条记录改用总耗时，不封顶或影响其它记录。
+  if (!useTotalDuration && rate > 3000) rate = tokens / (duration / 1000)
   return Number.isFinite(rate) ? rate : null
 }

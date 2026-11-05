@@ -188,7 +188,25 @@ export async function getPoolDisplaySettings():Promise<PoolDisplaySettings>{retu
 export async function savePoolDisplaySettings(settings:PoolDisplaySettings):Promise<PoolDisplaySettings>{return (await apiClient.put('/admin/pool/display-settings',settings)).data}
 
 export interface UserPoolAccount { name: string; platform: string; status: string; capacity: { in_use:number; concurrency:number }; five_hour: { utilization: number; enabled: boolean }; seven_day: { utilization: number; enabled: boolean } }
-export interface UserPoolUsage { name: string; model: string; created_at: string; duration_ms: number | null; stream: boolean }
+export interface UserPoolUsage {
+  name: string
+  model: string
+  reasoning_effort: string | null
+  inbound_endpoint: string | null
+  group_name: string
+  created_at: string
+  duration_ms: number | null
+  first_token_ms: number | null
+  stream: boolean
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  cache_creation_5m_tokens: number
+  cache_creation_1h_tokens: number
+  image_input_tokens: number
+  image_output_tokens: number
+}
 export async function listUserPoolUsage(page: number, signal?: AbortSignal): Promise<PaginatedResponse<UserPoolUsage>> {
   return (await apiClient.get<PaginatedResponse<UserPoolUsage>>('/pool/usage', { params: { page, page_size: 20 }, signal })).data
 }

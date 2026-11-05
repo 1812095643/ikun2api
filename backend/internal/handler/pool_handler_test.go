@@ -2,9 +2,11 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	middleware2 "github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
@@ -95,4 +97,50 @@ func TestPoolHandlerUsageMaskingAndAccountFilter(t *testing.T) {
 			require.Equal(t, &original, repo.listRows[0].AccountNameSnapshot)
 		})
 	}
+}
+
+func TestPoolHandlerUsageDisplayFieldsKeepPublicAllowlist(t *testing.T) {
+	name, effort, forwarded := "abcdefghi@example.test", "max", "high"
+	endpoint, upstream := "/v1/messages", "https://private-upstream.example.test"
+	duration, firstToken := 10000, 9999
+	now := time.Now().UTC().Truncate(time.Second)
+	repo := &userUsageRepoCapture{listRows: []service.UsageLog{{
+		UserID: 42, AccountID: 9, APIKeyID: 7, AccountNameSnapshot: &name,
+		Model: "internal-model", RequestedModel: "client-model",
+		ReasoningEffort: &forwarded, RequestedReasoningEffort: &effort,
+		InboundEndpoint: &endpoint, UpstreamEndpoint: &upstream,
+		Group:     &service.Group{ID: 1, Name: "Selected group"},
+		CreatedAt: now, DurationMs: &duration, FirstTokenMs: &firstToken, Stream: true,
+		InputTokens: 468, OutputTokens: 500, CacheReadTokens: 100900,
+		CacheCreationTokens: 281, CacheCreation5mTokens: 200, CacheCreation1hTokens: 81,
+		ActualCost: 99, TotalCost: 100,
+	}, {Model: "legacy-model", ReasoningEffort: &forwarded}}}
+	router := newPoolTestRouter(repo, true)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/pool/usage", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+	var body struct {
+		Data struct {
+			Items []map[string]any `json:"items"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body.Data.Items, 2)
+	row := body.Data.Items[0]
+	require.Equal(t, map[string]any{
+		"name": "abc***ghi@example.test", "model": "client-model",
+		"reasoning_effort": "max", "inbound_endpoint": endpoint, "group_name": "Selected group",
+		"created_at": now.Format(time.RFC3339), "duration_ms": float64(duration), "first_token_ms": float64(firstToken), "stream": true,
+		"input_tokens": float64(468), "output_tokens": float64(500), "cache_read_tokens": float64(100900),
+		"cache_creation_tokens": float64(281), "cache_creation_5m_tokens": float64(200), "cache_creation_1h_tokens": float64(81),
+		"image_input_tokens": float64(0), "image_output_tokens": float64(0),
+	}, row)
+	legacy := body.Data.Items[1]
+	require.Equal(t, "legacy-model", legacy["model"])
+	require.Equal(t, "high", legacy["reasoning_effort"])
+	require.Empty(t, legacy["group_name"])
+	require.Nil(t, legacy["inbound_endpoint"])
+	require.Nil(t, legacy["first_token_ms"])
+	require.Equal(t, &effort, repo.listRows[0].RequestedReasoningEffort)
 }

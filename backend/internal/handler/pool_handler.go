@@ -1,16 +1,17 @@
 package handler
 
 import (
-	"github.com/MACOS-DO/sub4api/internal/pkg/pagination"
-	"github.com/MACOS-DO/sub4api/internal/pkg/usagestats"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/MACOS-DO/sub4api/internal/handler/dto"
+	"github.com/MACOS-DO/sub4api/internal/pkg/pagination"
 	"github.com/MACOS-DO/sub4api/internal/pkg/response"
 	"github.com/MACOS-DO/sub4api/internal/pkg/timezone"
+	"github.com/MACOS-DO/sub4api/internal/pkg/usagestats"
 	middleware2 "github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
 )
@@ -125,26 +126,9 @@ func (h *PoolHandler) Usage(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	type record struct {
-		Name       string    `json:"name"`
-		Model      string    `json:"model"`
-		CreatedAt  time.Time `json:"created_at"`
-		DurationMs *int      `json:"duration_ms"`
-		Stream     bool      `json:"stream"`
-	}
-	items := make([]record, 0, len(records))
+	items := make([]dto.UserPoolUsageLog, 0, len(records))
 	for _, item := range records {
-		name := "—"
-		if item.AccountNameSnapshot != nil {
-			name = service.MaskAccountName(*item.AccountNameSnapshot)
-		} else if item.Account != nil {
-			name = service.MaskAccountName(item.Account.Name)
-		}
-		model := item.RequestedModel
-		if model == "" {
-			model = item.Model
-		}
-		items = append(items, record{Name: name, Model: model, CreatedAt: item.CreatedAt, DurationMs: item.DurationMs, Stream: item.Stream})
+		items = append(items, dto.UserPoolUsageLogFromService(&item))
 	}
 	c.Header("Cache-Control", "no-store")
 	response.Paginated(c, items, result.Total, result.Page, result.PageSize)
