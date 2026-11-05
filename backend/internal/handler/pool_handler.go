@@ -137,6 +137,8 @@ func (h *PoolHandler) Usage(c *gin.Context) {
 		name := "—"
 		if item.AccountNameSnapshot != nil {
 			name = service.MaskAccountName(*item.AccountNameSnapshot)
+		} else if item.Account != nil {
+			name = service.MaskAccountName(item.Account.Name)
 		}
 		model := item.RequestedModel
 		if model == "" {

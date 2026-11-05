@@ -399,7 +399,7 @@ func poolPseudoAccountName(userID, accountID int64, at time.Time) string {
 	sum := sha256.Sum256([]byte(poolPseudoNameSalt + "|" + seed))
 	local := poolFakeLocalParts[int(sum[0])%len(poolFakeLocalParts)]
 	domain := poolFakeDomains[int(sum[1])%len(poolFakeDomains)]
-	return local + strings.Repeat("*", 6) + domain
+	return local + "***" + domain
 }
 
 // poolDisplayAccountNameForUser keeps original names partially visible for all

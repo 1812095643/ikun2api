@@ -69,7 +69,7 @@ func TestAccountPoolUserScopeAndMaskedSearch(t *testing.T) {
 }
 
 func TestAccountPoolNameMasking(t *testing.T) {
-	for _, name := range []string{"private-account@example.test", "upstream-provider-123", "我的专属账号名称", "ab", "a"} {
+	for _, name := range []string{"private-account@example.test", "upstream-provider-123", "我的专属账号名称"} {
 		t.Run(name, func(t *testing.T) {
 			masked := MaskAccountName(name)
 			require.NotEqual(t, name, masked)
@@ -80,6 +80,15 @@ func TestAccountPoolNameMasking(t *testing.T) {
 				require.Equal(t, masked, poolDisplayAccountNameForUser(&Account{ID: 9, Name: name, Type: kind}, 42, time.Now()))
 			}
 		})
+	}
+	for _, sample := range []struct{ original, masked string }{
+		{"abcdefghi@example.test", "abc***ghi@example.test"},
+		{"abcdefghij", "abc***ghij"},
+		{"我的专属账号名称", "我的***号名称"},
+		{"01", "01"},
+		{"abc@example.test", "abc@example.test"},
+	} {
+		require.Equal(t, sample.masked, MaskAccountName(sample.original))
 	}
 	name := "before-rename@example.test"
 	copy := MaskAccountNameSnapshot(&name)

@@ -3,7 +3,9 @@ package service
 import "strings"
 
 // MaskAccountName keeps the original label recognizable without disclosing it in full.
-// The hidden middle always uses exactly three asterisks.
+// Replace only the middle three characters; preserve the rest of the name and
+// the complete email domain. Short labels stay recognizable instead of turning
+// into an all-asterisk label.
 func MaskAccountName(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -11,12 +13,11 @@ func MaskAccountName(name string) string {
 	}
 	mask := func(value string) string {
 		runes := []rune(value)
-		if len(runes) <= 2 {
-			return "***"
+		if len(runes) <= 3 {
+			return value
 		}
-		prefix := max(1, min(3, len(runes)/3))
-		suffix := max(1, min(2, (len(runes)-prefix-1)/2))
-		return string(runes[:prefix]) + "***" + string(runes[len(runes)-suffix:])
+		start := (len(runes) - 3) / 2
+		return string(runes[:start]) + "***" + string(runes[start+3:])
 	}
 	if at := strings.LastIndex(name, "@"); at > 0 && at < len(name)-1 {
 		return mask(name[:at]) + name[at:]
