@@ -32,7 +32,6 @@ watch(() => [props.account?.id, props.scope], () => { query.reset(); requestPage
 <template>
 <BaseDialog :show="!!account" :title="account?.name || t('admin.pool.actions.requests')" width="extra-wide" :close-on-click-outside="true" @close="$emit('close')">
   <div class="space-y-4">
-    <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.pool.dialog.subtitle') }}</p>
     <PoolNetworkError v-if="failed" :updated-at="updatedAt" :busy="loading" @retry="load" />
     <div v-if="loading && !requestRows.length" class="space-y-3 py-4" :aria-label="t('common.loading')">
       <div v-for="i in 5" :key="i" class="h-9 animate-pulse rounded bg-gray-100 dark:bg-dark-700" />

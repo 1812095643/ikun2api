@@ -42,13 +42,12 @@ watch(() => props.show, show => { read.reset(); saveFailed.value = false; if (sh
 <template>
   <BaseDialog :show="show" :title="t('admin.pool.extra.synthetic.title')" width="normal" :show-close-button="!saving" :close-on-escape="!saving" @close="close">
     <form id="pool-display-settings" class="space-y-5" @submit.prevent="save">
-      <p class="text-sm text-gray-500 dark:text-dark-400">{{ t('admin.pool.settingsHint') }}</p>
       <PoolNetworkError v-if="failed" :busy="loading" @retry="load" />
       <div v-if="saveFailed" role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{{ t('admin.pool.networkError') }} · {{ t('admin.pool.extra.synthetic.saveFailed') }}</div>
       <fieldset class="space-y-4" :disabled="loading || saving || failed || !read.data.value">
         <div class="grid grid-cols-2 gap-4">
           <label class="text-sm text-gray-700 dark:text-dark-200">{{ t('admin.pool.extra.synthetic.count') }}<input v-model.number="config.count" type="number" min="0" max="50" step="1" required class="input mt-1.5" /><span class="mt-1 block text-xs text-gray-500 dark:text-dark-400">{{ t('admin.pool.extra.synthetic.countHint') }}</span></label>
-          <label class="text-sm text-gray-700 dark:text-dark-200">{{ t('admin.pool.extra.synthetic.banned') }}<input v-model.number="config.banned" type="number" min="0" :max="config.count" step="1" required class="input mt-1.5" /><span class="mt-1 block text-xs text-gray-500 dark:text-dark-400">{{ t('admin.pool.extra.synthetic.bannedHint') }}</span></label>
+          <label class="text-sm text-gray-700 dark:text-dark-200">{{ t('admin.pool.extra.synthetic.banned') }}<input v-model.number="config.banned" type="number" min="0" :max="config.count" step="1" required class="input mt-1.5" /></label>
         </div>
         <div><label id="pool-platform-label" class="input-label">{{ t('admin.pool.extra.synthetic.platform') }}</label><Select v-model="config.platform" :options="platforms" :disabled="loading || saving || failed" aria-labelledby="pool-platform-label" /></div>
         <div><p id="pool-group-label" class="input-label">{{ t('admin.pool.extra.synthetic.visibleGroup') }}</p><div class="max-h-52 space-y-2 overflow-auto rounded-xl border border-gray-200 p-3 dark:border-dark-700" role="group" aria-labelledby="pool-group-label"><label v-for="group in groups" :key="group.id" class="flex cursor-pointer items-center gap-2 text-sm"><input v-model="config.groups" type="checkbox" :value="group.id" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />{{ group.name }}</label></div><p class="mt-2 text-xs text-gray-500 dark:text-dark-400">{{ t('admin.pool.groupScopeHint') }}</p></div>

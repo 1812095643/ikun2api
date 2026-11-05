@@ -246,8 +246,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Live Account Pool',
-      titleKey: 'admin.pool.user.title',
-      descriptionKey: 'admin.pool.user.description'
+      titleKey: 'admin.pool.user.title'
     }
   },
   {
@@ -658,8 +657,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Live Account Pool',
-      titleKey: 'admin.pool.title',
-      descriptionKey: 'admin.pool.description'
+      titleKey: 'admin.pool.title'
     }
   },
   {

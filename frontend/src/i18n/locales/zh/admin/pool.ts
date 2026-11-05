@@ -1,10 +1,10 @@
 export default {
   pool: {
-    groupScopeHint: '勾选用户可见分组，可多选；未勾选时不限制。账号池、使用记录与分享页面统一生效。',
+    groupScopeHint: '可多选；未选则不限分组。',
     visibleAccounts: '可见账号 {count} 个',
     sharePool: '分享号池',
     shareInvalid: '分享链接无效、已撤销或已过期。',
-    shareHint: '生成仅能查看号池的只读链接，无需登录。链接有效期 30 天；重新生成或撤销后旧链接立即失效。请只分享给需要查看的人。',
+    shareHint: '30 天有效；重新生成后旧链接失效。',
     shareLink: '分享链接',
     shareExpires: '有效期至 {time}',
     revokeShare: '撤销分享',
@@ -12,7 +12,6 @@ export default {
     generateShare: '生成链接',
     copyLink: '复制链接',
     linkCopied: '已复制',
-    shareReadOnly: '只读展示 · 不包含账号凭据和用量明细',
     networkError: '网络异常',
     retryHint: '暂时无法读取数据，请稍后重试。',
     lastAvailable: '当前显示上次成功的数据：{time}',
@@ -25,19 +24,15 @@ export default {
     displaySettings: '展示设置',
     moreFilters: '更多筛选',
     settingsSaved: '号池展示设置已保存',
-    settingsHint: '配置用户号池的展示账号与可见分组。',
     saving: '保存中…',
     extra: {
       synthetic: {
         title: '用户视图展示',
-        description: '只影响普通用户在号池页看到什么：不写库、不参与调度与计费，关掉即恢复真实数据。',
         count: '合成账号数量',
-        countHint: '额外展示多少个账号，0 表示关闭。上限 50。',
+        countHint: '0 表示关闭，最多 50 个。',
         banned: '其中封禁数量',
-        bannedHint: '这些账号会显示为不可用，用于还原真实号池的样子。',
         platform: '合成账号平台',
         visibleGroup: '用户可见分组',
-        visibleGroupHint: '只把该分组下的真实账号展示给用户，留空表示不限。',
         save: '保存设置',
         loadFailed: '读取号池展示设置失败',
         saveFailed: '保存号池展示设置失败',
@@ -68,12 +63,10 @@ export default {
     title: '实时号池',
     navAccounts: '账号池',
     navUsage: '使用记录',
-    description: '查看账号状态、今日用量与近期请求。',
 
     // 普通用户视角：只看得到自己用过的账号，且不暴露内部调度字段。
     user: {
       title: '实时号池',
-      description: '查看可见号池的账号与状态。',
       empty: '暂无可展示账号',
       overview: {
         accounts: '我用过的账号',
@@ -90,8 +83,6 @@ export default {
       todayCost: '今日费用',
       weekRequests: '近 7 天请求',
       activeHint: '活跃 {active} · 异常 {error} · 停用 {disabled}',
-      schedulableHint: '参与调度且未过期',
-      inUseHint: '正在处理的请求数',
       weekRequestsHint: '含今日',
     },
 
@@ -151,7 +142,6 @@ export default {
 
     dialog: {
       title: '账号 #{id} 近期请求',
-      subtitle: '仅展示最近时间窗口内的请求，与「使用记录」同源。',
       empty: '该账号在所选时间范围内没有请求',
       loadFailed: '加载账号请求流水失败',
       columns: {
@@ -167,9 +157,7 @@ export default {
 
     usage: {
       title: '号池使用记录',
-      description: '与「使用记录」同源，额外保留写入时固化的账号名与平台快照，账号改名或被删除后历史依然可读。',
       userTitle: '我的号池使用记录',
-      userDescription: '你在号池侧的全部请求明细。管理员为你指定的账号、模型映射与上游细节不会在此展示。',
       filters: {
         accountId: '账号 ID',
         userId: '用户 ID',

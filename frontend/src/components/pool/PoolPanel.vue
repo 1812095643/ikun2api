@@ -204,13 +204,13 @@ const overviewCards = computed<OverviewCard[]>(() => {
       key: 'schedulable',
       label: t('admin.pool.overview.schedulable'),
       value: formatNumber(o?.schedulable_count ?? 0),
-      hint: t('admin.pool.overview.schedulableHint')
+      hint: ''
     },
     {
       key: 'in_use',
       label: t('admin.pool.overview.inUse'),
       value: formatNumber(o?.total_in_use ?? 0),
-      hint: t('admin.pool.overview.inUseHint')
+      hint: ''
     },
     {
       key: 'today_requests',

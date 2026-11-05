@@ -1,10 +1,10 @@
 export default {
   pool: {
-    groupScopeHint: 'Select one or more visible groups. An empty selection has no group restriction. Applies to the pool, usage history and shared views.',
+    groupScopeHint: 'Select multiple groups. None selected means all groups.',
     visibleAccounts: '{count} visible accounts',
     sharePool: 'Share pool',
     shareInvalid: 'This link is invalid, revoked or expired.',
-    shareHint: 'Create a read-only pool link that needs no sign-in. Links expire in 30 days. Regenerating or revoking immediately invalidates the old link. Share only with intended viewers.',
+    shareHint: 'Valid for 30 days. Regenerating invalidates the old link.',
     shareLink: 'Share link',
     shareExpires: 'Expires {time}',
     revokeShare: 'Revoke sharing',
@@ -12,7 +12,6 @@ export default {
     generateShare: 'Generate link',
     copyLink: 'Copy link',
     linkCopied: 'Copied',
-    shareReadOnly: 'Read only · No credentials or usage details',
     networkError: 'Network error',
     retryHint: 'Data is temporarily unavailable. Please try again.',
     lastAvailable: 'Showing the last successful data from {time}',
@@ -25,20 +24,15 @@ export default {
     displaySettings: 'Display settings',
     moreFilters: 'More filters',
     settingsSaved: 'Pool display settings saved',
-    settingsHint: 'Configure displayed accounts and visible groups for the user pool.',
     saving: 'Saving…',
     extra: {
       synthetic: {
         title: 'User-facing display',
-        description:
-          'Only affects what regular users see on the pool page. Nothing is written to the database and no scheduling or billing is involved; turn it off to restore real data.',
         count: 'Synthetic accounts',
-        countHint: 'How many extra accounts to show. 0 disables it. Max 50.',
+        countHint: '0 to disable. Up to 50.',
         banned: 'Of which banned',
-        bannedHint: 'These accounts are shown as unavailable to mimic a real pool.',
         platform: 'Synthetic platform',
         visibleGroup: 'Visible group',
-        visibleGroupHint: 'Only show real accounts in this group to users. Empty means no filter.',
         save: 'Save settings',
         loadFailed: 'Failed to load pool display settings',
         saveFailed: 'Failed to save pool display settings',
@@ -69,12 +63,10 @@ export default {
     title: 'Live Account Pool',
     navAccounts: 'Account Pool',
     navUsage: 'Usage Records',
-    description: 'Real-time status, daily usage and recent request flow for every account in the pool. Data comes from the account table and usage logs; there is no write path here.',
 
     // Regular-user view: only the accounts they actually used, no internal scheduling fields.
     user: {
       title: 'My pool usage',
-      description: 'Only the upstream accounts you have called and your own numbers. Internal scheduling details (groups, concurrency, multiplier, priority) are not exposed to regular users.',
       empty: 'You have not used any pool account yet',
       overview: {
         accounts: 'Accounts I used',
@@ -91,8 +83,6 @@ export default {
       todayCost: 'Cost today',
       weekRequests: 'Requests (7d)',
       activeHint: 'Active {active} · Error {error} · Disabled {disabled}',
-      schedulableHint: 'Schedulable and not expired',
-      inUseHint: 'Requests currently being processed',
       weekRequestsHint: 'Includes today',
     },
 
@@ -152,7 +142,6 @@ export default {
 
     dialog: {
       title: 'Recent requests for account #{id}',
-      subtitle: 'Only requests inside the selected time window, sourced from the same table as Usage Records.',
       empty: 'This account has no requests in the selected time range',
       loadFailed: 'Failed to load account requests',
       columns: {
@@ -168,9 +157,7 @@ export default {
 
     usage: {
       title: 'Pool Usage Records',
-      description: 'Same source as Usage Records, plus the account name and platform snapshot captured at write time, so history stays readable after an account is renamed or deleted.',
       userTitle: 'My pool usage records',
-      userDescription: 'Every request you made through the pool. Admin-assigned accounts, model mappings and upstream details are not shown here.',
       filters: {
         accountId: 'Account ID',
         userId: 'User ID',
