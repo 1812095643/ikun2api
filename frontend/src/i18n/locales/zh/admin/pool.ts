@@ -4,7 +4,7 @@ export default {
     visibleAccounts: '可见账号 {count} 个',
     sharePool: '分享号池',
     shareInvalid: '分享链接无效、已撤销或已过期。',
-    shareHint: '30 天有效；重新生成后旧链接失效。',
+    shareHint: '分享号池及本人使用记录；30 天有效，重新生成后旧链接失效。',
     shareLink: '分享链接',
     shareExpires: '有效期至 {time}',
     revokeShare: '撤销分享',

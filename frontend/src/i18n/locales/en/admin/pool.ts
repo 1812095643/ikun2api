@@ -4,7 +4,7 @@ export default {
     visibleAccounts: '{count} visible accounts',
     sharePool: 'Share pool',
     shareInvalid: 'This link is invalid, revoked or expired.',
-    shareHint: 'Valid for 30 days. Regenerating invalidates the old link.',
+    shareHint: 'Shares the pool and your usage records for 30 days. Regenerating invalidates the old link.',
     shareLink: 'Share link',
     shareExpires: 'Expires {time}',
     revokeShare: 'Revoke sharing',

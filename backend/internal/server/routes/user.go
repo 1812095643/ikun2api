@@ -17,7 +17,7 @@ func RegisterUserRoutes(
 	settingService *service.SettingService,
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
-	v1.GET("/pool-share/accounts", panelRateLimiter.PublicIP(), h.Pool.ShareAuth, panelRateLimiter.Heavy(), h.Pool.Accounts)
+	registerPoolShareRoutes(v1, h.Pool, panelRateLimiter)
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
@@ -170,4 +170,12 @@ func RegisterUserRoutes(
 			monitorV2.GET("/users", h.ChannelMonitorV2.Users)
 		}
 	}
+}
+
+// Share tokens grant only these read-only public projections, never general panel access.
+func registerPoolShareRoutes(v1 *gin.RouterGroup, h *handler.PoolHandler, limiter *middleware.PanelRateLimiter) {
+	share := v1.Group("/pool-share")
+	share.Use(limiter.PublicIP(), h.ShareAuth, limiter.Heavy())
+	share.GET("/accounts", h.Accounts)
+	share.GET("/usage", h.Usage)
 }

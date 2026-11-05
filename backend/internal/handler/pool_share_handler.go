@@ -34,7 +34,7 @@ func (h *PoolHandler) RevokeShare(c *gin.Context) {
 	response.Success(c, gin.H{"revoked": true})
 }
 
-// This authentication is registered only on the single read-only share route.
+// This authentication is registered only on the read-only pool share routes.
 // It must never be used as general JWT or API-key authentication.
 func (h *PoolHandler) ShareAuth(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
