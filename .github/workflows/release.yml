@@ -59,6 +59,9 @@ jobs:
       - name: 前端类型、文案与生产构建
         working-directory: frontend
         run: pnpm install --frozen-lockfile && pnpm exec vitest run src/components/common/__tests__/SystemUpdateDialog.spec.ts src/views/auth/__tests__/ResetPasswordView.spec.ts src/views/__tests__/HomeView.compact.spec.ts src/components/admin/settings/__tests__/ClaudeTelemetrySettings.spec.ts src/components/group/__tests__/ClaudeDesktopAccessOption.spec.ts src/views/admin/__tests__/GroupsView.duplicate.spec.ts src/constants/__tests__/platforms.spec.ts src/components/account/__tests__/credentialsBuilder.platformCatalog.spec.ts src/components/admin/group/__tests__/GroupI18nField.spec.ts && pnpm build
+      - name: 分享页打包模式响应头回归
+        working-directory: backend
+        run: go test -tags embed ./internal/web -run TestFrontendServerPoolShareHeaders -count=1
       - name: 新订阅、号池与原版更新界面回归
         run: |
           cd backend

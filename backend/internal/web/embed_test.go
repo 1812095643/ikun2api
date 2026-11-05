@@ -427,6 +427,37 @@ func TestFrontendServer_ServeIndexHTML(t *testing.T) {
 	})
 }
 
+func TestFrontendServerPoolShareHeaders(t *testing.T) {
+	provider := &mockSettingsProvider{settings: map[string]string{"site_name": "test"}}
+	server, err := NewFrontendServer(provider)
+	require.NoError(t, err)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Header("Referrer-Policy", "strict-origin-when-cross-origin"); c.Next() })
+	router.Use(server.Middleware())
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/share/pool", nil)
+		if cached := server.cache.Get(); cached != nil {
+			req.Header.Set("If-None-Match", cached.ETag)
+		}
+		router.ServeHTTP(w, req)
+		require.Equal(t, 200, w.Code)
+		require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+		require.Equal(t, "no-referrer", w.Header().Get("Referrer-Policy"))
+		require.Equal(t, "noindex, noarchive", w.Header().Get("X-Robots-Tag"))
+		require.Empty(t, w.Header().Get("ETag"))
+	}
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/home", nil))
+	require.Equal(t, "no-cache", w.Header().Get("Cache-Control"))
+	legacy := gin.New()
+	legacy.Use(ServeEmbeddedFrontend())
+	w = httptest.NewRecorder()
+	legacy.ServeHTTP(w, httptest.NewRequest("GET", "/share/pool", nil))
+	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+	require.Equal(t, "no-referrer", w.Header().Get("Referrer-Policy"))
+}
+
 func TestFrontendServer_InvalidateCache(t *testing.T) {
 	t.Run("invalidates_cache", func(t *testing.T) {
 		provider := &mockSettingsProvider{
