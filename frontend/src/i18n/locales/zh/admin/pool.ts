@@ -1,5 +1,19 @@
 export default {
   pool: {
+    networkError: '网络异常',
+    retryHint: '暂时无法读取数据，请稍后重试。',
+    lastAvailable: '当前显示上次成功的数据：{time}',
+    retry: '重试',
+    updatedAt: '更新于 {time}',
+    autoRefresh: '自动刷新间隔',
+    refreshOff: '暂停自动刷新',
+    refreshEvery: '每 {seconds} 秒刷新',
+    refreshPaused: '自动刷新已暂停，可手动刷新',
+    displaySettings: '展示设置',
+    moreFilters: '更多筛选',
+    settingsSaved: '号池展示设置已保存',
+    settingsHint: '配置用户号池的展示账号与可见分组。',
+    saving: '保存中…',
     extra: {
       synthetic: {
         title: '用户视图展示',
@@ -41,12 +55,12 @@ export default {
     title: '实时号池',
     navAccounts: '账号池',
     navUsage: '使用记录',
-    description: '号池内每个账号的实时状态、今日用量与近期请求流水。数据来自账号表与用量记录，不提供写入入口。',
+    description: '查看账号状态、今日用量与近期请求。',
 
     // 普通用户视角：只看得到自己用过的账号，且不暴露内部调度字段。
     user: {
       title: '我的号池用量',
-      description: '这里只展示你自己调用过的上游账号与用量，内部调度信息（分组、并发、倍率、优先级）不对普通用户开放。',
+      description: '查看近期使用过的账号、用量与请求记录。',
       empty: '你还没有使用过任何号池账号',
       overview: {
         accounts: '我用过的账号',
@@ -150,7 +164,7 @@ export default {
         model: '模型',
         requestId: '请求 ID',
         accountPlaceholder: '精确匹配',
-        modelPlaceholder: '如 claude-sonnet-4-5',
+        modelPlaceholder: '搜索模型名称',
         requestIdPlaceholder: '完整或前缀',
       },
       columns: {

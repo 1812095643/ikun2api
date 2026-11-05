@@ -156,3 +156,21 @@ func (s *AccountPoolService) poolUserVisibleGroupID(ctx context.Context) int64 {
 	}
 	return s.settingService.GetPoolUserVisibleGroupID(ctx)
 }
+
+// poolDisplayConfiguration reads the four values together. A missing setting
+// uses its original default; a failed read must not expand the visible group.
+func (s *AccountPoolService) poolDisplayConfiguration(ctx context.Context) (PoolSyntheticPlan, int64, error) {
+	if s.settingService == nil {
+		return PoolSyntheticPlan{}, DefaultPoolUserVisibleGroupID, nil
+	}
+	values, err := s.settingService.settingRepo.GetMultiple(ctx, []string{
+		SettingKeyPoolUserSyntheticCount, SettingKeyPoolUserSyntheticBanned,
+		SettingKeyPoolUserSyntheticPlatform, SettingKeyPoolUserVisibleGroupID,
+	})
+	if err != nil {
+		return PoolSyntheticPlan{}, 0, poolDataUnavailable(err)
+	}
+	count := parsePoolUserSyntheticCount(values[SettingKeyPoolUserSyntheticCount])
+	plan := PoolSyntheticPlan{Count: count, Banned: min(count, parsePoolUserSyntheticBanned(values[SettingKeyPoolUserSyntheticBanned])), Platform: parsePoolUserSyntheticPlatform(values[SettingKeyPoolUserSyntheticPlatform])}
+	return plan, parsePoolUserVisibleGroupID(values[SettingKeyPoolUserVisibleGroupID]), nil
+}

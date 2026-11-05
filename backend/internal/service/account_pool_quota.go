@@ -286,18 +286,22 @@ func (s *AccountPoolService) accountStatsReader() (accountWindowStatsBatchReader
 }
 
 // fillWindowStats 用 usage_logs 补齐 5h / 7d 窗口的本地实测用量。
-// 失败静默降级：列表照常返回，窗口数字为 0。
-func (s *AccountPoolService) fillWindowStats(ctx context.Context, items []PoolAccount, ids []int64) {
+// 读取失败向页面报告网络异常，不把失败伪装成零值。
+func (s *AccountPoolService) fillWindowStats(ctx context.Context, items []PoolAccount, ids []int64) error {
 	if len(ids) == 0 {
-		return
+		return nil
 	}
 	reader, ok := s.accountStatsReader()
 	if !ok {
-		return
+		return nil
 	}
 	now := timezone.Now()
 
-	if stats, err := reader.GetAccountWindowStatsBatch(ctx, ids, now.Add(-5*time.Hour)); err == nil {
+	stats, err := reader.GetAccountWindowStatsBatch(ctx, ids, now.Add(-5*time.Hour))
+	if err != nil {
+		return poolDataUnavailable(err)
+	}
+	{
 		for i := range items {
 			st := stats[items[i].ID]
 			if st == nil {
@@ -313,7 +317,11 @@ func (s *AccountPoolService) fillWindowStats(ctx context.Context, items []PoolAc
 		}
 	}
 
-	if stats, err := reader.GetAccountWindowStatsBatch(ctx, ids, now.AddDate(0, 0, -7)); err == nil {
+	stats, err = reader.GetAccountWindowStatsBatch(ctx, ids, now.AddDate(0, 0, -7))
+	if err != nil {
+		return poolDataUnavailable(err)
+	}
+	{
 		for i := range items {
 			st := stats[items[i].ID]
 			if st == nil {
@@ -324,20 +332,22 @@ func (s *AccountPoolService) fillWindowStats(ctx context.Context, items []PoolAc
 			items[i].SevenDay.Cost = st.Cost
 		}
 	}
+	return nil
 }
 
-// fillUserCapacity 给普通用户视角补并发占用（Redis 实时值）；Redis 不可用时保持 0。
-func (s *AccountPoolService) fillUserCapacity(ctx context.Context, items []PoolUserAccount, ids []int64) {
+// fillUserCapacity 给普通用户视角补并发占用（Redis 实时值）；读取失败返回错误。
+func (s *AccountPoolService) fillUserCapacity(ctx context.Context, items []PoolUserAccount, ids []int64) error {
 	if len(ids) == 0 || s.concurrencyService == nil {
-		return
+		return nil
 	}
 	counts, err := s.concurrencyService.GetAccountConcurrencyBatch(ctx, ids)
-	if err != nil || len(counts) == 0 {
-		return
+	if err != nil {
+		return poolDataUnavailable(err)
 	}
 	for i := range items {
 		items[i].Capacity.InUse = counts[items[i].ID]
 	}
+	return nil
 }
 
 // poolUserCapacityFrom 裁剪出用户可见的容量。

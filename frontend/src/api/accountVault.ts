@@ -12,6 +12,8 @@ export interface VaultRecord {
  id: string; platform: string; title: string; tags: string; status: string
  email: string; auxiliary_email: string; account_id: number | null; fields: Record<string, boolean>
  version: number; updated_at: string
+ oauth_account?: { id: number; name: string; platform: string; status: string } | null
+ oauth_match?: 'matched' | 'none' | 'ambiguous'
 }
 export interface VaultParseRow { line: number; entry: VaultEntry; error?: string }
 export const vaultFields = [

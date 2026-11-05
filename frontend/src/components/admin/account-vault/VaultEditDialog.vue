@@ -20,7 +20,7 @@ const states = [{ value: 'unused', label: '未使用' }, { value: 'active', labe
     <textarea v-if="key === 'notes'" v-model="form[key]" class="input mt-1 min-h-20" maxlength="16000" />
     <input v-else v-model="form[key]" :type="['password','auxiliary_password','session_key','api_key'].includes(key) ? 'password' : 'text'" :required="key === 'email'" class="input mt-1 font-mono" spellcheck="false" autocomplete="new-password" :maxlength="key.includes('url') ? 2048 : 8192" />
    </label>
-   <label class="text-sm">关联账号 ID（可选）<input v-model.number="form.account_id" type="number" min="1" class="input mt-1" /></label>
+   <label class="text-sm">手动关联账号 ID（可选）<input v-model.number="form.account_id" type="number" min="1" class="input mt-1" /><span class="mt-1 block text-xs text-gray-500">列表会根据主邮箱自动匹配同平台 OAuth 账号，无需填写此项。</span></label>
    <div class="flex items-end justify-end gap-2 sm:col-span-2"><button type="button" class="btn btn-secondary" @click="emit('close')">取消</button><button type="submit" class="btn btn-primary" :disabled="saving">{{ saving ? '保存中…' : '保存' }}</button></div>
   </form>
  </BaseDialog>

@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
+	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
 	"github.com/MACOS-DO/sub4api/internal/pkg/timezone"
 	"github.com/MACOS-DO/sub4api/internal/pkg/usagestats"
 )
@@ -227,10 +229,16 @@ func (s *AccountPoolService) ListAccounts(ctx context.Context, filter PoolAccoun
 		ids = append(ids, acc.ID)
 	}
 
-	s.fillTodayStats(ctx, items, ids)
-	s.fillConcurrency(ctx, items, ids)
+	if err := s.fillTodayStats(ctx, items, ids); err != nil {
+		return nil, err
+	}
+	if err := s.fillConcurrency(ctx, items, ids); err != nil {
+		return nil, err
+	}
 	s.fillCapacity(ctx, items)
-	s.fillWindowStats(ctx, items, ids)
+	if err := s.fillWindowStats(ctx, items, ids); err != nil {
+		return nil, err
+	}
 
 	// 窗口费用回填之后再体检「限额满了还能调度」的不一致，需要用到 window_cost_used。
 	for i := range items {
@@ -248,42 +256,45 @@ func (s *AccountPoolService) ListAccounts(ctx context.Context, filter PoolAccoun
 	}, nil
 }
 
-// fillTodayStats 批量填充今日用量；失败时静默降级为零值，不影响列表可用性。
-func (s *AccountPoolService) fillTodayStats(ctx context.Context, items []PoolAccount, ids []int64) {
-	if len(ids) == 0 || s.accountUsageService == nil {
-		return
-	}
-	stats, err := s.accountUsageService.GetTodayStatsBatch(ctx, ids)
-	if err != nil || len(stats) == 0 {
-		return
-	}
-	for i := range items {
-		st, ok := stats[items[i].ID]
-		if !ok || st == nil {
-			continue
-		}
-		items[i].Today = PoolWindow{
-			Requests:     st.Requests,
-			Tokens:       st.Tokens,
-			Cost:         st.Cost,
-			StandardCost: st.StandardCost,
-			UserCost:     st.UserCost,
-		}
-	}
+// poolDataUnavailable surfaces failed reads instead of manufacturing zero usage.
+func poolDataUnavailable(err error) error {
+	return infraerrors.ServiceUnavailable("POOL_DATA_UNAVAILABLE", "Pool data temporarily unavailable").WithCause(err)
 }
 
-// fillConcurrency 批量填充当前并发占用；Redis 不可用时保持 0。
-func (s *AccountPoolService) fillConcurrency(ctx context.Context, items []PoolAccount, ids []int64) {
+func (s *AccountPoolService) fillTodayStats(ctx context.Context, items []PoolAccount, ids []int64) error {
+	if len(ids) == 0 || s.usageLogRepo == nil {
+		return nil
+	}
+	reader, ok := s.accountStatsReader()
+	if !ok {
+		return poolDataUnavailable(errors.New("pool statistics reader unavailable"))
+	}
+	// The shared AccountUsageService fallback hides failed reads as zeros. Pool
+	// queries need an explicit failure signal, while keeping the same aggregation.
+	stats, err := reader.GetAccountWindowStatsBatch(ctx, ids, timezone.Today())
+	if err != nil {
+		return poolDataUnavailable(err)
+	}
+	for i := range items {
+		if st := stats[items[i].ID]; st != nil {
+			items[i].Today = poolWindowFromAccountStats(st)
+		}
+	}
+	return nil
+}
+
+func (s *AccountPoolService) fillConcurrency(ctx context.Context, items []PoolAccount, ids []int64) error {
 	if len(ids) == 0 || s.concurrencyService == nil {
-		return
+		return nil
 	}
 	counts, err := s.concurrencyService.GetAccountConcurrencyBatch(ctx, ids)
-	if err != nil || len(counts) == 0 {
-		return
+	if err != nil {
+		return poolDataUnavailable(err)
 	}
 	for i := range items {
 		items[i].InUse = counts[items[i].ID]
 	}
+	return nil
 }
 
 // Overview 返回号池概览：账号状态分布 + 全站今日/近 7 天用量。
@@ -320,10 +331,12 @@ func (s *AccountPoolService) Overview(ctx context.Context) (*PoolOverview, error
 			}
 		}
 		if s.concurrencyService != nil && len(ids) > 0 {
-			if counts, err := s.concurrencyService.GetAccountConcurrencyBatch(ctx, ids); err == nil {
-				for _, id := range ids {
-					overview.TotalInUse += counts[id]
-				}
+			counts, err := s.concurrencyService.GetAccountConcurrencyBatch(ctx, ids)
+			if err != nil {
+				return nil, poolDataUnavailable(err)
+			}
+			for _, id := range ids {
+				overview.TotalInUse += counts[id]
 			}
 		}
 		if len(accounts) == 0 || int64(page*poolOverviewBatch) >= total {
@@ -335,13 +348,17 @@ func (s *AccountPoolService) Overview(ctx context.Context) (*PoolOverview, error
 		// 概览必须与逐个账号卡片同口径，否则「卡片之和 != 概览」会被当成 bug。
 		// 走 poolGlobalWindowStats：cost 已乘账号倍率。
 		dayStart := timezone.Today()
-		if stats := s.poolGlobalWindowStats(ctx, dayStart); stats != nil {
-			overview.Today = poolWindowFromAccountStats(stats)
+		stats, err := s.poolGlobalWindowStats(ctx, dayStart)
+		if err != nil {
+			return nil, err
 		}
+		overview.Today = poolWindowFromAccountStats(stats)
 		weekStart := dayStart.AddDate(0, 0, -6)
-		if stats := s.poolGlobalWindowStats(ctx, weekStart); stats != nil {
-			overview.Window7d = poolWindowFromAccountStats(stats)
+		stats, err = s.poolGlobalWindowStats(ctx, weekStart)
+		if err != nil {
+			return nil, err
 		}
+		overview.Window7d = poolWindowFromAccountStats(stats)
 	}
 
 	return overview, nil
@@ -467,17 +484,27 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 	// 概览需要「今日」与「近 7 天」两个窗口，账号集合按 7 天取，
 	// 否则今天没调用的账号会从卡片里消失。
 	weekStart := dayStart.AddDate(0, 0, -6)
-	if weekIDs, weekErr := reader.ListAccountIDsByUser(ctx, userID, weekStart); weekErr == nil && len(weekIDs) > len(accountIDs) {
+	weekIDs, weekErr := reader.ListAccountIDsByUser(ctx, userID, weekStart)
+	if weekErr != nil {
+		return nil, poolDataUnavailable(weekErr)
+	}
+	if len(weekIDs) > len(accountIDs) {
 		accountIDs = weekIDs
 	}
 
 	// 账号数按用户实际可见的口径统计：分组过滤要生效，合成账号也要算进来，
 	// 否则列表行数与概览卡片会对不上，池子大小一眼就穿。
 	overview.AccountCount = 0
-	visibleGroupID := s.poolUserVisibleGroupID(ctx)
+	plan, visibleGroupID, err := s.poolDisplayConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if len(accountIDs) > 0 {
 		accounts, accErr := s.adminService.GetAccountsByIDs(ctx, accountIDs)
-		if accErr == nil {
+		if accErr != nil {
+			return nil, poolDataUnavailable(accErr)
+		}
+		{
 			for _, acc := range accounts {
 				if acc == nil {
 					continue
@@ -498,15 +525,19 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 		}
 	}
 
-	if stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart); err == nil {
-		overview.Today = poolSumUserWindows(stats)
+	stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart)
+	if err != nil {
+		return nil, poolDataUnavailable(err)
 	}
-	if stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart); err == nil {
-		overview.Window7d = poolSumUserWindows(stats)
+	overview.Today = poolSumUserWindows(stats)
+	stats, err = reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart)
+	if err != nil {
+		return nil, poolDataUnavailable(err)
 	}
+	overview.Window7d = poolSumUserWindows(stats)
 
 	// 合成账号只影响用户视图的数目与平台分布，不参与任何真实用量聚合。
-	if plan := s.poolSyntheticPlan(ctx); !plan.empty() {
+	if !plan.empty() {
 		overview.AccountCount += int64(plan.Count)
 		overview.ActiveCount += int64(plan.available())
 		platform := strings.TrimSpace(plan.Platform)
@@ -549,9 +580,11 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	dayStart := timezone.Today()
 	weekStart := dayStart.AddDate(0, 0, -6)
 	// 管理员可以限制用户端只看某个分组的真实账号。
-	visibleGroupID := s.poolUserVisibleGroupID(ctx)
+	plan, visibleGroupID, err := s.poolDisplayConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
 	now := timezone.Now()
-	plan := s.poolSyntheticPlan(ctx)
 
 	accountIDs, err := reader.ListAccountIDsByUser(ctx, userID, weekStart)
 	if err != nil {
@@ -573,7 +606,7 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 
 	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart)
 	if err != nil {
-		todayStats = map[int64]*usagestats.AccountStats{}
+		return nil, poolDataUnavailable(err)
 	}
 
 	search := strings.ToLower(strings.TrimSpace(filter.Search))
@@ -634,7 +667,9 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 		itemIDs = append(itemIDs, acc.ID)
 	}
 
-	s.fillUserCapacity(ctx, items, itemIDs)
+	if err := s.fillUserCapacity(ctx, items, itemIDs); err != nil {
+		return nil, err
+	}
 	// 合成账号排在真实账号之后：真实数据永远优先，翻页时也不会挤掉真号。
 	items = append(items, poolFilterSyntheticUserItems(s.buildSyntheticUserAccounts(ctx, userID, plan, now), filter)...)
 
@@ -649,21 +684,17 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	return result, nil
 }
 
-// poolGlobalWindowStats 取全站从 startTime 起的号池口径聚合。
-//
-// 优先用 repo 的 GetPoolGlobalWindowStats（cost 乘了账号倍率，与账号卡片一致）；
-// repo 不支持时返回 nil，调用方保持零值，不用 GetGlobalStats 兜底——
-// 那个口径的 cost 不含倍率，兜底会让概览和卡片对不上账，宁可显示 0 也不显示错的数。
-func (s *AccountPoolService) poolGlobalWindowStats(ctx context.Context, startTime time.Time) *usagestats.AccountStats {
+// poolGlobalWindowStats keeps account-cost semantics and reports failed reads.
+func (s *AccountPoolService) poolGlobalWindowStats(ctx context.Context, startTime time.Time) (*usagestats.AccountStats, error) {
 	reader, ok := s.usageLogRepo.(poolGlobalStatsReader)
 	if !ok {
-		return nil
+		return nil, poolDataUnavailable(errors.New("pool global statistics reader unavailable"))
 	}
 	stats, err := reader.GetPoolGlobalWindowStats(ctx, startTime)
-	if err != nil || stats == nil {
-		return nil
+	if err != nil {
+		return nil, poolDataUnavailable(err)
 	}
-	return stats
+	return stats, nil
 }
 
 // userStatsReader 在底层 repo 支持用户维度聚合时返回 reader。

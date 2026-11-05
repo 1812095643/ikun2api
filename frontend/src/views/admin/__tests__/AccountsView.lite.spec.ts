@@ -5,6 +5,9 @@ import { defineComponent } from 'vue'
 import AccountsView from '../AccountsView.vue'
 import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
 
+const mockRoute = vi.hoisted(() => ({ query: {} as Record<string,string> }))
+vi.mock('vue-router', async importOriginal => ({ ...await importOriginal<typeof import('vue-router')>(), useRoute: () => mockRoute }))
+
 const {
   listAccounts,
   listWithEtag,
@@ -159,6 +162,7 @@ const fullAccount = {
 
 describe('admin AccountsView lite account list', () => {
   beforeEach(() => {
+    mockRoute.query = {}
     localStorage.clear()
     listAccounts.mockReset().mockResolvedValue({ items: [listRow], total: 1, page: 1, page_size: 20, pages: 1 })
     listWithEtag.mockReset().mockResolvedValue({ notModified: true, etag: 'compact-etag', data: null })
@@ -175,6 +179,15 @@ describe('admin AccountsView lite account list', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('opens the matched OAuth account by URL without changing list filters', async () => {
+    mockRoute.query = { account_id: '42' }
+    const wrapper = mountView()
+    await flushPromises()
+    expect(getById).toHaveBeenCalledWith(42)
+    expect(wrapper.get('[data-test="edit-account"]').text()).toBe('compact row')
+    wrapper.unmount()
   })
 
   it('keeps lite=1 on the initial list request', async () => {

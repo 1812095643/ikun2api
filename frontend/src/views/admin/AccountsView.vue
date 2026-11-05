@@ -503,6 +503,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, toRaw, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -1918,6 +1919,7 @@ const cols = computed(() =>
   )
 )
 
+const accountRoute = useRoute()
 const accountDetailLoading = new Set<number>()
 const loadAccountDetails = async (account: Pick<AccountListItem, 'id'>): Promise<Account | null> => {
   if (accountDetailLoading.has(account.id)) return null
@@ -1939,6 +1941,17 @@ const handleEdit = async (a: AccountListItem) => {
   edAcc.value = account
   showEdit.value = true
 }
+// Account-vault links resolve by ID even if the current list filters hide it.
+watch(() => accountRoute?.query.account_id, async (raw, _previous, onCleanup) => {
+  const id = typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : 0
+  if (!Number.isSafeInteger(id) || id <= 0) return
+  let canceled = false
+  onCleanup(() => { canceled = true })
+  const account = await loadAccountDetails({ id })
+  if (!account || canceled) return
+  edAcc.value = account
+  showEdit.value = true
+}, { immediate: true })
 const openMenu = (a: Account, e: MouseEvent) => {
   menu.acc = a
   const target = e.currentTarget as HTMLElement

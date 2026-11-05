@@ -1,5 +1,19 @@
 export default {
   pool: {
+    networkError: 'Network error',
+    retryHint: 'Data is temporarily unavailable. Please try again.',
+    lastAvailable: 'Showing the last successful data from {time}',
+    retry: 'Retry',
+    updatedAt: 'Updated {time}',
+    autoRefresh: 'Automatic refresh interval',
+    refreshOff: 'Pause auto refresh',
+    refreshEvery: 'Every {seconds} seconds',
+    refreshPaused: 'Auto refresh is paused. Refresh manually.',
+    displaySettings: 'Display settings',
+    moreFilters: 'More filters',
+    settingsSaved: 'Pool display settings saved',
+    settingsHint: 'Configure displayed accounts and visible groups for the user pool.',
+    saving: 'Saving…',
     extra: {
       synthetic: {
         title: 'User-facing display',

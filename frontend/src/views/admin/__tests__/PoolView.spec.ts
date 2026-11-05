@@ -1,7 +1,7 @@
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { reactive } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import PoolView from '../PoolView.vue'
+import PoolView from '@/components/pool/PoolPanel.vue'
 
 const mocks = vi.hoisted(() => ({
   route: { path: '/pool', query: {} as Record<string, string> },
@@ -45,7 +45,7 @@ function mountPage() {
   return shallowMount(PoolView, {
     global: { stubs: {
       AppLayout: { template: '<div><slot /></div>' },
-      TablePageLayout: { template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
+      TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
     } },
   })
 }
@@ -53,6 +53,7 @@ function mountPage() {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.route = reactive({ path: '/pool', query: {} as Record<string, string> })
+  mocks.replace.mockImplementation(({ query }) => { mocks.route.query = query; return Promise.resolve() })
   mocks.auth = reactive({ isAdmin: false })
   mocks.overview.mockResolvedValue({ account_count: 0, today: {}, window_7d: {}, generated_at: '2026-11-04T00:00:00Z' })
   mocks.accounts.mockResolvedValue({ items: [], total: 0 })
@@ -78,7 +79,7 @@ describe('live account pool page', () => {
     await wrapper.findAll('[role="tab"]')[0].trigger('click')
     await wrapper.findAll('[role="tab"]')[1].trigger('click')
     await flushPromises()
-    expect(mocks.usage).toHaveBeenCalledTimes(1)
+    expect(mocks.usage).toHaveBeenCalledTimes(2)
     wrapper.unmount()
   })
 
@@ -91,6 +92,24 @@ describe('live account pool page', () => {
     mocks.route.query = { tab: 'accounts' }
     await flushPromises()
     expect(wrapper.findAll('[role="tab"]')[0].attributes('aria-selected')).toBe('true')
+    wrapper.unmount()
+  })
+
+  it('keeps the last successful rows and exposes retry on failed refresh', async () => {
+    const rows = [{ id: 9, name: 'Last known account' }]
+    mocks.accounts.mockResolvedValueOnce({ items: rows, total: 1 })
+    const wrapper = mountPage()
+    await flushPromises()
+    mocks.accounts.mockRejectedValueOnce(new Error('offline'))
+    await wrapper.find('button[aria-label="common.refresh"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'PoolAccountTable' }).props('rows')).toEqual(rows)
+    expect(wrapper.findComponent({ name: 'PoolNetworkError' }).exists()).toBe(true)
+    expect(mocks.error).not.toHaveBeenCalled()
+    mocks.accounts.mockResolvedValueOnce({ items: rows, total: 1 })
+    wrapper.findComponent({ name: 'PoolNetworkError' }).vm.$emit('retry')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'PoolNetworkError' }).exists()).toBe(false)
     wrapper.unmount()
   })
 

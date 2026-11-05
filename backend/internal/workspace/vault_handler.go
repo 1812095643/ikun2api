@@ -79,17 +79,19 @@ func (h *Handler) registerAccountTools(manage *gin.RouterGroup) {
 }
 
 type vaultRecord struct {
-	ID             string          `json:"id"`
-	Platform       string          `json:"platform"`
-	Title          string          `json:"title"`
-	Tags           string          `json:"tags"`
-	Status         string          `json:"status"`
-	AccountID      *int64          `json:"account_id"`
-	Email          string          `json:"email"`
-	AuxiliaryEmail string          `json:"auxiliary_email"`
-	Fields         map[string]bool `json:"fields"`
-	Version        int64           `json:"version"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	ID             string             `json:"id"`
+	Platform       string             `json:"platform"`
+	Title          string             `json:"title"`
+	Tags           string             `json:"tags"`
+	Status         string             `json:"status"`
+	AccountID      *int64             `json:"account_id"`
+	Email          string             `json:"email"`
+	AuxiliaryEmail string             `json:"auxiliary_email"`
+	Fields         map[string]bool    `json:"fields"`
+	Version        int64              `json:"version"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	OAuthAccount   *vaultOAuthAccount `json:"oauth_account"`
+	OAuthMatch     string             `json:"oauth_match"`
 }
 
 func (h *Handler) listVault(c *gin.Context) {
@@ -164,6 +166,14 @@ func (h *Handler) listVault(c *gin.Context) {
 		items = append(items, item)
 	}
 	if err = rows.Err(); err != nil {
+		fail(c, err)
+		return
+	}
+	if err = rows.Close(); err != nil {
+		fail(c, err)
+		return
+	}
+	if err = h.matchVaultOAuthAccounts(ctx, items); err != nil {
 		fail(c, err)
 		return
 	}

@@ -72,6 +72,9 @@ func toolsPostgresFixture(t *testing.T) (*Handler, *gin.Engine) {
  INSERT INTO accounts VALUES(1,'a','anthropic','oauth',NULL),(2,'b','anthropic','oauth',NULL),(3,'c','anthropic','oauth',NULL),(4,'d','anthropic','oauth',NULL);`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = db.Exec(`ALTER TABLE accounts ADD COLUMN status TEXT NOT NULL DEFAULT 'active', ADD COLUMN extra JSONB NOT NULL DEFAULT '{}', ADD COLUMN credentials JSONB NOT NULL DEFAULT '{}'`); err != nil {
+		t.Fatal(err)
+	}
 	raw, err := migrations.FS.ReadFile("263_admin_account_tools.sql")
 	if err != nil {
 		t.Fatal(err)
