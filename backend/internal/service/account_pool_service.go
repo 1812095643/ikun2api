@@ -672,8 +672,14 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	if err := s.fillUserCapacity(ctx, items, itemIDs); err != nil {
 		return nil, err
 	}
+	// 合成账号的忙闲跟着真实池走：真实账号全闲着的时候，一屏随机号也不该还在
+	// 自己爬今日用量、占并发槽位。拿不到容量信息时 ratio 为 nil，退回固有强度。
+	syntheticPlan := plan
+	if ratio := poolRealLoadRatio(items); ratio != nil {
+		syntheticPlan.LoadRatio = ratio
+	}
 	// 合成账号排在真实账号之后：真实数据永远优先，翻页时也不会挤掉真号。
-	items = append(items, poolFilterSyntheticUserItems(s.buildSyntheticUserAccounts(ctx, userID, plan, now), filter)...)
+	items = append(items, poolFilterSyntheticUserItems(s.buildSyntheticUserAccounts(ctx, userID, syntheticPlan, now), filter)...)
 
 	result.Total = int64(len(items))
 	start, end := len(items), len(items)

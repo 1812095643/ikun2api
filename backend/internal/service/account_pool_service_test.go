@@ -139,3 +139,30 @@ func TestAccountPoolQuotaReadings(t *testing.T) {
 		require.Zero(t, window.RemainingSeconds)
 	}
 }
+
+// TestPoolQuotaWindowUsesDailyQuotaForAPIKeyAccounts 验证 api_key 这类没有上游
+// 5 小时读数的账号会用每日额度算百分比：额度才能跟着真实请求一起涨、到日界归零。
+func TestPoolQuotaWindowUsesDailyQuotaForAPIKeyAccounts(t *testing.T) {
+	account := &Account{
+		Platform:    PlatformAnthropic,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 3,
+		Extra: map[string]any{
+			"quota_daily_limit": 200.0,
+			"quota_daily_used":  50.0,
+		},
+	}
+	capacity := poolCapacityFromAccount(account)
+	require.True(t, capacity.SupportsQuota, "api_key accounts execute quota limits")
+
+	window := poolQuotaWindowFromAccount(account, poolWindowFiveHour, capacity)
+	require.Equal(t, 25.0, window.Utilization)
+	require.Equal(t, "quota", window.Source)
+
+	// 没配每日额度时保持 local：设计上绝不编一个百分比出来。
+	bare := &Account{Platform: PlatformAnthropic, Type: AccountTypeAPIKey}
+	bareWindow := poolQuotaWindowFromAccount(bare, poolWindowFiveHour, poolCapacityFromAccount(bare))
+	require.Zero(t, bareWindow.Utilization)
+	require.Equal(t, "local", bareWindow.Source)
+	require.Nil(t, bareWindow.ResetsAt)
+}
