@@ -1,10 +1,5 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import App from './App.vue'
-import router from './router'
-import i18n, { initI18n } from './i18n'
-import { useAppStore } from '@/stores/app'
-import { updateFavicon } from '@/utils/branding'
+import { isPoolSharePagePath } from '@/utils/poolShareLink'
 import { isIOSDevice } from '@/utils/device'
 import './style.css'
 
@@ -23,7 +18,8 @@ function initIOSViewportZoomFix() {
 }
 
 function initThemeClass() {
-  const savedTheme = localStorage.getItem('theme')
+  let savedTheme: string | null = null
+  try { savedTheme = localStorage.getItem('theme') } catch { /* Third-party frames can deny storage. */ }
   const shouldUseDark =
     savedTheme === 'dark' ||
     (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -35,6 +31,16 @@ async function bootstrap() {
   initThemeClass()
   initIOSViewportZoomFix()
 
+  // Cross-site shares run a read-only root without console auth, dialogs or polling.
+  if (isPoolSharePagePath(window.location.pathname)) {
+    const { bootstrapPoolShareApp } = await import('./poolShareApp')
+    await bootstrapPoolShareApp()
+    return
+  }
+
+  const [{ default: App }, { default: router }, { createPinia }, { default: i18n, initI18n }, { useAppStore }, { updateFavicon }] = await Promise.all([
+    import('./App.vue'), import('./router'), import('pinia'), import('./i18n'), import('@/stores/app'), import('@/utils/branding'),
+  ])
   const app = createApp(App)
   const pinia = createPinia()
   app.use(pinia)

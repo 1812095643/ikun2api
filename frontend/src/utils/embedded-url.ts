@@ -4,6 +4,8 @@
  * with user_id, token, theme, lang, ui_mode, src_host, and src parameters.
  */
 
+import { preservePoolShareCredential } from './poolShareLink'
+
 const EMBEDDED_USER_ID_QUERY_KEY = 'user_id'
 const EMBEDDED_AUTH_TOKEN_QUERY_KEY = 'token'
 const EMBEDDED_THEME_QUERY_KEY = 'theme'
@@ -20,13 +22,14 @@ export function buildEmbeddedUrl(
   theme: 'light' | 'dark' = 'light',
   lang?: string,
 ): string {
-  if (!baseUrl) return baseUrl
+  if (!baseUrl || (!/^https?:\/\//i.test(baseUrl) && !baseUrl.startsWith('/'))) return baseUrl
   try {
     const url = new URL(baseUrl, typeof window === 'undefined' ? undefined : window.location.origin)
-    if (userId) {
+    const isPoolShare = preservePoolShareCredential(url)
+    if (userId && !isPoolShare) {
       url.searchParams.set(EMBEDDED_USER_ID_QUERY_KEY, String(userId))
     }
-    if (authToken) {
+    if (authToken && !isPoolShare) {
       url.searchParams.set(EMBEDDED_AUTH_TOKEN_QUERY_KEY, authToken)
     }
     url.searchParams.set(EMBEDDED_THEME_QUERY_KEY, theme)

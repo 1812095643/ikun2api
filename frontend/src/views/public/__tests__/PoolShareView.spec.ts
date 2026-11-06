@@ -12,6 +12,19 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 beforeEach(() => { mocks.route = reactive({ query: {} as LocationQuery, hash: '' }) })
 
 describe('pool share URL compatibility', () => {
+  it('uses the portable share token even when the embedding site appends its login token', () => {
+    mocks.route.query = { share_token: 'pool_PORTABLE_TEST', token: 'foreign-jwt', user_id: '999', ui_mode: 'embedded', tab: 'usage' }
+    const wrapper = shallowMount(PoolShareView)
+    expect(wrapper.findComponent({ name: 'UserPoolPanel' }).props()).toMatchObject({ shared: true, token: 'pool_PORTABLE_TEST', initialTab: 'usage' })
+    wrapper.unmount()
+  })
+  it('retains fragment links when Sub2API injects a foreign login JWT', () => {
+    mocks.route.query = { token: 'foreign-jwt', ui_mode: 'embedded' }
+    mocks.route.hash = '#token=pool_LEGACY_TEST&tab=usage'
+    const wrapper = shallowMount(PoolShareView)
+    expect(wrapper.findComponent({ name: 'UserPoolPanel' }).props()).toMatchObject({ token: 'pool_LEGACY_TEST', initialTab: 'usage' })
+    wrapper.unmount()
+  })
   it.each(['accounts', 'usage'])('opens query links on the %s tab', tab => {
     mocks.route.query = { token: 'pool_QUERY_TEST', tab }
     const wrapper = shallowMount(PoolShareView)

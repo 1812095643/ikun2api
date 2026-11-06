@@ -72,6 +72,12 @@ jobs:
           go test -tags integration ./internal/repository -run '^TestGroupRepoSuite$/^TestPriceChangeHistory$' -count=1 -timeout=240s
           cd ../frontend
           pnpm exec vitest run src/components/common/__tests__/GroupPriceChangeBadge.spec.ts src/components/common/__tests__/GroupOptionItem.spec.ts src/components/common/__tests__/VersionBadge.spec.ts src/views/user/__tests__/KeysView.spec.ts src/components/modelPlaza/__tests__/PlazaGroupSection.spec.ts
+      - name: Cross-site pool share credentials and read-only bootstrap regression
+        run: |
+          cd frontend
+          pnpm exec vitest run src/utils/__tests__/poolShareLink.spec.ts src/utils/__tests__/embedded-url.spec.ts src/__tests__/poolShareApp.spec.ts src/views/user/__tests__/CustomPageView.spec.ts
+          cd ../backend
+          go test -tags unit ./internal/server/middleware -run 'TestPoolShare|TestSecurityHeaders' -count=1
       - name: 分享页打包模式响应头回归
         working-directory: backend
         run: go test -tags embed ./internal/web -run TestFrontendServerPoolShareHeaders -count=1

@@ -60,6 +60,13 @@ describe('embedded-url', () => {
     expect(buildEmbeddedUrl('not a url', 1, 'token')).toBe('not a url')
   })
 
+  it('continues to support root-relative configured pages', () => {
+    const url = new URL(buildEmbeddedUrl('/checkout?plan=pro', 42, 'host-token'))
+    expect(url.origin).toBe('https://app.example.com')
+    expect(url.pathname).toBe('/checkout')
+    expect(url.searchParams.get('token')).toBe('host-token')
+  })
+
   it('detects dark mode from document root class', () => {
     document.documentElement.classList.add('dark')
     expect(detectTheme()).toBe('dark')

@@ -19,7 +19,8 @@ function isLocaleCode(value: string): value is LocaleCode {
 }
 
 function getDefaultLocale(): LocaleCode {
-  const saved = localStorage.getItem(LOCALE_KEY)
+  let saved: string | null = null
+  try { saved = localStorage.getItem(LOCALE_KEY) } catch { /* Third-party frames can deny storage. */ }
   if (saved && isLocaleCode(saved)) {
     return saved
   }

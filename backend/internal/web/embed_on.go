@@ -401,7 +401,7 @@ func serveIndexHTML(c *gin.Context, fsys fs.FS) {
 // The embedded frontend terminates requests before route middleware runs.
 // Set share-page headers on its actual HTML return paths, including fallback.
 func setPoolSharePageHeaders(c *gin.Context) bool {
-	if c.Request.URL.Path != "/share/pool" {
+	if path := c.Request.URL.EscapedPath(); path != "/share/pool" && path != "/share/pool/" {
 		return false
 	}
 	c.Header("Cache-Control", "no-store")

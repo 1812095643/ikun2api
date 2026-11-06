@@ -6,9 +6,16 @@
 - 使用记录保留当前用户自己的时间、脱敏账号、模型、流式类型和耗时，不输出金额。原逐账号详情接口返回 `POOL_DETAILS_DISABLED`。
 - 管理员通过专用 `/admin/pool/display-settings` 接口保存分组多选 `pool_user_visible_group_ids`。存在新设置时使用新值；不存在时兼容旧 `pool_user_visible_group_id`。空数组表示不限分组，非法值或读取失败返回异常。
 - 账号集合与窗口统计 SQL 同时限定用户及选中的分组；使用记录将分组条件写在服务端，客户端不能用参数扩大范围。分享请求按 token 对应用户解析，并实时采用同一展示配置。
-- 分享链接只开放 `/pool-share/accounts`。每个用户仅一个有效 token，32 字节随机数，只存 SHA-256 摘要，30 天过期；重新生成替换旧摘要，删除分享立即撤销，用户停用或软删除不能继续访问。
-- 链接使用 `/share/pool#token=...`，独立页面无站点导航、无登录要求。API 用专用 header 传递 token，`credentials: omit`，不附带当前登录凭据；不允许拿分享 token 访问其它接口。
+- 分享链接只开放 `/pool-share/accounts` 与 `/pool-share/usage` 两个只读接口。每个用户仅一个有效 token，32 字节随机数，只存 SHA-256 摘要，30 天过期；重新生成替换旧摘要，删除分享立即撤销，用户停用或软删除不能继续访问。
+- 链接使用 `/share/pool?share_token=...&tab=accounts`（使用记录为 `tab=usage`，旧 `?token=` 与 `#token=` 格式仍兼容），独立页面无站点导航、无登录要求。API 用专用 header 传递 token，`credentials: omit`，不附带当前登录凭据；不允许拿分享 token 访问其它接口。
 - 分享页面与数据响应使用 no-store/no-referrer/noindex 相关边界；普通 API Key 和 JWT 不能作为分享 token 使用。
 - 本版数据库迁移仅增加 `pool_share_links`。原版程序可忽略这张表，回退后分享功能不可用；已有账单和资料库记录不改变。
 
 资料库新增 `account_vault_security` runtime 设置，默认两步验证开启。关闭要求已有验证，启用不需要先暴露资料。配置读取错误不按关闭处理。一次点击导入仍先完整校验，再通过原批次接口事务写入；网络失败保留相同批次与载荷供幂等重试。
+
+## 导入其他站点的自定义页面
+
+- 将完整分享链接填写为对方 Sub2API 或 IKUN2api 的自定义页面 URL；账号池和使用记录均可嵌入，也可在新窗口打开。
+- `share_token` 是原分享凭据，独立于对方站点自动附加的登录 `token`；对方站点无需改代码或生成新的分享凭据。
+- 旧的 `/share/pool?token=pool_...` 链接导入尚未更新的原版 Sub2API 时，将参数名改为 `share_token`，保留原值，避免被对方登录 token 覆盖。已经被覆盖且原凭据丢失的链接，需找回原分享链接。
+- 分享页只读取分享范围内的数据，既不验证对方站点的登录 JWT，也不读取本地登录状态；只有分享页开放跨站嵌入，后台页面继续拒绝嵌入。

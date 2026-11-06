@@ -5,6 +5,7 @@ import { createPoolShareLink, revokePoolShareLink, type UserPoolAccount } from '
 import { useUserPoolData, type UserPoolTab } from '@/composables/useUserPoolData'
 import { usePoolRefresh } from '@/composables/usePoolRefresh'
 import { useClipboard } from '@/composables/useClipboard'
+import { buildPoolShareUrl } from '@/utils/poolShareLink'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -27,7 +28,7 @@ function capacityColor(row:UserPoolAccount){const current=row.capacity?.in_use??
 async function generate(){
   if(shareBusy.value)return
   shareBusy.value=true;shareError.value='';copied.value=false
-  try{const result=await createPoolShareLink();shareURL.value=`${location.origin}/share/pool?${new URLSearchParams({token:result.token,tab:activeTab.value})}`;expires.value=result.expires_at}
+  try{const result=await createPoolShareLink();shareURL.value=buildPoolShareUrl(location.origin,result.token,activeTab.value);expires.value=result.expires_at}
   catch{shareError.value=t('admin.pool.networkError')}
   finally{shareBusy.value=false}
 }

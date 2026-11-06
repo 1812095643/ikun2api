@@ -434,7 +434,7 @@ func TestFrontendServerPoolShareHeaders(t *testing.T) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) { c.Header("Referrer-Policy", "strict-origin-when-cross-origin"); c.Next() })
 	router.Use(server.Middleware())
-	for _, path := range []string{"/share/pool", "/share/pool?token=pool_TEST_ONLY&tab=usage"} {
+	for _, path := range []string{"/share/pool", "/share/pool/", "/share/pool?token=pool_TEST_ONLY&tab=usage", "/share/pool?share_token=pool_TEST_ONLY&token=foreign-jwt&tab=usage"} {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", path, nil)
 		if cached := server.cache.Get(); cached != nil {

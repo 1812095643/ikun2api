@@ -3,14 +3,13 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import UserPoolPanel from '@/components/pool/UserPoolPanel.vue'
+import { resolvePoolShareToken } from '@/utils/poolShareLink'
 
 const route = useRoute()
 const { t } = useI18n()
-// New links use query parameters for menu import compatibility; old fragment links remain valid.
+// share_token survives the host site's automatic injection of its login token.
 const fragment = computed(() => new URLSearchParams(route.hash.slice(1)))
-const token = computed(() => route.query.token !== undefined
-  ? typeof route.query.token === 'string' ? route.query.token : ''
-  : fragment.value.get('token') || '')
+const token = computed(() => resolvePoolShareToken(route.query, route.hash))
 const initialTab = computed(() => (route.query.tab ?? fragment.value.get('tab')) === 'usage' ? 'usage' : 'accounts')
 </script>
 

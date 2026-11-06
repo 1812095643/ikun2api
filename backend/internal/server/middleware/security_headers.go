@@ -119,6 +119,13 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 
 	return func(c *gin.Context) {
 		finalPolicy := policy
+		// Only the standalone read-only share document may be framed by another site.
+		// Compare the escaped path too: encoded aliases must not boot the console.
+		sharePage := (c.Request.Method == "GET" || c.Request.Method == "HEAD") &&
+			(c.Request.URL.EscapedPath() == "/share/pool" || c.Request.URL.EscapedPath() == "/share/pool/")
+		if sharePage {
+			finalPolicy = poolShareCSP(finalPolicy)
+		}
 		if c.Request.URL.Path == "/image-studio" || strings.HasPrefix(c.Request.URL.Path, "/image-studio/") {
 			finalPolicy = standaloneStudioCSP(finalPolicy)
 		}
@@ -133,6 +140,12 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		if sharePage {
+			c.Writer.Header().Del("X-Frame-Options")
+			c.Header("Referrer-Policy", "no-referrer")
+			c.Header("Cache-Control", "no-store")
+			c.Header("X-Robots-Tag", "noindex, noarchive")
+		}
 		if isAPIRoutePath(c) {
 			c.Next()
 			return
@@ -152,6 +165,20 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 		}
 		c.Next()
 	}
+}
+
+// A share is intentionally portable across arbitrary HTTP(S) parent sites.
+// Do not reflect src_host or the host site's login token into a security policy.
+func poolShareCSP(policy string) string {
+	directives := make([]string, 0)
+	for _, raw := range strings.Split(policy, ";") {
+		fields := strings.Fields(raw)
+		if len(fields) == 0 || strings.EqualFold(fields[0], "frame-ancestors") {
+			continue
+		}
+		directives = append(directives, strings.TrimSpace(raw))
+	}
+	return strings.Join(append(directives, "frame-ancestors http: https:"), "; ")
 }
 
 // The standalone studio runs user-authored model adapters and can connect to a

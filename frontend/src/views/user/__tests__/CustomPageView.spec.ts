@@ -86,6 +86,18 @@ describe('custom page open button', () => {
     expect(wrapper.get('iframe').attributes('src')).toContain('https://example.com/docs')
   })
 
+  it('retains the original pool share credential for both iframe and new window without leaking the host login', () => {
+    appStore.cachedPublicSettings.custom_menu_items = [{ id: 'docs', url: 'https://share.example.test/share/pool?token=pool_ORIGINAL&tab=usage' }]
+    const wrapper = mountPage()
+    const iframeURL = new URL(wrapper.get('iframe').attributes('src'))
+    const openURL = new URL(wrapper.get<HTMLAnchorElement>('.custom-open-fab').element.href)
+    expect(openURL.href).toBe(iframeURL.href)
+    expect(openURL.searchParams.get('share_token')).toBe('pool_ORIGINAL')
+    expect(openURL.searchParams.get('tab')).toBe('usage')
+    expect(openURL.searchParams.has('token')).toBe(false)
+    expect(openURL.searchParams.has('user_id')).toBe(false)
+  })
+
   it('preserves the embedded URL, secure link attributes, and normal clicks with small pointer movements', async () => {
     const { wrapper, button } = mountEmbed()
     expect(button.href).toBe(wrapper.get('iframe').attributes('src'))
