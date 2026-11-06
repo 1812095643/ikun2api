@@ -110,7 +110,7 @@ export default {
     created: '创建时间',
     copyToClipboard: '复制到剪贴板',
     copied: '已复制！',
-    importToCcSwitch: '导入到 CCS',
+    importToCcSwitch: '导入到 CC-Switch',
     enable: '启用',
     disable: '禁用',
     nameLabel: '名称',
@@ -154,9 +154,9 @@ export default {
     quota: '额度',
     lastUsedAt: '上次使用时间',
     lastUsedIP: '最近使用 IP',
-    useKey: '使用密钥',
+    useKey: '手动导入',
     useKeyModal: {
-      title: '使用 API 密钥',
+      title: '手动导入',
       description: '将以下环境变量添加到您的终端配置文件或直接在终端中运行。',
       copy: '复制',
       copied: '已复制',
@@ -283,6 +283,14 @@ export default {
     ipRestrictionEnabled: '已配置 IP 限制',
     ccSwitchNotInstalled:
       'CC-Switch 未安装或协议处理程序未注册。请先安装 CC-Switch 或手动复制 API 密钥。',
+    quickUse: { title: '一键使用', unavailable: '当前分组不支持' },
+    magpieImport: {
+      title: '导入到 Magpie', install: '安装 Magpie', model: '模型（可选）', automaticModel: '自动获取',
+      import: '打开 Magpie 导入', opened: '请在 Magpie 中确认导入。',
+      modelsFailed: '模型读取失败，可重试或手动输入。',
+      openFailed: '未能打开 Magpie，请检查安装。', httpsRequired: 'Magpie 导入需要 HTTPS 地址。',
+      invalidName: '请填写供应商名称，名称过长时请适当缩短。'
+    },
     ccsImport: {
       useModelId: '使用模型 ID',
       client: '目标客户端', format: '接口格式', name: '供应商名称', model: '默认模型',

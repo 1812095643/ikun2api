@@ -9,14 +9,6 @@
     <PlatformIcon v-if="platform" :platform="platform" size="sm" />
     <!-- Group name -->
     <span :class="truncate ? 'truncate' : 'min-w-0 whitespace-normal [overflow-wrap:anywhere]'">{{ name }}</span>
-    <GroupPriceChangeBadge
-      v-if="showRate && (!isSubscription || alwaysShowRate)"
-      :rate-multiplier="rateMultiplier"
-      :previous-rate-multiplier="previousRateMultiplier"
-      :rate-multiplier-changed-at="rateMultiplierChangedAt"
-      :created-at="createdAt"
-      :user-rate-multiplier="userRateMultiplier"
-    />
     <!-- Right side label -->
     <span v-if="showLabel" :class="labelClass">
       <template v-if="hasCustomRate">
@@ -36,7 +28,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import GroupPriceChangeBadge from './GroupPriceChangeBadge.vue'
 import { useI18n } from 'vue-i18n'
 import type { SubscriptionType, GroupPlatform } from '@/types'
 import { useAppStore } from '@/stores/app'
@@ -48,9 +39,6 @@ interface Props {
   platform?: GroupPlatform
   subscriptionType?: SubscriptionType
   rateMultiplier?: number
-  previousRateMultiplier?: number | null
-  rateMultiplierChangedAt?: string | null
-  createdAt?: string | null
   userRateMultiplier?: number | null // 用户专属倍率
   peakRateEnabled?: boolean
   peakStart?: string

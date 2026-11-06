@@ -110,7 +110,7 @@ export default {
     created: 'Created',
     copyToClipboard: 'Copy to clipboard',
     copied: 'Copied!',
-    importToCcSwitch: 'Import to CCS',
+    importToCcSwitch: 'Import to CC-Switch',
     enable: 'Enable',
     disable: 'Disable',
     nameLabel: 'Name',
@@ -154,9 +154,9 @@ export default {
     quota: 'Quota',
     lastUsedAt: 'Last Used',
     lastUsedIP: 'Last Used IP',
-    useKey: 'Use Key',
+    useKey: 'Manual Import',
     useKeyModal: {
-      title: 'Use API Key',
+      title: 'Manual Import',
       description:
         'Add the following environment variables to your terminal profile or run directly in terminal to configure API access.',
       copy: 'Copy',
@@ -278,6 +278,14 @@ export default {
     ipBlacklistHint: 'One IP or CIDR per line. These IPs will be blocked from using this key.',
     ipRestrictionEnabled: 'IP restriction enabled',
     ccSwitchNotInstalled: 'CC-Switch is not installed or the protocol handler is not registered. Please install CC-Switch first or manually copy the API key.',
+    quickUse: { title: 'Quick Use', unavailable: 'Unavailable for this group' },
+    magpieImport: {
+      title: 'Import to Magpie', install: 'Install Magpie', model: 'Model (optional)', automaticModel: 'Auto discover',
+      import: 'Open Magpie Import', opened: 'Confirm the import in Magpie.',
+      modelsFailed: 'Could not load models. Retry or enter a model ID.',
+      openFailed: 'Could not open Magpie. Check its installation.', httpsRequired: 'Magpie import requires an HTTPS URL.',
+      invalidName: 'Enter a provider name, or shorten it if it is too long.'
+    },
     ccsImport: {
       useModelId: 'Use model ID',
       client: 'Target client', format: 'API format', name: 'Provider name', model: 'Default model',

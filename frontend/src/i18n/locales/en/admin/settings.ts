@@ -743,8 +743,8 @@ export default {
         homeModeHint: 'Custom HTML/URL is used only in custom mode; switch between the new and legacy pages at any time.',
         compactHome: 'Compact Home Page',
         compactHomeHint: 'Show a restrained site identity page when no custom home page content is set.',
-        hideCcsImportButton: 'Hide CCS Import Button',
-        hideCcsImportButtonHint: 'When enabled, the "Import to CCS" button will be hidden on the API Keys page'
+        hideCcsImportButton: 'Hide Quick Use Button',
+        hideCcsImportButtonHint: 'Hide the Quick Use button on the API Keys page.'
       },
       purchase: {
         title: 'Recharge / Subscription Page',

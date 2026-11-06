@@ -11,8 +11,8 @@ import { useCcSwitchImport } from '@/composables/useCcSwitchImport'
 import { CC_SWITCH_FORMATS, CC_SWITCH_VERSION } from '@/utils/ccswitchImport'
 import { maskApiKey } from '@/utils/maskApiKey'
 
-const props = defineProps<{ apiKey: ApiKey | null; baseUrl: string; siteName: string }>()
-const emit = defineEmits<{ close: [] }>()
+const props = defineProps<{ apiKey: ApiKey | null; baseUrl: string; siteName: string; showBack?: boolean }>()
+const emit = defineEmits<{ close: []; back: [] }>()
 const { t } = useI18n()
 const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
@@ -112,6 +112,7 @@ function copyImport() {
     </div>
     <template #footer>
       <div class="flex w-full flex-wrap justify-end gap-2">
+        <button v-if="showBack" type="button" class="btn btn-secondary mr-auto" data-test="back" @click="emit('back')">{{ t('common.back') }}</button>
         <button type="button" class="btn btn-secondary" @click="emit('close')">{{ t('common.close') }}</button>
         <button v-if="clients.length" type="button" class="btn btn-secondary" :disabled="!importResult.url" data-test="copy" @click="copyImport">{{ t('keys.ccsImport.copyLink') }}</button>
         <button v-if="clients.length" type="button" class="btn btn-primary" :disabled="!importResult.url" data-test="import" @click="openImport">

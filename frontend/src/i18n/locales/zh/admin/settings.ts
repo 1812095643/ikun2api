@@ -738,8 +738,8 @@ export default {
         homeModeHint: '自定义 HTML/URL 仅在选择自定义模式时显示；旧版与新版可以随时切换。',
         compactHome: '简洁首页',
         compactHomeHint: '未设置自定义首页内容时，展示简洁的站点信息页面。',
-        hideCcsImportButton: '隐藏 CCS 导入按钮',
-        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮'
+        hideCcsImportButton: '隐藏一键使用按钮',
+        hideCcsImportButtonHint: '启用后在 API 密钥页面隐藏“一键使用”。'
       },
       purchase: {
         title: '充值/订阅页面',

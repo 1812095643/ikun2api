@@ -169,9 +169,6 @@
                   :platform="row.group.platform"
                   :subscription-type="row.group.subscription_type"
                   :rate-multiplier="row.group.rate_multiplier"
-                  :previous-rate-multiplier="row.group.previous_rate_multiplier"
-                  :rate-multiplier-changed-at="row.group.rate_multiplier_changed_at"
-                  :created-at="row.group.created_at"
                   :user-rate-multiplier="userGroupRates[row.group.id]"
                   :peak-rate-enabled="row.group.peak_rate_enabled"
                   :peak-start="row.group.peak_start"
@@ -404,14 +401,15 @@
                 <Icon name="terminal" size="sm" />
                 <span class="text-xs">{{ t('keys.useKey') }}</span>
               </button>
-              <!-- Import to CC Switch Button -->
+              <!-- Quick use -->
               <button
                 v-if="!publicSettings?.hide_ccs_import_button"
-                @click="importToCcswitch(row)"
+                data-test="quick-use"
+                @click="openQuickUse(row, $event)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
               >
                 <Icon name="upload" size="sm" />
-                <span class="text-xs">{{ t('keys.importToCcSwitch') }}</span>
+                <span class="text-xs">{{ t('keys.quickUse.title') }}</span>
               </button>
               <!-- Toggle Status Button -->
               <button
@@ -567,9 +565,6 @@
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
-                :previous-rate-multiplier="(option as unknown as GroupOption).previousRate"
-                :rate-multiplier-changed-at="(option as unknown as GroupOption).rateChangedAt"
-                :created-at="(option as unknown as GroupOption).createdAt"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
                 :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
                 :peak-start="(option as unknown as GroupOption).peakStart"
@@ -1099,12 +1094,13 @@
       @close="closeUseKeyModal"
     />
 
-    <CcSwitchImportDialog
-      v-if="pendingCcsRow"
-      :api-key="pendingCcsRow"
+    <KeyQuickUseDialog
+      v-if="pendingQuickUseKey"
+      :api-key="pendingQuickUseKey"
+      :anchor="quickUseAnchor"
       :base-url="publicSettings?.api_base_url || origin"
       :site-name="publicSettings?.site_name || DEFAULT_SITE_NAME"
-      @close="pendingCcsRow = null"
+      @close="closeQuickUse"
     />
 
     <!-- Group Selector Dropdown (Teleported to body to avoid overflow clipping) -->
@@ -1215,7 +1211,7 @@ import { maskApiKey } from '@/utils/maskApiKey'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { platformBadgeLightClass } from '@/utils/platformColors'
 import { KEY_GROUP_PROVIDERS, KEY_GROUP_PROVIDER_ICONS, getKeyGroupProvider, type KeyGroupProvider } from '@/utils/keyGroupProviders'
-import CcSwitchImportDialog from '@/components/keys/CcSwitchImportDialog.vue'
+import KeyQuickUseDialog from '@/components/keys/KeyQuickUseDialog.vue'
 const origin = window.location.origin
 
 // Helper to format date for datetime-local input
@@ -1403,7 +1399,8 @@ const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
 const showColumnDropdown = ref(false)
-const pendingCcsRow = ref<ApiKey | null>(null)
+const pendingQuickUseKey = ref<ApiKey | null>(null)
+const quickUseAnchor = ref<HTMLElement | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
@@ -2016,8 +2013,14 @@ const resetRateLimitUsage = async () => {
   }
 }
 
-const importToCcswitch = (row: ApiKey) => {
-  pendingCcsRow.value = row
+const closeQuickUse = () => {
+  pendingQuickUseKey.value = null
+  quickUseAnchor.value = null
+}
+const openQuickUse = (row: ApiKey, event: MouseEvent) => {
+  if (pendingQuickUseKey.value?.id === row.id) { closeQuickUse(); return }
+  quickUseAnchor.value = event.currentTarget as HTMLElement
+  pendingQuickUseKey.value = row
 }
 
 function formatResetTime(resetAt: string | null): string {
