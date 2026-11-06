@@ -71,7 +71,7 @@ func poolSyntheticUserAccount(userID int64, index int, plan PoolSyntheticPlan, n
 	}
 
 	// 容量与额度都从 seed 派生：同一桶内稳定，跨桶轮换。
-	concurrency := 3 + int(seed%3)                       // 3..5
+	concurrency := 3                                     // fixed display capacity
 	inUse := int((seed >> 8) % uint64(concurrency+1))    // 0..concurrency
 	fiveHour := 20.0 + float64((seed>>16)%66)            // 20..85
 	sevenDay := 30.0 + float64((seed>>24)%61)            // 30..90

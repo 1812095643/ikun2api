@@ -240,56 +240,7 @@ func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []
 		return fmt.Errorf("chmod failed: %w", err)
 	}
 
-	if s.safety == nil {
-		return fmt.Errorf("upgrade safety service unavailable")
-	}
-	backupDir := filepath.Join(exeDir, "upgrade-backups", time.Now().UTC().Format("20060102T150405.000000000Z"))
-	if err := s.safety.Prepare(ctx, newBinaryPath, backupDir); err != nil {
-		return err
-	}
-	// Persist the old executable before one atomic rename over the live path.
-	backupPath := exePath + ".backup"
-	in, err := os.Open(exePath)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	backupTemp := filepath.Join(tempDir, "previous-binary")
-	out, err := os.OpenFile(backupTemp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0755)
-	if err != nil {
-		return err
-	}
-	_, copyErr := io.Copy(out, in)
-	syncErr := out.Sync()
-	closeErr := out.Close()
-	if copyErr != nil || syncErr != nil || closeErr != nil {
-		return fmt.Errorf("executable backup incomplete")
-	}
-	if err := os.Rename(backupTemp, backupPath); err != nil {
-		return fmt.Errorf("save executable backup: %w", err)
-	}
-	previousHash, err := UpgradeFileHash(backupPath)
-	if err != nil {
-		return err
-	}
-	candidateHash, err := UpgradeFileHash(newBinaryPath)
-	if err != nil {
-		return err
-	}
-	journal := UpgradeJournal{BackupDirectory: backupDir, PreviousBinary: backupPath, PreviousSHA256: previousHash, CandidateSHA256: candidateHash, CreatedAt: time.Now().UTC()}
-	if err := WriteUpgradeJournal(exePath, journal); err != nil {
-		return err
-	}
-	if err := os.Rename(newBinaryPath, exePath); err != nil {
-		_ = os.Remove(UpgradeJournalPath(exePath))
-		return fmt.Errorf("atomic executable replacement: %w", err)
-	}
-	if dir, e := os.Open(exeDir); e == nil {
-		_ = dir.Sync()
-		_ = dir.Close()
-	}
-
-	return nil
+	return stageUpgradeCandidate(ctx, exePath, newBinaryPath, s.safety, s.currentVersion, targetVersion)
 }
 
 // Rollback restores the previous version

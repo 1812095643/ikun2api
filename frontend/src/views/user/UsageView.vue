@@ -69,11 +69,11 @@
       <div class="card p-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
+            <div v-if="isFilterVisible('api_key_id')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-api_key_id">
               <label class="input-label">{{ t('usage.errors.keyName') }}</label>
               <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
+            <div v-if="isFilterVisible('model')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-model">
               <label class="input-label">{{ t('usage.errors.model') }}</label>
               <Select
                 v-model="errorFilter.model"
@@ -85,41 +85,41 @@
                 @change="applyErrorFilters"
               />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
+            <div v-if="isFilterVisible('category')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-category">
               <label class="input-label">{{ t('usage.errors.category') }}</label>
               <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
+            <div v-if="isFilterVisible('status_code')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-status_code">
               <label class="input-label">{{ t('usage.errors.status') }}</label>
               <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
             </div>
           </div>
           <div v-else class="flex flex-1 flex-wrap items-end gap-4">
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
+            <div v-if="isFilterVisible('api_key_id')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-api_key_id">
               <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
               <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[220px]">
+            <div v-if="isFilterVisible('model')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-model">
               <label class="input-label">{{ t('usage.model') }}</label>
               <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
+            <div v-if="isFilterVisible('group_id')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-group_id">
               <label class="input-label">{{ t('admin.usage.group') }}</label>
               <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
+            <div v-if="isFilterVisible('request_type')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-request_type">
               <label class="input-label">{{ t('usage.type') }}</label>
               <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[180px]">
+            <div v-if="isFilterVisible('native_compaction_v2')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-native_compaction_v2">
               <label class="input-label">{{ t('usage.compactionFilter') }}</label>
               <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="applyFilters" />
             </div>
-            <div v-if="subscriptionFeatureEnabled" class="w-full sm:w-auto sm:min-w-[200px]">
+            <div v-if="subscriptionFeatureEnabled && isFilterVisible('billing_type')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-billing_type">
               <label class="input-label">{{ t('admin.usage.billingType') }}</label>
               <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
+            <div v-if="isFilterVisible('billing_mode')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-billing_mode">
               <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
               <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
             </div>
@@ -132,6 +132,7 @@
             <button type="button" @click="resetFilters" class="btn btn-secondary">
               {{ t('common.reset') }}
             </button>
+            <FilterSettingsDropdown :options="filterOptions" :hidden="hiddenFilters" @toggle="toggleFilter" @reset="resetFilterVisibility" />
             <div class="relative" ref="columnDropdownRef">
               <button
                 type="button"
@@ -235,6 +236,8 @@ import GroupDistributionChart from '@/components/charts/GroupDistributionChart.v
 import EndpointDistributionChart from '@/components/charts/EndpointDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import Icon from '@/components/icons/Icon.vue'
+import FilterSettingsDropdown from '@/components/common/FilterSettingsDropdown.vue'
+import { useUsageFilterVisibility } from '@/composables/useUsageFilterVisibility'
 import UserErrorRequestsTable from '@/components/user/UserErrorRequestsTable.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
@@ -914,4 +917,43 @@ onUnmounted(() => {
 watch(endpointDistributionSource, () => {
   // Endpoint source switching is handled by the chart component using already loaded stats.
 })
+
+const { hidden: hiddenFilters, isVisible: isFilterVisible, toggle: toggleFilterVisibility, reveal: revealFilter, reset: resetFilterVisibility } = useUsageFilterVisibility('user', activeTab)
+const filterOptions = computed(() => activeTab.value === 'errors' ? [
+  { key: 'api_key_id', label: t('usage.errors.keyName') },
+  { key: 'model', label: t('usage.errors.model') },
+  { key: 'category', label: t('usage.errors.category') },
+  { key: 'status_code', label: t('usage.errors.status') },
+] : [
+  { key: 'api_key_id', label: t('usage.apiKeyFilter') },
+  { key: 'model', label: t('usage.model') },
+  { key: 'group_id', label: t('admin.usage.group') },
+  { key: 'request_type', label: t('usage.type') },
+  { key: 'native_compaction_v2', label: t('usage.compactionFilter') },
+  ...(subscriptionFeatureEnabled.value ? [{ key: 'billing_type', label: t('admin.usage.billingType') }] : []),
+  { key: 'billing_mode', label: t('admin.usage.billingMode') },
+])
+function toggleFilter(key: string) {
+  if (toggleFilterVisibility(key)) return
+  if (activeTab.value === 'errors') {
+    const target = errorFilter.value
+    const value = target[key as keyof typeof target]
+    if (value === null || value === undefined || value === '') return
+    Object.assign(target, { [key]: key === 'category' ? '' : null })
+    applyErrorFilters()
+  } else {
+    const target = filters.value
+    const value = target[key as keyof typeof target]
+    if (value === null || value === undefined || value === '') return
+    Object.assign(target, { [key]: null })
+    applyFilters()
+  }
+}
+watch(() => filterOptions.value.map(option => {
+  const target = activeTab.value === 'errors' ? errorFilter.value : filters.value
+  return [option.key, (target as Record<string, unknown>)[option.key]] as const
+}), values => {
+  for (const [key, value] of values) if (value !== null && value !== undefined && value !== '') revealFilter(key)
+}, { immediate: true })
+
 </script>

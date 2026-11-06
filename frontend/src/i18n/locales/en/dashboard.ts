@@ -361,6 +361,8 @@ export default {
 
   // Usage
   usage: {
+    filterSettings: 'Filter settings',
+    restoreFilters: 'Restore default filters',
     title: 'Usage Records',
     description: 'View and analyze your API usage history',
     costDetails: 'Cost Breakdown',

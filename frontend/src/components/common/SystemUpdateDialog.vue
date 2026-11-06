@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { watch, computed } from 'vue'
 import BaseDialog from './BaseDialog.vue'
+import UpgradeBackupSettings from './UpgradeBackupSettings.vue'
 import { useSystemUpdate } from '@/composables/useSystemUpdate'
 const props = defineProps<{ show: boolean; version?: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -25,12 +26,13 @@ watch(() => props.show, show => { if (show && !info.value) void check() })
       <p v-if="info && !info.supports_self_update" class="text-sm text-gray-500 dark:text-dark-400">当前启动方式不支持自动更新，请使用迁入脚本启用受监护启动。</p>
       <p v-if="info?.warning" class="text-sm text-amber-700 dark:text-amber-400">{{ info.warning }}</p>
       <pre v-if="info?.release_info?.body" class="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-gray-50 p-4 font-sans text-sm leading-6 text-gray-700 dark:bg-dark-900 dark:text-dark-300">{{ info.release_info.body }}</pre>
+      <UpgradeBackupSettings v-if="show" :disabled="busy" />
       <p v-if="progress" role="status" class="text-sm text-primary-600 dark:text-primary-400">{{ progress }}</p>
       <p v-if="error" role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">{{ error }}</p>
     </div>
     <template #footer>
       <button type="button" class="btn btn-secondary" :disabled="busy" @click="emit('close')">关闭</button>
-      <button v-if="needRestart && !busy" type="button" class="btn btn-primary" @click="restart">重试重启</button>
+      <button v-if="needRestart && !busy" type="button" class="btn btn-primary" @click="restart">重启以应用更新</button>
       <button v-else-if="info?.has_update && info.supports_self_update" type="button" class="btn btn-primary" :disabled="busy" @click="update">{{ busy ? '正在更新…' : '备份并一键更新' }}</button>
     </template>
   </BaseDialog>

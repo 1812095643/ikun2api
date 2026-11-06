@@ -366,6 +366,8 @@ export default {
 
   // Usage
   usage: {
+    filterSettings: '筛选设置',
+    restoreFilters: '恢复默认筛选项',
     title: '使用记录',
     description: '查看和分析您的 API 使用历史',
     costDetails: '费用明细',

@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"flag"
+	"fmt"
 	"github.com/MACOS-DO/sub4api/internal/service"
 	"log"
 	"net"
@@ -61,6 +62,7 @@ func main() {
 	// Parse command line flags
 	setupMode := flag.Bool("setup", false, "Run setup wizard in CLI mode")
 	showVersion := flag.Bool("version", false, "Show version information")
+	prepareRuntime := flag.String("prepare-runtime", "", "Prepare the persistent container executable")
 	upgradePreflight := flag.Bool("upgrade-preflight", false, "Read-only check of existing database compatibility")
 	upgradeBackup := flag.String("upgrade-backup-dir", "", "Create a complete backup of existing deployment without starting server")
 	upgradeRestore := flag.String("upgrade-restore-file", "", "Restore an explicit local database snapshot; service must be stopped")
@@ -70,7 +72,22 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		log.Printf("IKUN2api %s (commit: %s, built: %s)\n", Version, Commit, Date)
+		fmt.Printf("IKUN2api %s (commit: %s, built: %s)\n", Version, Commit, Date)
+		return
+	}
+
+	if *prepareRuntime != "" {
+		image, err := os.Executable()
+		if err != nil {
+			log.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+		defer cancel()
+		binary, err := service.PreparePersistentRuntime(ctx, image, *prepareRuntime, Version)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(binary)
 		return
 	}
 
@@ -225,6 +242,8 @@ func runMainServer() {
 
 	log.Printf("Server started on %s", app.Server.Addr)
 	service.MarkUpgradeReady()
+	stopBackupCleanup := service.StartUpgradeBackupCleanup()
+	defer stopBackupCleanup()
 
 	// 等待中断信号
 	quit := make(chan os.Signal, 1)

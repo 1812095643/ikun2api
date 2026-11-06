@@ -11,13 +11,13 @@ afterEach(()=>vi.useRealTimers())
 beforeEach(()=>{vi.clearAllMocks();api.checkUpdates.mockResolvedValue(release);api.getUpdateStatus.mockResolvedValue({phase:'idle',active:false})})
 describe('version update controls',()=>{
  it('loads release details on opening and renders notes as escaped text',async()=>{
-  const wrapper=mount(SystemUpdateDialog,{props:{show:false,version:'1.3.16'},global:{stubs:{BaseDialog:dialog}}})
+  const wrapper=mount(SystemUpdateDialog,{props:{show:false,version:'1.3.16'},global:{stubs:{BaseDialog:dialog,UpgradeBackupSettings:true}}})
   expect(api.checkUpdates).not.toHaveBeenCalled();await wrapper.setProps({show:true});await flushPromises()
   expect(api.checkUpdates).toHaveBeenCalledOnce();expect(wrapper.text()).toContain('1.3.17');expect(wrapper.find('img').exists()).toBe(false);expect(wrapper.text()).toContain('<img src=x onerror=alert(1)>');wrapper.unmount()
  })
  it('keeps the update action unavailable on unsupported startup modes',async()=>{
   api.checkUpdates.mockResolvedValue({...release,supports_self_update:false})
-  const wrapper=mount(SystemUpdateDialog,{props:{show:false},global:{stubs:{BaseDialog:dialog}}});await wrapper.setProps({show:true});await flushPromises()
+  const wrapper=mount(SystemUpdateDialog,{props:{show:false},global:{stubs:{BaseDialog:dialog,UpgradeBackupSettings:true}}});await wrapper.setProps({show:true});await flushPromises()
   expect(wrapper.findAll('button').some(b=>b.text()==='备份并一键更新')).toBe(false);wrapper.unmount()
  })
  it('reports a backend refusal without starting a restart',async()=>{
@@ -50,7 +50,7 @@ describe('version update controls',()=>{
  })
  it('keeps the dialog busy when reopened during request draining',async()=>{
   api.getUpdateStatus.mockResolvedValue({phase:'draining',active:true})
-  const wrapper=mount(SystemUpdateDialog,{props:{show:false},global:{stubs:{BaseDialog:dialog}}})
+  const wrapper=mount(SystemUpdateDialog,{props:{show:false},global:{stubs:{BaseDialog:dialog,UpgradeBackupSettings:true}}})
   await wrapper.setProps({show:true});await flushPromises()
   expect(wrapper.text()).toContain('正在中断当前请求')
   expect(wrapper.findAll('button').some(b=>b.text()==='备份并一键更新')).toBe(false)

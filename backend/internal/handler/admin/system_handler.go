@@ -18,6 +18,7 @@ import (
 
 // SystemHandler handles system-related operations
 type SystemHandler struct {
+	backupSvc systemUpgradeBackupService
 	updateSvc systemUpdateService
 	lockSvc   *service.SystemOperationLockService
 	version   string
@@ -51,12 +52,15 @@ type systemUpdateService interface {
 	RollbackToVersion(ctx context.Context, version string) error
 }
 
+type systemUpgradeBackupService interface {
+	GetUpgradeBackups() (*service.UpgradeBackupStatus, error)
+	ConfigureUpgradeBackups(service.UpgradeBackupPolicy) (*service.UpgradeBackupStatus, error)
+}
+
 // NewSystemHandler creates a new SystemHandler
 func NewSystemHandler(updateSvc systemUpdateService, lockSvc *service.SystemOperationLockService) *SystemHandler {
-	return &SystemHandler{
-		updateSvc: updateSvc,
-		lockSvc:   lockSvc,
-	}
+	backupSvc, _ := updateSvc.(systemUpgradeBackupService)
+	return &SystemHandler{updateSvc: updateSvc, backupSvc: backupSvc, lockSvc: lockSvc}
 }
 
 // GetVersion returns the current version
@@ -302,3 +306,51 @@ func (h *SystemHandler) StartUpdate(c *gin.Context) {
 	response.Success(c, gin.H{"started": true, "operation_id": lock.OperationID(), "need_restart": false, "message": "更新已开始"})
 }
 func (h *SystemHandler) UpdateStatus(c *gin.Context) { response.Success(c, service.UpgradeStatus()) }
+
+// GetUpgradeBackups is available only behind the existing administrator routes.
+func (h *SystemHandler) GetUpgradeBackups(c *gin.Context) {
+	if h.backupSvc == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Upgrade backup management is unavailable")
+		return
+	}
+	status, err := h.backupSvc.GetUpgradeBackups()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, status)
+}
+
+func (h *SystemHandler) ConfigureUpgradeBackups(c *gin.Context) {
+	var request struct {
+		AutoCleanup *bool `json:"auto_cleanup"`
+		Keep        int   `json:"keep"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil || request.AutoCleanup == nil || request.Keep < 1 || request.Keep > 30 {
+		response.Error(c, http.StatusBadRequest, "auto_cleanup and a keep count between 1 and 30 are required")
+		return
+	}
+	if h.backupSvc == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Upgrade backup management is unavailable")
+		return
+	}
+	operationID := buildSystemOperationID(c, "upgrade-backup-settings")
+	_, release, err := h.acquireSystemLock(c.Request.Context(), operationID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	succeeded := false
+	defer func() { release("", succeeded) }()
+	if service.UpgradeInProgress() {
+		response.Error(c, http.StatusConflict, "An upgrade is in progress")
+		return
+	}
+	status, err := h.backupSvc.ConfigureUpgradeBackups(service.UpgradeBackupPolicy{AutoCleanup: *request.AutoCleanup, Keep: request.Keep})
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	succeeded = true
+	response.Success(c, status)
+}

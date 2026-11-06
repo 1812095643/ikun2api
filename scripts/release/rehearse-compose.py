@@ -84,6 +84,25 @@ def main():
             # The updated runtime survives both a restart and a same-image recreate.
             for action in [['restart','sub2api'],['up','-d','--no-deps','--force-recreate','sub2api']]:
                 run(newcommand+action);container=run(newcommand+['ps','-q','sub2api']);hostport=json.loads(run(['docker','inspect',container]))[0]['NetworkSettings']['Ports']['8080/tcp'][0]['HostPort'];url='http://127.0.0.1:'+hostport;ready();assert fingerprint()==before
+            # Exercise the actual container entrypoint with a persistent file
+            # reporting a newer web-installed version. The wrapper delegates
+            # serving to the real verified release; no model traffic is sent.
+            next_parts=[int(x) for x in VERSION.split('.')];next_parts[2]+=1
+            next_version='.'.join(str(x) for x in next_parts)
+            wrapper=("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf 'IKUN2api "+next_version+" (commit: runtime-fixture, built: fixture)\\n'; exit 0; fi\nexec /app/data/runtime/.qa-original \"$@\"\n")
+            run(newcommand+['stop','sub2api'])
+            install_fixture='cp /app/data/runtime/ikun2api /app/data/runtime/.qa-original; printf \"%s\" \"$1\" > /app/data/runtime/.qa-new; chmod 755 /app/data/runtime/.qa-new; mv /app/data/runtime/.qa-new /app/data/runtime/ikun2api; printf \"old timestamped version log\\n\" > /app/data/runtime/.image-version'
+            run(['docker','run','--rm','--volumes-from',container,'--entrypoint','sh',image,'-ec',install_fixture,'fixture',wrapper])
+            run(newcommand+['up','-d','sub2api'])
+            wrapper_hash=hashlib.sha256(wrapper.encode()).hexdigest()
+            for action in [[],['restart','sub2api'],['up','-d','--no-deps','--force-recreate','sub2api']]:
+                if action:run(newcommand+action)
+                container=run(newcommand+['ps','-q','sub2api'])
+                hostport=json.loads(run(['docker','inspect',container]))[0]['NetworkSettings']['Ports']['8080/tcp'][0]['HostPort'];url='http://127.0.0.1:'+hostport
+                ready();assert fingerprint()==before
+                actual=run(['docker','exec',container,'sha256sum','/app/data/runtime/ikun2api']).split()[0]
+                assert actual==wrapper_hash,'Older image overwrote the newer persistent runtime'
+            report.update(newer_runtime_survives_older_image_restart_and_recreate=True,runtime_version_selection_fixture=True)
             report.update(isolated=True,official_binary='0.2.19',login_preserved=True,html_injected_version_visible=True,restart_and_recreate_preserve_data=True,provider_model_requests_sent=0)
             (bundle/'compose-rehearsal.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
         finally:

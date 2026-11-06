@@ -399,7 +399,16 @@ func poolPseudoAccountName(userID, accountID int64, at time.Time) string {
 	sum := sha256.Sum256([]byte(poolPseudoNameSalt + "|" + seed))
 	local := poolFakeLocalParts[int(sum[0])%len(poolFakeLocalParts)]
 	domain := poolFakeDomains[int(sum[1])%len(poolFakeDomains)]
-	return local + "***" + domain
+	local = strings.ToUpper(local[:1]) + local[1:]
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+	var suffix strings.Builder
+	for index := 0; index < 2+int(sum[2]%4); index++ {
+		suffix.WriteByte(letters[int(sum[3+index])%len(letters)])
+	}
+	digits := 2 + int(sum[10]%3)
+	modulus := []int{100, 1000, 10000}[digits-2]
+	number := (int(sum[11])<<8 | int(sum[12])) % modulus
+	return fmt.Sprintf("%s***%s%0*d%s", local, suffix.String(), digits, number, domain)
 }
 
 // poolDisplayAccountNameForUser uses the same masked primary email as usage records.

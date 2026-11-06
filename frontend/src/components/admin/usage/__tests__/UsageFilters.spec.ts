@@ -89,7 +89,7 @@ const defaultFilters = () => ({
   end_date: '',
 })
 
-function mountFilters(filters = defaultFilters()) {
+function mountFilters(filters: Record<string, unknown> = defaultFilters()) {
   return mount(UsageFilters, {
     props: {
       modelValue: filters,
@@ -303,5 +303,38 @@ describe('UsageFilters — native compaction filter', () => {
 
     expect(filters.native_compaction_v2).toBe(true)
     expect(wrapper.emitted('change')).toBeTruthy()
+  })
+})
+
+
+describe('UsageFilters display settings', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: vi.fn() })
+    mockSearchApiKeys.mockResolvedValue([])
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('hides and clears an applied field, retains the model by default and restores visibility', async () => {
+    const filters = { ...defaultFilters(), user_id: 42 }
+    const wrapper = mount(UsageFilters, { props: { modelValue: filters, exporting: false, startDate: '', endDate: '', showActions: true }, global: { stubs: { Select: true } } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="usage-filter-field-model"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="usage-filter-settings"]').trigger('click')
+    await wrapper.get('[data-testid="usage-filter-toggle-user_id"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="usage-filter-field-user_id"]').exists()).toBe(false)
+    expect(filters.user_id).toBeNull()
+    expect(wrapper.emitted('change')).toBeTruthy()
+    await wrapper.get('[data-testid="usage-filter-reset"]').trigger('click')
+    expect(wrapper.find('[data-testid="usage-filter-field-user_id"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('reveals a field applied by a deep link instead of leaving it hidden', async () => {
+    vi.stubGlobal('localStorage', { getItem: (key: string) => key.includes('usage-filter-visibility') ? '["user_id"]' : null, setItem: vi.fn() })
+    const wrapper = mountFilters({ ...defaultFilters(), user_id: 42 })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="usage-filter-field-user_id"]').exists()).toBe(true)
+    wrapper.unmount()
   })
 })

@@ -186,6 +186,7 @@ __pycache__/
 !docs/REMOTE_BROWSER.md
 !docs/TELEMETRY_STATUS.md
 !docs/DEPLOYMENT.md
+!docs/UPDATER.md
 !docs/CHANGELOG.md
 !docs/realtime-account-pool/
 !docs/realtime-account-pool/*.md

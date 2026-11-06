@@ -117,3 +117,26 @@ export default systemAPI
 export async function getUpdateStatus(): Promise<{phase: string; error?: string; active: boolean}> {
  const {data} = await apiClient.get('/admin/system/update-status'); return data
 }
+
+export interface UpgradeBackupPolicy {
+  auto_cleanup: boolean
+  keep: number
+}
+
+export interface UpgradeBackupStatus {
+  policy: UpgradeBackupPolicy
+  count: number
+  complete_count: number
+  protected_count: number
+  bytes: number
+}
+
+export async function getUpgradeBackups(): Promise<UpgradeBackupStatus> {
+  const { data } = await apiClient.get<UpgradeBackupStatus>('/admin/system/upgrade-backups')
+  return data
+}
+
+export async function configureUpgradeBackups(policy: UpgradeBackupPolicy): Promise<UpgradeBackupStatus> {
+  const { data } = await apiClient.put<UpgradeBackupStatus>('/admin/system/upgrade-backups', policy)
+  return data
+}
