@@ -1,5 +1,7 @@
 export default {
   common: {
+    groupPriceChange: '{previous}x → {current}x · {time}',
+    newGroup: 'New group',
     loading: 'Loading...',
     submitting: 'Submitting...',
     justNow: 'just now',

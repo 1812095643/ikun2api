@@ -24,6 +24,13 @@
 
     <!-- Right: rate pill + checkmark (vertically centered to first row) -->
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
+      <GroupPriceChangeBadge
+        :rate-multiplier="rateMultiplier"
+        :previous-rate-multiplier="previousRateMultiplier"
+        :rate-multiplier-changed-at="rateMultiplierChangedAt"
+        :created-at="createdAt"
+        :user-rate-multiplier="userRateMultiplier"
+      />
       <div class="flex shrink-0 flex-col items-end gap-1">
         <!-- Rate pill (platform color) -->
         <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
@@ -60,6 +67,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import GroupPriceChangeBadge from './GroupPriceChangeBadge.vue'
 import { useI18n } from 'vue-i18n'
 import GroupBadge from './GroupBadge.vue'
 import type { SubscriptionType, GroupPlatform } from '@/types'
@@ -73,6 +81,9 @@ interface Props {
   platform: GroupPlatform
   subscriptionType?: SubscriptionType
   rateMultiplier?: number
+  previousRateMultiplier?: number | null
+  rateMultiplierChangedAt?: string | null
+  createdAt?: string | null
   userRateMultiplier?: number | null
   peakRateEnabled?: boolean
   peakStart?: string

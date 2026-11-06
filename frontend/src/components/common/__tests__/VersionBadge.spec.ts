@@ -57,7 +57,8 @@ describe('original version badge and rollback panel', () => {
     await wrapper.get('button').trigger('click')
     expect(wrapper.text()).toContain('立即更新')
     expect(wrapper.text()).toContain('v1.3.41')
-    expect(wrapper.text()).toContain('直接断开当前请求')
+    expect(wrapper.text()).not.toContain('直接断开当前请求')
+    expect(wrapper.text()).not.toContain('程序与数据保留恢复备份')
     expect(wrapper.find('img').exists()).toBe(false)
   })
 

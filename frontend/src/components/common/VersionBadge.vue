@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
                 <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
                   {{
                     hasUpdate
-                      ? t('version.latestVersion') + ': v' + latestVersion
+                      ? '→ v' + latestVersion
                       : t('version.upToDate')
                   }}
                 </p>
@@ -413,30 +413,6 @@ onBeforeUnmount(() => {
 
               <!-- Priority 4: Update available for release build - show update button -->
               <div v-else-if="hasUpdate && isReleaseBuild" class="space-y-2">
-                <!-- Update info card -->
-                <div
-                  class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-900/20"
-                >
-                <div
-                  class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50"
-                >
-                  <Icon
-                    name="download"
-                    size="sm"
-                    :stroke-width="2"
-                    class="text-amber-600 dark:text-amber-400"
-                  />
-                </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium text-amber-700 dark:text-amber-300">
-                      {{ t('version.updateAvailable') }}
-                    </p>
-                    <p class="text-xs text-amber-600/70 dark:text-amber-400/70">
-                      v{{ latestVersion }}
-                    </p>
-                  </div>
-                </div>
-
                 <!-- Update button -->
                 <button
                   @click="handleUpdate"
@@ -461,7 +437,6 @@ onBeforeUnmount(() => {
                   <Icon v-else name="download" size="sm" :stroke-width="2" />
                   {{ updating ? (phase === 'interrupting' ? t('version.interrupting') : t('version.updating')) : t('version.updateNow') }}
                 </button>
-                <p class="text-[11px] leading-4 text-gray-500 dark:text-dark-400">{{ t('version.updateHint') }}</p>
 
                 <!-- View release link -->
                 <a

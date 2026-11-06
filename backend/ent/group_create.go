@@ -112,6 +112,34 @@ func (_c *GroupCreate) SetNillableRateMultiplier(v *float64) *GroupCreate {
 	return _c
 }
 
+// SetPreviousRateMultiplier sets the "previous_rate_multiplier" field.
+func (_c *GroupCreate) SetPreviousRateMultiplier(v float64) *GroupCreate {
+	_c.mutation.SetPreviousRateMultiplier(v)
+	return _c
+}
+
+// SetNillablePreviousRateMultiplier sets the "previous_rate_multiplier" field if the given value is not nil.
+func (_c *GroupCreate) SetNillablePreviousRateMultiplier(v *float64) *GroupCreate {
+	if v != nil {
+		_c.SetPreviousRateMultiplier(*v)
+	}
+	return _c
+}
+
+// SetRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field.
+func (_c *GroupCreate) SetRateMultiplierChangedAt(v time.Time) *GroupCreate {
+	_c.mutation.SetRateMultiplierChangedAt(v)
+	return _c
+}
+
+// SetNillableRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableRateMultiplierChangedAt(v *time.Time) *GroupCreate {
+	if v != nil {
+		_c.SetRateMultiplierChangedAt(*v)
+	}
+	return _c
+}
+
 // SetPeakRateEnabled sets the "peak_rate_enabled" field.
 func (_c *GroupCreate) SetPeakRateEnabled(v bool) *GroupCreate {
 	_c.mutation.SetPeakRateEnabled(v)
@@ -1549,6 +1577,14 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldRateMultiplier, field.TypeFloat64, value)
 		_node.RateMultiplier = value
 	}
+	if value, ok := _c.mutation.PreviousRateMultiplier(); ok {
+		_spec.SetField(group.FieldPreviousRateMultiplier, field.TypeFloat64, value)
+		_node.PreviousRateMultiplier = &value
+	}
+	if value, ok := _c.mutation.RateMultiplierChangedAt(); ok {
+		_spec.SetField(group.FieldRateMultiplierChangedAt, field.TypeTime, value)
+		_node.RateMultiplierChangedAt = &value
+	}
 	if value, ok := _c.mutation.PeakRateEnabled(); ok {
 		_spec.SetField(group.FieldPeakRateEnabled, field.TypeBool, value)
 		_node.PeakRateEnabled = value
@@ -2044,6 +2080,48 @@ func (u *GroupUpsert) UpdateRateMultiplier() *GroupUpsert {
 // AddRateMultiplier adds v to the "rate_multiplier" field.
 func (u *GroupUpsert) AddRateMultiplier(v float64) *GroupUpsert {
 	u.Add(group.FieldRateMultiplier, v)
+	return u
+}
+
+// SetPreviousRateMultiplier sets the "previous_rate_multiplier" field.
+func (u *GroupUpsert) SetPreviousRateMultiplier(v float64) *GroupUpsert {
+	u.Set(group.FieldPreviousRateMultiplier, v)
+	return u
+}
+
+// UpdatePreviousRateMultiplier sets the "previous_rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsert) UpdatePreviousRateMultiplier() *GroupUpsert {
+	u.SetExcluded(group.FieldPreviousRateMultiplier)
+	return u
+}
+
+// AddPreviousRateMultiplier adds v to the "previous_rate_multiplier" field.
+func (u *GroupUpsert) AddPreviousRateMultiplier(v float64) *GroupUpsert {
+	u.Add(group.FieldPreviousRateMultiplier, v)
+	return u
+}
+
+// ClearPreviousRateMultiplier clears the value of the "previous_rate_multiplier" field.
+func (u *GroupUpsert) ClearPreviousRateMultiplier() *GroupUpsert {
+	u.SetNull(group.FieldPreviousRateMultiplier)
+	return u
+}
+
+// SetRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field.
+func (u *GroupUpsert) SetRateMultiplierChangedAt(v time.Time) *GroupUpsert {
+	u.Set(group.FieldRateMultiplierChangedAt, v)
+	return u
+}
+
+// UpdateRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateRateMultiplierChangedAt() *GroupUpsert {
+	u.SetExcluded(group.FieldRateMultiplierChangedAt)
+	return u
+}
+
+// ClearRateMultiplierChangedAt clears the value of the "rate_multiplier_changed_at" field.
+func (u *GroupUpsert) ClearRateMultiplierChangedAt() *GroupUpsert {
+	u.SetNull(group.FieldRateMultiplierChangedAt)
 	return u
 }
 
@@ -3211,6 +3289,55 @@ func (u *GroupUpsertOne) AddRateMultiplier(v float64) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateRateMultiplier() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateRateMultiplier()
+	})
+}
+
+// SetPreviousRateMultiplier sets the "previous_rate_multiplier" field.
+func (u *GroupUpsertOne) SetPreviousRateMultiplier(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetPreviousRateMultiplier(v)
+	})
+}
+
+// AddPreviousRateMultiplier adds v to the "previous_rate_multiplier" field.
+func (u *GroupUpsertOne) AddPreviousRateMultiplier(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddPreviousRateMultiplier(v)
+	})
+}
+
+// UpdatePreviousRateMultiplier sets the "previous_rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdatePreviousRateMultiplier() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdatePreviousRateMultiplier()
+	})
+}
+
+// ClearPreviousRateMultiplier clears the value of the "previous_rate_multiplier" field.
+func (u *GroupUpsertOne) ClearPreviousRateMultiplier() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearPreviousRateMultiplier()
+	})
+}
+
+// SetRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field.
+func (u *GroupUpsertOne) SetRateMultiplierChangedAt(v time.Time) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetRateMultiplierChangedAt(v)
+	})
+}
+
+// UpdateRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateRateMultiplierChangedAt() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateRateMultiplierChangedAt()
+	})
+}
+
+// ClearRateMultiplierChangedAt clears the value of the "rate_multiplier_changed_at" field.
+func (u *GroupUpsertOne) ClearRateMultiplierChangedAt() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearRateMultiplierChangedAt()
 	})
 }
 
@@ -4713,6 +4840,55 @@ func (u *GroupUpsertBulk) AddRateMultiplier(v float64) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateRateMultiplier() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateRateMultiplier()
+	})
+}
+
+// SetPreviousRateMultiplier sets the "previous_rate_multiplier" field.
+func (u *GroupUpsertBulk) SetPreviousRateMultiplier(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetPreviousRateMultiplier(v)
+	})
+}
+
+// AddPreviousRateMultiplier adds v to the "previous_rate_multiplier" field.
+func (u *GroupUpsertBulk) AddPreviousRateMultiplier(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddPreviousRateMultiplier(v)
+	})
+}
+
+// UpdatePreviousRateMultiplier sets the "previous_rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdatePreviousRateMultiplier() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdatePreviousRateMultiplier()
+	})
+}
+
+// ClearPreviousRateMultiplier clears the value of the "previous_rate_multiplier" field.
+func (u *GroupUpsertBulk) ClearPreviousRateMultiplier() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearPreviousRateMultiplier()
+	})
+}
+
+// SetRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field.
+func (u *GroupUpsertBulk) SetRateMultiplierChangedAt(v time.Time) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetRateMultiplierChangedAt(v)
+	})
+}
+
+// UpdateRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateRateMultiplierChangedAt() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateRateMultiplierChangedAt()
+	})
+}
+
+// ClearRateMultiplierChangedAt clears the value of the "rate_multiplier_changed_at" field.
+func (u *GroupUpsertBulk) ClearRateMultiplierChangedAt() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearRateMultiplierChangedAt()
 	})
 }
 

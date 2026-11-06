@@ -169,6 +169,9 @@
                   :platform="row.group.platform"
                   :subscription-type="row.group.subscription_type"
                   :rate-multiplier="row.group.rate_multiplier"
+                  :previous-rate-multiplier="row.group.previous_rate_multiplier"
+                  :rate-multiplier-changed-at="row.group.rate_multiplier_changed_at"
+                  :created-at="row.group.created_at"
                   :user-rate-multiplier="userGroupRates[row.group.id]"
                   :peak-rate-enabled="row.group.peak_rate_enabled"
                   :peak-start="row.group.peak_start"
@@ -564,6 +567,9 @@
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
+                :previous-rate-multiplier="(option as unknown as GroupOption).previousRate"
+                :rate-multiplier-changed-at="(option as unknown as GroupOption).rateChangedAt"
+                :created-at="(option as unknown as GroupOption).createdAt"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
                 :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
                 :peak-start="(option as unknown as GroupOption).peakStart"
@@ -578,6 +584,9 @@
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
+                :previous-rate-multiplier="(option as unknown as GroupOption).previousRate"
+                :rate-multiplier-changed-at="(option as unknown as GroupOption).rateChangedAt"
+                :created-at="(option as unknown as GroupOption).createdAt"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
                 :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
                 :peak-start="(option as unknown as GroupOption).peakStart"
@@ -1147,6 +1156,9 @@
               :platform="option.platform"
               :subscription-type="option.subscriptionType"
               :rate-multiplier="option.rate"
+              :previous-rate-multiplier="option.previousRate"
+              :rate-multiplier-changed-at="option.rateChangedAt"
+              :created-at="option.createdAt"
               :user-rate-multiplier="option.userRate"
               :peak-rate-enabled="option.peakRateEnabled"
               :peak-start="option.peakStart"
@@ -1218,6 +1230,9 @@ interface GroupOption {
   label: string
   description: string | null
   rate: number
+  previousRate?: number | null
+  rateChangedAt?: string | null
+  createdAt?: string
   userRate: number | null
   peakRateEnabled: boolean
   peakStart: string
@@ -1502,6 +1517,9 @@ const groupOptions = computed(() =>
     label: group.name,
     description: group.description,
     rate: group.rate_multiplier,
+    previousRate: group.previous_rate_multiplier,
+    rateChangedAt: group.rate_multiplier_changed_at,
+    createdAt: group.created_at,
     userRate: userGroupRates.value[group.id] ?? null,
     peakRateEnabled: group.peak_rate_enabled,
     peakStart: group.peak_start,

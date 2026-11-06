@@ -35,7 +35,6 @@ export default {
     updateNow: 'Update Now',
     updating: 'Updating...',
     interrupting: 'Interrupting active requests...',
-    updateHint: 'Restarting disconnects active requests; application and data recovery backups are retained.',
     updateComplete: 'Update Complete',
     updateFailed: 'Update Failed',
     restartRequired: 'Please restart the service to apply the update',

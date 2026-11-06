@@ -1,5 +1,7 @@
 export default {
   common: {
+    groupPriceChange: '{previous}x → {current}x · {time}',
+    newGroup: '新增分组',
     loading: '加载中...',
     submitting: '提交中...',
     justNow: '刚刚',

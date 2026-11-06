@@ -30,6 +30,10 @@ const (
 	FieldI18n = "i18n"
 	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
 	FieldRateMultiplier = "rate_multiplier"
+	// FieldPreviousRateMultiplier holds the string denoting the previous_rate_multiplier field in the database.
+	FieldPreviousRateMultiplier = "previous_rate_multiplier"
+	// FieldRateMultiplierChangedAt holds the string denoting the rate_multiplier_changed_at field in the database.
+	FieldRateMultiplierChangedAt = "rate_multiplier_changed_at"
 	// FieldPeakRateEnabled holds the string denoting the peak_rate_enabled field in the database.
 	FieldPeakRateEnabled = "peak_rate_enabled"
 	// FieldPeakStart holds the string denoting the peak_start field in the database.
@@ -238,6 +242,8 @@ var Columns = []string{
 	FieldDescription,
 	FieldI18n,
 	FieldRateMultiplier,
+	FieldPreviousRateMultiplier,
+	FieldRateMultiplierChangedAt,
 	FieldPeakRateEnabled,
 	FieldPeakStart,
 	FieldPeakEnd,
@@ -492,6 +498,16 @@ func ByDescription(opts ...sql.OrderTermOption) OrderOption {
 // ByRateMultiplier orders the results by the rate_multiplier field.
 func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
+}
+
+// ByPreviousRateMultiplier orders the results by the previous_rate_multiplier field.
+func ByPreviousRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPreviousRateMultiplier, opts...).ToFunc()
+}
+
+// ByRateMultiplierChangedAt orders the results by the rate_multiplier_changed_at field.
+func ByRateMultiplierChangedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateMultiplierChangedAt, opts...).ToFunc()
 }
 
 // ByPeakRateEnabled orders the results by the peak_rate_enabled field.

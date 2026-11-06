@@ -22143,6 +22143,9 @@ type GroupMutation struct {
 	i18n                                    *domain.GroupI18n
 	rate_multiplier                         *float64
 	addrate_multiplier                      *float64
+	previous_rate_multiplier                *float64
+	addprevious_rate_multiplier             *float64
+	rate_multiplier_changed_at              *time.Time
 	peak_rate_enabled                       *bool
 	peak_start                              *string
 	peak_end                                *string
@@ -22653,6 +22656,125 @@ func (m *GroupMutation) AddedRateMultiplier() (r float64, exists bool) {
 func (m *GroupMutation) ResetRateMultiplier() {
 	m.rate_multiplier = nil
 	m.addrate_multiplier = nil
+}
+
+// SetPreviousRateMultiplier sets the "previous_rate_multiplier" field.
+func (m *GroupMutation) SetPreviousRateMultiplier(f float64) {
+	m.previous_rate_multiplier = &f
+	m.addprevious_rate_multiplier = nil
+}
+
+// PreviousRateMultiplier returns the value of the "previous_rate_multiplier" field in the mutation.
+func (m *GroupMutation) PreviousRateMultiplier() (r float64, exists bool) {
+	v := m.previous_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreviousRateMultiplier returns the old "previous_rate_multiplier" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldPreviousRateMultiplier(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreviousRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreviousRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreviousRateMultiplier: %w", err)
+	}
+	return oldValue.PreviousRateMultiplier, nil
+}
+
+// AddPreviousRateMultiplier adds f to the "previous_rate_multiplier" field.
+func (m *GroupMutation) AddPreviousRateMultiplier(f float64) {
+	if m.addprevious_rate_multiplier != nil {
+		*m.addprevious_rate_multiplier += f
+	} else {
+		m.addprevious_rate_multiplier = &f
+	}
+}
+
+// AddedPreviousRateMultiplier returns the value that was added to the "previous_rate_multiplier" field in this mutation.
+func (m *GroupMutation) AddedPreviousRateMultiplier() (r float64, exists bool) {
+	v := m.addprevious_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPreviousRateMultiplier clears the value of the "previous_rate_multiplier" field.
+func (m *GroupMutation) ClearPreviousRateMultiplier() {
+	m.previous_rate_multiplier = nil
+	m.addprevious_rate_multiplier = nil
+	m.clearedFields[group.FieldPreviousRateMultiplier] = struct{}{}
+}
+
+// PreviousRateMultiplierCleared returns if the "previous_rate_multiplier" field was cleared in this mutation.
+func (m *GroupMutation) PreviousRateMultiplierCleared() bool {
+	_, ok := m.clearedFields[group.FieldPreviousRateMultiplier]
+	return ok
+}
+
+// ResetPreviousRateMultiplier resets all changes to the "previous_rate_multiplier" field.
+func (m *GroupMutation) ResetPreviousRateMultiplier() {
+	m.previous_rate_multiplier = nil
+	m.addprevious_rate_multiplier = nil
+	delete(m.clearedFields, group.FieldPreviousRateMultiplier)
+}
+
+// SetRateMultiplierChangedAt sets the "rate_multiplier_changed_at" field.
+func (m *GroupMutation) SetRateMultiplierChangedAt(t time.Time) {
+	m.rate_multiplier_changed_at = &t
+}
+
+// RateMultiplierChangedAt returns the value of the "rate_multiplier_changed_at" field in the mutation.
+func (m *GroupMutation) RateMultiplierChangedAt() (r time.Time, exists bool) {
+	v := m.rate_multiplier_changed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateMultiplierChangedAt returns the old "rate_multiplier_changed_at" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldRateMultiplierChangedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateMultiplierChangedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateMultiplierChangedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateMultiplierChangedAt: %w", err)
+	}
+	return oldValue.RateMultiplierChangedAt, nil
+}
+
+// ClearRateMultiplierChangedAt clears the value of the "rate_multiplier_changed_at" field.
+func (m *GroupMutation) ClearRateMultiplierChangedAt() {
+	m.rate_multiplier_changed_at = nil
+	m.clearedFields[group.FieldRateMultiplierChangedAt] = struct{}{}
+}
+
+// RateMultiplierChangedAtCleared returns if the "rate_multiplier_changed_at" field was cleared in this mutation.
+func (m *GroupMutation) RateMultiplierChangedAtCleared() bool {
+	_, ok := m.clearedFields[group.FieldRateMultiplierChangedAt]
+	return ok
+}
+
+// ResetRateMultiplierChangedAt resets all changes to the "rate_multiplier_changed_at" field.
+func (m *GroupMutation) ResetRateMultiplierChangedAt() {
+	m.rate_multiplier_changed_at = nil
+	delete(m.clearedFields, group.FieldRateMultiplierChangedAt)
 }
 
 // SetPeakRateEnabled sets the "peak_rate_enabled" field.
@@ -26123,7 +26245,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 70)
+	fields := make([]string, 0, 72)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26144,6 +26266,12 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.rate_multiplier != nil {
 		fields = append(fields, group.FieldRateMultiplier)
+	}
+	if m.previous_rate_multiplier != nil {
+		fields = append(fields, group.FieldPreviousRateMultiplier)
+	}
+	if m.rate_multiplier_changed_at != nil {
+		fields = append(fields, group.FieldRateMultiplierChangedAt)
 	}
 	if m.peak_rate_enabled != nil {
 		fields = append(fields, group.FieldPeakRateEnabled)
@@ -26356,6 +26484,10 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.I18n()
 	case group.FieldRateMultiplier:
 		return m.RateMultiplier()
+	case group.FieldPreviousRateMultiplier:
+		return m.PreviousRateMultiplier()
+	case group.FieldRateMultiplierChangedAt:
+		return m.RateMultiplierChangedAt()
 	case group.FieldPeakRateEnabled:
 		return m.PeakRateEnabled()
 	case group.FieldPeakStart:
@@ -26505,6 +26637,10 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldI18n(ctx)
 	case group.FieldRateMultiplier:
 		return m.OldRateMultiplier(ctx)
+	case group.FieldPreviousRateMultiplier:
+		return m.OldPreviousRateMultiplier(ctx)
+	case group.FieldRateMultiplierChangedAt:
+		return m.OldRateMultiplierChangedAt(ctx)
 	case group.FieldPeakRateEnabled:
 		return m.OldPeakRateEnabled(ctx)
 	case group.FieldPeakStart:
@@ -26688,6 +26824,20 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRateMultiplier(v)
+		return nil
+	case group.FieldPreviousRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreviousRateMultiplier(v)
+		return nil
+	case group.FieldRateMultiplierChangedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplierChangedAt(v)
 		return nil
 	case group.FieldPeakRateEnabled:
 		v, ok := value.(bool)
@@ -27141,6 +27291,9 @@ func (m *GroupMutation) AddedFields() []string {
 	if m.addrate_multiplier != nil {
 		fields = append(fields, group.FieldRateMultiplier)
 	}
+	if m.addprevious_rate_multiplier != nil {
+		fields = append(fields, group.FieldPreviousRateMultiplier)
+	}
 	if m.addpeak_rate_multiplier != nil {
 		fields = append(fields, group.FieldPeakRateMultiplier)
 	}
@@ -27229,6 +27382,8 @@ func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case group.FieldRateMultiplier:
 		return m.AddedRateMultiplier()
+	case group.FieldPreviousRateMultiplier:
+		return m.AddedPreviousRateMultiplier()
 	case group.FieldPeakRateMultiplier:
 		return m.AddedPeakRateMultiplier()
 	case group.FieldDailyLimitUsd:
@@ -27296,6 +27451,13 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddRateMultiplier(v)
+		return nil
+	case group.FieldPreviousRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPreviousRateMultiplier(v)
 		return nil
 	case group.FieldPeakRateMultiplier:
 		v, ok := value.(float64)
@@ -27493,6 +27655,12 @@ func (m *GroupMutation) ClearedFields() []string {
 	if m.FieldCleared(group.FieldDescription) {
 		fields = append(fields, group.FieldDescription)
 	}
+	if m.FieldCleared(group.FieldPreviousRateMultiplier) {
+		fields = append(fields, group.FieldPreviousRateMultiplier)
+	}
+	if m.FieldCleared(group.FieldRateMultiplierChangedAt) {
+		fields = append(fields, group.FieldRateMultiplierChangedAt)
+	}
 	if m.FieldCleared(group.FieldDuplicateOperationID) {
 		fields = append(fields, group.FieldDuplicateOperationID)
 	}
@@ -27572,6 +27740,12 @@ func (m *GroupMutation) ClearField(name string) error {
 		return nil
 	case group.FieldDescription:
 		m.ClearDescription()
+		return nil
+	case group.FieldPreviousRateMultiplier:
+		m.ClearPreviousRateMultiplier()
+		return nil
+	case group.FieldRateMultiplierChangedAt:
+		m.ClearRateMultiplierChangedAt()
 		return nil
 	case group.FieldDuplicateOperationID:
 		m.ClearDuplicateOperationID()
@@ -27661,6 +27835,12 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldRateMultiplier:
 		m.ResetRateMultiplier()
+		return nil
+	case group.FieldPreviousRateMultiplier:
+		m.ResetPreviousRateMultiplier()
+		return nil
+	case group.FieldRateMultiplierChangedAt:
+		m.ResetRateMultiplierChangedAt()
 		return nil
 	case group.FieldPeakRateEnabled:
 		m.ResetPeakRateEnabled()

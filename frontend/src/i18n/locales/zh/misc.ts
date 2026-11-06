@@ -35,7 +35,6 @@ export default {
     updateNow: '立即更新',
     updating: '正在更新...',
     interrupting: '正在中断当前请求...',
-    updateHint: '点击重启后会直接断开当前请求，程序与数据保留恢复备份。',
     updateComplete: '更新完成',
     updateFailed: '更新失败',
     restartRequired: '请重启服务以应用更新',

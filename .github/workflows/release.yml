@@ -65,6 +65,13 @@ jobs:
       - name: Claude 每周窗口调度与分享链接导入回归
         working-directory: backend
         run: go test -tags unit ./internal/service ./internal/handler/admin ./internal/handler/dto ./internal/repository -run 'Test(ClaudeWeeklyReset|AdminGroupWeeklyReset|GroupRequests_WeeklyReset|GroupMapper_WeeklyReset|APIKeyAuthSnapshot_WeeklyReset|CustomMenuAcceptsPoolShare)' -count=1 -timeout=180s
+      - name: 分组价格变化与精简更新面板回归
+        run: |
+          cd backend
+          go test -tags unit ./internal/handler/dto ./internal/handler ./internal/service -run 'Test(GroupMapper_PriceChange|ListPlazaGroups|WorkspacePlazaGroups|ToModelPlazaGroupDTO)' -count=1 -timeout=180s
+          go test -tags integration ./internal/repository -run '^TestGroupRepoSuite$/^TestPriceChangeHistory$' -count=1 -timeout=240s
+          cd ../frontend
+          pnpm exec vitest run src/components/common/__tests__/GroupPriceChangeBadge.spec.ts src/components/common/__tests__/GroupOptionItem.spec.ts src/components/common/__tests__/VersionBadge.spec.ts src/views/user/__tests__/KeysView.spec.ts src/components/modelPlaza/__tests__/PlazaGroupSection.spec.ts
       - name: 分享页打包模式响应头回归
         working-directory: backend
         run: go test -tags embed ./internal/web -run TestFrontendServerPoolShareHeaders -count=1

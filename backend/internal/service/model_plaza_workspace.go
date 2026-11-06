@@ -10,6 +10,7 @@ func plazaGroupMetadata(g *Group) *PlazaGroup {
 	return &PlazaGroup{
 		ID: g.ID, Name: g.Name, Description: g.Description, I18n: g.I18n, Platform: g.Platform,
 		SubscriptionType: g.SubscriptionType, RateMultiplier: g.RateMultiplier,
+		PreviousRateMultiplier: g.PreviousRateMultiplier, RateMultiplierChangedAt: g.RateMultiplierChangedAt, CreatedAt: g.CreatedAt,
 		PeakRateEnabled: g.PeakRateEnabled, PeakStart: g.PeakStart, PeakEnd: g.PeakEnd,
 		PeakRateMultiplier: g.PeakRateMultiplier, IsExclusive: g.IsExclusive,
 		ImageRateIndependent: g.ImageRateIndependent, ImageRateMultiplier: g.ImageRateMultiplier,

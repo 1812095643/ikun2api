@@ -85,6 +85,16 @@ func RateMultiplier(v float64) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldRateMultiplier, v))
 }
 
+// PreviousRateMultiplier applies equality check predicate on the "previous_rate_multiplier" field. It's identical to PreviousRateMultiplierEQ.
+func PreviousRateMultiplier(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldPreviousRateMultiplier, v))
+}
+
+// RateMultiplierChangedAt applies equality check predicate on the "rate_multiplier_changed_at" field. It's identical to RateMultiplierChangedAtEQ.
+func RateMultiplierChangedAt(v time.Time) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldRateMultiplierChangedAt, v))
+}
+
 // PeakRateEnabled applies equality check predicate on the "peak_rate_enabled" field. It's identical to PeakRateEnabledEQ.
 func PeakRateEnabled(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldPeakRateEnabled, v))
@@ -668,6 +678,106 @@ func RateMultiplierLT(v float64) predicate.Group {
 // RateMultiplierLTE applies the LTE predicate on the "rate_multiplier" field.
 func RateMultiplierLTE(v float64) predicate.Group {
 	return predicate.Group(sql.FieldLTE(FieldRateMultiplier, v))
+}
+
+// PreviousRateMultiplierEQ applies the EQ predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldPreviousRateMultiplier, v))
+}
+
+// PreviousRateMultiplierNEQ applies the NEQ predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierNEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldPreviousRateMultiplier, v))
+}
+
+// PreviousRateMultiplierIn applies the In predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldPreviousRateMultiplier, vs...))
+}
+
+// PreviousRateMultiplierNotIn applies the NotIn predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierNotIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldPreviousRateMultiplier, vs...))
+}
+
+// PreviousRateMultiplierGT applies the GT predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierGT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldPreviousRateMultiplier, v))
+}
+
+// PreviousRateMultiplierGTE applies the GTE predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierGTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldPreviousRateMultiplier, v))
+}
+
+// PreviousRateMultiplierLT applies the LT predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierLT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldPreviousRateMultiplier, v))
+}
+
+// PreviousRateMultiplierLTE applies the LTE predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierLTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldPreviousRateMultiplier, v))
+}
+
+// PreviousRateMultiplierIsNil applies the IsNil predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldPreviousRateMultiplier))
+}
+
+// PreviousRateMultiplierNotNil applies the NotNil predicate on the "previous_rate_multiplier" field.
+func PreviousRateMultiplierNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldPreviousRateMultiplier))
+}
+
+// RateMultiplierChangedAtEQ applies the EQ predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtEQ(v time.Time) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldRateMultiplierChangedAt, v))
+}
+
+// RateMultiplierChangedAtNEQ applies the NEQ predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtNEQ(v time.Time) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldRateMultiplierChangedAt, v))
+}
+
+// RateMultiplierChangedAtIn applies the In predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtIn(vs ...time.Time) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldRateMultiplierChangedAt, vs...))
+}
+
+// RateMultiplierChangedAtNotIn applies the NotIn predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtNotIn(vs ...time.Time) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldRateMultiplierChangedAt, vs...))
+}
+
+// RateMultiplierChangedAtGT applies the GT predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtGT(v time.Time) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldRateMultiplierChangedAt, v))
+}
+
+// RateMultiplierChangedAtGTE applies the GTE predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtGTE(v time.Time) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldRateMultiplierChangedAt, v))
+}
+
+// RateMultiplierChangedAtLT applies the LT predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtLT(v time.Time) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldRateMultiplierChangedAt, v))
+}
+
+// RateMultiplierChangedAtLTE applies the LTE predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtLTE(v time.Time) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldRateMultiplierChangedAt, v))
+}
+
+// RateMultiplierChangedAtIsNil applies the IsNil predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldRateMultiplierChangedAt))
+}
+
+// RateMultiplierChangedAtNotNil applies the NotNil predicate on the "rate_multiplier_changed_at" field.
+func RateMultiplierChangedAtNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldRateMultiplierChangedAt))
 }
 
 // PeakRateEnabledEQ applies the EQ predicate on the "peak_rate_enabled" field.

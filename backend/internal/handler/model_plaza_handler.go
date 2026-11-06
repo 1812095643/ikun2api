@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/pkg/response"
 	"github.com/MACOS-DO/sub4api/internal/server/middleware"
@@ -80,18 +81,21 @@ type modelPlazaModel struct {
 
 // modelPlazaGroup 广场分组条目（白名单字段）。
 type modelPlazaGroup struct {
-	ID                 int64    `json:"id"`
-	Name               string   `json:"name"`
-	Description        string   `json:"description"`
-	Platform           string   `json:"platform"`
-	SubscriptionType   string   `json:"subscription_type"`
-	RateMultiplier     float64  `json:"rate_multiplier"`
-	UserRateMultiplier *float64 `json:"user_rate_multiplier,omitempty"`
-	PeakRateEnabled    bool     `json:"peak_rate_enabled"`
-	PeakStart          string   `json:"peak_start"`
-	PeakEnd            string   `json:"peak_end"`
-	PeakRateMultiplier float64  `json:"peak_rate_multiplier"`
-	IsExclusive        bool     `json:"is_exclusive"`
+	ID                      int64      `json:"id"`
+	Name                    string     `json:"name"`
+	Description             string     `json:"description"`
+	Platform                string     `json:"platform"`
+	SubscriptionType        string     `json:"subscription_type"`
+	RateMultiplier          float64    `json:"rate_multiplier"`
+	PreviousRateMultiplier  *float64   `json:"previous_rate_multiplier,omitempty"`
+	RateMultiplierChangedAt *time.Time `json:"rate_multiplier_changed_at,omitempty"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UserRateMultiplier      *float64   `json:"user_rate_multiplier,omitempty"`
+	PeakRateEnabled         bool       `json:"peak_rate_enabled"`
+	PeakStart               string     `json:"peak_start"`
+	PeakEnd                 string     `json:"peak_end"`
+	PeakRateMultiplier      float64    `json:"peak_rate_multiplier"`
+	IsExclusive             bool       `json:"is_exclusive"`
 	// 生图独立倍率：为 true 时图片计费模型的实付倍率取 ImageRateMultiplier，
 	// 不取分组/用户专属倍率。
 	ImageRateIndependent bool    `json:"image_rate_independent"`
@@ -247,12 +251,13 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 		})
 	}
 	dto := modelPlazaGroup{
-		ID:                        g.ID,
-		Name:                      g.Name,
-		Description:               g.Description,
-		Platform:                  g.Platform,
-		SubscriptionType:          g.SubscriptionType,
-		RateMultiplier:            g.RateMultiplier,
+		ID:                     g.ID,
+		Name:                   g.Name,
+		Description:            g.Description,
+		Platform:               g.Platform,
+		SubscriptionType:       g.SubscriptionType,
+		RateMultiplier:         g.RateMultiplier,
+		PreviousRateMultiplier: g.PreviousRateMultiplier, RateMultiplierChangedAt: g.RateMultiplierChangedAt, CreatedAt: g.CreatedAt,
 		PeakRateEnabled:           g.PeakRateEnabled,
 		PeakStart:                 g.PeakStart,
 		PeakEnd:                   g.PeakEnd,
