@@ -854,6 +854,20 @@ func (_u *GroupUpdate) SetNillableClaudeCodeOnly(v *bool) *GroupUpdate {
 	return _u
 }
 
+// SetPreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field.
+func (_u *GroupUpdate) SetPreferSoonestWeeklyReset(v bool) *GroupUpdate {
+	_u.mutation.SetPreferSoonestWeeklyReset(v)
+	return _u
+}
+
+// SetNillablePreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillablePreferSoonestWeeklyReset(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetPreferSoonestWeeklyReset(*v)
+	}
+	return _u
+}
+
 // SetAllowClaudeDesktop sets the "allow_claude_desktop" field.
 func (_u *GroupUpdate) SetAllowClaudeDesktop(v bool) *GroupUpdate {
 	_u.mutation.SetAllowClaudeDesktop(v)
@@ -1847,6 +1861,9 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PreferSoonestWeeklyReset(); ok {
+		_spec.SetField(group.FieldPreferSoonestWeeklyReset, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.AllowClaudeDesktop(); ok {
 		_spec.SetField(group.FieldAllowClaudeDesktop, field.TypeBool, value)
@@ -3091,6 +3108,20 @@ func (_u *GroupUpdateOne) SetNillableClaudeCodeOnly(v *bool) *GroupUpdateOne {
 	return _u
 }
 
+// SetPreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field.
+func (_u *GroupUpdateOne) SetPreferSoonestWeeklyReset(v bool) *GroupUpdateOne {
+	_u.mutation.SetPreferSoonestWeeklyReset(v)
+	return _u
+}
+
+// SetNillablePreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillablePreferSoonestWeeklyReset(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetPreferSoonestWeeklyReset(*v)
+	}
+	return _u
+}
+
 // SetAllowClaudeDesktop sets the "allow_claude_desktop" field.
 func (_u *GroupUpdateOne) SetAllowClaudeDesktop(v bool) *GroupUpdateOne {
 	_u.mutation.SetAllowClaudeDesktop(v)
@@ -4114,6 +4145,9 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PreferSoonestWeeklyReset(); ok {
+		_spec.SetField(group.FieldPreferSoonestWeeklyReset, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.AllowClaudeDesktop(); ok {
 		_spec.SetField(group.FieldAllowClaudeDesktop, field.TypeBool, value)

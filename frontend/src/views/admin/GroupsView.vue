@@ -1842,6 +1842,11 @@
           </div>
         </div>
 
+        <ClaudeWeeklyResetPriorityOption
+          v-model="createForm.prefer_soonest_weekly_reset"
+          :platform="createForm.platform"
+        />
+
         <!-- 账号过滤控制 (OpenAI/Antigravity/Anthropic/Gemini) -->
         <div
           v-if="
@@ -3506,6 +3511,11 @@
           </div>
         </div>
 
+        <ClaudeWeeklyResetPriorityOption
+          v-model="editForm.prefer_soonest_weekly_reset"
+          :platform="editForm.platform"
+        />
+
         <!-- 账号过滤控制 (OpenAI/Antigravity/Anthropic/Gemini) -->
         <div
           v-if="
@@ -4324,6 +4334,7 @@ import DataTable from "@/components/common/DataTable.vue";
 import Pagination from "@/components/common/Pagination.vue";
 import Toggle from "@/components/common/Toggle.vue";
 import ClaudeDesktopAccessOption from "@/components/group/ClaudeDesktopAccessOption.vue";
+import ClaudeWeeklyResetPriorityOption from "@/components/group/ClaudeWeeklyResetPriorityOption.vue";
 import BaseDialog from "@/components/common/BaseDialog.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -5023,6 +5034,7 @@ const createForm = reactive({
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
   allow_claude_desktop: false,
+  prefer_soonest_weekly_reset: true,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
@@ -5391,6 +5403,7 @@ const editForm = reactive({
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
   allow_claude_desktop: false,
+  prefer_soonest_weekly_reset: true,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
@@ -5862,6 +5875,7 @@ const closeCreateModal = () => {
   createForm.profit_safety_buffer_percent = 0;
   createForm.claude_code_only = false;
   createForm.allow_claude_desktop = false;
+  createForm.prefer_soonest_weekly_reset = true;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
   resetMessagesDispatchFormState(createForm);
@@ -5970,6 +5984,7 @@ const handleCreateGroup = async () => {
     const requestData = {
       ...createGroupForm,
       allow_claude_desktop: createForm.platform === 'anthropic' && createForm.claude_code_only && createForm.allow_claude_desktop,
+      prefer_soonest_weekly_reset: createForm.platform === 'anthropic' && createForm.prefer_soonest_weekly_reset,
       force_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
         createForm.force_openai_fast,
@@ -6163,6 +6178,7 @@ const handleEdit = async (group: AdminGroup) => {
   );
   editForm.claude_code_only = group.claude_code_only || false;
   editForm.allow_claude_desktop = group.allow_claude_desktop || false;
+  editForm.prefer_soonest_weekly_reset = group.prefer_soonest_weekly_reset ?? true;
   editForm.fallback_group_id = group.fallback_group_id;
   editForm.fallback_group_id_on_invalid_request =
     group.fallback_group_id_on_invalid_request;
@@ -6316,6 +6332,7 @@ const handleUpdateGroup = async () => {
     const payload = {
       ...editForm,
       allow_claude_desktop: editForm.platform === 'anthropic' && editForm.claude_code_only && editForm.allow_claude_desktop,
+      prefer_soonest_weekly_reset: editForm.platform === 'anthropic' && editForm.prefer_soonest_weekly_reset,
       force_openai_fast: normalizeGroupOpenAIFast(
         editForm.platform,
         editForm.force_openai_fast,

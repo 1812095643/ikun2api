@@ -614,6 +614,20 @@ func (_c *GroupCreate) SetNillableClaudeCodeOnly(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetPreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field.
+func (_c *GroupCreate) SetPreferSoonestWeeklyReset(v bool) *GroupCreate {
+	_c.mutation.SetPreferSoonestWeeklyReset(v)
+	return _c
+}
+
+// SetNillablePreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field if the given value is not nil.
+func (_c *GroupCreate) SetNillablePreferSoonestWeeklyReset(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetPreferSoonestWeeklyReset(*v)
+	}
+	return _c
+}
+
 // SetAllowClaudeDesktop sets the "allow_claude_desktop" field.
 func (_c *GroupCreate) SetAllowClaudeDesktop(v bool) *GroupCreate {
 	_c.mutation.SetAllowClaudeDesktop(v)
@@ -1169,6 +1183,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultClaudeCodeOnly
 		_c.mutation.SetClaudeCodeOnly(v)
 	}
+	if _, ok := _c.mutation.PreferSoonestWeeklyReset(); !ok {
+		v := group.DefaultPreferSoonestWeeklyReset
+		_c.mutation.SetPreferSoonestWeeklyReset(v)
+	}
 	if _, ok := _c.mutation.AllowClaudeDesktop(); !ok {
 		v := group.DefaultAllowClaudeDesktop
 		_c.mutation.SetAllowClaudeDesktop(v)
@@ -1391,6 +1409,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
 		return &ValidationError{Name: "claude_code_only", err: errors.New(`ent: missing required field "Group.claude_code_only"`)}
+	}
+	if _, ok := _c.mutation.PreferSoonestWeeklyReset(); !ok {
+		return &ValidationError{Name: "prefer_soonest_weekly_reset", err: errors.New(`ent: missing required field "Group.prefer_soonest_weekly_reset"`)}
 	}
 	if _, ok := _c.mutation.AllowClaudeDesktop(); !ok {
 		return &ValidationError{Name: "allow_claude_desktop", err: errors.New(`ent: missing required field "Group.allow_claude_desktop"`)}
@@ -1675,6 +1696,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)
 		_node.ClaudeCodeOnly = value
+	}
+	if value, ok := _c.mutation.PreferSoonestWeeklyReset(); ok {
+		_spec.SetField(group.FieldPreferSoonestWeeklyReset, field.TypeBool, value)
+		_node.PreferSoonestWeeklyReset = value
 	}
 	if value, ok := _c.mutation.AllowClaudeDesktop(); ok {
 		_spec.SetField(group.FieldAllowClaudeDesktop, field.TypeBool, value)
@@ -2667,6 +2692,18 @@ func (u *GroupUpsert) SetClaudeCodeOnly(v bool) *GroupUpsert {
 // UpdateClaudeCodeOnly sets the "claude_code_only" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateClaudeCodeOnly() *GroupUpsert {
 	u.SetExcluded(group.FieldClaudeCodeOnly)
+	return u
+}
+
+// SetPreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field.
+func (u *GroupUpsert) SetPreferSoonestWeeklyReset(v bool) *GroupUpsert {
+	u.Set(group.FieldPreferSoonestWeeklyReset, v)
+	return u
+}
+
+// UpdatePreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field to the value that was provided on create.
+func (u *GroupUpsert) UpdatePreferSoonestWeeklyReset() *GroupUpsert {
+	u.SetExcluded(group.FieldPreferSoonestWeeklyReset)
 	return u
 }
 
@@ -3930,6 +3967,20 @@ func (u *GroupUpsertOne) SetClaudeCodeOnly(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateClaudeCodeOnly() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateClaudeCodeOnly()
+	})
+}
+
+// SetPreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field.
+func (u *GroupUpsertOne) SetPreferSoonestWeeklyReset(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetPreferSoonestWeeklyReset(v)
+	})
+}
+
+// UpdatePreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdatePreferSoonestWeeklyReset() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdatePreferSoonestWeeklyReset()
 	})
 }
 
@@ -5418,6 +5469,20 @@ func (u *GroupUpsertBulk) SetClaudeCodeOnly(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateClaudeCodeOnly() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateClaudeCodeOnly()
+	})
+}
+
+// SetPreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field.
+func (u *GroupUpsertBulk) SetPreferSoonestWeeklyReset(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetPreferSoonestWeeklyReset(v)
+	})
+}
+
+// UpdatePreferSoonestWeeklyReset sets the "prefer_soonest_weekly_reset" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdatePreferSoonestWeeklyReset() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdatePreferSoonestWeeklyReset()
 	})
 }
 

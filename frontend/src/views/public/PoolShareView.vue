@@ -6,10 +6,12 @@ import UserPoolPanel from '@/components/pool/UserPoolPanel.vue'
 
 const route = useRoute()
 const { t } = useI18n()
-// Fragment tokens do not enter HTTP URLs, access logs or Referer headers.
-const params = computed(() => new URLSearchParams(route.hash.slice(1)))
-const token = computed(() => params.value.get('token') || '')
-const initialTab = computed(() => params.value.get('tab') === 'usage' ? 'usage' : 'accounts')
+// New links use query parameters for menu import compatibility; old fragment links remain valid.
+const fragment = computed(() => new URLSearchParams(route.hash.slice(1)))
+const token = computed(() => route.query.token !== undefined
+  ? typeof route.query.token === 'string' ? route.query.token : ''
+  : fragment.value.get('token') || '')
+const initialTab = computed(() => (route.query.tab ?? fragment.value.get('tab')) === 'usage' ? 'usage' : 'accounts')
 </script>
 
 <template>

@@ -118,6 +118,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	}
 	ctx = s.withGroupContext(ctx, group)
 	ctx = s.withGatewayProfitControlGate(ctx, groupID)
+	weeklyOrder := newClaudeWeeklyResetOrder(group, time.Now())
 
 	// Claude Code 限制可能已将 groupID 解析为 fallback group，
 	// 渠道限制预检查必须使用解析后的分组。
@@ -477,6 +478,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					}
 				})
 				shuffleWithinSortGroups(routingAvailable)
+				weeklyOrder.sortLoaded(routingAvailable)
 
 				// 4. 尝试获取槽位
 				for _, item := range routingAvailable {
@@ -735,10 +737,10 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			}
 		}
 
-		// 分层过滤选择：优先级 →（可选）最早重置 → 负载率 → LRU
+		// 分层过滤选择：优先级（叠加分组 7d 高权重）→（可选）5h 重置 → 负载率 → LRU
 		for len(available) > 0 {
 			// 1. 取优先级最小的集合
-			candidates := filterByMinPriority(available)
+			candidates := weeklyOrder.filterByPriority(available)
 			// 2. （可选）use-it-or-lose-it：优先选用会话窗口最早重置的账号
 			if cfg.PreferSoonestReset {
 				candidates = filterBySoonestReset(candidates)
@@ -778,6 +780,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 	// ============ Layer 3: 兜底排队 ============
 	s.sortCandidatesForFallback(candidates, preferOAuth, cfg.FallbackSelectionMode)
+	weeklyOrder.sortAccounts(candidates)
 	for _, acc := range candidates {
 		// 会话数量限制检查（等待计划也需要占用会话配额）
 		if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
@@ -796,6 +799,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates []*Account, groupID *int64, sessionHash string, preferOAuth bool) (*AccountSelectionResult, bool, error) {
 	ordered := append([]*Account(nil), candidates...)
 	sortAccountsByPriorityAndLastUsed(ordered, preferOAuth)
+	s.claudeWeeklyResetOrder(ctx, groupID).sortAccounts(ordered)
 
 	for _, acc := range ordered {
 		result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
@@ -1910,6 +1914,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	if groupID != nil && s.groupRepo != nil {
 		schedGroup, _ = s.groupRepo.GetByIDLite(ctx, *groupID)
 	}
+	weeklyOrder := newClaudeWeeklyResetOrder(schedGroup, time.Now())
 
 	var accounts []Account
 	accountsLoaded := false
@@ -2008,6 +2013,12 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 			}
 			if selected == nil {
 				selected = acc
+				continue
+			}
+			if cmp := weeklyOrder.compare(acc, selected); cmp != 0 {
+				if cmp < 0 {
+					selected = acc
+				}
 				continue
 			}
 			if acc.Priority < selected.Priority {
@@ -2127,6 +2138,12 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 			selected = acc
 			continue
 		}
+		if cmp := weeklyOrder.compare(acc, selected); cmp != 0 {
+			if cmp < 0 {
+				selected = acc
+			}
+			continue
+		}
 		if acc.Priority < selected.Priority {
 			selected = acc
 		} else if acc.Priority == selected.Priority {
@@ -2176,6 +2193,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	if groupID != nil && s.groupRepo != nil {
 		schedGroup, _ = s.groupRepo.GetByIDLite(ctx, *groupID)
 	}
+	weeklyOrder := newClaudeWeeklyResetOrder(schedGroup, time.Now())
 
 	var accounts []Account
 	accountsLoaded := false
@@ -2274,6 +2292,12 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 			}
 			if selected == nil {
 				selected = acc
+				continue
+			}
+			if cmp := weeklyOrder.compare(acc, selected); cmp != 0 {
+				if cmp < 0 {
+					selected = acc
+				}
 				continue
 			}
 			if acc.Priority < selected.Priority {
@@ -2392,6 +2416,12 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 		}
 		if selected == nil {
 			selected = acc
+			continue
+		}
+		if cmp := weeklyOrder.compare(acc, selected); cmp != 0 {
+			if cmp < 0 {
+				selected = acc
+			}
 			continue
 		}
 		if acc.Priority < selected.Priority {

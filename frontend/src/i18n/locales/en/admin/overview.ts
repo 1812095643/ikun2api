@@ -903,6 +903,10 @@ export default {
       rateAndAccounts: '{rate}x rate · {count} accounts',
       accountsCount: '{count} accounts',
       rateLabel: 'rate',
+      weeklyResetPriority: {
+        title: 'Prefer accounts nearing their 7d reset',
+        hint: 'Prioritize eligible accounts with the soonest weekly reset over account priority.'
+      },
       accountFilters: {
         title: 'Account Filter Controls',
         oauthOnly: 'Only allow OAuth accounts',

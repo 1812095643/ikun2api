@@ -38,6 +38,17 @@ beforeEach(() => {
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()) })
 
 describe('original version badge and rollback panel', () => {
+  it('omits the view-release link while retaining rollback on the latest version', async () => {
+    api.checkUpdates.mockResolvedValue({ ...release, latest_version: '1.3.40', has_update: false })
+    const wrapper = render()
+    await flushPromises()
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.text()).not.toContain('查看发布')
+    expect(wrapper.find(`a[href="${release.release_info.html_url}"]`).exists()).toBe(false)
+    expect(wrapper.text()).toContain('版本回退')
+    expect(wrapper.find('button[title="刷新"]').exists()).toBe(true)
+  })
+
   it('checks on mount and shows the original amber update indicator', async () => {
     const wrapper = render()
     await flushPromises()

@@ -104,6 +104,8 @@ const (
 	FieldModelPricing = "model_pricing"
 	// FieldClaudeCodeOnly holds the string denoting the claude_code_only field in the database.
 	FieldClaudeCodeOnly = "claude_code_only"
+	// FieldPreferSoonestWeeklyReset holds the string denoting the prefer_soonest_weekly_reset field in the database.
+	FieldPreferSoonestWeeklyReset = "prefer_soonest_weekly_reset"
 	// FieldAllowClaudeDesktop holds the string denoting the allow_claude_desktop field in the database.
 	FieldAllowClaudeDesktop = "allow_claude_desktop"
 	// FieldFallbackGroupID holds the string denoting the fallback_group_id field in the database.
@@ -273,6 +275,7 @@ var Columns = []string{
 	FieldLongContextPricingEnabled,
 	FieldModelPricing,
 	FieldClaudeCodeOnly,
+	FieldPreferSoonestWeeklyReset,
 	FieldAllowClaudeDesktop,
 	FieldFallbackGroupID,
 	FieldFallbackGroupIDOnInvalidRequest,
@@ -399,6 +402,8 @@ var (
 	DefaultLongContextPricingEnabled bool
 	// DefaultClaudeCodeOnly holds the default value on creation for the "claude_code_only" field.
 	DefaultClaudeCodeOnly bool
+	// DefaultPreferSoonestWeeklyReset holds the default value on creation for the "prefer_soonest_weekly_reset" field.
+	DefaultPreferSoonestWeeklyReset bool
 	// DefaultAllowClaudeDesktop holds the default value on creation for the "allow_claude_desktop" field.
 	DefaultAllowClaudeDesktop bool
 	// DefaultModelRoutingEnabled holds the default value on creation for the "model_routing_enabled" field.
@@ -662,6 +667,11 @@ func ByLongContextPricingEnabled(opts ...sql.OrderTermOption) OrderOption {
 // ByClaudeCodeOnly orders the results by the claude_code_only field.
 func ByClaudeCodeOnly(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldClaudeCodeOnly, opts...).ToFunc()
+}
+
+// ByPreferSoonestWeeklyReset orders the results by the prefer_soonest_weekly_reset field.
+func ByPreferSoonestWeeklyReset(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPreferSoonestWeeklyReset, opts...).ToFunc()
 }
 
 // ByAllowClaudeDesktop orders the results by the allow_claude_desktop field.

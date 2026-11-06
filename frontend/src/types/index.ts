@@ -643,6 +643,7 @@ export interface Group {
 }
 
 export interface AdminGroup extends Group {
+  prefer_soonest_weekly_reset?: boolean
   // 管理端的 name / description 始终是原字段，各语言译文另放在 i18n 里
   i18n?: GroupI18n
   force_openai_fast: boolean
@@ -857,6 +858,7 @@ export interface CreateGroupRequest {
   profit_safety_buffer?: number
   claude_code_only?: boolean
   allow_claude_desktop?: boolean
+  prefer_soonest_weekly_reset?: boolean
   fallback_group_id?: number | null
   fallback_group_id_on_invalid_request?: number | null
   mcp_xml_inject?: boolean
@@ -926,6 +928,7 @@ export interface UpdateGroupRequest {
   profit_safety_buffer?: number
   claude_code_only?: boolean
   allow_claude_desktop?: boolean
+  prefer_soonest_weekly_reset?: boolean
   fallback_group_id?: number | null
   fallback_group_id_on_invalid_request?: number | null
   mcp_xml_inject?: boolean

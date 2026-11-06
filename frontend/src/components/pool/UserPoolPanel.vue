@@ -27,7 +27,7 @@ function capacityColor(row:UserPoolAccount){const current=row.capacity?.in_use??
 async function generate(){
   if(shareBusy.value)return
   shareBusy.value=true;shareError.value='';copied.value=false
-  try{const result=await createPoolShareLink();shareURL.value=`${location.origin}/share/pool#${new URLSearchParams({token:result.token,tab:activeTab.value})}`;expires.value=result.expires_at}
+  try{const result=await createPoolShareLink();shareURL.value=`${location.origin}/share/pool?${new URLSearchParams({token:result.token,tab:activeTab.value})}`;expires.value=result.expires_at}
   catch{shareError.value=t('admin.pool.networkError')}
   finally{shareBusy.value=false}
 }

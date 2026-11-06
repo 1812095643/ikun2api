@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"hash/fnv"
 	"strings"
@@ -40,8 +42,8 @@ func poolFilterSyntheticUserItems(items []PoolUserAccount, filter PoolAccountFil
 // buildSyntheticUserAccounts 为普通用户视图生成合成账号。
 //
 // 目的只是让号池看起来像一个真实在用的池子：账号名走同一套 7 天伪名，
-// 容量与额度由 (用户, 序号, 桶) 的哈希派生出稳定值，所以刷新页面不会跳变，
-// 换桶之后才会换一批。合成账号永远不写库，也不会出现在管理员视图里。
+// 邮箱与额度由 (用户, 序号, 桶) 派生，桶内保持稳定；使用中并发独立按短周期错峰变化。
+// 合成账号永远不写库，也不会出现在管理员视图里。
 func (s *AccountPoolService) buildSyntheticUserAccounts(_ context.Context, userID int64, plan PoolSyntheticPlan, now time.Time) []PoolUserAccount {
 	if plan.empty() || userID <= 0 {
 		return nil
@@ -70,9 +72,9 @@ func poolSyntheticUserAccount(userID int64, index int, plan PoolSyntheticPlan, n
 		status = poolSyntheticBannedStatus(index)
 	}
 
-	// 容量与额度都从 seed 派生：同一桶内稳定，跨桶轮换。
-	concurrency := 3                                     // fixed display capacity
-	inUse := int((seed >> 8) % uint64(concurrency+1))    // 0..concurrency
+	// 上限固定为 3，使用中并发独立变化，不影响邮箱和额度的轮换。
+	concurrency := 3
+	inUse := poolSyntheticInUse(seed, concurrency, now)
 	fiveHour := 20.0 + float64((seed>>16)%66)            // 20..85
 	sevenDay := 30.0 + float64((seed>>24)%61)            // 30..90
 	requests := int64(6 + (seed>>32)%38)                 // 6..43
@@ -136,6 +138,19 @@ func poolSyntheticSeed(userID int64, index int, now time.Time) uint64 {
 	hasher := fnv.New64a()
 	_, _ = fmt.Fprintf(hasher, "pool-synthetic|%d|%d|%d", userID, index, bucket)
 	return hasher.Sum64()
+}
+
+// poolSyntheticInUse 按账号错峰，每 20–45 秒派生一份并发快照。
+// 同一时间段重复读取结果一致，登录页与分享页共用；不产生数据库或调度状态。
+func poolSyntheticInUse(seed uint64, capacity int, now time.Time) int {
+	if capacity <= 0 {
+		return 0
+	}
+	period := int64(20 + seed%26)
+	offset := int64((seed >> 12) % uint64(period))
+	bucket := (now.Unix() + offset) / period
+	digest := sha256.Sum256(fmt.Appendf(nil, "pool-synthetic-activity|%d|%d", seed, bucket))
+	return int(binary.LittleEndian.Uint64(digest[:8]) % uint64(capacity+1))
 }
 
 // poolSyntheticWindow 组装一条额度窗口读数。

@@ -3,6 +3,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -56,4 +57,24 @@ func TestMenuLabelsPartialUpdateAndValidation(t *testing.T) {
 		require.Equal(t, "Updated", repo.values[service.SettingKeySiteName])
 	}
 	require.Equal(t, map[string]string{"/news": "网站资讯"}, service.PublicMenuLabels(service.ParseMenuLabels(repo.values[service.SettingKeyMenuLabels])))
+}
+
+func TestCustomMenuAcceptsPoolShareQueryLinks(t *testing.T) {
+	for _, link := range []string{
+		"https://example.test/share/pool?token=pool_TEST_ONLY&tab=accounts",
+		"https://example.test/share/pool?token=pool_TEST_ONLY&tab=usage",
+		"/share/pool?token=pool_TEST_ONLY&tab=usage",
+	} {
+		h, repo := newStepUpSwitchTestHandler(t, nil)
+		r := doUpdateSettings(t, h, map[string]any{"custom_menu_items": []map[string]any{{
+			"id": "pool-share-test", "label": "共享号池", "url": link, "visibility": "user",
+		}}}, nil)
+		require.Equal(t, http.StatusOK, r.Code, r.Body.String())
+		var items []struct {
+			URL string `json:"url"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(repo.values[service.SettingKeyCustomMenuItems]), &items))
+		require.Len(t, items, 1)
+		require.Equal(t, link, items[0].URL)
+	}
 }

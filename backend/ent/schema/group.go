@@ -207,6 +207,9 @@ func (Group) Fields() []ent.Field {
 		field.Bool("claude_code_only").
 			Default(false).
 			Comment("是否仅允许 Claude Code 客户端"),
+		field.Bool("prefer_soonest_weekly_reset").
+			Default(true).
+			Comment("Claude 分组优先调度 7 天窗口即将重置的可用账号"),
 		field.Bool("allow_claude_desktop").
 			Default(false).
 			Comment("Claude Code 限制开启时额外允许 Claude Desktop"),

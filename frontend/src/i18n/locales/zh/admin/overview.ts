@@ -999,6 +999,10 @@ export default {
       rateAndAccounts: '{rate}x 费率 · {count} 个账号',
       accountsCount: '{count} 个账号',
       rateLabel: '倍率',
+      weeklyResetPriority: {
+        title: '7d 时间临近优先调度',
+        hint: '优先使用 7 天额度即将刷新的可用账号，覆盖账号优先级。'
+      },
       accountFilters: {
         title: '账号过滤控制',
         oauthOnly: '仅允许 OAuth 账号',

@@ -260,6 +260,11 @@ func ClaudeCodeOnly(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldClaudeCodeOnly, v))
 }
 
+// PreferSoonestWeeklyReset applies equality check predicate on the "prefer_soonest_weekly_reset" field. It's identical to PreferSoonestWeeklyResetEQ.
+func PreferSoonestWeeklyReset(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldPreferSoonestWeeklyReset, v))
+}
+
 // AllowClaudeDesktop applies equality check predicate on the "allow_claude_desktop" field. It's identical to AllowClaudeDesktopEQ.
 func AllowClaudeDesktop(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldAllowClaudeDesktop, v))
@@ -2113,6 +2118,16 @@ func ClaudeCodeOnlyEQ(v bool) predicate.Group {
 // ClaudeCodeOnlyNEQ applies the NEQ predicate on the "claude_code_only" field.
 func ClaudeCodeOnlyNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldClaudeCodeOnly, v))
+}
+
+// PreferSoonestWeeklyResetEQ applies the EQ predicate on the "prefer_soonest_weekly_reset" field.
+func PreferSoonestWeeklyResetEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldPreferSoonestWeeklyReset, v))
+}
+
+// PreferSoonestWeeklyResetNEQ applies the NEQ predicate on the "prefer_soonest_weekly_reset" field.
+func PreferSoonestWeeklyResetNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldPreferSoonestWeeklyReset, v))
 }
 
 // AllowClaudeDesktopEQ applies the EQ predicate on the "allow_claude_desktop" field.
