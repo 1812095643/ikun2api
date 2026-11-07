@@ -131,6 +131,17 @@ jobs:
 
       # ---------------- 五个平台二进制 ----------------
 
+      - name: 释放 runner 磁盘空间
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          rm -rf frontend/node_modules || true
+          sudo docker image prune -af || true
+          sudo docker builder prune -af || true
+          df -h /
+
       - name: 编译五个平台二进制
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -140,6 +151,7 @@ jobs:
           for TARGET in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64; do
             echo "::group::build $TARGET"
             python3 scripts/release/build.py --target "$TARGET" --version "$VERSION" --commit "$COMMIT"
+            go clean -cache || true
             echo "::endgroup::"
           done
           ls -lh dist/release
@@ -174,6 +186,8 @@ jobs:
             docker save "$REGISTRY_IMAGE:$VERSION" | gzip -1 > "dist/release/ikun2api_image_${VERSION}_linux_${ARCH}.tar.gz"
             if [ "$PUBLISH" = true ]; then docker push "$REGISTRY_IMAGE:$VERSION-$ARCH"; fi
             docker rmi -f "$REGISTRY_IMAGE:$VERSION" "$REGISTRY_IMAGE:$VERSION-$ARCH" >/dev/null 2>&1 || true
+            docker builder prune -af >/dev/null 2>&1 || true
+            df -h /
             echo "::endgroup::"
           done
           rm -rf dist/docker
