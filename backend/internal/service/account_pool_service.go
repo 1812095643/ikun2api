@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -482,49 +483,35 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 	}
 
 	dayStart := timezone.Today()
-	accountIDs, err := reader.ListAccountIDsByUser(ctx, userID, dayStart, visibleGroupIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// 概览需要「今日」与「近 7 天」两个窗口，账号集合按 7 天取，
-	// 否则今天没调用的账号会从卡片里消失。
 	weekStart := dayStart.AddDate(0, 0, -6)
-	weekIDs, weekErr := reader.ListAccountIDsByUser(ctx, userID, weekStart, visibleGroupIDs)
-	if weekErr != nil {
-		return nil, poolDataUnavailable(weekErr)
-	}
-	if len(weekIDs) > len(accountIDs) {
-		accountIDs = weekIDs
-	}
 
+	// 概览的账号口径与列表保持一致：可见分组内的全部账号，而不是本人用过的账号。
+	// 否则卡片显示 3、列表显示整池，两边对不上。
+	accounts, err := s.listVisiblePoolAccounts(ctx, visibleGroupIDs)
+	if err != nil {
+		return nil, poolDataUnavailable(err)
+	}
+	accountIDs := make([]int64, 0, len(accounts))
 	// 账号数按用户实际可见的口径统计：分组过滤要生效，合成账号也要算进来，
 	// 否则列表行数与概览卡片会对不上，池子大小一眼就穿。
 	overview.AccountCount = 0
-	if len(accountIDs) > 0 {
-		accounts, accErr := s.adminService.GetAccountsByIDs(ctx, accountIDs)
-		if accErr != nil {
-			return nil, poolDataUnavailable(accErr)
+	for _, acc := range accounts {
+		if acc == nil {
+			continue
 		}
-		{
-			for _, acc := range accounts {
-				if acc == nil {
-					continue
-				}
-				if len(visibleGroupIDs) > 0 && !poolAccountMatchesGroups(acc, visibleGroupIDs) {
-					continue
-				}
-				overview.AccountCount++
-				if strings.EqualFold(acc.Status, "active") && acc.Schedulable {
-					overview.ActiveCount++
-				}
-				platform := strings.TrimSpace(acc.Platform)
-				if platform == "" {
-					platform = "unknown"
-				}
-				overview.PlatformCounts[platform]++
-			}
+		if len(visibleGroupIDs) > 0 && !poolAccountMatchesGroups(acc, visibleGroupIDs) {
+			continue
 		}
+		accountIDs = append(accountIDs, acc.ID)
+		overview.AccountCount++
+		if strings.EqualFold(acc.Status, "active") && acc.Schedulable {
+			overview.ActiveCount++
+		}
+		platform := strings.TrimSpace(acc.Platform)
+		if platform == "" {
+			platform = "unknown"
+		}
+		overview.PlatformCounts[platform]++
 	}
 
 	stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart, visibleGroupIDs)
@@ -552,7 +539,11 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 	return overview, nil
 }
 
-// ListAccountsForUser 返回该用户用过（近 7 天）的账号列表，附带本人今日用量。
+// ListAccountsForUser 返回用户端号池：可见分组内的全部账号，附带本人今日用量。
+//
+// 号池是共享池，所以账号集合只由「管理员配置的可见分组」决定 —— 没调用过的账号
+// 同样要列出来，否则新用户一进页面就以为池子是空的。用量列（Today）仍然按 userID
+// 切分：别人消耗了多少，不会显示给当前用户。
 func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int64, filter PoolAccountFilter) (*PoolUserAccountList, error) {
 	result := &PoolUserAccountList{
 		Items:    []PoolUserAccount{},
@@ -580,7 +571,6 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	}
 
 	dayStart := timezone.Today()
-	weekStart := dayStart.AddDate(0, 0, -6)
 	// 管理员可以限制用户端只看某个分组的真实账号。
 	plan, visibleGroupIDs, err := s.poolDisplayConfiguration(ctx)
 	if err != nil {
@@ -588,12 +578,12 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	}
 	now := timezone.Now()
 
-	accountIDs, err := reader.ListAccountIDsByUser(ctx, userID, weekStart, visibleGroupIDs)
+	accounts, err := s.listVisiblePoolAccounts(ctx, visibleGroupIDs)
 	if err != nil {
 		return nil, err
 	}
-	if len(accountIDs) == 0 {
-		// 没有任何真实用量时仍然展示合成账号：否则管理员一打开合成开关，
+	if len(accounts) == 0 {
+		// 池子里一个真实账号都没有时仍然展示合成账号：否则管理员一打开合成开关，
 		// 新用户反而看到空列表，与让池子看起来在用的意图相反。
 		items := poolFilterSyntheticUserItems(s.buildSyntheticUserAccounts(ctx, userID, plan, now), filter)
 		result.Total = int64(len(items))
@@ -601,12 +591,14 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 		return result, nil
 	}
 
-	accounts, err := s.adminService.GetAccountsByIDs(ctx, accountIDs)
-	if err != nil {
-		return nil, err
+	// 统计口径只带本人：同一批账号，别人用了多少不显示。
+	statsIDs := make([]int64, 0, len(accounts))
+	for _, acc := range accounts {
+		if acc != nil {
+			statsIDs = append(statsIDs, acc.ID)
+		}
 	}
-
-	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart, visibleGroupIDs)
+	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, statsIDs, dayStart, visibleGroupIDs)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -692,7 +684,56 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	return result, nil
 }
 
+// listVisiblePoolAccounts 取用户端号池应当展示的真实账号集合。
+//
+// 集合只由可见分组决定：配了分组就取这些分组里的全部账号，没配就取全部分组。
+// 这里刻意不复用「本人近 7 天调用过的账号」—— 那是使用记录的口径，不是号池的口径。
+// 返回按账号 ID 升序去重，翻页顺序稳定。
+func (s *AccountPoolService) listVisiblePoolAccounts(ctx context.Context, groupIDs []int64) ([]*Account, error) {
+	if s == nil || s.adminService == nil {
+		return nil, nil
+	}
+	if len(groupIDs) == 0 {
+		accounts, err := s.adminService.ListAccountsForSchedulerScoreFilter(ctx, "", "", "", "", 0, "")
+		if err != nil {
+			return nil, err
+		}
+		return poolPointerAccounts(accounts), nil
+	}
+	seen := make(map[int64]struct{}, 16)
+	merged := make([]*Account, 0, 16)
+	for _, groupID := range groupIDs {
+		accounts, err := s.adminService.ListAccountsForSchedulerScoreFilter(ctx, "", "", "", "", groupID, "")
+		if err != nil {
+			return nil, err
+		}
+		for i := range accounts {
+			acc := &accounts[i]
+			if acc.ID <= 0 {
+				continue
+			}
+			if _, exists := seen[acc.ID]; exists {
+				continue
+			}
+			seen[acc.ID] = struct{}{}
+			merged = append(merged, acc)
+		}
+	}
+	slices.SortFunc(merged, func(a, b *Account) int { return cmp.Compare(a.ID, b.ID) })
+	return merged, nil
+}
+
+// poolPointerAccounts 把值切片转成指针切片，让两条取数路径口径一致。
+func poolPointerAccounts(accounts []Account) []*Account {
+	out := make([]*Account, 0, len(accounts))
+	for i := range accounts {
+		out = append(out, &accounts[i])
+	}
+	return out
+}
+
 // poolGlobalWindowStats keeps account-cost semantics and reports failed reads.
+
 func (s *AccountPoolService) poolGlobalWindowStats(ctx context.Context, startTime time.Time) (*usagestats.AccountStats, error) {
 	reader, ok := s.usageLogRepo.(poolGlobalStatsReader)
 	if !ok {

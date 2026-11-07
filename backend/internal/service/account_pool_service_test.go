@@ -20,6 +20,31 @@ func (a poolTestAdmin) GetAccountsByIDs(context.Context, []int64) ([]*Account, e
 	return a.accounts, nil
 }
 
+// ListAccountsForSchedulerScoreFilter 是号池取「分组内全部账号」的入口。
+// 测试桩按 groupID 过滤回放，groupID 为 0 表示不限分组。
+func (a poolTestAdmin) ListAccountsForSchedulerScoreFilter(_ context.Context, _, _, _, _ string, groupID int64, _ string) ([]Account, error) {
+	out := make([]Account, 0, len(a.accounts))
+	for _, acc := range a.accounts {
+		if acc == nil {
+			continue
+		}
+		if groupID > 0 {
+			matched := false
+			for _, group := range acc.Groups {
+				if group != nil && group.ID == groupID {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		out = append(out, *acc)
+	}
+	return out, nil
+}
+
 type poolTestUsageRepo struct {
 	UsageLogRepository
 	users  []int64
@@ -165,4 +190,57 @@ func TestPoolQuotaWindowUsesDailyQuotaForAPIKeyAccounts(t *testing.T) {
 	require.Zero(t, bareWindow.Utilization)
 	require.Equal(t, "local", bareWindow.Source)
 	require.Nil(t, bareWindow.ResetsAt)
+}
+
+// TestAccountPoolListsWholeGroupWithoutPersonalUsage 验证号池是共享池：
+// 当前用户一次都没调用过的账号同样要列出来，而 Today 只统计本人的用量。
+func TestAccountPoolListsWholeGroupWithoutPersonalUsage(t *testing.T) {
+	accounts := []*Account{
+		{ID: 11, Name: "u11@example.test", Platform: "anthropic", Type: "oauth", Status: StatusActive, Schedulable: true},
+		{ID: 12, Name: "u12@example.test", Platform: "anthropic", Type: "oauth", Status: StatusActive, Schedulable: true},
+	}
+	repo := &poolTestUsageRepo{}
+	svc := NewAccountPoolService(poolTestAdmin{accounts: accounts}, nil, nil, repo, nil)
+
+	result, err := svc.ListAccountsForUser(context.Background(), 42, PoolAccountFilter{})
+	require.NoError(t, err)
+	// 没有任何个人用量，号池也不能是空的。
+	require.Len(t, result.Items, len(accounts))
+	require.Equal(t, int64(len(accounts)), result.Total)
+	for _, item := range result.Items {
+		require.Equal(t, int64(0), item.Today.Requests)
+	}
+	// 用量查询依然带 userID：使用记录只显示自己的。
+	require.NotEmpty(t, repo.users)
+	for _, id := range repo.users {
+		require.Equal(t, int64(42), id)
+	}
+}
+
+// TestAccountPoolVisibleGroupsScopeTheList 验证可见分组仍然收窄号池范围。
+func TestAccountPoolVisibleGroupsScopeTheList(t *testing.T) {
+	accounts := []*Account{
+		{ID: 11, Name: "u11@example.test", Platform: "anthropic", Type: "oauth", Status: StatusActive,
+			Groups: []*Group{{ID: 1001, Name: "claude"}}},
+		{ID: 12, Name: "u12@example.test", Platform: "anthropic", Type: "oauth", Status: StatusActive,
+			Groups: []*Group{{ID: 2, Name: "pro"}}},
+	}
+	svc := &AccountPoolService{adminService: poolTestAdmin{accounts: accounts}}
+
+	scoped, err := svc.listVisiblePoolAccounts(context.Background(), []int64{1001})
+	require.NoError(t, err)
+	require.Len(t, scoped, 1)
+	require.Equal(t, int64(11), scoped[0].ID)
+
+	// 多分组去重后按 ID 升序。
+	all, err := svc.listVisiblePoolAccounts(context.Background(), []int64{1001, 2, 1001})
+	require.NoError(t, err)
+	require.Len(t, all, 2)
+	require.Equal(t, int64(11), all[0].ID)
+	require.Equal(t, int64(12), all[1].ID)
+
+	// 空分组等于不限分组，整池都可见。
+	unscoped, err := svc.listVisiblePoolAccounts(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, unscoped, 2)
 }

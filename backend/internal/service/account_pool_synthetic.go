@@ -119,7 +119,7 @@ func poolSyntheticUserAccount(userID int64, index int, plan PoolSyntheticPlan, n
 		dayProgress = math.Min(math.Max(now.Sub(dayStart).Seconds()/dayLength.Seconds(), 0), 1)
 	}
 	requests := int64((4 + 40*intensity) * (0.15 + 0.85*dayProgress) * (0.02 + 0.98*demand))
-	tokens := requests * int64(900+(quotaSeed>>24)%2100)   // 每请求 900..3000 tokens
+	tokens := requests * int64(900+(quotaSeed>>24)%2100) // 每请求 900..3000 tokens
 	cost := float64(tokens) * poolSyntheticTokenPriceUSD // 粗略折算，只用于展示
 
 	if banned {
