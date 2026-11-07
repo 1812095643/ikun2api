@@ -123,6 +123,12 @@ type PoolSyntheticPlan struct {
 	Count    int
 	Banned   int
 	Platform string
+
+	// LoadRatio 是真实账号池的实时占用比例（0..1）。池子闲下来的时候合成账号
+	// 也要闲下来，否则没人发请求、一屏随机号还在自己爬额度，一眼就看出是凑数的。
+	// nil 表示拿不到真实信号（例如池子里一个真实账号都没有），这时按合成账号
+	// 自身的固有强度渲染，避免整页额度归零反而更突兀。
+	LoadRatio *float64
 }
 
 // empty 表示本次不需要追加任何合成账号。

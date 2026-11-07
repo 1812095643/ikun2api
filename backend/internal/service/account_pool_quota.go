@@ -231,6 +231,14 @@ func poolQuotaWindowFromAccount(acc *Account, kind string, capacity PoolCapacity
 		if window.Source == "local" && capacity.SupportsWindowCost && capacity.WindowCostLimit > 0 {
 			window.Source = "quota"
 		}
+		// api_key / bedrock / service_account 这类账号既没有上游 5 小时读数，也不会
+		// 执行 window cost 限额，但管理员通常会给它们配每日额度（quota_daily_*）。
+		// 这时直接用「今日已用 / 每日上限」算百分比：额度跟着真实请求一起涨，到本地
+		// 日界再一起归零。少了这一条，这些号在池子里会永远挂着 0%，看着像链路坏了。
+		if window.Source == "local" && capacity.SupportsQuota && capacity.QuotaDailyLimit > 0 {
+			window.Utilization = poolPercent(capacity.QuotaDailyUsed, capacity.QuotaDailyLimit)
+			window.Source = "quota"
+		}
 		switch {
 		case acc.SessionWindowEnd != nil && acc.SessionWindowEnd.After(now):
 			window.ResetsAt = poolFormatTimePtr(acc.SessionWindowEnd)
@@ -266,6 +274,36 @@ func poolQuotaWindowFromAccount(acc *Account, kind string, capacity PoolCapacity
 		}
 	}
 	return window
+}
+
+// poolRealLoadRatio 用真实账号的并发占用估出整池的忙闲程度（0..1）。
+//
+// 分母是管理员配置的并发上限；没配并发（0）的账号不参与统计，因为它们本来就不
+// 占槽位，算进去只会把比例稀释掉。一条容量信息都拿不到时返回 nil，让调用方退回
+// 合成账号的固有强度，而不是把整页额度按 0 负载渲染。
+func poolRealLoadRatio(items []PoolUserAccount) *float64 {
+	used, total := 0, 0
+	for i := range items {
+		if items[i].Synthetic {
+			continue
+		}
+		limit := items[i].Capacity.Concurrency
+		if limit <= 0 {
+			continue
+		}
+		total += limit
+		used += items[i].Capacity.InUse
+	}
+	if total <= 0 {
+		return nil
+	}
+	ratio := float64(used) / float64(total)
+	if ratio < 0 {
+		ratio = 0
+	} else if ratio > 1 {
+		ratio = 1
+	}
+	return &ratio
 }
 
 // fillCapacity 把并发占用（Redis 实时值）回填进容量视图。
