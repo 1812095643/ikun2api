@@ -32,12 +32,12 @@ var claudePrivacyOpaqueID = regexp.MustCompile(`^[A-Za-z0-9_.:-]{0,256}$`)
 
 var claudePrivacySystemLine = regexp.MustCompile(`(?i)^\s*(?:x-anthropic-billing-header|x-claude-code-[\w-]+|x-claude-remote-[\w-]+|x-cc-[\w-]+|tengu_[\w-]+|cc_[\w-]+|cch|git[_ -]remote(?:[_ -]url)?|git[_ -]hash|git[_ -]commit|git[_ -]branch|(?:primary )?working directory|home directory|(?:repo|repository|project)[_ -](?:url|hash|id|root|path))\s*[:=]`)
 
-// 2.1.301 抓包确认：本机环境与 Git 快照以独立 system-reminder 文本块进入 user 消息。
-// 仅识别客户端的固定包装和模板；普通用户文字、引用示例、工具结果与签名保持原样。
+// 仅识别客户端自动上下文模板；环境段兼容独立包装和合并消息。
 func stripClaudePrivacyAutoContext(text string) string {
 	trimmed := strings.TrimSpace(text)
 	if !strings.HasPrefix(trimmed, "<system-reminder>\n") && !strings.HasPrefix(trimmed, "<system-reminder>\r\n") {
-		return text
+		clean, _ := stripClaudePrivacyEnvironmentText(text)
+		return clean
 	}
 	if !strings.HasSuffix(trimmed, "</system-reminder>") || strings.Count(trimmed, "<system-reminder>") != 1 {
 		return text
@@ -48,23 +48,9 @@ func stripClaudePrivacyAutoContext(text string) string {
 	var out strings.Builder
 	changed := false
 	if strings.HasPrefix(inner, "# Environment\nYou have been invoked in the following environment:") || strings.HasPrefix(inner, "# Environment update\n") {
-		skipDirectories := false
-		for _, line := range lines {
-			if skipDirectories && strings.HasPrefix(line, "  - ") {
-				continue
-			}
-			skipDirectories = false
-			field := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "- "))
-			if strings.HasPrefix(field, "Additional working directories:") || strings.HasPrefix(field, "Additional working directories added:") || strings.HasPrefix(field, "Additional working directories removed:") {
-				skipDirectories, changed = true, true
-				continue
-			}
-			if strings.HasPrefix(field, "Primary working directory:") || strings.HasPrefix(field, "Scratchpad directory:") {
-				changed = true
-				continue
-			}
-			out.WriteString(line)
-		}
+		clean, environmentChanged := stripClaudePrivacyEnvironmentText(inner)
+		out.WriteString(clean)
+		changed = environmentChanged
 	} else {
 		announced := strings.HasPrefix(inner, "As you answer the user's questions, you can use the following context:\n") || strings.HasPrefix(inner, "The session context has changed; these values replace the earlier ones:\n") || (strings.HasPrefix(inner, "The session context was re-read ") && strings.Contains(inner, "; these values replace the earlier ones:\n"))
 		if !announced || !strings.Contains(inner, "Claude Code attached this context automatically; it isn't part of the user's message.") {
@@ -94,6 +80,64 @@ func stripClaudePrivacyAutoContext(text string) string {
 		return text
 	}
 	return "<system-reminder>\n" + strings.TrimSpace(out.String()) + "\n</system-reminder>"
+}
+
+func stripClaudePrivacyEnvironmentText(text string) (string, bool) {
+	lines := strings.SplitAfter(text, "\n")
+	start := 0
+	for start < len(lines) && strings.TrimSpace(lines[start]) == "" {
+		start++
+	}
+	if start == len(lines) {
+		return text, false
+	}
+	switch strings.TrimSpace(lines[start]) {
+	case "# Environment":
+		if start+1 >= len(lines) || strings.TrimSpace(lines[start+1]) != "You have been invoked in the following environment:" {
+			return text, false
+		}
+		start += 2
+	case "# Environment update":
+		start++
+	default:
+		return text, false
+	}
+
+	var out strings.Builder
+	changed, inEnvironment := false, true
+	skipIndent := -1
+	for i, line := range lines {
+		if i < start || !inEnvironment {
+			out.WriteString(line)
+			continue
+		}
+		fieldLine := strings.TrimLeft(line, " \t")
+		// 首个非列表行结束自动环境段，后续模型、工具和用户文字保持原样。
+		if !strings.HasPrefix(fieldLine, "- ") {
+			inEnvironment = false
+			out.WriteString(line)
+			continue
+		}
+		indent := len(line) - len(fieldLine)
+		if skipIndent >= 0 && indent > skipIndent {
+			continue
+		}
+		skipIndent = -1
+		field := strings.TrimSpace(strings.TrimPrefix(fieldLine, "- "))
+		if strings.HasPrefix(field, "Additional working directories:") || strings.HasPrefix(field, "Additional working directories added:") || strings.HasPrefix(field, "Additional working directories removed:") {
+			skipIndent, changed = indent, true
+			continue
+		}
+		if strings.HasPrefix(field, "Primary working directory:") || strings.HasPrefix(field, "Scratchpad directory:") {
+			changed = true
+			continue
+		}
+		out.WriteString(line)
+	}
+	if !changed {
+		return text, false
+	}
+	return out.String(), true
 }
 
 // 仅处理 system 中独立的客户端附加行和已确认的自动上下文模板。
@@ -277,8 +321,9 @@ func sanitizeClaudePrivacyMessages(value gjson.Result) ([]byte, bool, error) {
 	changed := false
 	for _, message := range value.Array() {
 		keepMessage := true
+		role := message.Get("role").String()
 		next, err := filterClaudePrivacyObject([]byte(message.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
-			if key != "content" || message.Get("role").String() != "user" {
+			if key != "content" || (role != "user" && role != "system") {
 				return []byte(field.Raw), true, nil
 			}
 			clean, keep, err := sanitizeClaudePrivacyMessageContent(field)
