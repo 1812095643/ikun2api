@@ -477,7 +477,7 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 		return overview, nil
 	}
 
-	plan, _, err := s.poolDisplayConfiguration(ctx)
+	plan, visibleGroupIDs, err := s.poolDisplayConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +487,7 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 
 	// 概览的账号口径与列表保持一致：整池 oauth 账号，而不是本人用过的账号。
 	// 否则卡片显示 3、列表显示整池，两边对不上。
-	accounts, err := s.listVisiblePoolAccounts(ctx, nil)
+	accounts, err := s.listVisiblePoolAccounts(ctx, visibleGroupIDs)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -511,12 +511,12 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 		overview.PlatformCounts[platform]++
 	}
 
-	stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart, nil)
+	stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart, visibleGroupIDs)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
 	overview.Today = poolSumUserWindows(stats)
-	stats, err = reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart, nil)
+	stats, err = reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart, visibleGroupIDs)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -569,13 +569,13 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 
 	dayStart := timezone.Today()
 	// 用户端号池不再按可见分组裁剪：不管管理员怎么分池，普通用户看到的是同一份池子。
-	plan, _, err := s.poolDisplayConfiguration(ctx)
+	plan, visibleGroupIDs, err := s.poolDisplayConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
 	now := timezone.Now()
 
-	accounts, err := s.listVisiblePoolAccounts(ctx, nil)
+	accounts, err := s.listVisiblePoolAccounts(ctx, visibleGroupIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -595,7 +595,7 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 			statsIDs = append(statsIDs, acc.ID)
 		}
 	}
-	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, statsIDs, dayStart, nil)
+	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, statsIDs, dayStart, visibleGroupIDs)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -636,6 +636,10 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 		}
 		for _, g := range acc.Groups {
 			if g == nil {
+				continue
+			}
+			// 只展示管理员开放给用户端的分组，避免把账号在其它分组里的归属也露出来。
+			if len(visibleGroupIDs) > 0 && !slices.Contains(visibleGroupIDs, g.ID) {
 				continue
 			}
 			item.Groups = append(item.Groups, PoolGroupRef{ID: g.ID, Name: g.Name})
