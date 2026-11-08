@@ -346,10 +346,16 @@ func openAIAlphaSearchResponsesWebSearchPrompt(alphaBody []byte) string {
 
 func truncateOpenAIAlphaSearchPromptJSON(value string, limit int) string {
 	value = strings.TrimSpace(value)
-	if limit <= 0 || len(value) <= limit {
+	if limit <= 0 {
 		return value
 	}
-	return value[:limit] + "\n...<truncated>"
+	// This is a text budget, not a transport byte limit. Match JavaScript's
+	// UTF-16 length semantics while keeping Chinese and surrogate pairs intact.
+	prefix, truncated := javascriptUTF16Prefix(value, limit)
+	if !truncated {
+		return value
+	}
+	return prefix + "\n...<truncated>"
 }
 
 func (s *OpenAIGatewayService) buildOpenAIAlphaSearchRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token string) (*http.Request, error) {

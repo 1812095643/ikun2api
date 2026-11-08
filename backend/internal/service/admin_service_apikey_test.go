@@ -565,3 +565,16 @@ func TestAdminService_AdminUpdateAPIKeyGroupID_Unbind_NoAllowedGroupUpdate(t *te
 	require.False(t, userRepo.addGroupCalled)
 	require.False(t, got.AutoGrantedGroupAccess)
 }
+
+func TestSmartRoutingAdminPrimaryChangePreservesBackups(t *testing.T) {
+	existing := &APIKey{ID: 1, Key: "local-test-key", GroupID: int64Ptr(1), RouteGroupIDs: []int64{1, 2, 3}}
+	repo := &apiKeyRepoStubForGroupUpdate{key: existing}
+	svc := &adminServiceImpl{apiKeyRepo: repo, groupRepo: &smartRouteGroupRepo{groups: map[int64]*Group{4: {ID: 4, Status: StatusActive}}}}
+	result, err := svc.AdminUpdateAPIKeyGroupID(context.Background(), 1, int64Ptr(4))
+	require.NoError(t, err)
+	require.Equal(t, []int64{4, 2, 3}, result.APIKey.RouteGroupIDs)
+	result, err = svc.AdminUpdateAPIKeyGroupID(context.Background(), 1, int64Ptr(0))
+	require.NoError(t, err)
+	require.Nil(t, result.APIKey.GroupID)
+	require.Empty(t, result.APIKey.RouteGroupIDs)
+}

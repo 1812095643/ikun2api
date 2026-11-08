@@ -48,34 +48,6 @@ func computeClaudeCodeFingerprintFromText(firstText, version string) string {
 	return hex.EncodeToString(sum[:])[:3]
 }
 
-func javascriptUTF16CodeUnitAt(text string, index int) (uint16, bool) {
-	if index < 0 {
-		return 0, false
-	}
-	position := 0
-	for _, r := range text {
-		if r <= 0xFFFF {
-			if position == index {
-				return uint16(r), true
-			}
-			position++
-			continue
-		}
-		value := r - 0x10000
-		high := uint16(0xD800 + (value >> 10))
-		low := uint16(0xDC00 + (value & 0x3FF))
-		if position == index {
-			return high, true
-		}
-		position++
-		if position == index {
-			return low, true
-		}
-		position++
-	}
-	return 0, false
-}
-
 // extractFirstUserText 提取 messages 中第一条非 meta user 消息的首段 text 内容。
 // 兼容 string 和 []block 两种 content 格式；isMeta/is_meta 消息与官方 CLI 一样跳过。
 func extractFirstUserText(body []byte) string {

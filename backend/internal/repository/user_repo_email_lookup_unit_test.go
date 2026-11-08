@@ -11,6 +11,7 @@ import (
 	dbent "github.com/MACOS-DO/sub4api/ent"
 	"github.com/MACOS-DO/sub4api/ent/enttest"
 	"github.com/MACOS-DO/sub4api/internal/service"
+	dbmigrations "github.com/MACOS-DO/sub4api/migrations"
 	"github.com/stretchr/testify/require"
 
 	"entgo.io/ent/dialect"
@@ -27,6 +28,10 @@ func newUserEntRepo(t *testing.T) (*userRepository, *dbent.Client) {
 	db.SetMaxOpenConns(10)
 
 	_, err = db.Exec("PRAGMA foreign_keys = ON")
+	require.NoError(t, err)
+	mcpSchema, err := dbmigrations.FS.ReadFile("249_mcp_oauth.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(mcpSchema))
 	require.NoError(t, err)
 
 	drv := entsql.OpenDB(dialect.SQLite, db)

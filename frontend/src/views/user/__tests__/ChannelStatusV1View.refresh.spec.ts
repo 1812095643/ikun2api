@@ -12,10 +12,9 @@ vi.mock('vue-i18n', async () => ({
 const mountView = () => shallowMount(ChannelStatusV1View, {
   global: { stubs: {
     AppLayout: { template: '<div><slot /></div>' },
-    MonitorHero: { props: ['autoRefresh'], emits: ['refresh'], template: `<div>
-      <button class="interval" @click="autoRefresh.setInterval(120)">120 seconds</button>
-      <button class="refresh" @click="$emit('refresh')">Refresh</button>
-      <button class="disable" @click="autoRefresh.setEnabled(false)">Disable</button>
+    AutoRefreshButton: { props: ['enabled'], emits: ['update:enabled', 'update:interval'], template: `<div>
+      <button class="interval" @click="$emit('update:interval', 120)">120 seconds</button>
+      <button class="disable" @click="$emit('update:enabled', false)">Disable</button>
     </div>` },
   } },
 })

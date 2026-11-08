@@ -586,6 +586,38 @@ describe('user KeysView column settings', () => {
       getAvailableGroups.mockResolvedValue(availableGroups)
     })
 
+    it('creates an ordered cross-provider route without losing the candidate order', async () => {
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Universal key')
+      await wrapper.get('[data-testid="key-smart-routing"]').trigger('click')
+      const editor = wrapper.findComponent({ name: 'SmartRoutingEditor' })
+      expect(editor.props('groups')).toHaveLength(12)
+      editor.vm.$emit('update:modelValue', [2, 1, 5])
+      await nextTick()
+      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), group_id: 2, group_ids: [2, 1, 5] })
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(vi.mocked(keysAPI.create).mock.calls[0][1]).toBe(2)
+      expect(vi.mocked(keysAPI.create).mock.calls[0][9]).toEqual([2, 1, 5])
+    })
+
+    it('retains existing routes on edits and explicitly converts to a single route', async () => {
+      const key = { ...createApiKey(), group_id: 2, group_ids: [2, 1, 5] }
+      listKeys.mockResolvedValue({ items: [key], total: 1, page: 1, pages: 1, page_size: 20 })
+      updateKey.mockResolvedValue(key)
+      const wrapper = await mountView()
+      await getButtonByText(wrapper, 'common.edit').trigger('click')
+      expect(wrapper.findComponent({ name: 'SmartRoutingEditor' }).props('modelValue')).toEqual([2, 1, 5])
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(updateKey).toHaveBeenCalledWith(key.id, expect.objectContaining({ group_id: 2, group_ids: [2, 1, 5] }))
+      await getButtonByText(wrapper, 'common.edit').trigger('click')
+      await wrapper.get('[data-testid="key-smart-routing"]').trigger('click')
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(updateKey).toHaveBeenLastCalledWith(key.id, expect.objectContaining({ group_id: 2, group_ids: [2] }))
+    })
+
     it('classifies all configured platforms and retains the complete table filter', async () => {
       const wrapper = await openCreate()
       expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(4)

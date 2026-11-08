@@ -31,24 +31,20 @@
       :description="t('channelStatus.empty.description')"
     />
 
-    <div
-      v-else
-      class="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-    >
-      <MonitorCard
-        v-for="item in items"
-        :key="item.id"
-        :item="item"
-        :window="window"
-        :availability-value="resolveAvailability(item)"
-        :countdown-seconds="countdownSeconds"
-        @click="emit('cardClick', item)"
-      />
+    <div v-else class="space-y-7">
+      <section v-for="section in sections" :key="section.provider" class="space-y-3">
+        <h2 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ providerLabel(section.provider) }}<span class="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] dark:bg-dark-700">{{ section.items.length }}</span></h2>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <MonitorCard v-for="item in section.items" :key="item.id" :item="item" :window="window" :availability-value="resolveAvailability(item)" :countdown-seconds="countdownSeconds" @click="emit('cardClick', item)" />
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useChannelMonitorFormat } from '@/composables/useChannelMonitorFormat'
 import { useI18n } from 'vue-i18n'
 import type { UserMonitorView, UserMonitorDetail } from '@/api/channelMonitor'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -67,6 +63,16 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { providerLabel } = useChannelMonitorFormat()
+const sections = computed(() => {
+  const grouped = new Map<string, UserMonitorView[]>()
+  for (const item of props.items) {
+    const rows = grouped.get(item.provider) ?? []
+    rows.push(item)
+    grouped.set(item.provider, rows)
+  }
+  return [...grouped].map(([provider, items]) => ({ provider, items }))
+})
 
 function resolveAvailability(item: UserMonitorView): number | null {
   if (props.window === '7d') {

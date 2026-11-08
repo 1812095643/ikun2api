@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
 	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
@@ -214,6 +215,7 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
+	GroupIDs      []int64  `json:"group_ids"`
 	FundingSource string   `json:"funding_source"`
 	Name          string   `json:"name"`
 	GroupID       *int64   `json:"group_id"`
@@ -233,6 +235,7 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
+	GroupIDs      *[]int64  `json:"group_ids"`
 	FundingSource *string   `json:"funding_source"`
 	Name          *string   `json:"name"`
 	GroupID       *int64    `json:"group_id"`
@@ -516,18 +519,11 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	// 验证分组权限（如果指定了分组）
-	if req.GroupID != nil {
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
-		}
-
-		// 检查用户是否可以绑定该分组
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
-		}
+	routeIDs, primary, err := s.validateAPIKeyGroupRoutes(ctx, user, req.GroupID, req.GroupIDs)
+	if err != nil {
+		return nil, err
 	}
+	req.GroupID = primary
 
 	var key string
 
@@ -574,6 +570,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	}
 	// 创建API Key记录
 	apiKey := &APIKey{
+		RouteGroupIDs: persistedRouteGroupIDs(routeIDs),
 		FundingSource: fundingSource,
 		UserID:        userID,
 		Key:           key,
@@ -741,7 +738,9 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 
 // GetByKey 根据Key字符串获取API Key（用于认证）
 func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, error) {
-	if len(key) == 0 || len(key) > MaxAPIKeyCredentialBytes {
+	// 非 UTF-8 的 key 不可能存在（生成和自定义的 key 都是 ASCII），且 Postgres 会以
+	// invalid byte sequence 拒绝该参数；直接按不存在处理，避免返回 500。
+	if len(key) == 0 || len(key) > MaxAPIKeyCredentialBytes || !utf8.ValidString(key) {
 		return nil, ErrAPIKeyNotFound
 	}
 	cacheKey := s.authCacheKey(key)
@@ -844,23 +843,31 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		fields.Name = true
 	}
 
-	if req.GroupID != nil {
-		// 验证分组权限
+	if req.GroupID != nil || req.GroupIDs != nil {
+		if req.GroupIDs == nil && len(apiKey.RouteGroupIDs) > 1 {
+			return nil, infraerrors.BadRequest("API_KEY_SMART_ROUTES_REQUIRE_GROUP_IDS", "Edit smart-routing groups with group_ids")
+		}
 		user, err := s.userRepo.GetByID(ctx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
 		}
-
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
+		var ids []int64
+		if req.GroupIDs != nil {
+			ids = *req.GroupIDs
+		}
+		routeIDs, primary, err := s.validateAPIKeyGroupRoutes(ctx, user, req.GroupID, ids)
 		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
+			return nil, err
 		}
-
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
+		apiKey.GroupID = primary
+		apiKey.RouteGroupIDs = persistedRouteGroupIDs(routeIDs)
+		apiKey.Group = nil
+		if primary != nil {
+			apiKey.Group, err = s.groupRepo.GetByID(ctx, *primary)
+			if err != nil {
+				return nil, err
+			}
 		}
-
-		apiKey.GroupID = req.GroupID
 		fields.GroupID = true
 	}
 

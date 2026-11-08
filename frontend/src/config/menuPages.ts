@@ -20,6 +20,7 @@ export const menuPageGroups = [
     ['/subscriptions', '我的订阅', 'My subscriptions'], ['/purchase', '充值与订阅', 'Purchase'],
     ['/orders', '我的订单', 'My orders'], ['/redeem', '兑换', 'Redeem'],
     ['/affiliate', '邀请好友', 'Referrals'], ['/profile', '个人资料', 'Profile'],
+    ['/settings/mcp', 'MCP 连接', 'MCP connection'],
   ]) },
   { id: 'admin', zh: '管理员端', en: 'Admin pages', pages: pages([
     ['/admin/dashboard', '仪表盘', 'Dashboard'], ['/admin/ops', '运行监控', 'Operations'],

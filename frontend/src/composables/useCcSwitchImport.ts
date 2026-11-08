@@ -65,7 +65,8 @@ export function useCcSwitchImport(options: {
     modelsState.value = 'loading'
     timer = setTimeout(() => currentController.abort(), 15000)
     try {
-      const result = await fetchCcSwitchModels(options.baseUrl(), row.key, group.value.platform, currentController.signal)
+      const modelPlatform = (row.group_ids?.length ?? 0) > 1 ? undefined : group.value.platform
+      const result = await fetchCcSwitchModels(options.baseUrl(), row.key, modelPlatform, currentController.signal)
       if (currentId !== requestId) return
       models.value = result
       modelsState.value = 'ready'

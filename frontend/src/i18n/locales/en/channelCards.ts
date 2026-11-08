@@ -1,0 +1,22 @@
+export default { channelCards: {
+  "title": "Channel status",
+  "updatedTo": "Updated {time}",
+  "timeRange": "Time range",
+  "details": "Detailed statistics",
+  "loadFailed": "Failed to load channel status",
+  "retry": "Retry",
+  "historyLoading": "Syncing history",
+  "cacheRate": "Cache rate",
+  "successRate": "Availability",
+  "ttft": "First token",
+  "userRate": "Your rate",
+  "unknownGroup": "Unknown group",
+  "summary": "Availability {success} · Cache {cache}",
+  "noSamples": "No data",
+  "recentRecords": "Last {count} records",
+  "refreshIn": "Refresh in {seconds}s",
+  "history": "Status history",
+  "timelineTooltip": "{time} · Availability {availability} · Cache {cache} · First token {ttft}",
+  "emptyTitle": "No channel data",
+  "emptyDescription": "No records in this time range"
+} }

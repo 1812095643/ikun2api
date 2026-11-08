@@ -265,7 +265,10 @@ const submit = async () => {
   if (!canSubmit.value) return
   const updates: UpdateApiKeyRequest = {}
   if (enabled.funding_source) updates.funding_source = fundingSource.value
-  if (enabled.group_id) updates.group_id = groupId.value
+  if (enabled.group_id) {
+    updates.group_id = groupId.value
+    updates.group_ids = groupId.value != null ? [groupId.value] : []
+  }
   if (enabled.status) updates.status = status.value
   for (const { key } of limitFields) {
     if (enabled[key]) updates[key] = Number(limits[key])

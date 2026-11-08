@@ -32,6 +32,7 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
+	GroupIDs      []int64  `json:"group_ids"`
 	FundingSource string   `json:"funding_source"`
 	Name          string   `json:"name" binding:"required"`
 	GroupID       *int64   `json:"group_id"`        // nullable
@@ -49,6 +50,7 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
+	GroupIDs      *[]int64  `json:"group_ids"`
 	FundingSource *string   `json:"funding_source"`
 	Name          string    `json:"name"`
 	GroupID       *int64    `json:"group_id"`
@@ -199,6 +201,7 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 	}
 
 	svcReq := service.CreateAPIKeyRequest{
+		GroupIDs:      req.GroupIDs,
 		FundingSource: req.FundingSource,
 		Name:          req.Name,
 		GroupID:       req.GroupID,
@@ -255,6 +258,7 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	}
 
 	svcReq := service.UpdateAPIKeyRequest{
+		GroupIDs:            req.GroupIDs,
 		FundingSource:       req.FundingSource,
 		IPWhitelist:         req.IPWhitelist,
 		IPBlacklist:         req.IPBlacklist,

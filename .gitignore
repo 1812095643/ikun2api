@@ -141,8 +141,12 @@ vite.config.js
 frontend/config/*.js
 frontend/config/*.d.ts
 docs/*
+!docs/kedaya-smart-routing.md
 !docs/ADMIN_ACCOUNT_TOOLS.md
+!docs/agent-resource-safety.md
+!docs/moego-json-batching.md
 !docs/admin-api-keys.md
+!docs/mcp.md
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
@@ -212,3 +216,5 @@ backend/ikun2api
 /frontend/studio/tsconfig.tsbuildinfo
 
 !docs/UNIVERSAL_SUBSCRIPTION_IMPLEMENTATION.md
+
+!docs/UPSTREAM_SYNC_20261108.md

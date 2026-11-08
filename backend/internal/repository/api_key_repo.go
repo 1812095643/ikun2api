@@ -13,6 +13,7 @@ import (
 	dbent "github.com/MACOS-DO/sub4api/ent"
 	"github.com/MACOS-DO/sub4api/ent/apikey"
 	"github.com/MACOS-DO/sub4api/ent/group"
+	"github.com/MACOS-DO/sub4api/ent/predicate"
 	"github.com/MACOS-DO/sub4api/ent/schema/mixins"
 	"github.com/MACOS-DO/sub4api/ent/user"
 	"github.com/MACOS-DO/sub4api/internal/service"
@@ -22,6 +23,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
 )
 
 type apiKeyRepository struct {
@@ -50,6 +52,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetStatus(key.Status).
 		SetFundingSource(apiKeyFundingSourceOrDefault(key.FundingSource)).
 		SetNillableGroupID(key.GroupID).
+		SetRouteGroupIds(key.RouteGroupIDs).
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
 		SetQuotaUsed(key.QuotaUsed).
@@ -135,6 +138,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldID,
 			apikey.FieldUserID,
 			apikey.FieldGroupID,
+			apikey.FieldRouteGroupIds,
 			apikey.FieldFundingSource,
 			apikey.FieldName,
 			apikey.FieldStatus,
@@ -235,6 +239,8 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldProfitControlEnabled,
 				group.FieldProfitMinMargin,
 				group.FieldProfitSafetyBuffer,
+				// OpenAI 选号从 ctx 分组读取隐私门，漏选会放行未设置隐私的账号。
+				group.FieldRequirePrivacySet,
 			)
 		}).
 		Only(ctx)
@@ -308,6 +314,7 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 		builder.SetFundingSource(key.FundingSource)
 	}
 	if fields.GroupID {
+		builder.SetRouteGroupIds(key.RouteGroupIDs)
 		if key.GroupID != nil {
 			builder.SetGroupID(*key.GroupID)
 		} else {
@@ -456,7 +463,7 @@ func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service
 		if *filters.GroupID == 0 {
 			q = q.Where(apikey.GroupIDIsNil())
 		} else {
-			q = q.Where(apikey.GroupIDEQ(*filters.GroupID))
+			q = q.Where(apiKeyGroupMembership(*filters.GroupID))
 		}
 	}
 
@@ -628,7 +635,7 @@ func (r *apiKeyRepository) ExistsByKey(ctx context.Context, key string) (bool, e
 }
 
 func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]service.APIKey, *pagination.PaginationResult, error) {
-	q := r.activeQuery().Where(apikey.GroupIDEQ(groupID))
+	q := r.activeQuery().Where(apiKeyGroupMembership(groupID))
 
 	total, err := q.Count(ctx)
 	if err != nil {
@@ -728,26 +735,15 @@ func (r *apiKeyRepository) SearchAPIKeys(ctx context.Context, userID int64, keyw
 
 // ClearGroupIDByGroupID 将指定分组的所有 API Key 的 group_id 设为 nil
 func (r *apiKeyRepository) ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	n, err := r.client.APIKey.Update().
-		Where(apikey.GroupIDEQ(groupID), apikey.DeletedAtIsNil()).
-		ClearGroupID().
-		Save(ctx)
-	return int64(n), err
+	return r.rewriteAPIKeyGroups(ctx, apiKeyGroupMembership(groupID), groupID, 0)
 }
 
-// UpdateGroupIDByUserAndGroup 将用户下绑定 oldGroupID 的所有 Key 迁移到 newGroupID
 func (r *apiKeyRepository) UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error) {
-	client := clientFromContext(ctx, r.client)
-	n, err := client.APIKey.Update().
-		Where(apikey.UserIDEQ(userID), apikey.GroupIDEQ(oldGroupID), apikey.DeletedAtIsNil()).
-		SetGroupID(newGroupID).
-		Save(ctx)
-	return int64(n), err
+	return r.rewriteAPIKeyGroups(ctx, apikey.And(apikey.UserIDEQ(userID), apiKeyGroupMembership(oldGroupID)), oldGroupID, newGroupID)
 }
 
-// CountByGroupID 获取分组的 API Key 数量
 func (r *apiKeyRepository) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	count, err := r.activeQuery().Where(apikey.GroupIDEQ(groupID)).Count(ctx)
+	count, err := r.activeQuery().Where(apiKeyGroupMembership(groupID)).Count(ctx)
 	return int64(count), err
 }
 
@@ -764,7 +760,7 @@ func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) (
 
 func (r *apiKeyRepository) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
 	keys, err := r.activeQuery().
-		Where(apikey.GroupIDEQ(groupID)).
+		Where(apiKeyGroupMembership(groupID)).
 		Select(apikey.FieldKey).
 		Strings(ctx)
 	if err != nil {
@@ -903,6 +899,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 		GroupID:       m.GroupID,
+		RouteGroupIDs: append([]int64(nil), m.RouteGroupIds...),
 		FundingSource: m.FundingSource,
 		Quota:         m.Quota,
 		QuotaUsed:     m.QuotaUsed,
@@ -1073,4 +1070,73 @@ func apiKeyFundingSourceOrDefault(value string) string {
 		return service.FundingSourceBalance
 	}
 	return value
+}
+
+func apiKeyGroupMembership(id int64) predicate.APIKey {
+	return apikey.Or(apikey.GroupIDEQ(id), func(sel *entsql.Selector) { sel.Where(sqljson.ValueContains(apikey.FieldRouteGroupIds, id)) })
+}
+
+// Promote the next route on deletion and preserve order/deduplicate on group
+// migration. Row locks keep this atomic with concurrent key-editor changes.
+func (r *apiKeyRepository) rewriteAPIKeyGroups(ctx context.Context, filter predicate.APIKey, oldID, newID int64) (int64, error) {
+	var tx *dbent.Tx
+	client := clientFromContext(ctx, r.client)
+	if dbent.TxFromContext(ctx) == nil {
+		var err error
+		tx, err = r.client.Tx(ctx)
+		if err != nil {
+			return 0, err
+		}
+		defer func() { _ = tx.Rollback() }()
+		client = tx.Client()
+	}
+	models, err := client.APIKey.Query().Where(apikey.DeletedAtIsNil(), filter).ForUpdate().All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, model := range models {
+		key := apiKeyEntityToService(model)
+		ids := rewriteAPIKeyRouteIDs(key.CandidateGroupIDs(), oldID, newID)
+		update := client.APIKey.UpdateOneID(model.ID)
+		if len(ids) > 0 {
+			update.SetGroupID(ids[0])
+		} else {
+			update.ClearGroupID()
+		}
+		if len(ids) > 1 {
+			update.SetRouteGroupIds(ids)
+		} else {
+			update.SetRouteGroupIds(nil)
+		}
+		if _, err = update.Save(ctx); err != nil {
+			return 0, err
+		}
+	}
+	if tx != nil {
+		if err = tx.Commit(); err != nil {
+			return 0, err
+		}
+	}
+	return int64(len(models)), nil
+}
+func rewriteAPIKeyRouteIDs(ids []int64, oldID, newID int64) []int64 {
+	out := make([]int64, 0, len(ids))
+	seen := map[int64]bool{}
+	for _, id := range ids {
+		if id == oldID {
+			id = newID
+		}
+		if id > 0 && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// Single-group keys retain their deleted group for existing audit semantics.
+// Only smart-route keys promote a remaining group during group cascade.
+func (r *apiKeyRepository) RemoveGroupFromSmartRoutes(ctx context.Context, id int64) (int64, error) {
+	filter := apikey.And(apiKeyGroupMembership(id), func(sel *entsql.Selector) { sel.Where(sqljson.LenGT(apikey.FieldRouteGroupIds, 1)) })
+	return r.rewriteAPIKeyGroups(ctx, filter, id, 0)
 }

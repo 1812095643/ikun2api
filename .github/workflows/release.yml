@@ -206,7 +206,7 @@ jobs:
           cp deploy/MIGRATION.md dist/release/MIGRATION.md
           python3 - <<'PY'
           import json,os,pathlib
-          pathlib.Path('dist/release/release-manifest.json').write_text(json.dumps({'version':os.environ['VERSION'],'commit':os.environ['COMMIT'],'repository':'1812095643/ikun2api','upstream_baseline':'0.2.19','schema_forward_only':True,'signature':'Ed25519'},indent=2))
+          pathlib.Path('dist/release/release-manifest.json').write_text(json.dumps({'version':os.environ['VERSION'],'commit':os.environ['COMMIT'],'repository':'1812095643/ikun2api','upstream_baseline':'0.2.20','schema_forward_only':True,'signature':'Ed25519'},indent=2))
           PY
       - name: 生成并签名完整校验清单
         env:

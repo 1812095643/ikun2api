@@ -1,14 +1,14 @@
 <template>
   <AppLayout>
-    <MonitorHero
-      :overall-status="overallStatus"
-      :interval-seconds="DEFAULT_INTERVAL_SECONDS"
-      :window="currentWindow"
-      :loading="loading"
-      :auto-refresh="autoRefresh"
-      @update:window="handleWindowChange"
-      @refresh="manualReload"
-    />
+    <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <h1 class="page-title">{{ t('channelCards.title') }}</h1>
+      <div class="flex items-center gap-2"><AutoRefreshButton :enabled="autoRefresh.enabled.value" :interval-seconds="autoRefresh.intervalSeconds.value" :countdown="countdown" :intervals="autoRefresh.intervals" @update:enabled="autoRefresh.setEnabled" @update:interval="autoRefresh.setInterval" /><button type="button" class="refresh btn btn-secondary btn-sm" :disabled="loading" @click="manualReload">{{ t('common.refresh') }}</button></div>
+    </header>
+    <div class="card mb-6 flex flex-wrap items-center gap-3 px-4 py-3">
+      <div class="tabs inline-flex" role="group" :aria-label="t('channelCards.timeRange')">
+        <button v-for="window in (['7d', '15d', '30d'] as const)" :key="window" type="button" class="tab !px-3 !py-1.5 text-xs" :class="currentWindow === window ? 'tab-active' : ''" :aria-pressed="currentWindow === window" @click="handleWindowChange(window)">{{ window }}</button>
+      </div>
+    </div>
 
     <MonitorCardGrid
       :items="items"
@@ -40,13 +40,11 @@ import {
   type UserMonitorDetail,
 } from '@/api/channelMonitor'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import MonitorHero, {
-  type MonitorWindow,
-  type OverallStatus,
-} from '@/components/user/monitor/MonitorHero.vue'
+import AutoRefreshButton from '@/components/common/AutoRefreshButton.vue'
+import type { MonitorWindow } from '@/components/user/monitor/MonitorHero.vue'
 import MonitorCardGrid from '@/components/user/monitor/MonitorCardGrid.vue'
 import MonitorDetailDialog from '@/components/user/MonitorDetailDialog.vue'
-import { DEFAULT_INTERVAL_SECONDS, STATUS_OPERATIONAL } from '@/constants/channelMonitor'
+import { DEFAULT_INTERVAL_SECONDS } from '@/constants/channelMonitor'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 
 const { t } = useI18n()
@@ -73,14 +71,6 @@ const autoRefresh = useAutoRefresh({
 const countdown = autoRefresh.countdown
 
 // ── Computed ──
-const overallStatus = computed<OverallStatus>(() => {
-  if (items.value.length === 0) return 'operational'
-  for (const it of items.value) {
-    if (it.primary_status === 'failed' || it.primary_status === 'error') return 'degraded'
-    if (it.primary_status !== STATUS_OPERATIONAL) return 'degraded'
-  }
-  return 'operational'
-})
 
 const detailTitle = computed(() => {
   return detailTarget.value?.name || t('channelStatus.detailTitle')

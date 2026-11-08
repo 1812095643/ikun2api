@@ -459,6 +459,9 @@ func openAICompatibleAccountEligibilityFailureReasonBeforeProfit(ctx context.Con
 	if requireCompact && openAICompactSupportTier(account) == 0 {
 		return "compact_unsupported"
 	}
+	if vetoed, reason := openAIImageSizeVetoReason(ctx, account); vetoed {
+		return reason
+	}
 	return ""
 }
 
@@ -976,6 +979,7 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 	if _, excluded := excludedIDs[accountID]; excluded {
 		return nil
 	}
+	ctx = withOpenAIImageSizeStickyAccount(ctx, accountID)
 
 	account, err := s.getSchedulableAccount(ctx, accountID)
 	if err != nil {
@@ -1132,7 +1136,8 @@ func (s *OpenAIGatewayService) isBetterAccount(candidate, current *Account) bool
 }
 
 // SelectAccountWithLoadAwareness selects an account with load-awareness and wait plan.
-func (s *OpenAIGatewayService) SelectAccountWithLoadAwareness(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*AccountSelectionResult, error) {
+func (s *OpenAIGatewayService) SelectAccountWithLoadAwareness(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (routeSelection *AccountSelectionResult, routeErr error) {
+	defer func() { recordAPIKeyRouteSelection(ctx, routeErr) }()
 	ctx = s.withOpenAIQuotaAutoPauseContext(ctx)
 	ctx = s.withOpenAIGroupPrivacyRequirement(ctx, groupID)
 	// 分组利润控制：legacy 公共入口同样装门，保证不经
@@ -1159,6 +1164,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			stickyAccountID = accountID
 		}
 	}
+	ctx = withOpenAIImageSizeStickyAccount(ctx, stickyAccountID)
 	if s.concurrencyService == nil || !cfg.LoadBatchEnabled {
 		account, stickyHit, err := s.selectAccountForModelWithExclusionsStickyHit(ctx, groupID, platform, sessionHash, requestedModel, excludedIDs, requireCompact, stickyAccountID, requiredCapability, preferLowUpstreamRate)
 		if err != nil {

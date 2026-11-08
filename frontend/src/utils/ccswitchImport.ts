@@ -1,5 +1,6 @@
 import type { Group, GroupPlatform } from '@/types'
 import { CLAUDE_PRIVACY_ENV } from '@/utils/claudeClientPrivacy'
+import { buildCodexApiKeyAuthConfig } from '@/utils/codexAuthConfig'
 
 // Verified against CC Switch v4.0.25 parser.rs/provider.rs and its site integration guide.
 export const CC_SWITCH_VERSION = '4.0.25'
@@ -208,11 +209,9 @@ export function buildCcSwitchImportDeeplink(input: CcSwitchImportDeeplinkInput):
   }
   if (app === 'codex') {
     const config = [
-      'model_provider = "ikun"', `model = ${JSON.stringify(model)}`, 'disable_response_storage = true', '',
+      'model_provider = "ikun"', `model = ${JSON.stringify(model)}`, 'disable_response_storage = true', 'web_search = "live"', '',
       '[model_providers.ikun]', `name = ${JSON.stringify(name)}`, `base_url = ${JSON.stringify(endpoint)}`,
-      'wire_api = "responses"', 'requires_openai_auth = false',
-      'http_headers = { "x-openai-actor-authorization" = "local-image-extension" }',
-      `experimental_bearer_token = ${JSON.stringify(input.apiKey)}`,
+      'wire_api = "responses"', buildCodexApiKeyAuthConfig(input.apiKey),
       ...(input.apiFormat === 'openai_responses' ? [`model_catalog_url = ${JSON.stringify(root + '/v1/models')}`] : [])
     ].join('\n')
     entries.push(['configFormat', 'toml'], ['config', encodeCcSwitchBase64(config)])

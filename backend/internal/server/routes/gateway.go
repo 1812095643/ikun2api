@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -30,11 +29,22 @@ func RegisterGatewayRoutes(
 	compositeResolver *service.CompositeRouteResolver,
 	cfg *config.Config,
 ) {
-	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize)
-	textBodyLimit := middleware.RequestBodyLimit(cfg.Gateway.TextMaxBodySize)
+	bodyMemoryBudget := pkghttputil.NewBodyMemoryBudget(cfg.Gateway.RequestBodyMemoryBudgetBytes)
+	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize, bodyMemoryBudget)
+	textBodyLimit := middleware.RequestBodyLimit(cfg.Gateway.TextMaxBodySize, bodyMemoryBudget)
 	clientRequestID := middleware.ClientRequestID()
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 	endpointNorm := handler.InboundEndpointMiddleware()
+	var smartKeys middleware.SmartRouteKeyService
+	if apiKeyService != nil {
+		smartKeys = apiKeyService
+	}
+	smartRoute := middleware.APIKeySmartRouting(r, smartKeys, cfg)
+	var smartMatcher middleware.SmartRouteMatcher
+	if h.Gateway != nil {
+		smartMatcher = h.Gateway.SmartRouteMatchesRequest
+	}
+	smartRouteGuard := middleware.APIKeySmartRouteGuard(smartMatcher)
 	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver)
 	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver)
 
@@ -180,10 +190,12 @@ func RegisterGatewayRoutes(
 	gateway := r.Group("/v1")
 	gateway.Use(bodyLimit)
 	gateway.Use(clientRequestID)
+	gateway.Use(smartRoute)
 	gateway.Use(opsErrorLogger)
 	gateway.Use(endpointNorm)
 	gateway.Use(gin.HandlerFunc(apiKeyAuth))
 	gateway.GET("/sub2api/billing", h.Gateway.KeyBillingInfo)
+	gateway.Use(smartRouteGuard)
 	gateway.Use(groupModelAllowlist)
 	gateway.Use(compositeTarget)
 	gateway.Use(openAIBPSEndpointGuard)
@@ -339,9 +351,11 @@ func RegisterGatewayRoutes(
 	gemini := r.Group("/v1beta")
 	gemini.Use(bodyLimit)
 	gemini.Use(clientRequestID)
+	gemini.Use(smartRoute)
 	gemini.Use(opsErrorLogger)
 	gemini.Use(endpointNorm)
 	gemini.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
+	gemini.Use(smartRouteGuard)
 	gemini.Use(groupModelAllowlist)
 	gemini.Use(compositeGeminiTarget)
 	gemini.Use(requireGroupGoogle)
@@ -369,7 +383,7 @@ func RegisterGatewayRoutes(
 	// 根路径别名共用中间件链：白名单准入在 apiKeyAuth 之后、compositeTarget
 	// 之前，避免逐条路由手工维护链导致漏挂。
 	rootRoute := func(method, path string, limit gin.HandlerFunc, handler gin.HandlerFunc) {
-		r.Handle(method, path, limit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), groupModelAllowlist, compositeTarget, openAIBPSEndpointGuard, requireGroupAnthropic, handler)
+		r.Handle(method, path, limit, clientRequestID, smartRoute, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), smartRouteGuard, groupModelAllowlist, compositeTarget, openAIBPSEndpointGuard, requireGroupAnthropic, handler)
 	}
 	for _, prefix := range []string{"/api/v3", "/v3", "/v1", ""} {
 		rootRoute(http.MethodPost, prefix+"/contents/generations/tasks", bodyLimit, h.OpenAIGateway.SeedanceTasks)
@@ -386,7 +400,7 @@ func RegisterGatewayRoutes(
 	rootRoute(http.MethodGet, "/models/:model", bodyLimit, h.Gateway.Models)
 	rootRoute(http.MethodPost, "/messages/count_tokens", bodyLimit, countTokensHandler)
 	codexDirect := r.Group("/backend-api/codex")
-	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), groupModelAllowlist, compositeTarget, openAIBPSEndpointGuard, requireGroupAnthropic)
+	codexDirect.Use(bodyLimit, clientRequestID, smartRoute, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), smartRouteGuard, groupModelAllowlist, compositeTarget, openAIBPSEndpointGuard, requireGroupAnthropic)
 	{
 		codexDirect.POST("/realtime/calls", h.OpenAIGateway.Live)
 		codexDirect.GET("/:call_id", h.OpenAIGateway.LiveSideband)
@@ -489,16 +503,18 @@ func RegisterGatewayRoutes(
 	})
 
 	// Antigravity 模型列表
-	r.GET("/antigravity/models", gin.HandlerFunc(apiKeyAuth), requireGroupAnthropic, h.Gateway.AntigravityModels)
+	r.GET("/antigravity/models", smartRoute, gin.HandlerFunc(apiKeyAuth), smartRouteGuard, requireGroupAnthropic, h.Gateway.AntigravityModels)
 
 	// Antigravity 专用路由（仅使用 antigravity 账户，不混合调度）
 	antigravityV1 := r.Group("/antigravity/v1")
 	antigravityV1.Use(bodyLimit)
 	antigravityV1.Use(clientRequestID)
+	antigravityV1.Use(smartRoute)
 	antigravityV1.Use(opsErrorLogger)
 	antigravityV1.Use(endpointNorm)
 	antigravityV1.Use(middleware.ForcePlatform(service.PlatformAntigravity))
 	antigravityV1.Use(gin.HandlerFunc(apiKeyAuth))
+	antigravityV1.Use(smartRouteGuard)
 	antigravityV1.Use(groupModelAllowlist)
 	antigravityV1.Use(requireGroupAnthropic)
 	{
@@ -511,10 +527,12 @@ func RegisterGatewayRoutes(
 	antigravityV1Beta := r.Group("/antigravity/v1beta")
 	antigravityV1Beta.Use(bodyLimit)
 	antigravityV1Beta.Use(clientRequestID)
+	antigravityV1Beta.Use(smartRoute)
 	antigravityV1Beta.Use(opsErrorLogger)
 	antigravityV1Beta.Use(endpointNorm)
 	antigravityV1Beta.Use(middleware.ForcePlatform(service.PlatformAntigravity))
 	antigravityV1Beta.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
+	antigravityV1Beta.Use(smartRouteGuard)
 	antigravityV1Beta.Use(groupModelAllowlist)
 	antigravityV1Beta.Use(requireGroupGoogle)
 	{
@@ -564,15 +582,10 @@ func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver)
 
 		body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 		if err != nil {
-			status := http.StatusBadRequest
-			message := "Failed to read request body"
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
-				status = http.StatusRequestEntityTooLarge
-				message = "Request body is too large"
+			if middleware.RejectRequestBodyReadError(c, "middleware.composite_route", err) {
+				return
 			}
-			c.JSON(status, gin.H{"error": gin.H{"type": "invalid_request_error", "message": message}})
-			c.Abort()
+			middleware.AbortWithRequestBodyReadFailure(c, "middleware.composite_route", err)
 			return
 		}
 

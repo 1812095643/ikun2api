@@ -971,6 +971,16 @@ func (r *groupRepository) deleteCascade(ctx context.Context, id int64, requireEm
 		return nil, err
 	}
 
+	// Keep ordered key routes in the same transaction as group deletion.
+	// Promote the next candidate instead of leaving a deleted primary behind.
+	routeCtx := ctx
+	if tx != nil {
+		routeCtx = dbent.NewTxContext(ctx, tx)
+	}
+	if _, err := newAPIKeyRepositoryWithSQL(txClient, r.sql).RemoveGroupFromSmartRoutes(routeCtx, id); err != nil {
+		return nil, err
+	}
+
 	// 5. Soft-delete group itself.
 	if _, err := txClient.Group.Delete().Where(group.IDEQ(id)).Exec(ctx); err != nil {
 		return nil, err

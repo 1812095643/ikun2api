@@ -15,12 +15,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix='ikun-compose-qa-') as temp:
         work=pathlib.Path(temp);data=work/'data';data.mkdir();(data/'.installed').write_text('fixture')
         sqlroot=work/'official-sql';sqlroot.mkdir()
-        source=download('https://api.github.com/repos/Wei-Shaw/sub2api/tarball/v0.2.19')
+        source=download('https://api.github.com/repos/Wei-Shaw/sub2api/tarball/v0.2.20')
         with tarfile.open(fileobj=io.BytesIO(source),mode='r:gz') as tar:
             for member in tar:
                 if '/backend/migrations/' in member.name and member.name.endswith('.sql') and member.isfile():
                     (sqlroot/pathlib.PurePosixPath(member.name).name).write_bytes(tar.extractfile(member).read())
-        archive_name='sub2api_0.2.19_linux_amd64.tar.gz';base='https://github.com/Wei-Shaw/sub2api/releases/download/v0.2.19/'
+        archive_name='sub2api_0.2.20_linux_amd64.tar.gz';base='https://github.com/Wei-Shaw/sub2api/releases/download/v0.2.20/'
         original=download(base+archive_name);checksum=download(base+'checksums.txt').decode()
         assert any(line.split()==[hashlib.sha256(original).hexdigest(),archive_name] for line in checksum.splitlines())
         binary=work/'sub2api'
@@ -103,7 +103,7 @@ def main():
                 actual=run(['docker','exec',container,'sha256sum','/app/data/runtime/ikun2api']).split()[0]
                 assert actual==wrapper_hash,'Older image overwrote the newer persistent runtime'
             report.update(newer_runtime_survives_older_image_restart_and_recreate=True,runtime_version_selection_fixture=True)
-            report.update(isolated=True,official_binary='0.2.19',login_preserved=True,html_injected_version_visible=True,restart_and_recreate_preserve_data=True,provider_model_requests_sent=0)
+            report.update(isolated=True,official_binary='0.2.20',login_preserved=True,html_injected_version_visible=True,restart_and_recreate_preserve_data=True,provider_model_requests_sent=0)
             (bundle/'compose-rehearsal.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
         finally:
             # Only disposable containers/volumes belonging to the random QA project.

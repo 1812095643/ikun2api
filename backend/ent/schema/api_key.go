@@ -44,6 +44,7 @@ func (APIKey) Fields() []ent.Field {
 		field.Int64("group_id").
 			Optional().
 			Nillable(),
+		field.JSON("route_group_ids", []int64{}).Optional().Comment("Ordered smart-routing groups; empty uses group_id"),
 		field.String("funding_source").MaxLen(32).Default("balance"),
 		field.String("status").
 			MaxLen(20).

@@ -58,7 +58,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 
-		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
+		apiKey, err := lookupAPIKeyForRequest(c, apiKeyService, apiKeyString)
 		if err != nil {
 			if errors.Is(err, service.ErrAPIKeyNotFound) {
 				recordInvalidAuthFailure(c, apiKeyService)
@@ -69,6 +69,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			if errors.Is(err, service.ErrAPIKeyAuthOverloaded) {
 				MarkIngressRejected(c, IngressRejectAPIKeyAuthOverloaded)
 				abortWithGoogleError(c, 503, "API key authentication is temporarily unavailable")
+				return
+			}
+			if abortIfAPIKeyLookupClientGone(c, err) {
 				return
 			}
 			abortWithGoogleError(c, 500, "Failed to validate API key")
@@ -113,6 +116,12 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "User account is not active")
 			return
 		}
+		apiKey, err = bindSmartRouteGroup(c, apiKeyService, apiKey)
+		if err != nil {
+			abortWithGoogleError(c, 503, "Failed to load key route")
+			return
+		}
+		SetOpsFallbackAPIKey(c, apiKey)
 		if code, message, ok := validateAPIKeyGroupAvailable(apiKey); !ok {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
 			if code == "GROUP_DELETED" {

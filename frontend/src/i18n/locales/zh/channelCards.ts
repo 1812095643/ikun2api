@@ -1,0 +1,22 @@
+export default { channelCards: {
+  "title": "渠道状态",
+  "updatedTo": "更新至 {time}",
+  "timeRange": "时间范围",
+  "details": "详细统计",
+  "loadFailed": "渠道状态加载失败",
+  "retry": "重试",
+  "historyLoading": "历史数据同步中",
+  "cacheRate": "缓存率",
+  "successRate": "可用率",
+  "ttft": "首 Token",
+  "userRate": "用户倍率",
+  "unknownGroup": "未知分组",
+  "summary": "可用率 {success} · 缓存率 {cache}",
+  "noSamples": "暂无记录",
+  "recentRecords": "近 {count} 条记录",
+  "refreshIn": "{seconds}s 后刷新",
+  "history": "历史状态",
+  "timelineTooltip": "{time} · 可用率 {availability} · 缓存率 {cache} · 首 Token {ttft}",
+  "emptyTitle": "暂无渠道数据",
+  "emptyDescription": "当前时间范围内暂无记录"
+} }

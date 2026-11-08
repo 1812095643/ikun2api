@@ -1385,6 +1385,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 
 	if *groupID == 0 {
 		// 0 表示解绑分组（不修改 user_allowed_groups，避免影响用户其他 Key）
+		apiKey.RouteGroupIDs = nil
 		apiKey.GroupID = nil
 		apiKey.Group = nil
 	} else {
@@ -1410,6 +1411,15 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 		}
 
 		gid := *groupID
+		if len(apiKey.RouteGroupIDs) > 1 {
+			ids := []int64{gid}
+			for _, id := range apiKey.CandidateGroupIDs()[1:] {
+				if id != gid {
+					ids = append(ids, id)
+				}
+			}
+			apiKey.RouteGroupIDs = persistedRouteGroupIDs(ids)
+		}
 		apiKey.GroupID = &gid
 		apiKey.Group = group
 

@@ -84,7 +84,7 @@ describe('BulkEditKeysModal', () => {
     expect(bulkUpdate).not.toHaveBeenCalled()
     await wrapper.get('[data-test="group-input"]').setValue('7')
     await wrapper.get('form').trigger('submit')
-    expect(bulkUpdate).toHaveBeenCalledWith([1, 2], { group_id: 7 })
+    expect(bulkUpdate).toHaveBeenCalledWith([1, 2], { group_id: 7, group_ids: [7] })
   })
 
   it('clears only an explicitly selected IP list and expiration', async () => {
