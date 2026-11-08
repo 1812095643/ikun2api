@@ -83,7 +83,7 @@ func TestAccountPoolPublicProjectionExcludesInternalDetails(t *testing.T) {
 	}
 }
 
-func TestAccountPoolUserGroupScopesEveryStatisticsQuery(t *testing.T) {
+func TestAccountPoolUserPoolIgnoresVisibleGroupScoping(t *testing.T) {
 	ctx := context.Background()
 	repo := &poolTestUsageRepo{}
 	settings := NewSettingService(&poolErrorSettings{}, nil)
@@ -91,11 +91,10 @@ func TestAccountPoolUserGroupScopesEveryStatisticsQuery(t *testing.T) {
 	s := NewAccountPoolService(poolTestAdmin{accounts: []*Account{acc}}, nil, nil, repo, settings)
 	rows, err := s.ListAccountsForUser(ctx, 42, PoolAccountFilter{})
 	require.NoError(t, err)
-	require.Equal(t, []PoolGroupRef{{ID: 3, Name: "selected"}}, rows.Items[0].Groups)
+	// 用户端不再按可见分组裁剪：账号挂在哪些分组就全列出来。
+	require.Equal(t, []PoolGroupRef{{ID: 3, Name: "selected"}, {ID: 4, Name: "hidden"}}, rows.Items[0].Groups)
 	_, err = s.OverviewForUser(ctx, 42)
 	require.NoError(t, err)
-	require.NotEmpty(t, repo.groups)
-	for _, id := range repo.groups {
-		require.Equal(t, int64(3), id)
-	}
+	// 统计查询也不再带分组过滤，否则同一账号在不同分组下会被重复计算。
+	require.Empty(t, repo.groups)
 }

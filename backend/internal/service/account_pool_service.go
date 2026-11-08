@@ -477,7 +477,7 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 		return overview, nil
 	}
 
-	plan, visibleGroupIDs, err := s.poolDisplayConfiguration(ctx)
+	plan, _, err := s.poolDisplayConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -485,9 +485,9 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 	dayStart := timezone.Today()
 	weekStart := dayStart.AddDate(0, 0, -6)
 
-	// 概览的账号口径与列表保持一致：可见分组内的全部账号，而不是本人用过的账号。
+	// 概览的账号口径与列表保持一致：整池 oauth 账号，而不是本人用过的账号。
 	// 否则卡片显示 3、列表显示整池，两边对不上。
-	accounts, err := s.listVisiblePoolAccounts(ctx, visibleGroupIDs)
+	accounts, err := s.listVisiblePoolAccounts(ctx, nil)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -497,9 +497,6 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 	overview.AccountCount = 0
 	for _, acc := range accounts {
 		if acc == nil {
-			continue
-		}
-		if len(visibleGroupIDs) > 0 && !poolAccountMatchesGroups(acc, visibleGroupIDs) {
 			continue
 		}
 		accountIDs = append(accountIDs, acc.ID)
@@ -514,12 +511,12 @@ func (s *AccountPoolService) OverviewForUser(ctx context.Context, userID int64) 
 		overview.PlatformCounts[platform]++
 	}
 
-	stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart, visibleGroupIDs)
+	stats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, dayStart, nil)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
 	overview.Today = poolSumUserWindows(stats)
-	stats, err = reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart, visibleGroupIDs)
+	stats, err = reader.GetUserAccountWindowStatsBatch(ctx, userID, accountIDs, weekStart, nil)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -571,14 +568,14 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 	}
 
 	dayStart := timezone.Today()
-	// 管理员可以限制用户端只看某个分组的真实账号。
-	plan, visibleGroupIDs, err := s.poolDisplayConfiguration(ctx)
+	// 用户端号池不再按可见分组裁剪：不管管理员怎么分池，普通用户看到的是同一份池子。
+	plan, _, err := s.poolDisplayConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
 	now := timezone.Now()
 
-	accounts, err := s.listVisiblePoolAccounts(ctx, visibleGroupIDs)
+	accounts, err := s.listVisiblePoolAccounts(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -598,7 +595,7 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 			statsIDs = append(statsIDs, acc.ID)
 		}
 	}
-	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, statsIDs, dayStart, visibleGroupIDs)
+	todayStats, err := reader.GetUserAccountWindowStatsBatch(ctx, userID, statsIDs, dayStart, nil)
 	if err != nil {
 		return nil, poolDataUnavailable(err)
 	}
@@ -624,9 +621,6 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 			!strings.Contains(strings.ToLower(displayName), search) {
 			continue
 		}
-		if len(visibleGroupIDs) > 0 && !poolAccountMatchesGroups(acc, visibleGroupIDs) {
-			continue
-		}
 		capacity := poolCapacityFromAccount(acc)
 		item := PoolUserAccount{
 			ID:          acc.ID,
@@ -641,7 +635,7 @@ func (s *AccountPoolService) ListAccountsForUser(ctx context.Context, userID int
 			SevenDay:    poolUserQuotaWindowFrom(poolQuotaWindowFromAccount(acc, poolWindowSevenDay, capacity)),
 		}
 		for _, g := range acc.Groups {
-			if g == nil || (len(visibleGroupIDs) > 0 && !slices.Contains(visibleGroupIDs, g.ID)) {
+			if g == nil {
 				continue
 			}
 			item.Groups = append(item.Groups, PoolGroupRef{ID: g.ID, Name: g.Name})
@@ -698,7 +692,7 @@ func (s *AccountPoolService) listVisiblePoolAccounts(ctx context.Context, groupI
 		if err != nil {
 			return nil, err
 		}
-		return poolPointerAccounts(accounts), nil
+		return poolFilterUserPoolAccounts(poolPointerAccounts(accounts)), nil
 	}
 	seen := make(map[int64]struct{}, 16)
 	merged := make([]*Account, 0, 16)
@@ -709,7 +703,7 @@ func (s *AccountPoolService) listVisiblePoolAccounts(ctx context.Context, groupI
 		}
 		for i := range accounts {
 			acc := &accounts[i]
-			if acc.ID <= 0 {
+			if acc.ID <= 0 || !poolShowInUserPool(acc) {
 				continue
 			}
 			if _, exists := seen[acc.ID]; exists {
@@ -721,6 +715,25 @@ func (s *AccountPoolService) listVisiblePoolAccounts(ctx context.Context, groupI
 	}
 	slices.SortFunc(merged, func(a, b *Account) int { return cmp.Compare(a.ID, b.ID) })
 	return merged, nil
+}
+
+// poolShowInUserPool 判断一个账号是否出现在用户端号池。
+//
+// 只放 oauth 类型：api_key / bedrock / service_account 这些是管理员自己接的上游凭据，
+// 展示给普通用户既解释不清，也和「一人一号」的直觉对不上。
+func poolShowInUserPool(acc *Account) bool {
+	return acc != nil && strings.EqualFold(acc.Type, AccountTypeOAuth)
+}
+
+// poolFilterUserPoolAccounts 原地过滤出用户端号池可见的账号。
+func poolFilterUserPoolAccounts(accounts []*Account) []*Account {
+	out := accounts[:0]
+	for _, acc := range accounts {
+		if poolShowInUserPool(acc) {
+			out = append(out, acc)
+		}
+	}
+	return out
 }
 
 // poolPointerAccounts 把值切片转成指针切片，让两条取数路径口径一致。

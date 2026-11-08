@@ -37,7 +37,7 @@ func TestAccountPoolSyntheticAliasesAndCapacity(t *testing.T) {
 	second := service.buildSyntheticUserAccounts(context.Background(), 42, plan, now.Add(time.Second))
 	names := map[string]bool{}
 	for index, item := range first {
-		require.Regexp(t, `^[A-Z][a-z]+\*{3}[a-z]{2,5}[0-9]{2,4}@(outlook\.(com|jp)|hotmail\.com|live\.com)$`, item.Name)
+		require.Regexp(t, `^[A-Z][a-z]+\*{3}[a-z]{2,5}[0-9]{2,4}@outlook\.com$`, item.Name)
 		require.Equal(t, item.Name, second[index].Name)
 		require.False(t, names[item.Name], "synthetic account labels must not collide within a pool")
 		names[item.Name] = true

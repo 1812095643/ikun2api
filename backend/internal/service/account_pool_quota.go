@@ -418,9 +418,9 @@ var poolFakeLocalParts = []string{
 	"xena", "yuri", "zoe", "alan", "bella", "carl", "diana", "eric",
 }
 
-var poolFakeDomains = []string{
-	"@outlook.com", "@hotmail.com", "@outlook.jp", "@live.com", "@outlook.com",
-}
+// 合成账号统一落在 outlook.com。真实的 Claude 号绝大多数也是 outlook 注册的，
+// 混进 hotmail / live / outlook.jp 反而一眼看出是随机拼出来的。
+var poolFakeDomains = []string{"@outlook.com"}
 
 // PoolMaskAccountName uses the same original-name masking as user usage records.
 func PoolMaskAccountName(name string) string {
