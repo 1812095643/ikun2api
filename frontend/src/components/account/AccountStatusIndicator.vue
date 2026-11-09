@@ -5,6 +5,14 @@
       <span v-if="account.status !== 'active' && account.status !== 'error'" class="badge badge-gray text-xs">{{ t(`admin.accounts.status.${account.status}`) }}</span>
       <span v-if="account.schedulable === false" class="text-[11px] text-gray-500">{{ t('admin.accounts.status.paused') }}</span>
     </div>
+    <div v-else-if="isProxyQuarantined" class="flex flex-col items-center gap-1">
+      <span class="badge badge-warning text-xs">{{ t('admin.accounts.status.proxyWaitingRecovery') }}</span>
+      <span class="max-w-[220px] text-center text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+        {{ proxyRecoveryText }}
+      </span>
+      <span v-if="account.status !== 'active'" class="badge badge-gray text-xs">{{ t(`admin.accounts.status.${account.status}`) }}</span>
+      <span v-if="account.schedulable === false" class="text-[11px] text-gray-500">{{ t('admin.accounts.status.paused') }}</span>
+    </div>
     <!-- Rate Limit Display (429) - Two-line layout -->
     <div v-else-if="isRateLimited" class="flex flex-col items-center gap-1">
       <span class="badge text-xs badge-warning">{{ t('admin.accounts.status.rateLimited') }}</span>
@@ -191,6 +199,22 @@ const emit = defineEmits<{
 }>()
 
 const { state: bpsCredentialState, failed: bpsCredentialFailed } = useBPSCredentialState(() => props.account)
+
+const proxyQuarantine = computed(() => {
+  const extra = props.account.extra as Record<string, unknown> | undefined
+  return extra?.proxy_failure_guard
+})
+const isProxyQuarantined = computed(() => proxyQuarantine.value != null)
+const proxyRecoveryText = computed(() => {
+  const state = proxyQuarantine.value
+  if (state && typeof state === 'object' && !Array.isArray(state)) {
+    const notBefore = (state as Record<string, unknown>).not_before
+    if (typeof notBefore === 'string' && new Date(notBefore) > new Date()) {
+      return t('admin.accounts.status.proxyRecoveryNotBefore', { time: formatDateTime(notBefore) })
+    }
+  }
+  return t('admin.accounts.status.proxyRecoveryProbeRequired')
+})
 
 // Computed: is rate limited (429)
 const isRateLimited = computed(() => {

@@ -12,7 +12,9 @@ import "time"
 func ResolveProxyFallbackTarget(start Proxy, byID map[int64]Proxy, now time.Time) (*int64, bool) {
 	switch start.FallbackMode {
 	case FallbackModeDirect:
-		return nil, true
+		// An assigned proxy is an egress boundary. Expiry must never expose
+		// the server's direct IP, even for older saved fallback=direct settings.
+		return nil, false
 	case FallbackModeProxy:
 		visited := map[int64]struct{}{start.ID: {}}
 		curID := start.BackupProxyID
@@ -35,7 +37,7 @@ func ResolveProxyFallbackTarget(start Proxy, byID map[int64]Proxy, now time.Time
 			visited[*curID] = struct{}{}
 			switch p.FallbackMode {
 			case FallbackModeDirect:
-				return nil, true
+				return nil, false
 			case FallbackModeProxy:
 				curID = p.BackupProxyID
 			default:

@@ -193,6 +193,9 @@ func (a *Account) EffectiveLoadFactor() int {
 }
 
 func (a *Account) IsSchedulable() bool {
+	if a.IsProxyQuarantined() {
+		return false
+	}
 	if a.IsOpenAIBPS() {
 		state := a.OpenAIBPSCredentialState(time.Now())
 		if state.Status == "expired" || state.Status == "revoked" || state.Status == "auth_failed" {
@@ -235,6 +238,9 @@ func (a *Account) IsSchedulable() bool {
 // 不应连坐 spark(否则重新耦合影子架构本应解耦的两条 429 道)。nil receiver 返回 false。
 func (a *Account) IsCredentialUsableForShadow() bool {
 	if a == nil || !a.IsActive() {
+		return false
+	}
+	if a.IsProxyQuarantined() {
 		return false
 	}
 	now := time.Now()

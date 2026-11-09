@@ -59,22 +59,23 @@ func (s *ProxyExpirySuite) TestSweep_DirectMode() {
 
 	changed, err := s.repo.SweepExpiredProxies(s.ctx, time.Now())
 	s.Require().NoError(err)
-	s.Require().GreaterOrEqual(changed, int64(1))
+	s.Require().Zero(changed)
 
 	got, _ := s.repo.GetByID(s.ctx, pid)
 	s.Require().Equal(service.StatusExpired, got.Status)
-	s.Require().Nil(s.accountProxyID(aid))
+	s.Require().Equal(&pid, s.accountProxyID(aid))
 	var origin *int64
 	err = scanSingleRow(s.ctx, s.tx, `SELECT proxy_fallback_origin_id FROM accounts WHERE id=$1`, []any{aid}, &origin)
 	s.Require().NoError(err)
-	s.Require().NotNil(origin)
-	s.Require().Equal(pid, *origin)
+	s.Require().Nil(origin)
 }
 
 func (s *ProxyExpirySuite) TestSweep_EnqueuesChangedAccountIDsWithoutFullRebuild() {
 	past := time.Now().Add(-time.Hour)
-	firstProxyID := s.mkProxy("p-bulk-first", service.FallbackModeDirect, &past, nil)
-	secondProxyID := s.mkProxy("p-bulk-second", service.FallbackModeDirect, &past, nil)
+	future := time.Now().Add(time.Hour)
+	backupID := s.mkProxy("p-bulk-backup", service.FallbackModeNone, &future, nil)
+	firstProxyID := s.mkProxy("p-bulk-first", service.FallbackModeProxy, &past, &backupID)
+	secondProxyID := s.mkProxy("p-bulk-second", service.FallbackModeProxy, &past, &backupID)
 	firstAccountID := s.mkAccountWithProxy(firstProxyID)
 	secondAccountID := s.mkAccountWithProxy(secondProxyID)
 

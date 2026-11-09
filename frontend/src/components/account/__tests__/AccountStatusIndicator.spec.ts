@@ -51,6 +51,31 @@ function makeAccount(overrides: Partial<Account>): Account {
 }
 
 describe('AccountStatusIndicator', () => {
+  it('keeps a failed proxy blocked after the three-minute deadline until the marker is cleared', async () => {
+    const account = makeAccount({
+      platform: 'anthropic',
+      temp_unschedulable_until: '2000-01-01T00:00:00Z',
+      extra: { proxy_failure_guard: { generation: 'failure-1', not_before: '2000-01-01T00:00:00Z' } }
+    })
+    const wrapper = mount(AccountStatusIndicator, { props: { account }, global: { stubs: { Icon: true } } })
+    expect(wrapper.text()).toContain('admin.accounts.status.proxyWaitingRecovery')
+    expect(wrapper.text()).toContain('admin.accounts.status.proxyRecoveryProbeRequired')
+    expect(wrapper.text()).not.toContain('admin.accounts.status.tempUnschedulableUntil')
+    await wrapper.setProps({ account: { ...account, extra: {} } })
+    expect(wrapper.text()).not.toContain('admin.accounts.status.proxyWaitingRecovery')
+    wrapper.unmount()
+  })
+
+  it('shows the earliest proxy probe time and preserves manual pause', () => {
+    const wrapper = mount(AccountStatusIndicator, {
+      props: { account: makeAccount({ schedulable: false, extra: { proxy_failure_guard: { not_before: '2099-01-01T00:00:00Z' } } }) },
+      global: { stubs: { Icon: true } }
+    })
+    expect(wrapper.text()).toContain('admin.accounts.status.proxyRecoveryNotBefore')
+    expect(wrapper.text()).toContain('admin.accounts.status.paused')
+    wrapper.unmount()
+  })
+
   it('shows the predicted model only for an active automatic degradation block', async () => {
     const account = makeAccount({
       platform: 'openai',

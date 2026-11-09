@@ -521,7 +521,6 @@
           <Select v-model="createForm.fallback_mode" :options="[
             { label: t('admin.proxies.fallbackNone'), value: 'none' },
             { label: t('admin.proxies.fallbackProxy'), value: 'proxy' },
-            { label: t('admin.proxies.fallbackDirect'), value: 'direct' },
           ]" />
         </div>
         <div v-if="createForm.fallback_mode === 'proxy'">
@@ -754,7 +753,6 @@
           <Select v-model="editForm.fallback_mode" :options="[
             { label: t('admin.proxies.fallbackNone'), value: 'none' },
             { label: t('admin.proxies.fallbackProxy'), value: 'proxy' },
-            { label: t('admin.proxies.fallbackDirect'), value: 'direct' },
           ]" />
         </div>
         <div v-if="editForm.fallback_mode === 'proxy'">
@@ -1427,7 +1425,7 @@ const handleEdit = (proxy: Proxy) => {
   editForm.password = proxy.password || ''
   editForm.status = proxy.status === 'expired' ? 'inactive' : proxy.status
   editForm.expires_at = proxy.expires_at ? proxy.expires_at.slice(0, 10) : ''
-  editForm.fallback_mode = proxy.fallback_mode || 'none'
+  editForm.fallback_mode = proxy.fallback_mode === 'proxy' ? 'proxy' : 'none'
   editForm.backup_proxy_id = proxy.backup_proxy_id ?? null
   editForm.expiry_warn_days = proxy.expiry_warn_days ?? 7
   editPasswordVisible.value = false

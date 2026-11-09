@@ -111,6 +111,13 @@ jobs:
       - name: Claude 隐私过滤与遥测回归
         working-directory: backend
         run: go test -tags unit ./internal/service ./internal/handler ./internal/handler/admin ./internal/server/routes ./internal/server/middleware ./internal/pkg/claude -run 'Test(ClaudePrivacy|ClaudeDesktop|AdminGroupClaudeDesktop|ClaudeTelemetry|LocalClaudeTelemetry|GatewayClaude|GatewayService_ForwardSignatureRepair|ForwardClaudeThinking|ClaudeThinkingRecovery|StripClaudeThinkingHistory|ToolResponseIntegrity|ForwardToolResponseIntegrity|ClaudeThinkingTrace|ClaudeToolText|ForwardClaudeToolText|ParseClaudeTelemetry|BuildClaudeTelemetry|SanitizeClaude|Telemetry)' -count=1 -timeout=180s
+      - name: 代理断连停调与恢复安全回归
+        run: |
+          cd backend
+          go test -tags unit ./internal/service ./internal/repository ./cmd/server ./internal/pkg/proxyurl ./internal/pkg/proxyutil -run 'Test(ProxyFailureGuard|ResolveFallback|HTTPUpstream|ClaudeUsage|ClaudeOAuth)' -count=1 -timeout=180s
+          go test -tags integration ./internal/repository -run 'TestProxyFailureGuardRepositoryPersists|TestProxyExpirySuite' -count=1 -timeout=240s
+          cd ../frontend
+          pnpm exec vitest run src/components/account/__tests__/AccountStatusIndicator.spec.ts
       - name: 上游历史缺项回归
         working-directory: backend
         run: >-

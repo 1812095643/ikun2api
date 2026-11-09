@@ -565,7 +565,10 @@ export default {
         creditsExhaustedUntil: 'AI Credits 已用尽，预计 {time} 恢复',
         overloadedUntil: '负载过重，重置时间：{time}',
         viewTempUnschedDetails: '查看临时不可调度详情',
-        tempUnschedulableUntil: '预计 {time} 恢复'
+        tempUnschedulableUntil: '预计 {time} 恢复',
+        proxyWaitingRecovery: '等待代理恢复',
+        proxyRecoveryNotBefore: '最早 {time} 探测，代理恢复后才解除停调',
+        proxyRecoveryProbeRequired: '冷却后仍需代理探测成功；禁止回退直连'
       },
       tempUnschedulable: {
         title: '临时不可调度',

@@ -95,6 +95,7 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		nil, // promptAudit
 		nil, // pluginManager
 		nil, // claudeTelemetry
+		nil, // proxyFailureGuard
 	)
 
 	require.NotPanics(t, func() {

@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -425,6 +427,22 @@ func ProvideClaudeCodeVersionSyncService(
 func ProvideProxyExpiryService(proxyRepo ProxyRepository) *ProxyExpiryService {
 	svc := NewProxyExpiryService(proxyRepo, time.Minute)
 	svc.Start()
+	return svc
+}
+
+func ProvideProxyFailureGuard(accounts AccountRepository, prober ProxyRecoveryProber) *ProxyFailureGuard {
+	store, ok := accounts.(ProxyFailureGuardRepository)
+	if !ok {
+		panic("account repository does not implement the proxy safety gate")
+	}
+	guard := NewProxyFailureGuard(store, prober)
+	guard.Start()
+	return guard
+}
+
+func ProvideOAuthService(proxies ProxyRepository, client ClaudeOAuthClient, guard *ProxyFailureGuard) *OAuthService {
+	svc := NewOAuthService(proxies, client)
+	svc.proxyGuard = guard
 	return svc
 }
 
@@ -879,7 +897,8 @@ var ProviderSet = wire.NewSet(
 	ProvideBatchImageCleanupService,
 	ProvideBatchImageWorkerRuntime,
 	wire.Bind(new(AccountRuntimeBlocker), new(*OpenAIGatewayService)),
-	NewOAuthService,
+	ProvideOAuthService,
+	ProvideProxyFailureGuard,
 	ProvideClaudeResetCreditService,
 	ProvideOpenAIOAuthService,
 	ProvideGrokOAuthService,
@@ -1077,8 +1096,15 @@ func ProvideChannelMonitorV2Aggregator(repo ChannelMonitorV2Repository, db *sql.
 
 // ProvideClaudeResetCreditService wires the Claude reset query and, with the
 // idempotency store and Redis leases, manual redemption.
-func ProvideClaudeResetCreditService(accounts AccountRepository, tokens *ClaudeTokenProvider, proxies ProxyRepository, settings *SettingService, idem *IdempotencyCoordinator, locks LeaderLockCache) *ClaudeResetCreditService {
+func ProvideClaudeResetCreditService(accounts AccountRepository, tokens *ClaudeTokenProvider, proxies ProxyRepository, settings *SettingService, idem *IdempotencyCoordinator, locks LeaderLockCache, upstream HTTPUpstream) *ClaudeResetCreditService {
 	s := NewClaudeResetCreditService(accounts, tokens, proxies, settings)
+	s.do = func(req *http.Request, proxy string) (*http.Response, error) {
+		id, _ := req.Context().Value(claudeResetProxyAccountKey{}).(int64)
+		if id <= 0 {
+			return nil, fmt.Errorf("account proxy safety context unavailable")
+		}
+		return upstream.Do(req.WithContext(WithHTTPUpstreamRedirectsDisabled(req.Context())), proxy, id, 1)
+	}
 	s.ConfigureRedemption(idem, locks)
 	return s
 }

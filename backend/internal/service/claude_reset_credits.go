@@ -18,6 +18,8 @@ var claudeResetGrantIDPattern = regexp.MustCompile(`^[a-z0-9_-]{1,40}$`)
 
 const claudeResetUsageURL = "https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1"
 
+type claudeResetProxyAccountKey struct{}
+
 // ClaudeResetCredit is deliberately free of upstream grant and organization IDs.
 type ClaudeResetCredit struct {
 	Label            string             `json:"label"`
@@ -139,6 +141,7 @@ func (s *ClaudeResetCreditService) headers(ctx context.Context, req *http.Reques
 }
 
 func (s *ClaudeResetCreditService) query(ctx context.Context, id int64) (*ClaudeResetCredits, error) {
+	ctx = context.WithValue(ctx, claudeResetProxyAccountKey{}, id)
 	_, token, proxy, err := s.account(ctx, id)
 	if err != nil {
 		return nil, err

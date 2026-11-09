@@ -47,6 +47,7 @@ type OAuthService struct {
 	sessionStore *oauth.SessionStore
 	proxyRepo    ProxyRepository
 	oauthClient  ClaudeOAuthClient
+	proxyGuard   *ProxyFailureGuard
 }
 
 // NewOAuthService creates a new OAuth service
@@ -307,6 +308,18 @@ func (s *OAuthService) RefreshAccountToken(ctx context.Context, account *Account
 		return nil, err
 	}
 
+	if s.proxyGuard != nil {
+		lease, err := s.proxyGuard.Begin(ctx, account.ID, proxyURL, oauth.TokenURL)
+		if err != nil {
+			return nil, err
+		}
+		defer lease.Close()
+		result, err := s.RefreshToken(lease.Context(), refreshToken, proxyURL)
+		if err != nil {
+			return nil, lease.Failure(err)
+		}
+		return result, nil
+	}
 	return s.RefreshToken(ctx, refreshToken, proxyURL)
 }
 

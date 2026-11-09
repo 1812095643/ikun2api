@@ -757,6 +757,7 @@ func lockAndMergeAccountProbeExtra(
 		}
 	}
 	extra := service.MergeOpenAICodexTicketExtra(copyJSONMap(normalizeJSONMap(account.Extra)), currentExtra)
+	extra = service.MergeProxyFailureGuardExtra(extra, currentExtra)
 	extra = service.MergeOpenAIBPSCredentialStateExtra(account, extra, currentExtra, identityUnchanged)
 	for _, key := range []string{
 		service.UpstreamBillingProbeEnabledExtraKey,
@@ -1079,6 +1080,7 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 				),
 				dbpredicate.Account(func(s *entsql.Selector) {
 					col := s.C("temp_unschedulable_until")
+					s.Where(entsql.ExprP("NOT (COALESCE(" + s.C("extra") + ", '{}'::jsonb) ? 'proxy_failure_guard')"))
 					s.Where(entsql.Or(
 						entsql.IsNull(col),
 						entsql.LTE(col, entsql.Expr("NOW()")),
@@ -1102,9 +1104,9 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 				dbaccount.StatusEQ(service.StatusActive),
 				dbpredicate.Account(func(s *entsql.Selector) {
 					col := s.C("temp_unschedulable_until")
-					s.Where(entsql.And(
-						entsql.Not(entsql.IsNull(col)),
-						entsql.GT(col, entsql.Expr("NOW()")),
+					s.Where(entsql.Or(
+						entsql.ExprP("COALESCE("+s.C("extra")+", '{}'::jsonb) ? 'proxy_failure_guard'"),
+						entsql.And(entsql.Not(entsql.IsNull(col)), entsql.GT(col, entsql.Expr("NOW()"))),
 					))
 				}),
 			)
@@ -2154,6 +2156,7 @@ func (r *accountRepository) ListSchedulableCapacityByGroupIDs(ctx context.Contex
 			AND a.status = $2
 			AND a.schedulable = TRUE
 			AND (a.temp_unschedulable_until IS NULL OR a.temp_unschedulable_until <= $3)
+			AND NOT (COALESCE(a.extra,'{}'::jsonb) ? 'proxy_failure_guard')
 			AND (a.expires_at IS NULL OR a.expires_at > $3 OR a.auto_pause_on_expired = FALSE)
 			AND (a.overload_until IS NULL OR a.overload_until <= $3)
 			AND (a.rate_limit_reset_at IS NULL OR a.rate_limit_reset_at <= $3)
@@ -2818,6 +2821,7 @@ func (r *accountRepository) UpdateExtra(ctx context.Context, id int64, updates m
 		return scoped.UpdateExtra(ctx, id, updates)
 	}
 	updates = stripCodexFingerprintSeedFromExtraUpdate(updates)
+	updates = stripProxyFailureGuardUpdate(updates)
 	if len(updates) == 0 {
 		return nil
 	}
@@ -3095,6 +3099,7 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		return 0, nil
 	}
 	updates.Extra = stripCodexFingerprintSeedFromExtraUpdate(updates.Extra)
+	updates.Extra = stripProxyFailureGuardUpdate(updates.Extra)
 
 	setClauses := make([]string, 0, 8)
 	args := make([]any, 0, 8)
@@ -3514,6 +3519,7 @@ func (r *accountRepository) accountsToService(ctx context.Context, accounts []*d
 
 func tempUnschedulablePredicate() dbpredicate.Account {
 	return dbpredicate.Account(func(s *entsql.Selector) {
+		s.Where(entsql.ExprP("NOT (COALESCE(" + s.C("extra") + ", '{}'::jsonb) ? 'proxy_failure_guard')"))
 		col := s.C("temp_unschedulable_until")
 		s.Where(entsql.Or(
 			entsql.IsNull(col),

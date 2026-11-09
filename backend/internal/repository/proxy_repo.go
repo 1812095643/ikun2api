@@ -728,6 +728,9 @@ func (r *proxyRepository) sweepOneExpiredProxy(ctx context.Context, snapshot ser
 
 // sweepOneExpiredProxyOnExec 在给定的 sqlExecutor 上执行：标记 expired + 改投账号。
 func (r *proxyRepository) sweepOneExpiredProxyOnExec(ctx context.Context, exec sqlExecutor, snapshot service.Proxy, now time.Time, target *int64, change bool) ([]int64, error) {
+	// Legacy settings may still request direct fallback. Never remove an
+	// assigned proxy as an automatic recovery/expiry action.
+	if target == nil { change = false }
 	proxyID := snapshot.ID
 	// The UPDATE locks the row and rechecks its predicates after concurrent writes.
 	// If an administrator renewed, disabled or reconfigured the proxy after the

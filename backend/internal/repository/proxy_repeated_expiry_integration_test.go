@@ -35,10 +35,11 @@ func (s *ProxyExpirySuite) TestSweep_RepeatedExpiryPreservesOriginalProxy() {
 
 			changed, err = s.repo.SweepExpiredProxies(s.ctx, now.Add(2*time.Hour))
 			s.Require().NoError(err)
-			s.Require().EqualValues(1, changed, "accounts already in fallback must still be rerouted")
 			if direct {
-				s.Require().Nil(s.accountProxyID(accountID))
+				s.Require().Zero(changed, "automatic direct fallback is forbidden")
+				s.Require().Equal(&middleID, s.accountProxyID(accountID))
 			} else {
+				s.Require().EqualValues(1, changed, "accounts already in fallback must still be rerouted")
 				s.Require().Equal(&lastID, s.accountProxyID(accountID))
 			}
 			var origin *int64

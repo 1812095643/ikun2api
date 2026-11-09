@@ -69,6 +69,11 @@ func classifyUpstreamTransportError(err error) upstreamTransportErrorClass {
 	if err == nil {
 		return upstreamTransportErrorClass{}
 	}
+	// The proxy safety gate already persisted its minimum cooldown and an
+	// explicit health gate. Do not replace it with a blind ten-minute timeout.
+	if errors.Is(err, ErrProxyQuarantined) {
+		return upstreamTransportErrorClass{}
+	}
 
 	// — Typed checks (preferred) ——————————————————————————————————————————————
 	if errors.Is(err, syscall.ECONNREFUSED) ||

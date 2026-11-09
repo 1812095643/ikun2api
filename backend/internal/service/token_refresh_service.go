@@ -933,6 +933,11 @@ func (s *TokenRefreshService) refreshWithRetryWithRateGate(
 		if shortCircuit {
 			return err
 		}
+		if errors.Is(err, ErrProxyQuarantined) {
+			// Proxy safety owns the durable marker and minimum three-minute
+			// health gate. Do not replace it with token-error retry cooldowns.
+			return err
+		}
 
 		if err == nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {

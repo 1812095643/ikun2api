@@ -361,7 +361,10 @@ export default {
         creditsExhaustedUntil: 'AI Credits exhausted, expected recovery at {time}',
         overloadedUntil: 'Overloaded until {time}',
         viewTempUnschedDetails: 'View temp unschedulable details',
-        tempUnschedulableUntil: 'Resumes {time}'
+        tempUnschedulableUntil: 'Resumes {time}',
+        proxyWaitingRecovery: 'Waiting for proxy recovery',
+        proxyRecoveryNotBefore: 'Probe after {time}; resumes only after proxy recovery',
+        proxyRecoveryProbeRequired: 'A successful proxy probe is required after cooldown; direct fallback is blocked'
       },
       columns: {
         name: 'Name',
