@@ -201,7 +201,6 @@ type AnthropicEventToResponsesState struct {
 	textAccumBuffer            *strings.Builder
 	currentArgsBuffer          *strings.Builder
 	currentSummaryBuffer       *strings.Builder
-	currentSignatureBuffer     *strings.Builder
 
 	// PendingToolInput holds tool arguments that arrived complete on
 	// content_block_start instead of as input_json_delta. It is only consumed at
@@ -337,7 +336,6 @@ func anthToResHandleContentBlockStart(evt *AnthropicStreamEvent, state *Anthropi
 		state.CurrentThinking = *evt.ContentBlock
 		state.CurrentSummary = evt.ContentBlock.Thinking
 		state.currentSummaryBuffer = nil
-		state.currentSignatureBuffer = nil
 		state.ContentIndex = 0
 
 		events = append(events, makeResponsesEvent(state, "response.output_item.added", &ResponsesStreamEvent{
@@ -467,7 +465,12 @@ func anthToResHandleContentBlockDelta(evt *AnthropicStreamEvent, state *Anthropi
 	case "signature_delta":
 		// Keep signatures in the opaque bridge envelope, never in visible text.
 		if state.PreserveThinkingSignatures {
-			state.CurrentThinking.Signature = appendStreamString(&state.currentSignatureBuffer, state.CurrentThinking.Signature, evt.Delta.Signature)
+			// Anthropic sends the complete opaque signature value in a
+			// signature_delta event. Treating it like text and appending it
+			// corrupts the value when a stream contains more than one event.
+			// The official client replaces the previous value; keep that
+			// semantics at this protocol boundary.
+			state.CurrentThinking.Signature = evt.Delta.Signature
 		}
 		return nil
 	}
@@ -662,7 +665,6 @@ func closeCurrentResponsesItem(state *AnthropicEventToResponsesState) []Response
 	state.CurrentSummary = ""
 	state.currentSummaryBuffer = nil
 	state.CurrentThinking = AnthropicContentBlock{}
-	state.currentSignatureBuffer = nil
 	state.TextAccum = ""
 	state.textAccumBuffer = nil
 	state.OutputIndex++

@@ -20,7 +20,6 @@ func streamAccumulationFieldCases() []streamAccumulationFieldCase {
 		{"text", "text", func(s *AnthropicEventToResponsesState) *string { return &s.TextAccum }, func(v string) *AnthropicDelta { return &AnthropicDelta{Type: "text_delta", Text: v} }},
 		{"thinking", "thinking", func(s *AnthropicEventToResponsesState) *string { return &s.CurrentSummary }, func(v string) *AnthropicDelta { return &AnthropicDelta{Type: "thinking_delta", Thinking: v} }},
 		{"arguments", "tool_use", func(s *AnthropicEventToResponsesState) *string { return &s.CurrentArgs }, func(v string) *AnthropicDelta { return &AnthropicDelta{Type: "input_json_delta", PartialJSON: v} }},
-		{"signature", "thinking", func(s *AnthropicEventToResponsesState) *string { return &s.CurrentThinking.Signature }, func(v string) *AnthropicDelta { return &AnthropicDelta{Type: "signature_delta", Signature: v} }},
 	}
 }
 
@@ -33,11 +32,8 @@ func TestStreamAccumulationAnthropicPublicStringsAndReset(t *testing.T) {
 			if tc.name == "thinking" {
 				block.Thinking = "seed-"
 			}
-			if tc.name == "signature" {
-				block.Signature = "seed-"
-			}
 			AnthropicEventToResponsesEvents(&AnthropicStreamEvent{Type: "content_block_start", ContentBlock: block}, state)
-			if tc.name == "thinking" || tc.name == "signature" {
+			if tc.name == "thinking" {
 				require.Equal(t, "seed-", *tc.field(state), "content block seeds remain visible")
 			} else {
 				*tc.field(state) = "seed-"
