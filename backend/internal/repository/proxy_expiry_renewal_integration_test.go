@@ -16,11 +16,10 @@ func (s *ProxyExpirySuite) TestSweep_SkipsChangedSnapshot() {
 			past := now.Add(-time.Hour)
 			future := now.Add(24 * time.Hour)
 			backup := s.mkProxy("snapshot-backup", service.FallbackModeNone, &future, nil)
-			source := s.mkProxy("snapshot-source", service.FallbackModeDirect, &past, nil)
-			if edit == "change backup" {
-				_, err := s.tx.ExecContext(s.ctx, `UPDATE proxies SET fallback_mode='proxy', backup_proxy_id=$1 WHERE id=$2`, backup, source)
-				s.Require().NoError(err)
-			}
+			// Use a valid backup route: automatic direct fallback is forbidden.
+			// This test still exercises the stale snapshot's route CAS rather
+			// than accidentally depending on the removed direct fallback.
+			source := s.mkProxy("snapshot-source", service.FallbackModeProxy, &past, &backup)
 			account := s.mkAccountWithProxy(source)
 			snapshot, err := s.repo.GetByID(s.ctx, source)
 			s.Require().NoError(err)
