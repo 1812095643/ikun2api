@@ -8,20 +8,41 @@ import {
 } from '@/api/modelPlaza'
 import { workspaceError } from '@/api/workspace'
 import { formatScaled } from '@/utils/pricing'
+import { modelPlazaOriginalPricing, modelPlazaReferencePricing, type ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
 
 export interface ModelEntry {
   name: string
   platform: string
   offers: { group: ModelPlazaGroup; model: PlazaModel }[]
 }
+
+function originalTokenPricing(entry: ModelEntry): PlazaModel['official_pricing'] {
+  for (const { model } of entry.offers) {
+    const pricing = modelPlazaOriginalPricing({ ...model, name: entry.name })
+    if (pricing) return pricing
+  }
+  return null
+}
+
 export function modelPrice(
   entry: ModelEntry,
-  key: 'input_price' | 'output_price' | 'cache_read_price' | 'cache_write_price'
+  key: ModelPlazaTokenPriceKey
 ): string {
   const prices = entry.offers.flatMap(({ group, model }) => {
     if ((model.pricing?.billing_mode || 'token') !== 'token') return []
     const value = model.pricing?.[key]
     return value == null ? [] : [value * (group.user_rate_multiplier ?? group.rate_multiplier)]
+  })
+  return prices.length ? formatScaled(Math.min(...prices), 1000000, 2) : '—'
+}
+
+export function modelOfficialPrice(entry: ModelEntry, key: ModelPlazaTokenPriceKey): string {
+  const original = originalTokenPricing(entry)
+  const prices = entry.offers.flatMap(({ model }) => {
+    if ((model.pricing?.billing_mode || 'token') !== 'token') return []
+    const reference = original ?? modelPlazaReferencePricing({ ...model, name: entry.name })
+    const value = reference?.[key]
+    return value != null && Number.isFinite(value) && value >= 0 ? [value] : []
   })
   return prices.length ? formatScaled(Math.min(...prices), 1000000, 2) : '—'
 }

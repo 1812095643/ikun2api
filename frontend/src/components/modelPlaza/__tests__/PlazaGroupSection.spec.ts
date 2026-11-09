@@ -117,6 +117,13 @@ describe('PlazaGroupSection 长上下文说明', () => {
     expect(wrapper.text()).not.toContain(NOTE)
   })
 
+  it('Gemini 参考列使用渠道平价时不误提示目录阶梯', () => {
+    const model = { ...ladderModel(2), name: 'gemini-2.5-pro', platform: 'gemini' }
+    const wrapper = mountSection(group({ long_context_pricing_enabled: false, models: [model] }))
+    expect(wrapper.text()).not.toContain(NOTE)
+    wrapper.unmount()
+  })
+
   it('旧后端缺少开关字段时不显示', () => {
     const g = group()
     delete (g as Partial<ModelPlazaGroup>).long_context_pricing_enabled

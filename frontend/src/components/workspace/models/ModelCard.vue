@@ -2,18 +2,25 @@
 import { computed, ref } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
-import { modelPrice, mediaPrice, type ModelEntry } from '@/composables/workspace/useModelSquare'
+import { modelPrice, modelOfficialPrice, mediaPrice, type ModelEntry } from '@/composables/workspace/useModelSquare'
+import type { ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
 import { platformLabel } from '@/utils/platformColors'
 const props = defineProps<{ entry: ModelEntry }>()
 const emit = defineEmits<{ detail: [] }>()
 const copied = ref(false), copyError = ref(false)
 const billing = computed(() => props.entry.offers[0]?.model.pricing?.billing_mode || 'token')
-const rows = computed(() => [
-  { label: '输入', value: modelPrice(props.entry, 'input_price') },
-  { label: '输出', value: modelPrice(props.entry, 'output_price') },
-  { label: '缓存读取', value: modelPrice(props.entry, 'cache_read_price') },
-  { label: '缓存写入', value: modelPrice(props.entry, 'cache_write_price') }
-].filter(row => row.value !== '—'))
+const priceFields: { label: string; key: ModelPlazaTokenPriceKey }[] = [
+  { label: '输入', key: 'input_price' },
+  { label: '输出', key: 'output_price' },
+  { label: '缓存读取', key: 'cache_read_price' },
+  { label: '缓存创建', key: 'cache_write_price' },
+  { label: '缓存创建（1h）', key: 'cache_write_1h_price' }
+]
+const rows = computed(() => priceFields.map(field => ({
+  ...field,
+  paid: modelPrice(props.entry, field.key),
+  official: modelOfficialPrice(props.entry, field.key)
+})).filter(row => row.paid !== '—' || row.official !== '—'))
 async function copy() {
   try {
     await navigator.clipboard.writeText(props.entry.name)
@@ -33,14 +40,15 @@ async function copy() {
       <button class="copy-model" :aria-label="'复制模型名 ' + entry.name" @click="copy"><Icon :name="copied ? 'check' : 'copy'" size="sm" /></button>
     </header>
     <div v-if="billing === 'token'" class="model-prices">
-      <div v-for="row in rows" :key="row.label"><span>{{ row.label }}</span><strong>{{ row.value }}</strong><small>/ 1M</small></div>
+      <div v-if="rows.length" class="model-price-head"><span>/ 1M</span><span>实付价格</span><span>官方价格</span></div>
+      <div v-for="row in rows" :key="row.key" class="model-price-row" :data-price-field="row.key"><span>{{ row.label }}</span><strong>{{ row.paid }}</strong><span class="model-original-price">{{ row.official }}</span></div>
       <p v-if="!rows.length" class="ws-muted">查看分组计价</p>
     </div>
     <div v-else class="model-media"><strong>{{ mediaPrice(entry) }}</strong><span>{{ billing === 'image' ? '/ 张' : '/ 次' }}</span></div>
     <footer class="model-footer">
       <span v-if="copied" class="copy-feedback" role="status">模型名已复制</span>
       <span v-else-if="copyError" class="copy-feedback" role="alert">请手动复制模型名</span>
-      <span v-else class="model-offers">{{ entry.offers.length }} 个分组<span class="price-caption"> · 最低基础价</span></span>
+      <span v-else class="model-offers">{{ entry.offers.length }} 个分组<span class="price-caption"> · 最低实付价</span></span>
       <button @click="emit('detail')">计价详情<Icon name="arrowRight" size="xs" /></button>
     </footer>
   </article>
@@ -62,10 +70,12 @@ async function copy() {
 .copy-model:hover { background: var(--ws-soft); color: var(--ws-text); }
 .copy-model:focus-visible, .model-name:focus-visible, .model-footer button:focus-visible { outline: 2px solid var(--ws-primary); outline-offset: 3px; }
 .model-prices { display: grid; gap: 9px; margin: 21px 0 20px; }
-.model-prices > div { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
+.model-prices > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(65px, auto) minmax(65px, auto); align-items: baseline; gap: 9px; font-size: 12px; }
 .model-prices span { color: var(--ws-muted); }
-.model-prices strong { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
-.model-prices small { color: var(--ws-muted); font-size: 10px; min-width: 25px; }
+.model-prices strong, .model-original-price { text-align: right; font-variant-numeric: tabular-nums; }
+.model-prices strong { font-weight: 600; }
+.model-prices > .model-price-head { font-size: 10px; }
+.model-price-head > span:not(:first-child) { text-align: right; }
 .model-media { padding: 24px 0; }
 .model-media strong { font-size: 26px; font-weight: 550; }
 .model-media > span { color: var(--ws-muted); font-size: 11px; margin-left: 7px; }

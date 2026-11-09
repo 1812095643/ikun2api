@@ -330,7 +330,7 @@ func plazaImageDisplayPricing(p *ChannelModelPricing, g *Group) *ChannelModelPri
 	return &clone
 }
 
-// lookupOfficialPricing 查询模型的官方参考价（与计费同源：LiteLLM → 内置兜底 → 模型策略），
+// lookupOfficialPricing 查询模型的官方参考价（LiteLLM → 已识别型号的内置价 → 模型策略），
 // 带 memo 避免同名模型重复解析。官方阶梯按无分组、无渠道的口径查阶梯表。
 // billingService 为 nil（测试场景）或查不到时返回 nil。
 func (s *ModelPlazaService) lookupOfficialPricing(ctx context.Context, modelName string, memo map[string]*PlazaOfficialPricing) *PlazaOfficialPricing {
@@ -339,6 +339,13 @@ func (s *ModelPlazaService) lookupOfficialPricing(ctx context.Context, modelName
 	}
 	if cached, ok := memo[modelName]; ok {
 		return cached
+	}
+	// 计费可按系列回退以兼容未知型号，但这种猜测不能标成模型原价。
+	// 明确识别不到的型号留空，让模型卡片沿用渠道价；不改变实际计费。
+	identifiedModel := normalizeModelNameForPricing(strings.ToLower(strings.TrimSpace(modelName)))
+	if !s.billingService.HasIdentifiedTokenPricing(identifiedModel) {
+		memo[modelName] = nil
+		return nil
 	}
 	var result *PlazaOfficialPricing
 	if mp, err := s.billingService.GetModelPricing(modelName); err == nil && mp != nil {

@@ -259,20 +259,21 @@ describe('PlazaModelPricingTable', () => {
     expect(wrapper.findAll('tbody td')).toHaveLength(8)
   })
 
-  it('官方价包含 1h 缓存写入价;official_pricing 为 null 时官方三列显示 -', () => {
+  it('官方价包含 1h 缓存写入价;无原价时官方三列回退渠道基价', () => {
     const withOfficial = mountTable([tokenModel()], 1)
     expect(withOfficial.text()).toContain('$6.00')
     expect(withOfficial.text()).toContain('(1h')
 
     const withoutOfficial = mountTable([tokenModel({ official_pricing: null })], 1)
     const cells = withoutOfficial.findAll('tbody td')
-    // 官方 输入/输出/缓存 三列均为 -
-    expect(cells[4].text().trim()).toBe('-')
-    expect(cells[5].text().trim()).toBe('-')
-    expect(cells[6].text().trim()).toBe('-')
+    expect(cells[4].text().trim()).toBe('$3.00')
+    expect(cells[5].text().trim()).toBe('$15.00')
+    expect(cells[6].text()).toContain('$3.75')
+    expect(cells[6].text()).toContain('$0.30')
+    expect(cells[6].text()).not.toContain('(1h')
   })
 
-  it('实付价分别展示自定义 5m 与 1h 缓存写入价', () => {
+  it('实付价分别展示渠道自定义 5m 与 1h 缓存写入价', () => {
     const model = tokenModel()
     model.pricing!.cache_write_1h_price = 7e-6
 
@@ -351,6 +352,91 @@ describe('PlazaModelPricingTable', () => {
     expect(text).toContain('$1.50')
     expect(text).toContain('$7.50')
     expect(text).toContain('$15.00')
+  })
+
+  it.each([['claude-sonnet-4', 'anthropic'], ['gpt-5.4', 'openai']])(
+    '%s 只调整官方列为原价，实付保持渠道价乘倍率并涵盖缓存费用', (name, platform) => {
+      const model = tokenModel({ name, platform })
+      Object.assign(model.pricing!, {
+        input_price: 5e-6, output_price: 21e-6, cache_read_price: 1e-6,
+        cache_write_price: 6e-6, cache_write_1h_price: 12e-6
+      })
+      Object.assign(model.official_pricing!, {
+        input_price: 4e-6, output_price: 20e-6, cache_read_price: 0.4e-6,
+        cache_write_price: 5e-6, cache_write_1h_price: 8e-6
+      })
+      const wrapper = mountTable([model], 2, 0.5)
+      const cells = wrapper.findAll('tbody td')
+      expect(cells[1].text()).toBe('$2.50')
+      expect(cells[2].text()).toBe('$10.50')
+      expect(cells[3].text()).toContain('$0.50')
+      expect(cells[3].text()).toContain('$3.00')
+      expect(cells[3].text()).toContain('$6.00')
+      expect(cells[4].text()).toBe('$4.00')
+      expect(cells[5].text()).toBe('$20.00')
+      expect(cells[6].text()).toContain('$0.40')
+      expect(cells[6].text()).toContain('$5.00')
+      expect(cells[6].text()).toContain('$8.00')
+      expect(model.pricing!.input_price).toBe(5e-6)
+      expect(model.pricing!.cache_write_1h_price).toBe(12e-6)
+      const paidBefore = cells.slice(0, 4).map(cell => cell.text())
+      const configured = structuredClone(model)
+      configured.official_pricing = null
+      const withoutOriginal = mountTable([configured], 2, 0.5)
+      expect(withoutOriginal.findAll('tbody td').slice(0, 4).map(cell => cell.text())).toEqual(paidBefore)
+      expect(withoutOriginal.findAll('tbody td')[4].text()).toBe('$5.00')
+      expect(model.official_pricing!.input_price).toBe(4e-6)
+      withoutOriginal.unmount()
+      wrapper.unmount()
+    }
+  )
+
+  it.each([
+    ['gemini-2.5-pro', 'gemini', true], ['deepseek-chat', 'deepseek', true],
+    ['claude-unlisted-private-model', 'anthropic', false], ['gpt-unlisted', 'openai', false]
+  ] as const)('%s 官方列回退未乘倍率的渠道价，包含所有缓存字段', (name, platform, hasCatalog) => {
+    const model = tokenModel({ name, platform })
+    Object.assign(model.pricing!, {
+      input_price: 5e-6, output_price: 21e-6, cache_read_price: 1e-6,
+      cache_write_price: 6e-6, cache_write_1h_price: 12e-6
+    })
+    if (!hasCatalog) model.official_pricing = null
+    const originalModel = structuredClone(model)
+    const wrapper = mountTable([model], 2, 0.5)
+    const cells = wrapper.findAll('tbody td')
+    expect(cells[1].text()).toBe('$2.50')
+    expect(cells[2].text()).toBe('$10.50')
+    expect(cells[3].text()).toContain('$0.50')
+    expect(cells[3].text()).toContain('$3.00')
+    expect(cells[3].text()).toContain('$6.00')
+    expect(cells[4].text()).toBe('$5.00')
+    expect(cells[5].text()).toBe('$21.00')
+    expect(cells[6].text()).toContain('$1.00')
+    expect(cells[6].text()).toContain('$6.00')
+    expect(cells[6].text()).toContain('$12.00')
+    expect(model).toEqual(originalModel)
+    wrapper.unmount()
+  })
+
+  it('渠道参考阶梯解析倍率后展示原值，不使用目录阶梯或实付倍率', () => {
+    const model = tokenModel({ name: 'gemini-2.5-pro', platform: 'gemini' })
+    model.pricing!.intervals = [{
+      min_tokens: 0, max_tokens: null, tier_label: '渠道档位',
+      input_price: null, output_price: null, cache_read_price: null, cache_write_price: null,
+      input_multiplier: 2, output_multiplier: 3, cache_read_multiplier: 2, cache_write_multiplier: 2,
+      per_request_price: null
+    }]
+    const wrapper = mountTable([model], 0.5)
+    const cells = wrapper.findAll('tbody td')
+    expect(cells[1].text()).toContain('$3.00')
+    expect(cells[2].text()).toContain('$22.50')
+    expect(cells[4].text()).toContain('渠道档位')
+    expect(cells[4].text()).toContain('$6.00')
+    expect(cells[5].text()).toContain('$45.00')
+    expect(cells[6].text()).toContain('$7.50')
+    expect(cells[6].text()).toContain('$0.60')
+    expect(model.pricing!.intervals[0].input_price).toBeNull()
+    wrapper.unmount()
   })
 
   it('仅配置区间倍率时按基础价格展示 input/output/cache 各档价格', () => {
@@ -652,6 +738,26 @@ describe('PlazaModelPricingTable 长上下文阶梯', () => {
     })
     const rows = mountTable([model], 1).findAll('tbody td')[1].findAll('.leading-5')
     expect(rows.map((r) => r.text().split(/\s+/)[0])).toEqual(['≤100K', '≤200K', '≤1M', '>1M'])
+  })
+
+  it('Claude/GPT 官方阶梯与渠道实付阶梯各自独立，保留配置档位', () => {
+    const model = ladderModel()
+    model.pricing!.input_price = 9e-6
+    model.pricing!.intervals = [{
+      ...ladderIntervals()[0], max_tokens: 100000, tier_label: '渠道档位', input_price: 9e-6
+    }]
+    const wrapper = mountTable([model], 0.5)
+    const cells = wrapper.findAll('tbody td')
+    expect(cells[1].text()).toContain('渠道档位')
+    expect(cells[1].text()).toContain('$4.50')
+    expect(cells[1].findAll('.leading-5')).toHaveLength(1)
+    expect(cells[1].text()).not.toContain('272K')
+    expect(cells[4].text()).toContain('≤272K')
+    expect(cells[4].text()).toContain('>272K')
+    expect(cells[4].text()).toContain('$5.00')
+    expect(cells[4].text()).toContain('$10.00')
+    expect(model.pricing!.intervals[0].tier_label).toBe('渠道档位')
+    wrapper.unmount()
   })
 
   it('官方无 intervals 字段(旧响应)时官方列保持平价,实付无阶梯时缓存列保持两行', () => {

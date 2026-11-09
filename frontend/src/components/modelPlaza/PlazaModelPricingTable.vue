@@ -309,6 +309,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
+import { modelPlazaDisplayModel } from '@/utils/modelPlazaPricing'
 import { platformAccentColor, platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
 import {
   BILLING_MODE_TOKEN,
@@ -377,7 +378,7 @@ const sortedModels = computed(() => {
     if (pa != null && pb == null) return -1
     if (pa == null && pb != null) return 1
     return b.name.localeCompare(a.name)
-  })
+  }).map(modelPlazaDisplayModel)
 })
 
 const effectiveRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
@@ -422,7 +423,7 @@ function periodRate(period: PlazaTimePricingPeriod): number {
   return Math.round(effectiveRate.value * period.multiplier * 1000) / 1000
 }
 
-/** 实付价 = 渠道单价 × 生效倍率(时段行再乘时段倍率),按 $/1M token 展示。 */
+/** 实付价 = 渠道/分组基价 × 生效倍率(时段行再乘时段倍率)，按 $/1M token 展示。 */
 function paidPerMillion(value: number | null | undefined, period: PlazaTimePricingPeriod | null = null): string {
   if (value == null) return '-'
   const rate = period ? periodRate(period) : effectiveRate.value
@@ -511,7 +512,7 @@ function tokenIntervals(m: PlazaModel): UserPricingInterval[] {
   return sortByContext(m.pricing?.intervals ?? []).map(iv => resolveIntervalPrices(iv, m.pricing!))
 }
 
-/** 官方阶梯(后端按目录规则合成,不受分组开关影响)。 */
+/** 参考阶梯取已选原价或渠道价，不乘倍率，也不改写实付阶梯。 */
 function officialIntervals(m: PlazaModel): UserPricingInterval[] {
   return sortByContext(m.official_pricing?.intervals ?? [])
 }

@@ -605,3 +605,78 @@ func TestListGroups_TimePricingPassthrough(t *testing.T) {
 	// 展示单价为标准时段价
 	require.InDelta(t, 0.28e-6, *m.Pricing.InputPrice, 1e-15)
 }
+
+func TestPlazaOriginalPricingIgnoresChannelAndGroupOverrides(t *testing.T) {
+	// Synthetic catalog values make the display/charge separation explicit.
+	catalog := newStubPricingServiceFromMap(map[string]*LiteLLMModelPricing{
+		"gpt-5.4": {Mode: "chat", InputCostPerToken: 4e-6, OutputCostPerToken: 20e-6,
+			CacheReadInputTokenCost: 0.4e-6, CacheCreationInputTokenCost: 5e-6, CacheCreationInputTokenCostAbove1hr: 8e-6},
+		"claude-sonnet-4": {Mode: "chat", InputCostPerToken: 4e-6, OutputCostPerToken: 20e-6,
+			CacheReadInputTokenCost: 0.4e-6, CacheCreationInputTokenCost: 5e-6, CacheCreationInputTokenCostAbove1hr: 8e-6},
+	})
+	for _, tc := range []struct{ model, platform string }{
+		{"gpt-5.4", PlatformOpenAI},
+		{"claude-sonnet-4", PlatformAnthropic},
+	} {
+		t.Run(tc.model, func(t *testing.T) {
+			channel := plazaPricedChannel(1, "channel", []int64{10}, tc.platform, tc.model)
+			channel.ModelPricing[0].InputPrice = testPtrFloat64(5e-6)
+			channel.ModelPricing[0].OutputPrice = testPtrFloat64(20e-6)
+			channel.ModelPricing[0].CacheReadPrice = testPtrFloat64(1e-6)
+			channel.ModelPricing[0].CacheWritePrice = testPtrFloat64(6e-6)
+			channel.ModelPricing[0].CacheWrite1hPrice = testPtrFloat64(12e-6)
+			group := Group{ID: 10, Platform: tc.platform, RateMultiplier: 0.1,
+				ModelPricing: []ChannelModelPricing{{Models: []string{tc.model}, BillingMode: BillingModeToken,
+					InputPrice: testPtrFloat64(7e-6), OutputPrice: testPtrFloat64(21e-6)}}}
+			svc := newPlazaServiceWithBilling([]Channel{channel}, []Group{group}, map[int64]string{10: tc.platform}, catalog)
+			result, err := svc.ListGroups(context.Background())
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			model := result[0].Models[0]
+			require.NotNil(t, model.OfficialPricing)
+			require.InDelta(t, 4e-6, *model.OfficialPricing.InputPrice, 1e-15)
+			require.InDelta(t, 20e-6, *model.OfficialPricing.OutputPrice, 1e-15)
+			require.InDelta(t, 0.4e-6, *model.OfficialPricing.CacheReadPrice, 1e-15)
+			require.InDelta(t, 5e-6, *model.OfficialPricing.CacheWritePrice, 1e-15)
+			require.InDelta(t, 8e-6, *model.OfficialPricing.CacheWrite1hPrice, 1e-15)
+			require.InDelta(t, 7e-6, *model.Pricing.InputPrice, 1e-15, "实付明细仍遵循分组价卡")
+			require.InDelta(t, 21e-6, *model.Pricing.OutputPrice, 1e-15)
+			require.InDelta(t, 5e-6, *channel.ModelPricing[0].InputPrice, 1e-15, "渠道缓存不可被展示改写")
+		})
+	}
+}
+
+func TestPlazaUnknownFamiliesDoNotAdvertiseGuessedOriginalPricing(t *testing.T) {
+	for _, tc := range []struct{ model, platform string }{
+		{"claude-unlisted-private-model", PlatformAnthropic},
+		{"gpt-99-unlisted", PlatformOpenAI},
+	} {
+		t.Run(tc.model, func(t *testing.T) {
+			channel := plazaPricedChannel(1, "channel", []int64{10}, tc.platform, tc.model)
+			svc := newPlazaServiceWithBilling([]Channel{channel}, []Group{{ID: 10, Platform: tc.platform}}, map[int64]string{10: tc.platform}, nil)
+			result, err := svc.ListGroups(context.Background())
+			require.NoError(t, err)
+			model := result[0].Models[0]
+			require.Nil(t, model.OfficialPricing, "按系列猜出的计费兜底不是已知原价")
+			require.InDelta(t, 3e-6, *model.Pricing.InputPrice, 1e-15)
+		})
+	}
+}
+
+func TestWorkspacePlazaOriginalPricingUsesIdentifiedCatalogAliases(t *testing.T) {
+	catalog := newStubPricingServiceFromMap(map[string]*LiteLLMModelPricing{
+		"gpt-5.4": {Mode: "chat", InputCostPerToken: 4e-6, OutputCostPerToken: 20e-6},
+	})
+	group := Group{ID: 10, Platform: PlatformOpenAI, RateMultiplier: 0.1,
+		ModelPricing: []ChannelModelPricing{{Models: []string{"models/gpt-5.4"}, BillingMode: BillingModeToken,
+			InputPrice: testPtrFloat64(5e-6), OutputPrice: testPtrFloat64(20e-6)}}}
+	svc := newPlazaServiceWithBilling(nil, []Group{group}, nil, catalog)
+	result, err := svc.ListWorkspaceGroups(context.Background(), func(context.Context, *Group) []string {
+		return []string{"models/gpt-5.4"}
+	})
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	model := result[0].Models[0]
+	require.InDelta(t, 4e-6, *model.OfficialPricing.InputPrice, 1e-15)
+	require.InDelta(t, 5e-6, *model.Pricing.InputPrice, 1e-15)
+}

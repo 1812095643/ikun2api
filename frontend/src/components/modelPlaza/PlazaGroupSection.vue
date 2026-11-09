@@ -82,6 +82,7 @@ import PlazaModelPricingTable from './PlazaModelPricingTable.vue'
 import type { ModelPlazaGroup } from '@/api/modelPlaza'
 import type { GroupPlatform, SubscriptionType } from '@/types'
 import { platformBorderStrongClass } from '@/utils/platformColors'
+import { modelPlazaReferencePricing } from '@/utils/modelPlazaPricing'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { useAppStore } from '@/stores/app'
 
@@ -116,7 +117,7 @@ const peakNote = computed(() => {
 const longContextNote = computed(() => {
   if (props.group.long_context_pricing_enabled !== false) return ''
   const hasOfficialLadder = props.group.models.some(
-    (m) => (m.official_pricing?.intervals?.length ?? 0) > 1
+    (m) => (modelPlazaReferencePricing(m)?.intervals?.length ?? 0) > 1
   )
   return hasOfficialLadder ? t('modelPlaza.detail.longContextDisabledNote') : ''
 })
