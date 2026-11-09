@@ -85,7 +85,7 @@ func (h *Handler) drawLottery(ctx context.Context, id int64) (bool, error) {
 		return false, err
 	}
 	start, end := lotteryDateBounds(a.Spec)
-	rows, err = tx.QueryContext(ctx, lotteryEvidenceSQL+` AND u.id >= $1 AND EXISTS(SELECT 1 FROM workspace_lottery_entries e WHERE e.lottery_id=$4 AND e.user_id=u.id)`, int64(1), start, end, id)
+	rows, err = tx.QueryContext(ctx, lotteryEvidenceQuery(a.Spec, lotteryEvidenceEntrants), int64(1), start, end, id)
 	if err != nil {
 		return false, err
 	}

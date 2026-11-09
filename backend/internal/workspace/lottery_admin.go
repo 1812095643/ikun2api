@@ -38,7 +38,13 @@ func (h *Handler) previewLottery(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	count, samples, err := h.lotteryPreview(c.Request.Context(), s)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+	count, samples, err := h.lotteryPreview(ctx, s)
+	if ctx.Err() == context.DeadlineExceeded {
+		fail(c, &requestError{504, "人数核验超时，请稍后重试。"})
+		return
+	}
 	if err != nil {
 		fail(c, err)
 		return

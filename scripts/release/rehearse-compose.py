@@ -43,6 +43,13 @@ def main():
             dbport=json.loads(run(['docker','inspect',postgres]))[0]['NetworkSettings']['Ports']['5432/tcp'][0]['HostPort']
             fixtureenv={**os.environ,'IKUN_UPGRADE_TEST_DSN':f'host=127.0.0.1 port={dbport} user=fixture password={password} dbname=fixture sslmode=disable','IKUN_UPGRADE_TEST_MIGRATIONS':str(sqlroot),'IKUN_UPGRADE_TEST_BASELINE_ONLY':'1'}
             result=run(['go','test','-tags','unit','./internal/repository','-run','^TestUpgradeOfficialSnapshotsPreserveData$','-count=1','-v'],cwd=ROOT/'backend',env=fixtureenv);assert 'OFFICIAL_BASELINE_READY' in result
+            # Compare the optimized lottery query and mixed-snapshot draw in a
+            # separate disposable database, never the rehearsal's user records.
+            run(['docker','exec',postgres,'psql','-X','-U','fixture','-d','fixture','-v','ON_ERROR_STOP=1','-c','CREATE DATABASE lottery_fixture OWNER fixture'])
+            lotteryenv={**os.environ,'IKUN_LOTTERY_TEST_DSN':f'host=127.0.0.1 port={dbport} user=fixture password={password} dbname=lottery_fixture sslmode=disable'}
+            lottery_result=run(['go','test','./internal/workspace','-run','^TestLotteryEvidencePostgres','-count=1','-v'],cwd=ROOT/'backend',env=lotteryenv)
+            assert '--- PASS: TestLotteryEvidencePostgresMatchesExistingRules' in lottery_result
+
             # Snapshot the exact original schema/data before it is opened by either server.
             def sql(q):return run(['docker','exec',postgres,'psql','-X','-U','fixture','-d','fixture','-Atqc',q])
             def fingerprint():return {name:sql(query) for name,query in {

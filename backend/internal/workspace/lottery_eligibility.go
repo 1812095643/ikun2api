@@ -9,20 +9,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// 充值按已入账余额统计：支付订单与其兑换流水去重，赠送、奖金和来源不明的旧流水均不计入。
-const lotteryEvidenceSQL = `SELECT u.id,u.balance::text,u.created_at,
-COALESCE((SELECT SUM(actual_cost) FROM usage_logs WHERE user_id=u.id AND created_at >= $2 AND created_at < $3),0)::text,
-COALESCE((SELECT SUM(actual_cost) FROM usage_logs WHERE user_id=u.id),0)::text,
-(COALESCE((SELECT SUM(value) FROM redeem_codes r WHERE r.used_by=u.id AND r.status='used' AND r.value>0
- AND r.type IN ('balance','admin_balance') AND r.credit_source IN ('manual','redeem') AND r.used_at >= $2 AND r.used_at < $3
- AND NOT EXISTS(SELECT 1 FROM payment_orders po WHERE po.recharge_code=r.code)),0)
- + COALESCE((SELECT SUM(amount) FROM payment_orders WHERE user_id=u.id AND order_type='balance' AND status='COMPLETED' AND paid_at >= $2 AND paid_at < $3),0))::text,
-(COALESCE((SELECT SUM(value) FROM redeem_codes r WHERE r.used_by=u.id AND r.status='used' AND r.value>0
- AND r.type IN ('balance','admin_balance') AND r.credit_source IN ('manual','redeem')
- AND NOT EXISTS(SELECT 1 FROM payment_orders po WHERE po.recharge_code=r.code)),0)
- + COALESCE((SELECT SUM(amount) FROM payment_orders WHERE user_id=u.id AND order_type='balance' AND status='COMPLETED'),0))::text
-FROM users u WHERE u.deleted_at IS NULL AND u.status='active'`
-
 func lotteryDateBounds(s lotterySpec) (time.Time, time.Time) {
 	start, _ := time.ParseInLocation("2006-01-02", s.BusinessDate, lotteryLocation)
 	return start, start.AddDate(0, 0, 1)
@@ -73,7 +59,7 @@ func lotteryMatches(s lotterySpec, e lotteryEvidence) bool {
 }
 func (h *Handler) lotteryEligibility(ctx context.Context, db lotteryDB, s lotterySpec, userID int64) (lotteryEvidence, bool, error) {
 	start, end := lotteryDateBounds(s)
-	e, err := scanLotteryEvidence(db.QueryRowContext(ctx, lotteryEvidenceSQL+" AND u.id=$1", userID, start, end), s)
+	e, err := scanLotteryEvidence(db.QueryRowContext(ctx, lotteryEvidenceQuery(s, lotteryEvidenceUser), userID, start, end), s)
 	if err != nil {
 		return e, false, err
 	}
@@ -82,7 +68,7 @@ func (h *Handler) lotteryEligibility(ctx context.Context, db lotteryDB, s lotter
 
 func (h *Handler) lotteryPreview(ctx context.Context, s lotterySpec) (int, []map[string]any, error) {
 	start, end := lotteryDateBounds(s)
-	rows, err := h.db.QueryContext(ctx, lotteryEvidenceSQL+" AND u.id >= $1 ORDER BY u.id LIMIT 100001", int64(1), start, end)
+	rows, err := h.db.QueryContext(ctx, lotteryEvidenceQuery(s, lotteryEvidencePreview), int64(1), start, end)
 	if err != nil {
 		return 0, nil, err
 	}
