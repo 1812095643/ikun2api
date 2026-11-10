@@ -825,3 +825,32 @@ func TestGatewayServiceRecordUsage_FastSpeedHonouredKeepsPremium(t *testing.T) {
 	require.NoError(t, err)
 	require.InDelta(t, fastCost.TotalCost, usageRepo.lastLog.TotalCost, 1e-10)
 }
+
+func TestGatewayServiceRecordUsage_PersistsGatewayTiming(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	svc := newGatewayRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{})
+	upstreamTTFT := 1800
+
+	err := svc.RecordUsage(context.Background(), &RecordUsageInput{
+		Result: &ForwardResult{
+			RequestID:    "gateway_timing",
+			Usage:        ClaudeUsage{InputTokens: 10, OutputTokens: 6},
+			Model:        "claude-sonnet-4",
+			Stream:       true,
+			Duration:     4 * time.Second,
+			FirstTokenMs: &upstreamTTFT,
+		},
+		APIKey:        &APIKey{ID: 502, Quota: 100},
+		User:          &User{ID: 602},
+		Account:       &Account{ID: 702},
+		APIKeyService: &openAIRecordUsageAPIKeyQuotaStub{},
+		Timing:        &GatewayRequestTiming{SlotWait: 2 * time.Second, PreForward: 2500 * time.Millisecond, SwitchCount: 1},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, 2000, *usageRepo.lastLog.GatewayWaitMs)
+	require.Equal(t, 2500, *usageRepo.lastLog.PreForwardMs)
+	require.Equal(t, 1, *usageRepo.lastLog.AccountSwitchCount)
+	require.Equal(t, 4300, *usageRepo.lastLog.ClientFirstTokenMs)
+}
