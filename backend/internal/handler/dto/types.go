@@ -659,6 +659,11 @@ type UsageLog struct {
 	NativeCompactionV2 bool `json:"native_compaction_v2"`
 	DurationMs         *int `json:"duration_ms"`
 	FirstTokenMs       *int `json:"first_token_ms"`
+	// 网关侧耗时：first_token_ms 只从最后一次转发上游开始计时，client_first_token_ms 才是用户实际等到首字的时间。
+	GatewayWaitMs      *int `json:"gateway_wait_ms"`
+	PreForwardMs       *int `json:"pre_forward_ms"`
+	AccountSwitchCount *int `json:"account_switch_count"`
+	ClientFirstTokenMs *int `json:"client_first_token_ms"`
 
 	// 图片生成字段
 	ImageCount         int            `json:"image_count"`

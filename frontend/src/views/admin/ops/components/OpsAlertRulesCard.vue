@@ -145,6 +145,24 @@ const metricDefinitions = computed(() => {
       unit: '%'
     },
     {
+      type: 'ttft_p90_ms',
+      group: 'system',
+      label: t('admin.ops.alertRules.metrics.ttftP90'),
+      description: t('admin.ops.alertRules.metricDescriptions.ttftP90'),
+      recommendedOperator: '>',
+      recommendedThreshold: 15000,
+      unit: 'ms'
+    },
+    {
+      type: 'ttft_p95_ms',
+      group: 'system',
+      label: t('admin.ops.alertRules.metrics.ttftP95'),
+      description: t('admin.ops.alertRules.metricDescriptions.ttftP95'),
+      recommendedOperator: '>',
+      recommendedThreshold: 20000,
+      unit: 'ms'
+    },
+    {
       type: 'cpu_usage_percent',
       group: 'system',
       label: t('admin.ops.alertRules.metrics.cpu'),

@@ -695,17 +695,26 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			if err == nil && canWait {
 				accountWaitCounted = true
 			}
+			waitAccountID := account.ID
 			defer func() {
 				if accountWaitCounted {
-					geminiConcurrency.DecrementAccountWaitCount(c.Request.Context(), account.ID)
+					geminiConcurrency.DecrementAccountWaitCount(c.Request.Context(), waitAccountID)
 				}
 			}()
 
-			accountReleaseFunc, err = geminiConcurrency.AcquireAccountSlotWithWaitTimeout(
+			waitPlan := selection.WaitPlan
+			if cachedContentBinding != nil && len(waitPlan.Alternates) > 0 {
+				// 显式缓存只存在于绑定账号上，不能改用其他账号。
+				pinned := *waitPlan
+				pinned.Alternates = nil
+				waitPlan = &pinned
+			}
+			var waitedAccount *service.Account
+			waitedAccount, accountReleaseFunc, err = geminiConcurrency.AcquireSlotFromWaitPlan(
 				c,
-				account.ID,
-				selection.WaitPlan.MaxConcurrency,
-				selection.WaitPlan.Timeout,
+				account,
+				waitPlan,
+				h.gatewayService.HydrateWaitAlternate,
 				stream,
 				&streamStarted,
 			)
@@ -715,8 +724,14 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				return
 			}
 			if accountWaitCounted {
-				geminiConcurrency.DecrementAccountWaitCount(c.Request.Context(), account.ID)
+				geminiConcurrency.DecrementAccountWaitCount(c.Request.Context(), waitAccountID)
 				accountWaitCounted = false
+			}
+			account = switchToWaitedAccount(c, reqLog, selection, account, waitedAccount)
+			if sessionBoundAccountID > 0 && sessionBoundAccountID != account.ID {
+				// 等待期间改用了替换账号：thoughtSignature 与上游账号强相关，与上面的切换检测同样清理。
+				body = service.CleanGeminiNativeThoughtSignatures(body)
+				sessionBoundAccountID = account.ID
 			}
 		}
 		// 终检与准入后绑定使用选号结果携带的门（见 responses 同名注释）。

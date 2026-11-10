@@ -1480,6 +1480,8 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			return rateOrder.compare(candidates[i], candidates[j]) < 0
 		})
 	}
+	// 按实时排队压力稳定重排（见 gateway_fallback_queue.go），避免整波溢出请求排到同一个账号。
+	sortByQueuePressure(candidates, func(acc *Account) *Account { return acc }, freshQueuePressure(ctx, s.concurrencyService, candidates))
 	if requireCompact {
 		candidates = prioritizeOpenAICompactAccounts(candidates)
 	}

@@ -500,8 +500,16 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					}
 				}
 
-				// 5. 所有路由账号槽位满，尝试返回等待计划（选择负载最低的）
-				// 遍历找到第一个满足会话限制的账号
+				// 5. 所有路由账号槽位满，尝试返回等待计划（选择排队压力最低的）
+				// 上面的负载率来自短 TTL 缓存，这里按实时排队压力重排后再找第一个满足会话限制的账号
+				routedAccounts := make([]*Account, 0, len(routingAvailable))
+				for _, item := range routingAvailable {
+					routedAccounts = append(routedAccounts, item.account)
+				}
+				sortByQueuePressure(routingAvailable, func(item accountWithLoad) *Account { return item.account }, s.freshQueuePressure(ctx, routedAccounts))
+				for i := range routingAvailable {
+					routedAccounts[i] = routingAvailable[i].account
+				}
 				for _, item := range routingAvailable {
 					if !s.checkAndRegisterSession(ctx, item.account, sessionHash) {
 						continue // 会话限制已满，尝试下一个
@@ -514,6 +522,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 						MaxConcurrency: item.account.Concurrency,
 						Timeout:        cfg.StickySessionWaitTimeout,
 						MaxWaiting:     cfg.StickySessionMaxWaiting,
+						Alternates:     s.fallbackWaitAlternates(cfg, item.account.ID, routedAccounts, sessionHash),
 					})
 				}
 				// 所有路由账号会话限制都已满，继续到 Layer 2 回退
@@ -608,12 +617,17 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 								"session", shortSessionHash(sessionHash),
 								"result", "wait_plan",
 							)
-							return s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
+							plan := &AccountWaitPlan{
 								AccountID:      accountID,
 								MaxConcurrency: account.Concurrency,
 								Timeout:        cfg.StickySessionWaitTimeout,
 								MaxWaiting:     cfg.StickySessionMaxWaiting,
+							}
+							s.attachStickyWaitAlternates(ctx, cfg, plan, sessionHash, func() []*Account {
+								others, _ := s.filterLoadAwareCandidates(ctx, accounts, func(id int64) bool { return id == accountID || isExcluded(id) }, isChannelRestricted, platform, useMixed, requestedModel)
+								return others
 							})
+							return s.newSelectionResult(ctx, account, false, nil, plan)
 						}
 					}
 				} else if !clearSticky {
@@ -652,49 +666,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		"reason", "sticky_not_used_falling_back_to_load_balance",
 		"total_accounts", len(accounts),
 	)
-	candidates := make([]*Account, 0, len(accounts))
-	channelRestrictedCount := 0
-	for i := range accounts {
-		acc := &accounts[i]
-		if isExcluded(acc.ID) {
-			continue
-		}
-		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
-		// re-check schedulability here so recently rate-limited/overloaded accounts
-		// are not selected again before the bucket is rebuilt.
-		if !s.isAccountSchedulableForSelection(acc) {
-			continue
-		}
-		if !s.isGatewayAccountProfitEligible(ctx, acc) {
-			continue
-		}
-		if !s.isAccountAllowedForPlatform(acc, platform, useMixed) {
-			continue
-		}
-		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
-			continue
-		}
-		if isChannelRestricted(acc) {
-			channelRestrictedCount++
-			continue
-		}
-		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
-			continue
-		}
-		// 配额检查
-		if !s.isAccountSchedulableForQuota(acc) {
-			continue
-		}
-		// 窗口费用检查（非粘性会话路径）
-		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
-			continue
-		}
-		// RPM 检查（非粘性会话路径）
-		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
-			continue
-		}
-		candidates = append(candidates, acc)
-	}
+	candidates, channelRestrictedCount := s.filterLoadAwareCandidates(ctx, accounts, isExcluded, isChannelRestricted, platform, useMixed, requestedModel)
 
 	if len(candidates) == 0 {
 		if channelRestrictedCount > 0 {
@@ -782,6 +754,8 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	// ============ Layer 3: 兜底排队 ============
 	s.sortCandidatesForFallback(candidates, preferOAuth, cfg.FallbackSelectionMode)
 	weeklyOrder.sortAccounts(candidates)
+	// 上面的顺序只作为同压力时的先后；按实时排队压力重排，避免整波溢出请求排到同一个账号。
+	sortByQueuePressure(candidates, func(acc *Account) *Account { return acc }, s.freshQueuePressure(ctx, candidates))
 	for _, acc := range candidates {
 		// 会话数量限制检查（等待计划也需要占用会话配额）
 		if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
@@ -792,6 +766,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			MaxConcurrency: acc.Concurrency,
 			Timeout:        cfg.FallbackWaitTimeout,
 			MaxWaiting:     cfg.FallbackMaxWaiting,
+			Alternates:     s.fallbackWaitAlternates(cfg, acc.ID, candidates, sessionHash),
 		})
 	}
 	return nil, ErrNoAvailableAccounts
@@ -829,12 +804,17 @@ func (s *GatewayService) schedulingConfig() config.GatewaySchedulingConfig {
 		return s.cfg.Gateway.Scheduling
 	}
 	return config.GatewaySchedulingConfig{
-		StickySessionMaxWaiting:  3,
-		StickySessionWaitTimeout: 45 * time.Second,
-		FallbackWaitTimeout:      30 * time.Second,
-		FallbackMaxWaiting:       100,
-		LoadBatchEnabled:         true,
-		SlotCleanupInterval:      30 * time.Second,
+		StickySessionMaxWaiting:    3,
+		StickySessionWaitTimeout:   45 * time.Second,
+		FallbackWaitTimeout:        30 * time.Second,
+		FallbackMaxWaiting:         100,
+		FallbackWaitAnyAccount:     true,
+		StickyCacheGrace:           2 * time.Second,
+		StickyCacheGraceLarge:      5 * time.Second,
+		StickyCacheGraceMinBytes:   200_000,
+		StickyCacheGraceLargeBytes: 800_000,
+		LoadBatchEnabled:           true,
+		SlotCleanupInterval:        30 * time.Second,
 	}
 }
 
@@ -1193,6 +1173,54 @@ func (s *GatewayService) isAccountInGroup(account *Account, groupID *int64) bool
 		}
 	}
 	return false
+}
+
+// filterLoadAwareCandidates 返回负载感知选择（Layer 2）可用的候选账号，以及因渠道定价限制被排除的数量。
+func (s *GatewayService) filterLoadAwareCandidates(ctx context.Context, accounts []Account, isExcluded func(int64) bool, isChannelRestricted func(*Account) bool, platform string, useMixed bool, requestedModel string) ([]*Account, int) {
+	candidates := make([]*Account, 0, len(accounts))
+	channelRestrictedCount := 0
+	for i := range accounts {
+		acc := &accounts[i]
+		if isExcluded(acc.ID) {
+			continue
+		}
+		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
+		// re-check schedulability here so recently rate-limited/overloaded accounts
+		// are not selected again before the bucket is rebuilt.
+		if !s.isAccountSchedulableForSelection(acc) {
+			continue
+		}
+		if !s.isGatewayAccountProfitEligible(ctx, acc) {
+			continue
+		}
+		if !s.isAccountAllowedForPlatform(acc, platform, useMixed) {
+			continue
+		}
+		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
+			continue
+		}
+		if isChannelRestricted(acc) {
+			channelRestrictedCount++
+			continue
+		}
+		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
+			continue
+		}
+		// 配额检查
+		if !s.isAccountSchedulableForQuota(acc) {
+			continue
+		}
+		// 窗口费用检查（非粘性会话路径）
+		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
+			continue
+		}
+		// RPM 检查（非粘性会话路径）
+		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
+			continue
+		}
+		candidates = append(candidates, acc)
+	}
+	return candidates, channelRestrictedCount
 }
 
 func (s *GatewayService) tryAcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int) (*AcquireResult, error) {

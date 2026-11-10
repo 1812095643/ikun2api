@@ -1585,6 +1585,16 @@ type GatewaySchedulingConfig struct {
 
 	// 兜底层账户选择策略: "last_used"(按最后使用时间排序，默认) 或 "random"(随机)
 	FallbackSelectionMode string `mapstructure:"fallback_selection_mode"`
+	// FallbackWaitAnyAccount 开启后，兜底排队的等待计划会携带同批候选账号，
+	// 等待中的请求可抢占任一先空出的槽位，而不是只盯着被分配的那一个账号。
+	FallbackWaitAnyAccount bool `mapstructure:"fallback_wait_any_account"`
+	// 粘性会话缓存感知等待：粘性账号忙时先只等原账号一个宽限期，过后才改用其他空出的账号
+	// （换号会丢失上游提示词缓存）。请求体小于 StickyCacheGraceMinBytes 时不等，
+	// 不小于 StickyCacheGraceLargeBytes 时等 StickyCacheGraceLarge。
+	StickyCacheGrace           time.Duration `mapstructure:"sticky_cache_grace"`
+	StickyCacheGraceLarge      time.Duration `mapstructure:"sticky_cache_grace_large"`
+	StickyCacheGraceMinBytes   int           `mapstructure:"sticky_cache_grace_min_bytes"`
+	StickyCacheGraceLargeBytes int           `mapstructure:"sticky_cache_grace_large_bytes"`
 
 	// PreferSoonestReset 开启后，负载感知选择会优先选用「会话窗口最早重置」的账号
 	// （use-it-or-lose-it：先用尽即将重置的账号，保留重置时间还很久的账号）。
@@ -2664,6 +2674,11 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.fallback_wait_timeout", 30*time.Second)
 	viper.SetDefault("gateway.scheduling.fallback_max_waiting", 100)
 	viper.SetDefault("gateway.scheduling.fallback_selection_mode", "last_used")
+	viper.SetDefault("gateway.scheduling.fallback_wait_any_account", true)
+	viper.SetDefault("gateway.scheduling.sticky_cache_grace", 2*time.Second)
+	viper.SetDefault("gateway.scheduling.sticky_cache_grace_large", 5*time.Second)
+	viper.SetDefault("gateway.scheduling.sticky_cache_grace_min_bytes", 200_000)
+	viper.SetDefault("gateway.scheduling.sticky_cache_grace_large_bytes", 800_000)
 	viper.SetDefault("gateway.scheduling.prefer_soonest_reset", false)
 	viper.SetDefault("gateway.scheduling.load_batch_enabled", true)
 	viper.SetDefault("gateway.scheduling.load_batch_cache_ttl_ms", 200)

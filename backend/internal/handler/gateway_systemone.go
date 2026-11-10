@@ -175,12 +175,14 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 				h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts")
 				return
 			}
-			accountRelease, err = h.concurrencyHelper.AcquireAccountSlotWithWaitTimeout(c, account.ID, selection.WaitPlan.MaxConcurrency, selection.WaitPlan.Timeout, false, &streamStarted)
+			var waitedAccount *service.Account
+			waitedAccount, accountRelease, err = h.concurrencyHelper.WaitForPlannedAccountSlot(c, account, selection.WaitPlan, h.gatewayService.HydrateWaitAlternate, false, &streamStarted)
 			if err != nil {
 				reqLog.Warn("systemone.account_slot_acquire_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				h.handleConcurrencyError(c, err, "account", false)
 				return
 			}
+			account = switchToWaitedAccount(c, reqLog, selection, account, waitedAccount)
 		}
 		// 准入终检：与其他网关入口一致，利润控制否决的账号不得承接本次请求。
 		admissionCtx := service.ContextWithSelectionProfitGate(c.Request.Context(), selection)

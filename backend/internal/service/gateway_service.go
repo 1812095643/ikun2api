@@ -626,6 +626,12 @@ type AccountWaitPlan struct {
 	MaxConcurrency int
 	Timeout        time.Duration
 	MaxWaiting     int
+	// Alternates 是同批可替换的候选账号（按排队压力排序，未经 hydrate）。
+	// 等待期间任一账号先空出槽位即可改用它；为空时只等 AccountID。
+	Alternates []*Account
+	// AlternatesAfter 是只等 AccountID 的宽限期，过后才允许改用 Alternates。
+	// 用于粘性会话：换号会丢掉上游提示词缓存，长上下文时短暂等待原账号更划算。
+	AlternatesAfter time.Duration
 }
 
 type AccountSelectionResult struct {

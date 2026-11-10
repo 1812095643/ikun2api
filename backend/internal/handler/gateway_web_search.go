@@ -315,11 +315,11 @@ func (h *GatewayHandler) acquireWebSearchAccountSlot(
 		}
 	}
 	streamStarted := false
-	slotRelease, err := h.concurrencyHelper.AcquireAccountSlotWithWaitTimeout(
+	waitedAccount, slotRelease, err := h.concurrencyHelper.AcquireSlotFromWaitPlan(
 		c,
-		account.ID,
-		selected.WaitPlan.MaxConcurrency,
-		selected.WaitPlan.Timeout,
+		account,
+		selected.WaitPlan,
+		h.gatewayService.HydrateWaitAlternate,
 		false,
 		&streamStarted,
 	)
@@ -327,6 +327,8 @@ func (h *GatewayHandler) acquireWebSearchAccountSlot(
 	if err != nil {
 		return nil, false, err
 	}
+	// 调用方读取 selected.Account 作为承接账号。
+	switchToWaitedAccount(c, logger.L(), selected, account, waitedAccount)
 	return slotRelease, true, nil
 }
 

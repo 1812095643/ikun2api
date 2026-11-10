@@ -819,12 +819,13 @@ SELECT
   percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE duration_ms IS NOT NULL) AS duration_p99,
   AVG(duration_ms) FILTER (WHERE duration_ms IS NOT NULL) AS duration_avg,
   MAX(duration_ms) AS duration_max,
-  percentile_cont(0.50) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_p50,
-  percentile_cont(0.90) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_p90,
-  percentile_cont(0.95) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_p95,
-  percentile_cont(0.99) WITHIN GROUP (ORDER BY first_token_ms) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_p99,
-  AVG(first_token_ms) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_avg,
-  MAX(first_token_ms) AS ttft_max,
+  -- TTFT 为用户实际首字（含网关排队与换号）；旧记录回退到上游首字
+  percentile_cont(0.50) WITHIN GROUP (ORDER BY COALESCE(ul.client_first_token_ms, ul.first_token_ms)) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_p50,
+  percentile_cont(0.90) WITHIN GROUP (ORDER BY COALESCE(ul.client_first_token_ms, ul.first_token_ms)) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_p90,
+  percentile_cont(0.95) WITHIN GROUP (ORDER BY COALESCE(ul.client_first_token_ms, ul.first_token_ms)) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_p95,
+  percentile_cont(0.99) WITHIN GROUP (ORDER BY COALESCE(ul.client_first_token_ms, ul.first_token_ms)) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_p99,
+  AVG(COALESCE(ul.client_first_token_ms, ul.first_token_ms)) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_avg,
+  MAX(COALESCE(ul.client_first_token_ms, ul.first_token_ms)) AS ttft_max,
   COUNT(first_token_ms) AS ttft_sample_count
 FROM usage_logs ul
 ` + join + `

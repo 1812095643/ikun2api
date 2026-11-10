@@ -442,6 +442,8 @@ export default {
     duration: 'Duration',
     latency: 'Latency',
     latencyFirstToken: 'First',
+    latencyQueue: 'Queue',
+    latencyBreakdownHint: 'Client first token {client}: before forwarding {preForward} (queue {wait}, {switches} account switches) + upstream first token {upstream}',
     latencyDuration: 'Total',
     outputRateMode: 'tok/s basis',
     outputRateGeneration: 'Exclude first-token wait',

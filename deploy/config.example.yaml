@@ -618,6 +618,17 @@ gateway:
     # Fallback max waiting queue size
     # 兜底最大排队长度
     fallback_max_waiting: 100
+    # Let a fallback-queued request take whichever candidate account frees a slot first
+    # 兜底排队的请求可改用同批任一先空出槽位的候选账号（false 则只等被分配的账号）
+    fallback_wait_any_account: true
+    # Sticky sessions: when the bound account is busy, wait only for it for a grace period
+    # before taking another free account (switching drops the upstream prompt cache).
+    # 粘性会话缓存感知等待：绑定账号忙时先只等它一个宽限期，再改用其他空出的账号
+    # （换号会丢失上游提示词缓存）。请求体 < min_bytes 不等；>= large_bytes 等 grace_large。
+    sticky_cache_grace: 2s
+    sticky_cache_grace_large: 5s
+    sticky_cache_grace_min_bytes: 200000
+    sticky_cache_grace_large_bytes: 800000
     # Prefer the account whose session window resets soonest (use-it-or-lose-it).
     # 负载感知选择时优先用尽「会话窗口最早重置」的账号；false 保持
     # 原有「优先级 → 负载率 → LRU」行为（默认）。

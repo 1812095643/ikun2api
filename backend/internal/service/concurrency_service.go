@@ -235,6 +235,8 @@ type ConcurrencyService struct {
 	accountLoadCacheMu  sync.RWMutex
 	accountLoadCache    map[string]cachedAccountLoadBatch
 	accountLoadGroup    singleflight.Group
+
+	waitHub *slotWaitHub
 }
 
 type cachedAccountLoadBatch struct {
@@ -247,6 +249,7 @@ func NewConcurrencyService(cache ConcurrencyCache) *ConcurrencyService {
 	svc := &ConcurrencyService{
 		cache:            cache,
 		accountLoadCache: make(map[string]cachedAccountLoadBatch),
+		waitHub:          newSlotWaitHub(),
 	}
 	svc.SetAccountLoadBatchCacheTTL(defaultAccountLoadBatchCacheTTL)
 	return svc
@@ -365,6 +368,7 @@ func (s *ConcurrencyService) AcquireAccountSlot(ctx context.Context, accountID i
 				if err := s.cache.ReleaseAccountSlot(bgCtx, accountID, requestID); err != nil {
 					logger.LegacyPrintf("service.concurrency", "Warning: failed to release account slot for %d (req=%s): %v", accountID, requestID, err)
 				}
+				s.notifySlotReleased(SlotKindAccount, accountID)
 			},
 		}, nil
 	}
@@ -404,6 +408,7 @@ func (s *ConcurrencyService) AcquireUserSlot(ctx context.Context, userID int64, 
 				if err := s.cache.ReleaseUserSlot(bgCtx, userID, requestID); err != nil {
 					logger.LegacyPrintf("service.concurrency", "Warning: failed to release user slot for %d (req=%s): %v", userID, requestID, err)
 				}
+				s.notifySlotReleased(SlotKindUser, userID)
 			},
 		}, nil
 	}
