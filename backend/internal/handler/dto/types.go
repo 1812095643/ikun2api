@@ -664,6 +664,7 @@ type UsageLog struct {
 	PreForwardMs       *int `json:"pre_forward_ms"`
 	AccountSwitchCount *int `json:"account_switch_count"`
 	ClientFirstTokenMs *int `json:"client_first_token_ms"`
+	UploadMs           *int `json:"upload_ms"`
 
 	// 图片生成字段
 	ImageCount         int            `json:"image_count"`

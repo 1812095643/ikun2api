@@ -46,6 +46,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 
 	// Read request body
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
+	bodyReadDone := time.Now()
 	if err != nil {
 		if handleRequestBodyReadError(c, reqLog, err) {
 			return
@@ -329,7 +330,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			sessionID := service.ExtractClientSessionID(c)
 			stampForwardRequestedReasoningEffort(res, service.RequestedReasoningEffortFromContext(c.Request.Context()))
 			channelUsageFields := clientRequestedUsageFields(c, channelMapping, reqModel, res.UpstreamModel)
-			usageTiming := gatewayRequestTiming(c, requestStart, forwardStart, fs.SwitchCount)
+			usageTiming := gatewayRequestTiming(c, requestStart, bodyReadDone, forwardStart, fs.SwitchCount)
 			h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 				if usageErr := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 					Timing:             usageTiming,

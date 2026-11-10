@@ -17,6 +17,7 @@ const props = defineProps<{
     gateway_wait_ms?: number | null
     pre_forward_ms?: number | null
     account_switch_count?: number | null
+    upload_ms?: number | null
   }
 }>()
 const { t } = useI18n()
@@ -31,12 +32,16 @@ const barClass = computed(() => firstToken.value != null
 // 首字展示用户实际等待（含网关排队与换号）；旧记录没有该字段时回退到上游首字。
 const firstToken = computed(() => props.row.client_first_token_ms ?? props.row.first_token_ms ?? null)
 const QUEUE_HIGHLIGHT_MS = 1000
+// 客户端上传慢会推高首字，但不是网关的问题；单独标出以免误判为排队。
+const UPLOAD_HIGHLIGHT_MS = 3000
 const showQueue = computed(() => (props.row.gateway_wait_ms ?? 0) >= QUEUE_HIGHLIGHT_MS)
+const showUpload = computed(() => (props.row.upload_ms ?? 0) >= UPLOAD_HIGHLIGHT_MS)
 const breakdownHint = computed(() => props.row.client_first_token_ms == null
   ? undefined
   : t('usage.latencyBreakdownHint', {
       client: formatDuration(props.row.client_first_token_ms),
       preForward: formatDuration(props.row.pre_forward_ms),
+      upload: formatDuration(props.row.upload_ms ?? 0),
       wait: formatDuration(props.row.gateway_wait_ms ?? 0),
       switches: props.row.account_switch_count ?? 0,
       upstream: formatDuration(props.row.first_token_ms)
@@ -59,6 +64,10 @@ function formatDuration(ms: number | null | undefined): string {
       <span class="text-gray-400 dark:text-gray-500" :title="breakdownHint">{{ t('usage.latencyFirstToken') }}</span>
       <span v-if="firstToken != null" class="font-medium tabular-nums" :class="LATENCY_TEXT_CLASSES[firstTokenSeverity(firstToken)]" :title="breakdownHint" data-testid="usage-first-token">{{ formatDuration(firstToken) }}</span>
       <span v-else class="text-gray-400 dark:text-gray-500">-</span>
+      <template v-if="showUpload">
+        <span class="text-gray-400 dark:text-gray-500">{{ t('usage.latencyUpload') }}</span>
+        <span class="font-medium tabular-nums text-gray-600 dark:text-gray-300" data-testid="usage-upload">{{ formatDuration(row.upload_ms) }}</span>
+      </template>
       <template v-if="showQueue">
         <span class="text-gray-400 dark:text-gray-500">{{ t('usage.latencyQueue') }}</span>
         <span class="font-medium tabular-nums text-amber-600 dark:text-amber-400" data-testid="usage-gateway-wait">{{ formatDuration(row.gateway_wait_ms) }}</span>

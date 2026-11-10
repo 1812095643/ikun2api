@@ -201,6 +201,7 @@ export interface UserPoolUsage {
   pre_forward_ms?: number | null
   account_switch_count?: number | null
   client_first_token_ms?: number | null
+  upload_ms?: number | null
   stream: boolean
   input_tokens: number
   output_tokens: number

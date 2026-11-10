@@ -1898,6 +1898,7 @@ export interface UsageLog {
   pre_forward_ms?: number | null
   account_switch_count?: number | null
   client_first_token_ms?: number | null
+  upload_ms?: number | null
 
   // 图片生成字段
   image_count: number

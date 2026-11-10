@@ -844,7 +844,7 @@ func TestGatewayServiceRecordUsage_PersistsGatewayTiming(t *testing.T) {
 		User:          &User{ID: 602},
 		Account:       &Account{ID: 702},
 		APIKeyService: &openAIRecordUsageAPIKeyQuotaStub{},
-		Timing:        &GatewayRequestTiming{SlotWait: 2 * time.Second, PreForward: 2500 * time.Millisecond, SwitchCount: 1},
+		Timing:        &GatewayRequestTiming{Upload: 300 * time.Millisecond, SlotWait: 2 * time.Second, PreForward: 2500 * time.Millisecond, SwitchCount: 1},
 	})
 
 	require.NoError(t, err)
@@ -853,4 +853,5 @@ func TestGatewayServiceRecordUsage_PersistsGatewayTiming(t *testing.T) {
 	require.Equal(t, 2500, *usageRepo.lastLog.PreForwardMs)
 	require.Equal(t, 1, *usageRepo.lastLog.AccountSwitchCount)
 	require.Equal(t, 4300, *usageRepo.lastLog.ClientFirstTokenMs)
+	require.Equal(t, 300, *usageRepo.lastLog.UploadMs)
 }

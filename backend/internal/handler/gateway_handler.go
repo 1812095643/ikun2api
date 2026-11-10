@@ -147,6 +147,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	// 读取请求体
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
+	bodyReadDone := time.Now()
 	if err != nil {
 		if handleRequestBodyReadError(c, reqLog, err) {
 			return
@@ -623,7 +624,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 			sessionID := service.ExtractClientSessionID(c)
 			channelUsageFields := clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel)
-			usageTiming := gatewayRequestTiming(c, requestStart, forwardStart, fs.SwitchCount)
+			usageTiming := gatewayRequestTiming(c, requestStart, bodyReadDone, forwardStart, fs.SwitchCount)
 			h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 					Timing:             usageTiming,
@@ -993,7 +994,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				quotaPlatform := service.QuotaPlatform(c.Request.Context(), currentAPIKey)
 				sessionID := service.ExtractClientSessionID(c)
 				channelUsageFields := clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel)
-				usageTiming := gatewayRequestTiming(c, requestStart, forwardStart, fs.SwitchCount)
+				usageTiming := gatewayRequestTiming(c, requestStart, bodyReadDone, forwardStart, fs.SwitchCount)
 				h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 						Timing:             usageTiming,

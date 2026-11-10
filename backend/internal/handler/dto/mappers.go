@@ -740,6 +740,7 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		PreForwardMs:              l.PreForwardMs,
 		AccountSwitchCount:        l.AccountSwitchCount,
 		ClientFirstTokenMs:        l.ClientFirstTokenMs,
+		UploadMs:                  l.UploadMs,
 		ImageCount:                l.ImageCount,
 		ImageSize:                 l.ImageSize,
 		ImageInputSize:            l.ImageInputSize,

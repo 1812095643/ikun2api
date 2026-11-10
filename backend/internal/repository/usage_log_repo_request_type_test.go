@@ -108,6 +108,7 @@ func TestUsageLogRepositoryCreateSyncRequestTypeAndLegacyFields(t *testing.T) {
 			sqlmock.AnyArg(), // pre_forward_ms
 			sqlmock.AnyArg(), // account_switch_count
 			sqlmock.AnyArg(), // client_first_token_ms
+			sqlmock.AnyArg(), // upload_ms
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(99), createdAt))
@@ -209,6 +210,7 @@ func TestUsageLogRepositoryCreate_PersistsServiceTier(t *testing.T) {
 			sqlmock.AnyArg(), // pre_forward_ms
 			sqlmock.AnyArg(), // account_switch_count
 			sqlmock.AnyArg(), // client_first_token_ms
+			sqlmock.AnyArg(), // upload_ms
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(100), createdAt))
@@ -290,8 +292,8 @@ func TestPrepareUsageLogInsert_PersistsNativeCompactionV2WithoutChangingRequestT
 	prepared := prepareUsageLogInsert(log)
 
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
-	require.Equal(t, "boolean", usageLogInsertArgTypes[len(usageLogInsertArgTypes)-6])
-	require.Equal(t, true, prepared.args[len(prepared.args)-6])
+	require.Equal(t, "boolean", usageLogInsertArgTypes[len(usageLogInsertArgTypes)-7])
+	require.Equal(t, true, prepared.args[len(prepared.args)-7])
 	require.Equal(t, int16(service.RequestTypeStream), prepared.args[30])
 	require.Equal(t, service.RequestTypeStream, log.RequestType)
 	require.True(t, log.Stream)
@@ -978,6 +980,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullInt64{}, // pre_forward_ms
 			sql.NullInt64{}, // account_switch_count
 			sql.NullInt64{}, // client_first_token_ms
+			sql.NullInt64{}, // upload_ms
 			now,
 		}})
 		require.NoError(t, err)
@@ -1064,6 +1067,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullInt64{}, // pre_forward_ms
 			sql.NullInt64{}, // account_switch_count
 			sql.NullInt64{}, // client_first_token_ms
+			sql.NullInt64{}, // upload_ms
 			now,
 		}})
 		require.NoError(t, err)
@@ -1133,6 +1137,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullInt64{}, // pre_forward_ms
 			sql.NullInt64{}, // account_switch_count
 			sql.NullInt64{}, // client_first_token_ms
+			sql.NullInt64{}, // upload_ms
 			now,
 		}})
 		require.NoError(t, err)
@@ -1203,6 +1208,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullInt64{}, // pre_forward_ms
 			sql.NullInt64{}, // account_switch_count
 			sql.NullInt64{}, // client_first_token_ms
+			sql.NullInt64{}, // upload_ms
 			now,
 		}})
 		require.NoError(t, err)

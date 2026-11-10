@@ -55,6 +55,7 @@ func scopedAdminUsageLogResponse(record *service.UsageLog) gin.H {
 		"pre_forward_ms":               usage.PreForwardMs,
 		"account_switch_count":         usage.AccountSwitchCount,
 		"client_first_token_ms":        usage.ClientFirstTokenMs,
+		"upload_ms":                    usage.UploadMs,
 		"image_count":                  usage.ImageCount,
 		"image_size":                   usage.ImageSize,
 		"image_input_size":             usage.ImageInputSize,

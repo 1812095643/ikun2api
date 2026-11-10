@@ -188,6 +188,8 @@ type UsageLog struct {
 	// 网关侧耗时（FirstTokenMs 只从最后一次转发上游开始计时，不含这些）：
 	// GatewayWaitMs 等并发槽位的时长；PreForwardMs 从请求到达到最后一次转发开始
 	// （含读请求体、排队、失败重试）；ClientFirstTokenMs = PreForwardMs + FirstTokenMs。
+	// UploadMs 是 PreForwardMs 中读完客户端请求体的部分（客户端上传慢时偏大）。
+	UploadMs           *int
 	GatewayWaitMs      *int
 	PreForwardMs       *int
 	AccountSwitchCount *int

@@ -62,6 +62,7 @@ type RecordUsageInput struct {
 // GatewayRequestTiming 是 handler 测得的网关侧耗时。ForwardResult 的 Duration/FirstTokenMs
 // 只覆盖最后一次转发，用户实际首字还要加上 PreForward。
 type GatewayRequestTiming struct {
+	Upload      time.Duration // 读完客户端请求体的时长（客户端上传，含在 PreForward 内）
 	SlotWait    time.Duration // 等用户/账号并发槽位的总时长
 	PreForward  time.Duration // 从请求到达到最后一次转发开始
 	SwitchCount int           // 最后一次转发前的换号次数
@@ -80,6 +81,7 @@ func applyGatewayTiming(log *UsageLog, timing *GatewayRequestTiming) {
 	if log == nil || timing == nil {
 		return
 	}
+	log.UploadMs = durationMsPtr(timing.Upload)
 	log.GatewayWaitMs = durationMsPtr(timing.SlotWait)
 	log.PreForwardMs = durationMsPtr(timing.PreForward)
 	switchCount := timing.SwitchCount

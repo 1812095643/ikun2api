@@ -266,7 +266,8 @@ func cfgStickyTimeout(svc *GatewayService) time.Duration {
 func TestApplyGatewayTiming(t *testing.T) {
 	upstream := 1800
 	log := &UsageLog{FirstTokenMs: &upstream}
-	applyGatewayTiming(log, &GatewayRequestTiming{SlotWait: 3 * time.Second, PreForward: 3500 * time.Millisecond, SwitchCount: 2})
+	applyGatewayTiming(log, &GatewayRequestTiming{Upload: 400 * time.Millisecond, SlotWait: 3 * time.Second, PreForward: 3500 * time.Millisecond, SwitchCount: 2})
+	require.Equal(t, 400, *log.UploadMs)
 	require.Equal(t, 3000, *log.GatewayWaitMs)
 	require.Equal(t, 3500, *log.PreForwardMs)
 	require.Equal(t, 2, *log.AccountSwitchCount)

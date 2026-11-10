@@ -31,15 +31,19 @@ func addGatewayWait(c *gin.Context, d time.Duration) {
 }
 
 // gatewayRequestTiming 在请求热路径上拍下网关侧耗时快照，供异步用量记录使用。
-func gatewayRequestTiming(c *gin.Context, requestStart, forwardStart time.Time, switchCount int) *service.GatewayRequestTiming {
+func gatewayRequestTiming(c *gin.Context, requestStart, bodyReadDone, forwardStart time.Time, switchCount int) *service.GatewayRequestTiming {
 	if requestStart.IsZero() || forwardStart.IsZero() {
 		return nil
 	}
-	return &service.GatewayRequestTiming{
+	timing := &service.GatewayRequestTiming{
 		SlotWait:    gatewayWaitDuration(c),
 		PreForward:  forwardStart.Sub(requestStart),
 		SwitchCount: switchCount,
 	}
+	if !bodyReadDone.IsZero() {
+		timing.Upload = bodyReadDone.Sub(requestStart)
+	}
+	return timing
 }
 
 func gatewayWaitDuration(c *gin.Context) time.Duration {
