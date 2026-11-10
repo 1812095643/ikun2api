@@ -33,6 +33,7 @@
       {{ t('modelPlaza.loadFailed') }}
     </div>
     <template v-else>
+      <div class="flex justify-end"><PlazaCurrencyToggle v-model="currency" :credits-per-cny="response?.credits_per_cny" /></div>
       <!-- 筛选区:平台 → 分组 → 倍率 -->
       <PlazaFilterBar
         :platforms="platforms"
@@ -50,7 +51,7 @@
 
       <!-- 分组分节的模型清单(默认按生效倍率升序) -->
       <div v-if="filteredGroups.length > 0" class="space-y-5">
-        <PlazaGroupSection v-for="g in filteredGroups" :key="g.id" :group="g" />
+        <PlazaGroupSection v-for="g in filteredGroups" :key="g.id" :group="g" :currency="currency" :credits-per-cny="response?.credits_per_cny" />
       </div>
       <div
         v-else
@@ -69,6 +70,8 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import Icon from '@/components/icons/Icon.vue'
 import PlazaFilterBar from './PlazaFilterBar.vue'
+import PlazaCurrencyToggle from './PlazaCurrencyToggle.vue'
+import { useModelPlazaCurrency } from '@/composables/useModelPlazaCurrency'
 import PlazaGroupSection from './PlazaGroupSection.vue'
 import type { ModelPlazaGroup, ModelPlazaResponse } from '@/api/modelPlaza'
 import { useAuthStore } from '@/stores/auth'
@@ -81,6 +84,7 @@ const props = defineProps<{
   embedded?: boolean
 }>()
 
+const { currency } = useModelPlazaCurrency(() => props.response?.credits_per_cny)
 const { t } = useI18n()
 const authStore = useAuthStore()
 const isAuthenticated = computed(() => authStore.isAuthenticated)

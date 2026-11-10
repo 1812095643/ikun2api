@@ -3,9 +3,9 @@ import { computed, ref } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
 import { modelPrice, modelOfficialPrice, mediaPrice, type ModelEntry } from '@/composables/workspace/useModelSquare'
-import type { ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
+import type { ModelPlazaCurrency, ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
 import { platformLabel } from '@/utils/platformColors'
-const props = defineProps<{ entry: ModelEntry }>()
+const props = defineProps<{ entry: ModelEntry; currency?: ModelPlazaCurrency; creditsPerCny?: number }>()
 const emit = defineEmits<{ detail: [] }>()
 const copied = ref(false), copyError = ref(false)
 const billing = computed(() => props.entry.offers[0]?.model.pricing?.billing_mode || 'token')
@@ -18,7 +18,7 @@ const priceFields: { label: string; key: ModelPlazaTokenPriceKey }[] = [
 ]
 const rows = computed(() => priceFields.map(field => ({
   ...field,
-  paid: modelPrice(props.entry, field.key),
+  paid: modelPrice(props.entry, field.key, props.currency, props.creditsPerCny),
   official: modelOfficialPrice(props.entry, field.key)
 })).filter(row => row.paid !== '—' || row.official !== '—'))
 async function copy() {
@@ -44,7 +44,7 @@ async function copy() {
       <div v-for="row in rows" :key="row.key" class="model-price-row" :data-price-field="row.key"><span>{{ row.label }}</span><strong>{{ row.paid }}</strong><span class="model-original-price">{{ row.official }}</span></div>
       <p v-if="!rows.length" class="ws-muted">查看分组计价</p>
     </div>
-    <div v-else class="model-media"><strong>{{ mediaPrice(entry) }}</strong><span>{{ billing === 'image' ? '/ 张' : '/ 次' }}</span></div>
+    <div v-else class="model-media"><strong>{{ mediaPrice(entry, currency, creditsPerCny) }}</strong><span>{{ billing === 'image' ? '/ 张' : '/ 次' }}</span></div>
     <footer class="model-footer">
       <span v-if="copied" class="copy-feedback" role="status">模型名已复制</span>
       <span v-else-if="copyError" class="copy-feedback" role="alert">请手动复制模型名</span>

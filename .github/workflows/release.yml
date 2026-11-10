@@ -78,12 +78,12 @@ jobs:
           go test -tags integration ./internal/repository -run '^TestGroupRepoSuite$/^TestPriceChangeHistory$' -count=1 -timeout=240s
           cd ../frontend
           pnpm exec vitest run src/components/common/__tests__/GroupPriceChangeBadge.spec.ts src/components/common/__tests__/GroupOptionItem.spec.ts src/components/common/__tests__/VersionBadge.spec.ts src/views/user/__tests__/KeysView.spec.ts src/components/modelPlaza/__tests__/PlazaGroupSection.spec.ts
-      - name: 模型广场原价与渠道实付分离回归
+      - name: 模型广场原价展示与充值换算回归
         run: |
           cd backend
-          go test -tags unit ./internal/service ./internal/handler -run 'Test(ListPlazaGroups|WorkspacePlazaGroups|ListGroups_(TokenLadder|GeminiCatalog|GroupToken|ImageModel|CatalogMissing|TimePricing)|PlazaOriginal|PlazaUnknown|WorkspacePlazaOriginal|ToModelPlaza|ModelPlazaHandler)' -count=1 -timeout=180s
+          go test -tags unit ./internal/service ./internal/handler ./internal/handler/admin -run 'Test(ListPlazaGroups|WorkspacePlazaGroups|ListGroups_(TokenLadder|GeminiCatalog|GroupToken|ImageModel|CatalogMissing|TimePricing)|PlazaOriginal|PlazaUnknown|WorkspacePlazaOriginal|ToModelPlaza|ModelPlaza)' -count=1 -timeout=180s
           cd ../frontend
-          pnpm exec vitest run src/composables/workspace/modelPrices.spec.ts src/components/workspace/models/ModelCard.spec.ts src/components/modelPlaza/__tests__/PlazaModelPricingTable.spec.ts src/components/modelPlaza/__tests__/PlazaGroupSection.spec.ts
+          pnpm exec vitest run src/views/admin/__tests__/SettingsView.spec.ts src/composables/workspace/modelPrices.spec.ts src/components/modelPlaza/__tests__/PlazaCurrencyToggle.spec.ts src/components/workspace/models/ModelCard.spec.ts src/components/modelPlaza/__tests__/PlazaModelPricingTable.spec.ts src/components/modelPlaza/__tests__/PlazaGroupSection.spec.ts
       - name: Cross-site pool share credentials and read-only bootstrap regression
         run: |
           cd frontend

@@ -46,7 +46,7 @@ export interface PlazaTimePricing {
 export interface PlazaModel {
   name: string
   platform: string
-  /** 实收口径的展示定价：档位可提供绝对单价或相对基础价倍率；均为标准时段价。 */
+  /** 广场展示基价：已知 Claude/GPT 用官方原价，其余沿用渠道价；不影响实际扣费。 */
   pricing: UserSupportedModelPricing | null
   official_pricing: PlazaOfficialPricing | null
   /** 仅多档模型返回。 */
@@ -87,6 +87,8 @@ export interface ModelPlazaGroup {
 export interface ModelPlazaResponse {
   /** 管理员配置的全局价格说明（Markdown）。 */
   description: string
+  /** Display conversion only: 1 CNY buys this many balance credits; 0 means unset. */
+  credits_per_cny?: number
   groups: ModelPlazaGroup[]
 }
 

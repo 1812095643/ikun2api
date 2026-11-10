@@ -50,6 +50,9 @@ function mountTable(
     videoRateMultiplier?: number | null
     peakWindow?: string
     peakRateMultiplier?: number | null
+    currency?: 'usd' | 'cny'
+    creditsPerCny?: number
+    longContextPricingEnabled?: boolean
   }
 ) {
   return mount(PlazaModelPricingTable, {
@@ -273,13 +276,14 @@ describe('PlazaModelPricingTable', () => {
     expect(cells[6].text()).not.toContain('(1h')
   })
 
-  it('实付价分别展示渠道自定义 5m 与 1h 缓存写入价', () => {
+  it('Claude 实付价覆盖渠道自定义 5m 与 1h 缓存写入价', () => {
     const model = tokenModel()
     model.pricing!.cache_write_1h_price = 7e-6
 
     const wrapper = mountTable([model], 1)
     expect(wrapper.text()).toContain('$3.75')
-    expect(wrapper.text()).toContain('$7.00')
+    expect(wrapper.text()).toContain('$6.00')
+    expect(wrapper.text()).not.toContain('$7.00')
     expect(wrapper.text()).toContain('(1h')
   })
 
@@ -309,7 +313,7 @@ describe('PlazaModelPricingTable', () => {
   })
 
   it('token 模型阶梯定价内联进输入/输出列,按倍率折算', () => {
-    const model = tokenModel({
+    const model = tokenModel({ name: 'deepseek-chat',
       pricing: {
         billing_mode: 'token',
         input_price: 3e-6,
@@ -355,7 +359,7 @@ describe('PlazaModelPricingTable', () => {
   })
 
   it.each([['claude-sonnet-4', 'anthropic'], ['gpt-5.4', 'openai']])(
-    '%s 只调整官方列为原价，实付保持渠道价乘倍率并涵盖缓存费用', (name, platform) => {
+    '%s 五项实付统一使用官方原价乘倍率，原始渠道配置保持不变', (name, platform) => {
       const model = tokenModel({ name, platform })
       Object.assign(model.pricing!, {
         input_price: 5e-6, output_price: 21e-6, cache_read_price: 1e-6,
@@ -367,11 +371,11 @@ describe('PlazaModelPricingTable', () => {
       })
       const wrapper = mountTable([model], 2, 0.5)
       const cells = wrapper.findAll('tbody td')
-      expect(cells[1].text()).toBe('$2.50')
-      expect(cells[2].text()).toBe('$10.50')
-      expect(cells[3].text()).toContain('$0.50')
-      expect(cells[3].text()).toContain('$3.00')
-      expect(cells[3].text()).toContain('$6.00')
+      expect(cells[1].text()).toBe('$2.00')
+      expect(cells[2].text()).toBe('$10.00')
+      expect(cells[3].text()).toContain('$0.20')
+      expect(cells[3].text()).toContain('$2.50')
+      expect(cells[3].text()).toContain('$4.00')
       expect(cells[4].text()).toBe('$4.00')
       expect(cells[5].text()).toBe('$20.00')
       expect(cells[6].text()).toContain('$0.40')
@@ -383,7 +387,8 @@ describe('PlazaModelPricingTable', () => {
       const configured = structuredClone(model)
       configured.official_pricing = null
       const withoutOriginal = mountTable([configured], 2, 0.5)
-      expect(withoutOriginal.findAll('tbody td').slice(0, 4).map(cell => cell.text())).toEqual(paidBefore)
+      expect(withoutOriginal.findAll('tbody td').slice(0, 4).map(cell => cell.text())).not.toEqual(paidBefore)
+      expect(withoutOriginal.findAll('tbody td')[1].text()).toBe('$2.50')
       expect(withoutOriginal.findAll('tbody td')[4].text()).toBe('$5.00')
       expect(model.official_pricing!.input_price).toBe(4e-6)
       withoutOriginal.unmount()
@@ -717,14 +722,14 @@ describe('PlazaModelPricingTable 长上下文阶梯', () => {
     expect(wholeLabels.length).toBeGreaterThan(0)
     expect(whole.text()).not.toContain('modelPlaza.table.marginalBadge')
 
-    const marginal = mountTable([ladderModel({ long_context_basis: 'marginal' })], 1)
+    const marginal = mountTable([ladderModel({ name: 'deepseek-chat', official_pricing: null, long_context_basis: 'marginal' })], 1)
     const marginalLabels = marginal.findAll('tbody td span[title="modelPlaza.table.tierHintMarginal"]')
     expect(marginalLabels.length).toBeGreaterThan(0)
     expect(marginal.findAll('tbody td')[0].text()).toContain('modelPlaza.table.marginalBadge')
   })
 
   it('无标签的多档按区间生成统一形态(≤上限 / >下限),并按下限升序展示', () => {
-    const model = ladderModel({
+    const model = ladderModel({ name: 'deepseek-chat', official_pricing: null,
       pricing: {
         ...ladderModel().pricing!,
         // 故意乱序:展示必须按上下文从低到高
@@ -740,22 +745,17 @@ describe('PlazaModelPricingTable 长上下文阶梯', () => {
     expect(rows.map((r) => r.text().split(/\s+/)[0])).toEqual(['≤100K', '≤200K', '≤1M', '>1M'])
   })
 
-  it('Claude/GPT 官方阶梯与渠道实付阶梯各自独立，保留配置档位', () => {
+  it('Claude/GPT 两列统一使用官方阶梯，不带出渠道自定义档位', () => {
     const model = ladderModel()
     model.pricing!.input_price = 9e-6
-    model.pricing!.intervals = [{
-      ...ladderIntervals()[0], max_tokens: 100000, tier_label: '渠道档位', input_price: 9e-6
-    }]
+    model.pricing!.intervals = [{ ...ladderIntervals()[0], max_tokens: 100000, tier_label: '渠道档位', input_price: 9e-6 }]
     const wrapper = mountTable([model], 0.5)
     const cells = wrapper.findAll('tbody td')
-    expect(cells[1].text()).toContain('渠道档位')
-    expect(cells[1].text()).toContain('$4.50')
-    expect(cells[1].findAll('.leading-5')).toHaveLength(1)
-    expect(cells[1].text()).not.toContain('272K')
-    expect(cells[4].text()).toContain('≤272K')
-    expect(cells[4].text()).toContain('>272K')
-    expect(cells[4].text()).toContain('$5.00')
+    expect(cells[1].text()).toContain('≤272K')
+    expect(cells[1].text()).toContain('$2.50')
+    expect(cells[1].text()).toContain('$5.00')
     expect(cells[4].text()).toContain('$10.00')
+    expect(wrapper.text()).not.toContain('渠道档位')
     expect(model.pricing!.intervals[0].tier_label).toBe('渠道档位')
     wrapper.unmount()
   })
@@ -861,5 +861,42 @@ describe('PlazaModelPricingTable 分时计价', () => {
     const wrapper = mountTable([tokenModel()], 1)
     expect(wrapper.findAll('tbody tr')).toHaveLength(1)
     expect(wrapper.find('[title*="modelPlaza.table.timePricingRowHint"]').exists()).toBe(false)
+  })
+})
+
+
+describe('人民币展示与原价保护', () => {
+  it('详情中五项实付随币种切换，官方价格保持美元', async () => {
+    const model = tokenModel()
+    model.pricing!.input_price = 97e-6
+    model.pricing!.cache_read_price = 79e-6
+    const wrapper = mountTable([model], 0.5, null, { currency: 'cny', creditsPerCny: 10 })
+    const cells = () => wrapper.findAll('tbody td')
+    expect(wrapper.find('thead').text()).toContain('¥ / 1M token')
+    expect(cells()[1].text()).toBe('¥0.15')
+    expect(cells()[2].text()).toBe('¥0.75')
+    expect(cells()[3].text()).toContain('¥0.1875')
+    expect(cells()[3].text()).toContain('¥0.30')
+    expect(cells()[3].text()).toContain('¥0.015')
+    expect(cells()[4].text()).toBe('$3.00')
+    expect(wrapper.text()).not.toContain('97.00')
+    expect(wrapper.text()).not.toContain('79.00')
+    await wrapper.setProps({ currency: 'usd' })
+    expect(cells()[1].text()).toBe('$1.50')
+    expect(cells()[3].text()).toContain('$0.15')
+    wrapper.unmount()
+  })
+
+  it('关闭长上下文时只显示原价基础档，官方阶梯仍可查看', () => {
+    const model = tokenModel()
+    model.official_pricing!.intervals = [
+      { min_tokens: 0, max_tokens: 200000, input_price: 3e-6, output_price: 15e-6, cache_write_price: null, cache_read_price: null, per_request_price: null },
+      { min_tokens: 200000, max_tokens: null, input_price: 6e-6, output_price: 30e-6, cache_write_price: null, cache_read_price: null, per_request_price: null }
+    ]
+    const wrapper = mountTable([model], 0.5, null, { longContextPricingEnabled: false })
+    const cells = wrapper.findAll('tbody td')
+    expect(cells[1].text()).toBe('$1.50')
+    expect(cells[4].text()).toContain('$6.00')
+    wrapper.unmount()
   })
 })

@@ -617,6 +617,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.ModelPlazaRequireAuth != after.ModelPlazaRequireAuth {
 		changed = append(changed, "model_plaza_require_auth")
 	}
+	if before.ModelPlazaCreditsPerCNY != after.ModelPlazaCreditsPerCNY {
+		changed = append(changed, "model_plaza_credits_per_cny")
+	}
 	if before.ModelPlazaDescription != after.ModelPlazaDescription {
 		changed = append(changed, "model_plaza_description")
 	}

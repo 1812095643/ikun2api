@@ -569,6 +569,9 @@ const (
 	// the Model Plaza page (global pricing notes, exchange rate, promotions, ...).
 	SettingKeyModelPlazaDescription = "model_plaza_description"
 
+	// Display-only credits granted per CNY; zero disables CNY prices.
+	SettingKeyModelPlazaCreditsPerCNY = "model_plaza_credits_per_cny"
+
 	// SettingKeyPluginManagementEnabled controls sidebar visibility only; it does
 	// not stop or otherwise change already loaded plugin runtimes.
 	SettingKeyPluginManagementEnabled = "plugin_management_enabled"

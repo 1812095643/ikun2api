@@ -1,165 +1,128 @@
 import { describe, expect, it } from 'vitest'
 import { mediaPrice, modelPrice, modelOfficialPrice, type ModelEntry } from './useModelSquare'
+import { modelPlazaDisplayModel, modelPlazaPaidPrice, type ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
 import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
-import type { ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
 
-function entry(
-  group: Partial<ModelPlazaGroup>,
-  pricing: NonNullable<PlazaModel['pricing']>
-): ModelEntry {
+const cases: [ModelPlazaTokenPriceKey, string, string, string][] = [
+  ['input_price', '$2.00', '$4.00', '$2.50'],
+  ['output_price', '$10.00', '$20.00', '$10.00'],
+  ['cache_read_price', '$0.20', '$0.40', '$0.50'],
+  ['cache_write_price', '$2.50', '$5.00', '$3.00'],
+  ['cache_write_1h_price', '$4.00', '$8.00', '$6.00']
+]
+
+function pricedModel(name = 'claude-sonnet-5-5', platform = 'anthropic'): ModelEntry {
   return {
-    name: 'test',
-    platform: 'openai',
+    name, platform,
     offers: [{
-      group: { rate_multiplier: 2, ...group } as ModelPlazaGroup,
-      model: { name: 'test', platform: 'openai', pricing, official_pricing: null }
+      group: { rate_multiplier: 2, user_rate_multiplier: 0.5 } as ModelPlazaGroup,
+      model: {
+        name, platform,
+        pricing: {
+          billing_mode: 'token', input_price: 5e-6, output_price: 20e-6,
+          cache_read_price: 1e-6, cache_write_price: 6e-6, cache_write_1h_price: 12e-6,
+          image_input_price: null, image_output_price: null, per_request_price: null
+        },
+        official_pricing: {
+          input_price: 4e-6, output_price: 20e-6,
+          cache_read_price: 0.4e-6, cache_write_price: 5e-6, cache_write_1h_price: 8e-6
+        }
+      }
     }]
   }
 }
 
-const priceCases: [ModelPlazaTokenPriceKey, string, string, string][] = [
-  ['input_price', '$2.50', '$4.00', '$5.00'],
-  ['output_price', '$10.00', '$20.00', '$20.00'],
-  ['cache_read_price', '$0.50', '$0.40', '$1.00'],
-  ['cache_write_price', '$3.00', '$5.00', '$6.00'],
-  ['cache_write_1h_price', '$6.00', '$8.00', '$12.00']
-]
-
-function pricedModel(name: string, platform: string): ModelEntry {
-  const value = entry({ rate_multiplier: 2, user_rate_multiplier: 0.5 }, {
-    billing_mode: 'token', input_price: 5e-6, output_price: 20e-6,
-    cache_read_price: 1e-6, cache_write_price: 6e-6, cache_write_1h_price: 12e-6
-  } as NonNullable<PlazaModel['pricing']>)
-  value.name = name
-  value.platform = platform
-  value.offers[0].model = {
-    ...value.offers[0].model, name, platform,
-    official_pricing: {
-      input_price: 4e-6, output_price: 20e-6,
-      cache_read_price: 0.4e-6, cache_write_price: 5e-6, cache_write_1h_price: 8e-6
-    }
-  }
-  return value
-}
-
-describe('原生模型广场计价', () => {
+describe('模型广场展示价格', () => {
   it.each([
     ['claude-sonnet-5-5', 'anthropic'], ['gpt-5.5', 'openai'],
     ['gpt-5.5', 'openai_bps'], ['openai/gpt-5.5', 'openai'],
     ['anthropic.claude-sonnet-4-5', 'anthropic'], ['o3', 'openai']
-  ])('%s 只在官方列使用原价，实付仍按渠道价乘个人倍率', (name, platform) => {
+  ])('%s 五项实付均按官方原价乘个人倍率，忽略渠道改价', (name, platform) => {
     const value = pricedModel(name, platform)
-    for (const [key, paid, original] of priceCases) {
+    for (const [key, paid, original] of cases) {
       expect(modelPrice(value, key)).toBe(paid)
       expect(modelOfficialPrice(value, key)).toBe(original)
     }
-    const paidBefore = priceCases.map(([key]) => modelPrice(value, key))
-    value.offers[0].model.official_pricing = null
-    expect(priceCases.map(([key]) => modelPrice(value, key))).toEqual(paidBefore)
-    for (const [key, , , channel] of priceCases) expect(modelOfficialPrice(value, key)).toBe(channel)
-    expect(value.offers[0].model.pricing?.input_price).toBe(5e-6)
+    // Projected display never mutates the billing/channel object.
+    const model = value.offers[0].model
+    expect(modelPlazaDisplayModel(model).pricing?.input_price).toBe(4e-6)
+    expect(model.pricing?.input_price).toBe(5e-6)
+    for (const [key, paid] of cases) expect(modelPrice(value, key, 'cny', 10)).toBe(paid.replace('$', '¥').replace(/([0-9.]+)/, amount => (Number(amount) / 10).toFixed(2)))
   })
 
-  it.each([
-    ['gemini-2.5-pro', 'gemini'], ['deepseek-chat', 'deepseek'],
-    ['glm-5.2', 'openai'], ['minimax-m3', 'anthropic']
-  ])('%s 官方列显示渠道基价，忽略目录价且不乘倍率', (name, platform) => {
-    const value = pricedModel(name, platform)
-    for (const [key, paid, , channel] of priceCases) {
-      expect(modelPrice(value, key)).toBe(paid)
-      expect(modelOfficialPrice(value, key)).toBe(channel)
-    }
-  })
-
-  it.each([['claude-unlisted-private-model', 'anthropic'], ['gpt-unlisted', 'openai']])(
-    '%s 没有原价时官方列回退渠道价，保留零价与缺失值', (name, platform) => {
+  it.each([['gemini-2.5-pro', 'gemini'], ['deepseek-chat', 'deepseek'], ['glm-5.2', 'openai'], ['minimax-m3', 'anthropic']])(
+    '%s 保留渠道基价与倍率', (name, platform) => {
       const value = pricedModel(name, platform)
-      value.offers[0].model.official_pricing = null
-      for (const [key, paid, , channel] of priceCases) {
-        expect(modelPrice(value, key)).toBe(paid)
-        expect(modelOfficialPrice(value, key)).toBe(channel)
-      }
-      value.offers[0].model.pricing!.input_price = 0
-      expect(modelOfficialPrice(value, 'input_price')).toBe('$0.00')
-      value.offers[0].model.pricing!.output_price = null
-      expect(modelPrice(value, 'output_price')).toBe('—')
-      expect(modelOfficialPrice(value, 'output_price')).toBe('—')
+      for (const [key, , , paid] of cases) expect(modelPrice(value, key)).toBe(paid)
+      expect(modelOfficialPrice(value, 'input_price')).toBe('$5.00')
     }
   )
 
-  it('目录价无效时回退渠道价，零原价有效且不改变实付', () => {
-    const value = pricedModel('gpt-5.5', 'openai')
-    value.offers[0].model.official_pricing!.input_price = NaN
-    value.offers[0].model.official_pricing!.output_price = -1
-    expect(modelOfficialPrice(value, 'input_price')).toBe('$5.00')
-    value.offers[0].model.official_pricing!.input_price = 0
-    expect(modelOfficialPrice(value, 'input_price')).toBe('$0.00')
-    expect(modelPrice(value, 'input_price')).toBe('$2.50')
+  it('整个模型没有原价时，仍允许沿用渠道基价', () => {
+    const value = pricedModel('gpt-unlisted', 'openai')
+    value.offers[0].model.official_pricing = null
+    for (const [key, , , paid] of cases) expect(modelPrice(value, key)).toBe(paid)
+    expect(modelOfficialPrice(value, 'cache_write_1h_price')).toBe('$12.00')
   })
 
-  it('已知原价缺缓存项时官方列留空，实付仍显示渠道对应价', () => {
-    const value = pricedModel('claude-sonnet-5-5', 'anthropic')
+  it('已知原价缺少缓存项时两列均留空，不能补入渠道价或5m价', () => {
+    const value = pricedModel()
     value.offers[0].model.official_pricing!.cache_write_price = null
     value.offers[0].model.official_pricing!.cache_write_1h_price = null
-    expect(modelPrice(value, 'cache_write_price')).toBe('$3.00')
-    expect(modelPrice(value, 'cache_write_1h_price')).toBe('$6.00')
-    expect(modelOfficialPrice(value, 'cache_write_price')).toBe('—')
-    expect(modelOfficialPrice(value, 'cache_write_1h_price')).toBe('—')
+    for (const key of ['cache_write_price', 'cache_write_1h_price'] as const) {
+      expect(modelPrice(value, key)).toBe('—')
+      expect(modelOfficialPrice(value, key)).toBe('—')
+    }
+    expect(modelPlazaDisplayModel(value.offers[0].model).pricing?.cache_write_1h_price).toBeNull()
   })
 
-  it('多分组实付取渠道价乘各自倍率的最低值，官方价不受排序影响', () => {
+  it('跨分组取原价乘各自倍率的最低值，不被渠道价或排序影响', () => {
     const value = pricedModel('gpt-5.5', 'openai')
     const cheaper = structuredClone(value.offers[0])
     cheaper.group.user_rate_multiplier = 0.01
     cheaper.model.pricing!.input_price = 1e-6
     cheaper.model.official_pricing = null
     value.offers.unshift(cheaper)
-    for (let order = 0; order < 2; order++) {
-      expect(modelPrice(value, 'input_price')).toBe('$0.01')
+    for (let i = 0; i < 2; i++) {
+      expect(modelPrice(value, 'input_price')).toBe('$0.04')
       expect(modelOfficialPrice(value, 'input_price')).toBe('$4.00')
       value.offers.reverse()
     }
   })
 
-  it('无原价的多分组参考价取渠道基价，不使用最低实付价', () => {
-    const value = pricedModel('deepseek-chat', 'deepseek')
-    const other = structuredClone(value.offers[0])
-    other.model.pricing!.input_price = 2e-6
-    other.group.user_rate_multiplier = 10
-    value.offers.push(other)
-    expect(modelPrice(value, 'input_price')).toBe('$2.50')
-    expect(modelOfficialPrice(value, 'input_price')).toBe('$2.00')
-  })
-
-  it('按张计费不使用官方 token 价', () => {
-    const value = pricedModel('gpt-image-2', 'openai')
-    value.offers[0].model.pricing!.billing_mode = 'image'
-    value.offers[0].model.pricing!.per_request_price = 0.4
-    expect(modelPrice(value, 'input_price')).toBe('—')
-    expect(modelOfficialPrice(value, 'input_price')).toBe('—')
-    expect(mediaPrice(value)).toBe('$0.20')
-  })
-
-  it('个人倍率覆盖分组默认倍率，无个人倍率时沿用分组倍率', () => {
-    const value = pricedModel('claude-sonnet-5-5', 'anthropic')
-    expect(modelPrice(value, 'input_price')).toBe('$2.50')
+  it('个人倍率优先，零倍率与零原价有效，缺失值不会被当成免费', () => {
+    const value = pricedModel()
     delete value.offers[0].group.user_rate_multiplier
-    expect(modelPrice(value, 'input_price')).toBe('$10.00')
-    expect(modelOfficialPrice(value, 'input_price')).toBe('$4.00')
-  })
-
-  it('零倍率只让实付免费，不改变参考价或把缺失项显示为免费', () => {
-    const value = pricedModel('claude-sonnet-5-5', 'anthropic')
+    expect(modelPrice(value, 'input_price')).toBe('$8.00')
     value.offers[0].group.user_rate_multiplier = 0
     expect(modelPrice(value, 'input_price')).toBe('$0.00')
-    expect(modelOfficialPrice(value, 'input_price')).toBe('$4.00')
-    value.offers[0].model.pricing!.output_price = null
+    value.offers[0].model.official_pricing!.input_price = 0
+    expect(modelOfficialPrice(value, 'input_price')).toBe('$0.00')
+    value.offers[0].model.official_pricing!.output_price = null
     expect(modelPrice(value, 'output_price')).toBe('—')
   })
 
-  it('图片独立倍率覆盖通用倍率并保留按张单位', () => {
-    expect(mediaPrice(entry({ image_rate_independent: true, image_rate_multiplier: 0.5 }, {
-      billing_mode: 'image', per_request_price: 0.4
-    } as NonNullable<PlazaModel['pricing']>))).toBe('$0.20')
+  it('token 参考原价不用于图片计费，图片使用独立倍率及人民币换算', () => {
+    const value = pricedModel('gpt-image-2', 'openai')
+    value.offers[0].model.pricing!.billing_mode = 'image'
+    value.offers[0].model.pricing!.per_request_price = 0.4
+    value.offers[0].group.image_rate_independent = true
+    value.offers[0].group.image_rate_multiplier = 0.2
+    expect(modelPrice(value, 'input_price')).toBe('—')
+    expect(modelOfficialPrice(value, 'input_price')).toBe('—')
+    expect(mediaPrice(value)).toBe('$0.08')
+    expect(mediaPrice(value, 'cny', 10)).toBe('¥0.008')
+  })
+
+  it.each([0, -1, NaN, Infinity])('充值比例 %s 不产生虚假的人民币价格', ratio => {
+    expect(modelPlazaPaidPrice(3, 1, 'cny', ratio)).toBe('—')
+  })
+
+  it('人民币按照充值比例相除；切回美元及官方美元价不受影响', () => {
+    const value = pricedModel()
+    expect(modelPrice(value, 'input_price', 'cny', 10)).toBe('¥0.20')
+    expect(modelPrice(value, 'input_price', 'cny', 20)).toBe('¥0.10')
+    expect(modelPrice(value, 'input_price', 'usd', 20)).toBe('$2.00')
+    expect(modelOfficialPrice(value, 'input_price')).toBe('$4.00')
   })
 })

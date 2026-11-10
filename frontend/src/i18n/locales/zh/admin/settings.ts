@@ -87,6 +87,10 @@ export default {
           },
         },
         modelPlaza: {
+          rechargeRatio: '充值比例（1 元 = 多少额度）',
+          rechargeRatioHint: '填 10 表示 1 元充值 10 额度；填 0 关闭人民币展示。',
+          rechargeRatioInvalid: '充值比例必须为大于或等于 0 的有效数字',
+
           title: '模型广场',
           description: '以分组为单位向访客展示可用模型与价格的公开页面。默认关闭。',
           enabled: '启用模型广场',

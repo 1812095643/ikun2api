@@ -29,22 +29,21 @@ describe('模型卡片价格来源', () => {
     value.offers[0].model.official_pricing!.cache_write_1h_price = null
     const wrapper = mount(ModelCard, { props: { entry: value } })
     const row = wrapper.find('[data-price-field="cache_write_1h_price"]')
-    expect(row.find('strong').text()).toBe('$6.00')
-    expect(row.find('.model-original-price').text()).toBe('—')
+    expect(row.exists()).toBe(false)
     expect(value.offers[0].model.pricing!.cache_write_1h_price).toBe(12e-6)
     wrapper.unmount()
   })
 
   it.each([['claude-sonnet-5-5', 'anthropic'], ['gpt-5.5', 'openai']])(
-    '%s 官方列显示原价，实付保持渠道价乘倍率，包含缓存费用', (name, platform) => {
+    '%s 五项实付显示官方原价乘倍率，包含缓存费用', (name, platform) => {
       const wrapper = mount(ModelCard, { props: { entry: entry(name, platform) } })
       expect(wrapper.find('.model-price-head').text()).toContain('实付价格官方价格')
       for (const [field, paid, official] of [
-        ['input_price', '$2.50', '$4.00'],
+        ['input_price', '$2.00', '$4.00'],
         ['output_price', '$10.00', '$20.00'],
-        ['cache_read_price', '$0.50', '$0.40'],
-        ['cache_write_price', '$3.00', '$5.00'],
-        ['cache_write_1h_price', '$6.00', '$8.00']
+        ['cache_read_price', '$0.20', '$0.40'],
+        ['cache_write_price', '$2.50', '$5.00'],
+        ['cache_write_1h_price', '$4.00', '$8.00']
       ]) {
         const row = wrapper.find(`[data-price-field="${field}"]`)
         expect(row.find('strong').text()).toBe(paid)
@@ -65,4 +64,16 @@ describe('模型卡片价格来源', () => {
       wrapper.unmount()
     }
   )
+})
+
+
+it('卡片实付人民币价格响应币种和充值比例切换', async () => {
+  const value = entry('gpt-5.5', 'openai')
+  const wrapper = mount(ModelCard, { props: { entry: value, currency: 'cny', creditsPerCny: 10 } })
+  const row = () => wrapper.find('[data-price-field="cache_read_price"]')
+  expect(row().find('strong').text()).toBe('¥0.02')
+  expect(row().find('.model-original-price').text()).toBe('$0.40')
+  await wrapper.setProps({ currency: 'usd' })
+  expect(row().find('strong').text()).toBe('$0.20')
+  wrapper.unmount()
 })

@@ -715,6 +715,24 @@ describe("admin SettingsView payment visible method controls", () => {
     adminSettingsFetch.mockResolvedValue(undefined);
   });
 
+  it("loads, validates and saves the model plaza recharge ratio", async () => {
+    getSettings.mockResolvedValueOnce({ ...baseSettingsResponse, model_plaza_credits_per_cny: 10 });
+    const wrapper = mountView();
+    await flushPromises();
+    const input = wrapper.get('#model-plaza-recharge-ratio');
+    expect((input.element as HTMLInputElement).value).toBe('10');
+    await input.setValue(20);
+    await wrapper.find('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({ model_plaza_credits_per_cny: 20 }));
+    updateSettings.mockClear();
+    await input.setValue(-1);
+    await wrapper.find('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it("hides suspended ticket controls even with a saved enabled value", async () => {
     ticketFeature.enabled = false;
     getSettings.mockResolvedValueOnce({ ...baseSettingsResponse, openai_codex_ticket_enabled: true });

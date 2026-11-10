@@ -1,5 +1,5 @@
 import type { PlazaModel } from '@/api/modelPlaza'
-import { resolveIntervalPrices } from '@/utils/pricing'
+import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
 
 export type ModelPlazaTokenPriceKey =
   | 'input_price'
@@ -8,7 +8,7 @@ export type ModelPlazaTokenPriceKey =
   | 'cache_write_price'
   | 'cache_write_1h_price'
 
-/** Only known Claude/GPT originals belong in the official-price column. */
+/** Known Claude/GPT originals provide the model plaza display baseline. */
 export function modelPlazaOriginalPricing(model: PlazaModel): PlazaModel['official_pricing'] {
   if ((model.pricing?.billing_mode || 'token') !== 'token') return null
   const name = model.name.trim().toLowerCase().split('/').at(-1) || ''
@@ -38,8 +38,51 @@ export function modelPlazaReferencePricing(model: PlazaModel): PlazaModel['offic
   }
 }
 
-/** Change only the reference column; paid prices and their tiers stay intact. */
-export function modelPlazaDisplayModel(model: PlazaModel): PlazaModel {
+/** Plaza-only projection: known Claude/GPT prices never use channel overrides. */
+export function modelPlazaDisplayModel(model: PlazaModel, longContext = true): PlazaModel {
   if ((model.pricing?.billing_mode || 'token') !== 'token') return model
-  return { ...model, official_pricing: modelPlazaReferencePricing(model) }
+  const original = modelPlazaOriginalPricing(model)
+  if (!original) return { ...model, official_pricing: modelPlazaReferencePricing(model) }
+  const valid = (value: number | null | undefined) =>
+    value != null && Number.isFinite(value) && value >= 0 ? value : null
+  const intervals = longContext && (original.intervals?.length ?? 0) > 1 ? (original.intervals ?? []) : []
+  return {
+    ...model,
+    official_pricing: original,
+    pricing: {
+      ...model.pricing,
+      billing_mode: 'token',
+      input_price: valid(original.input_price),
+      output_price: valid(original.output_price),
+      cache_read_price: valid(original.cache_read_price),
+      cache_write_price: valid(original.cache_write_price),
+      cache_write_1h_price: valid(original.cache_write_1h_price),
+      image_input_price: null,
+      image_output_price: null,
+      per_request_price: null,
+      intervals
+    },
+    long_context_basis: intervals?.length ? 'whole_request' : undefined
+  }
+}
+
+export type ModelPlazaCurrency = 'usd' | 'cny'
+
+export function validModelPlazaRechargeRatio(value: number | undefined): boolean {
+  return value != null && Number.isFinite(value) && value > 0
+}
+
+/** CNY is a balance-credit conversion, never an exchange-rate conversion. */
+export function modelPlazaPaidPrice(
+  value: number,
+  scale: number,
+  currency: ModelPlazaCurrency = 'usd',
+  creditsPerCny = 0
+): string {
+  if (!Number.isFinite(value) || value < 0) return '—'
+  if (currency === 'cny') {
+    if (!validModelPlazaRechargeRatio(creditsPerCny)) return '—'
+    return formatScaled(value / creditsPerCny, scale, 2).replace('$', '¥')
+  }
+  return formatScaled(value, scale, 2)
 }

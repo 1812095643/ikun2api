@@ -24,7 +24,7 @@
           <th colspan="3" class="pz-bg pt-2 text-center">
             <div class="pz-title border-b pb-2 font-semibold">
               {{ t('modelPlaza.table.paidPrice') }}
-              <span class="pz-unit ml-1 normal-case font-normal">{{ t('modelPlaza.table.unitPerMillion') }}</span>
+              <span class="pz-unit ml-1 normal-case font-normal">{{ currency === 'cny' ? '¥ / 1M token' : t('modelPlaza.table.unitPerMillion') }}</span>
             </div>
           </th>
           <th
@@ -309,7 +309,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
-import { modelPlazaDisplayModel } from '@/utils/modelPlazaPricing'
+import { modelPlazaDisplayModel, modelPlazaOriginalPricing, modelPlazaPaidPrice, type ModelPlazaCurrency } from '@/utils/modelPlazaPricing'
 import { platformAccentColor, platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
 import {
   BILLING_MODE_TOKEN,
@@ -331,8 +331,11 @@ function reasoningEffortMultipliers(model: PlazaModel): [string, number][] {
   })
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   models: PlazaModel[]
+  currency?: ModelPlazaCurrency
+  creditsPerCny?: number
+  longContextPricingEnabled?: boolean
   /** 分组平台;实付分区底色随平台着色,未知平台回退品牌青。 */
   platform?: string
   /** 分组默认倍率。 */
@@ -352,7 +355,7 @@ const props = defineProps<{
    */
   peakWindow?: string
   peakRateMultiplier?: number | null
-}>()
+}>(), { longContextPricingEnabled: true })
 
 const { t } = useI18n()
 
@@ -378,7 +381,7 @@ const sortedModels = computed(() => {
     if (pa != null && pb == null) return -1
     if (pa == null && pb != null) return 1
     return b.name.localeCompare(a.name)
-  }).map(modelPlazaDisplayModel)
+  }).map(model => modelPlazaDisplayModel(model, props.longContextPricingEnabled !== false))
 })
 
 const effectiveRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
@@ -423,11 +426,11 @@ function periodRate(period: PlazaTimePricingPeriod): number {
   return Math.round(effectiveRate.value * period.multiplier * 1000) / 1000
 }
 
-/** 实付价 = 渠道/分组基价 × 生效倍率(时段行再乘时段倍率)，按 $/1M token 展示。 */
+/** 展示实付价 = 广场基价 × 生效倍率 × 时段倍率；人民币再按充值比例折算。 */
 function paidPerMillion(value: number | null | undefined, period: PlazaTimePricingPeriod | null = null): string {
   if (value == null) return '-'
   const rate = period ? periodRate(period) : effectiveRate.value
-  return formatScaled(value * rate, PER_MILLION, MIN_DECIMALS)
+  return modelPlazaPaidPrice(value * rate, PER_MILLION, props.currency, props.creditsPerCny)
 }
 
 /** 图片和视频分别使用对应的独立倍率开关。 */
@@ -449,7 +452,7 @@ function requestRate(m: PlazaModel): number {
 /** 非 token 单价乘该行生效倍率，不换算为每百万 token。 */
 function paidRequestPrice(m: PlazaModel, value: number | null | undefined): string {
   if (value == null) return '-'
-  return formatScaled(value * requestRate(m), 1, MIN_DECIMALS)
+  return modelPlazaPaidPrice(value * requestRate(m), 1, props.currency, props.creditsPerCny)
 }
 
 /** 官方参考价不乘倍率。 */
@@ -509,7 +512,10 @@ function sortByContext(intervals: UserPricingInterval[]): UserPricingInterval[] 
 
 /** token 模式的阶梯定价(内联进输入/输出/缓存列)。 */
 function tokenIntervals(m: PlazaModel): UserPricingInterval[] {
-  return sortByContext(m.pricing?.intervals ?? []).map(iv => resolveIntervalPrices(iv, m.pricing!))
+  const intervals = sortByContext(m.pricing?.intervals ?? [])
+  return intervals.length && modelPlazaOriginalPricing(m)
+    ? sortByContext(m.official_pricing?.intervals ?? [])
+    : intervals.map(iv => resolveIntervalPrices(iv, m.pricing!))
 }
 
 /** 参考阶梯取已选原价或渠道价，不乘倍率，也不改写实付阶梯。 */

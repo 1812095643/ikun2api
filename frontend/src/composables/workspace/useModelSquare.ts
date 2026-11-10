@@ -8,7 +8,7 @@ import {
 } from '@/api/modelPlaza'
 import { workspaceError } from '@/api/workspace'
 import { formatScaled } from '@/utils/pricing'
-import { modelPlazaOriginalPricing, modelPlazaReferencePricing, type ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
+import { modelPlazaOriginalPricing, modelPlazaReferencePricing, modelPlazaPaidPrice, type ModelPlazaCurrency, type ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
 
 export interface ModelEntry {
   name: string
@@ -26,14 +26,17 @@ function originalTokenPricing(entry: ModelEntry): PlazaModel['official_pricing']
 
 export function modelPrice(
   entry: ModelEntry,
-  key: ModelPlazaTokenPriceKey
+  key: ModelPlazaTokenPriceKey,
+  currency: ModelPlazaCurrency = 'usd',
+  creditsPerCny = 0
 ): string {
+  const original = originalTokenPricing(entry)
   const prices = entry.offers.flatMap(({ group, model }) => {
     if ((model.pricing?.billing_mode || 'token') !== 'token') return []
-    const value = model.pricing?.[key]
-    return value == null ? [] : [value * (group.user_rate_multiplier ?? group.rate_multiplier)]
+    const value = (original ?? model.pricing)?.[key]
+    return value == null || !Number.isFinite(value) || value < 0 ? [] : [value * (group.user_rate_multiplier ?? group.rate_multiplier)]
   })
-  return prices.length ? formatScaled(Math.min(...prices), 1000000, 2) : '—'
+  return prices.length ? modelPlazaPaidPrice(Math.min(...prices), 1000000, currency, creditsPerCny) : '—'
 }
 
 export function modelOfficialPrice(entry: ModelEntry, key: ModelPlazaTokenPriceKey): string {
@@ -46,7 +49,7 @@ export function modelOfficialPrice(entry: ModelEntry, key: ModelPlazaTokenPriceK
   })
   return prices.length ? formatScaled(Math.min(...prices), 1000000, 2) : '—'
 }
-export function mediaPrice(entry: ModelEntry): string {
+export function mediaPrice(entry: ModelEntry, currency: ModelPlazaCurrency = 'usd', creditsPerCny = 0): string {
   const prices = entry.offers.flatMap(({ group, model }) => {
     const value = model.pricing?.per_request_price
     if (value == null) return []
@@ -59,7 +62,7 @@ export function mediaPrice(entry: ModelEntry): string {
           : (group.user_rate_multiplier ?? group.rate_multiplier)
     return [value * rate]
   })
-  return prices.length ? formatScaled(Math.min(...prices), 1, 2) : '按档位查看'
+  return prices.length ? modelPlazaPaidPrice(Math.min(...prices), 1, currency, creditsPerCny) : '按档位查看'
 }
 export function useModelSquare() {
   const data = ref<ModelPlazaResponse | null>(null),

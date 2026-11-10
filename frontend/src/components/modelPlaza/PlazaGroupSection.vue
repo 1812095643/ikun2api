@@ -56,6 +56,9 @@
       <PlazaModelPricingTable
         v-if="group.models.length > 0"
         :models="group.models"
+        :long-context-pricing-enabled="group.long_context_pricing_enabled"
+        :currency="currency"
+        :credits-per-cny="creditsPerCny"
         :platform="group.platform"
         :rate-multiplier="group.rate_multiplier"
         :user-rate-multiplier="group.user_rate_multiplier ?? null"
@@ -82,12 +85,14 @@ import PlazaModelPricingTable from './PlazaModelPricingTable.vue'
 import type { ModelPlazaGroup } from '@/api/modelPlaza'
 import type { GroupPlatform, SubscriptionType } from '@/types'
 import { platformBorderStrongClass } from '@/utils/platformColors'
-import { modelPlazaReferencePricing } from '@/utils/modelPlazaPricing'
+import { modelPlazaReferencePricing, type ModelPlazaCurrency } from '@/utils/modelPlazaPricing'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { useAppStore } from '@/stores/app'
 
 const props = defineProps<{
   group: ModelPlazaGroup
+  currency?: ModelPlazaCurrency
+  creditsPerCny?: number
 }>()
 
 const { t } = useI18n()

@@ -7079,6 +7079,16 @@
 
 	        <!-- Tab: Features (功能开关) -->
         <div v-show="activeTab === 'features'" class="space-y-6">
+          <section class="card" data-testid="model-plaza-settings">
+            <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('admin.settings.features.modelPlaza.title') }}</h2>
+            </div>
+            <div class="p-6">
+              <label class="input-label" for="model-plaza-recharge-ratio">{{ t('admin.settings.features.modelPlaza.rechargeRatio') }}</label>
+              <input id="model-plaza-recharge-ratio" v-model.number="form.model_plaza_credits_per_cny" type="number" min="0" step="any" class="input max-w-xs" placeholder="10" />
+              <p class="mt-1 text-xs text-gray-400">{{ t('admin.settings.features.modelPlaza.rechargeRatioHint') }}</p>
+            </div>
+          </section>
 
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
@@ -9945,6 +9955,7 @@ const form = reactive<SettingsForm>({
   model_plaza_enabled: false,
   model_plaza_require_auth: false,
   model_plaza_description: '',
+  model_plaza_credits_per_cny: 0,
   // Plugin management menu visibility; plugin runtime is unaffected.
   plugin_management_enabled: false,
   // Affiliate (邀请返利) feature switch
@@ -11262,6 +11273,11 @@ const siteBillingModeHint = computed(() =>
 );
 
 async function saveSettings() {
+  const rechargeRatio = Number(form.model_plaza_credits_per_cny);
+  if (!Number.isFinite(rechargeRatio) || rechargeRatio < 0) {
+    appStore.showError(t('admin.settings.features.modelPlaza.rechargeRatioInvalid'));
+    return;
+  }
   const cadence = codexTicketCadenceRef.value;
   try {
     if (activeTab.value === "gateway" || cadence?.isDirty?.()) cadence?.validate?.();
@@ -11774,6 +11790,7 @@ async function saveSettings() {
       model_plaza_enabled: false,
       model_plaza_require_auth: form.model_plaza_require_auth,
       model_plaza_description: form.model_plaza_description,
+      model_plaza_credits_per_cny: Number(form.model_plaza_credits_per_cny),
       plugin_management_enabled: form.plugin_management_enabled,
       // Affiliate (邀请返利) feature switch
       affiliate_enabled: form.affiliate_enabled,

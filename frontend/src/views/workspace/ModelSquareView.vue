@@ -4,14 +4,17 @@ import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
 import WorkspaceShell from '@/components/workspace/WorkspaceShell.vue'
 import WorkspaceDialog from '@/components/workspace/WorkspaceDialog.vue'
 import ModelFilters from '@/components/workspace/models/ModelFilters.vue'
+import PlazaCurrencyToggle from '@/components/modelPlaza/PlazaCurrencyToggle.vue'
+import { useModelPlazaCurrency } from '@/composables/useModelPlazaCurrency'
 import ModelCard from '@/components/workspace/models/ModelCard.vue'
 import PlazaGroupSection from '@/components/modelPlaza/PlazaGroupSection.vue'
 import { useModelSquare } from '@/composables/workspace/useModelSquare'
 import { platformLabel } from '@/utils/platformColors'
 import coverImage from '@/assets/workspace/model-cover.webp'
 
-const { loading, error, search, platform, group, mode, selected, platforms,
+const { data, loading, error, search, platform, group, mode, selected, platforms,
   platformCounts, totalModels, groups, entries, filteredGroups, load } = useModelSquare()
+const { currency } = useModelPlazaCurrency(() => data.value?.credits_per_cny)
 function selectPlatform(value: string) {
   platform.value = value
   group.value = ''
@@ -39,6 +42,7 @@ function resetFilters() {
         </div>
         <div class="catalog-toolbar">
           <label class="model-search"><Icon name="search" size="sm" /><input v-model="search" class="ws-input" placeholder="搜索模型名称" aria-label="搜索模型名称" /></label>
+          <PlazaCurrencyToggle v-model="currency" :credits-per-cny="data?.credits_per_cny" />
           <div class="model-view-toggle" role="group" aria-label="显示方式">
             <button :aria-pressed="mode === 'cards'" aria-label="模型卡片" @click="mode = 'cards'"><Icon name="grid" size="sm" /><span>卡片</span></button>
             <button :aria-pressed="mode === 'groups'" aria-label="分组价目表" @click="mode = 'groups'"><Icon name="list" size="sm" /><span>价目表</span></button>
@@ -51,14 +55,14 @@ function resetFilters() {
         <div v-if="loading && !entries.length" class="ws-empty" role="status"><Icon name="refresh" class="ws-spin" /><p>正在读取模型…</p></div>
         <div v-else-if="!entries.length" class="ws-empty"><Icon name="search" size="lg" /><h2>没有匹配的模型</h2><button class="ws-button" @click="resetFilters">重置筛选</button></div>
         <div v-else-if="mode === 'cards'" class="model-grid">
-          <ModelCard v-for="entry in entries" :key="entry.platform + ':' + entry.name" :entry="entry" @detail="selected = entry" />
+          <ModelCard v-for="entry in entries" :key="entry.platform + ':' + entry.name" :entry="entry" :currency="currency" :credits-per-cny="data?.credits_per_cny" @detail="selected = entry" />
         </div>
-        <div v-else class="space-y-5"><PlazaGroupSection v-for="item in filteredGroups" :key="item.id" :group="item" /></div>
+        <div v-else class="space-y-5"><PlazaGroupSection v-for="item in filteredGroups" :key="item.id" :group="item" :currency="currency" :credits-per-cny="data?.credits_per_cny" /></div>
       </section>
     </div>
     <WorkspaceDialog :open="!!selected" :title="selected?.name || '模型计价'" wide @update:open="selected = null">
       <div v-if="selected" class="space-y-5">
-        <PlazaGroupSection v-for="offer in selected.offers" :key="offer.group.id" :group="{ ...offer.group, models: [offer.model] }" />
+        <PlazaGroupSection v-for="offer in selected.offers" :key="offer.group.id" :group="{ ...offer.group, models: [offer.model] }" :currency="currency" :credits-per-cny="data?.credits_per_cny" />
       </div>
     </WorkspaceDialog>
   </WorkspaceShell>
@@ -71,7 +75,7 @@ function resetFilters() {
 .catalog-cover h2 { font-size: 23px; font-weight: 650; letter-spacing: -.5px; margin-bottom: 9px; }
 .cover-count { font-size: 11px; padding: 4px 8px; background: #f1f6fc; color: #254665; border-radius: 6px; }
 .cover-mark { display: grid; place-items: center; flex-shrink: 0; width: 63px; height: 63px; border-radius: 17px; color: #213b55; background: #f2f7f4eb; box-shadow: inset 0 1px #ffffffcc; }
-.catalog-toolbar { display: flex; align-items: center; gap: 10px; padding: 12px; margin-bottom: 22px; background: var(--ws-surface); border-radius: 0 0 13px 13px; box-shadow: 0 1px 0 var(--ws-line); }
+.catalog-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; margin-bottom: 22px; background: var(--ws-surface); border-radius: 0 0 13px 13px; box-shadow: 0 1px 0 var(--ws-line); }
 .model-search { position: relative; flex: 1; min-width: 90px; }
 .model-search > svg { position: absolute; top: 12px; left: 12px; color: var(--ws-muted); }
 .model-search input { padding-left: 37px; background: var(--ws-soft); border-color: transparent; }

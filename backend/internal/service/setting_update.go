@@ -455,6 +455,10 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyModelPlazaEnabled] = strconv.FormatBool(settings.ModelPlazaEnabled)
 	updates[SettingKeyModelPlazaRequireAuth] = strconv.FormatBool(settings.ModelPlazaRequireAuth)
 	updates[SettingKeyModelPlazaDescription] = settings.ModelPlazaDescription
+	if value := settings.ModelPlazaCreditsPerCNY; value < 0 || math.IsNaN(value) || math.IsInf(value, 0) {
+		return nil, infraerrors.BadRequest("INVALID_MODEL_PLAZA_RECHARGE_RATIO", "Model plaza credits per CNY must be a finite non-negative number")
+	}
+	updates[SettingKeyModelPlazaCreditsPerCNY] = strconv.FormatFloat(settings.ModelPlazaCreditsPerCNY, 'f', -1, 64)
 	updates[SettingKeyPluginManagementEnabled] = strconv.FormatBool(settings.PluginManagementEnabled)
 
 	// Affiliate (邀请返利) feature switch

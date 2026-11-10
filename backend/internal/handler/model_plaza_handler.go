@@ -67,7 +67,7 @@ type modelPlazaTimePricing struct {
 	Periods      []modelPlazaTimePricingPeriod `json:"periods"`
 }
 
-// modelPlazaModel 广场模型条目：实收口径展示定价（白名单形态）+ 官方参考价。
+// modelPlazaModel 广场模型条目：展示基价（白名单形态）+ 官方参考价。
 type modelPlazaModel struct {
 	Name            string                     `json:"name"`
 	Platform        string                     `json:"platform"`
@@ -109,8 +109,9 @@ type modelPlazaGroup struct {
 
 // modelPlazaResponse 广场页响应。
 type modelPlazaResponse struct {
-	Description string            `json:"description"`
-	Groups      []modelPlazaGroup `json:"groups"`
+	Description   string            `json:"description"`
+	CreditsPerCNY float64           `json:"credits_per_cny"`
+	Groups        []modelPlazaGroup `json:"groups"`
 }
 
 // Get 返回模型广场数据。
@@ -183,8 +184,9 @@ func (h *ModelPlazaHandler) get(c *gin.Context, workspace bool) {
 	c.Writer.Header().Add("Vary", "Accept-Language")
 	out := toLocalizedModelPlazaGroups(visible, userRates, c.GetHeader("Accept-Language"))
 	response.Success(c, modelPlazaResponse{
-		Description: rt.Description,
-		Groups:      out,
+		Description:   rt.Description,
+		CreditsPerCNY: rt.CreditsPerCNY,
+		Groups:        out,
 	})
 }
 
@@ -240,7 +242,7 @@ func toLocalizedModelPlazaGroups(visible []service.PlazaGroup, userRates map[int
 func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) modelPlazaGroup {
 	models := make([]modelPlazaModel, 0, len(g.Models))
 	for i := range g.Models {
-		m := &g.Models[i]
+		m := modelPlazaDisplayModel(g.Models[i], g.LongContextPricingEnabled)
 		models = append(models, modelPlazaModel{
 			Name:             m.Name,
 			Platform:         m.Platform,

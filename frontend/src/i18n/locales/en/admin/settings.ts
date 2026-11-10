@@ -87,6 +87,10 @@ export default {
           },
         },
         modelPlaza: {
+          rechargeRatio: 'Credits per CNY',
+          rechargeRatioHint: '10 means ¥1 buys 10 credits; 0 disables CNY prices.',
+          rechargeRatioInvalid: 'Credits per CNY must be a finite non-negative number',
+
           title: 'Model Plaza',
           description: 'A public page showcasing available models and pricing by group. Disabled by default.',
           enabled: 'Enable Model Plaza',
