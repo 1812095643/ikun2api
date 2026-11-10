@@ -17,7 +17,7 @@ async function send(message: TicketDraft) {
 </script>
 
 <template>
-  <BaseDialog :show="true" title="通知用户" width="normal" body-class="workspace-tickets"
+  <BaseDialog :show="true" title="通知用户" width="normal" body-class="workspace-tickets" content-class="ticket-notification-dialog"
     :show-close-button="!busy && !uncertain" :close-on-escape="!busy && !uncertain" @close="emit('close')">
     <div class="workspace ticket-notification-content">
       <div class="notification-field">
@@ -42,7 +42,7 @@ async function send(message: TicketDraft) {
 </template>
 
 <style scoped>
-.ticket-notification-content { display: grid; gap: 20px; }
+.ticket-notification-content { display: grid; gap: 14px; }
 .notification-field { min-width: 0; }
 .notification-error { color: #dc2626; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .dark .notification-error { color: #f87171; }
@@ -52,6 +52,8 @@ async function send(message: TicketDraft) {
 </style>
 
 <style>
+.ticket-notification-dialog { max-width: 36rem !important; }
+.ticket-notification-dialog .modal-header,.ticket-notification-dialog .modal-body { padding: 16px 20px; }
 body:has(.ticket-notification-content) .select-dropdown-portal .select-option-selected {
   @apply bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300;
 }

@@ -67,10 +67,10 @@ onMounted(load);
     <p v-if="loading" class="py-8 text-sm text-gray-500 dark:text-gray-400">
       正在读取设置…
     </p>
-    <form v-else-if="ready" class="card p-5 sm:p-6" @submit.prevent="save">
-      <fieldset :disabled="saving" class="space-y-5">
+    <form v-else-if="ready" class="card p-4 sm:p-5" @submit.prevent="save">
+      <fieldset :disabled="saving" class="space-y-4">
         <div
-          class="flex items-center justify-between gap-4 border-b border-gray-100 pb-5 dark:border-dark-700"
+          class="flex items-center justify-between gap-4 border-b border-gray-100 pb-4 dark:border-dark-700"
         >
           <div>
             <h3
@@ -88,7 +88,7 @@ onMounted(load);
             aria-labelledby="blindbox-enabled-label"
           />
         </div>
-        <div class="grid max-w-2xl gap-5 sm:grid-cols-2">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div class="space-y-2">
             <label for="blindbox-price" class="input-label">每份售价（$）</label
             ><input
@@ -156,11 +156,10 @@ onMounted(load);
           </div>
         </div>
         <p class="max-w-2xl text-xs leading-6 text-gray-500 dark:text-gray-400">
-          今日消费大于 0 至 100 解锁 1 份，超过 100 至 200 解锁 2
-          份，依此类推。首份购买后锁定本场价格、奖励范围及开奖时间；修改从下一场生效。关闭开关只停止新购，已购场次照常结算。
+          首份购买后本场规则锁定，修改从下一场生效；关闭仅停止新购，已购场次照常结算。
         </p>
         <div
-          class="flex justify-end border-t border-gray-100 pt-5 dark:border-dark-700"
+          class="flex justify-end border-t border-gray-100 pt-4 dark:border-dark-700"
         >
           <button type="submit" class="blindbox-save btn btn-primary">
             {{ saving ? "保存中…" : "保存设置" }}

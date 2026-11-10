@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
-import WorkspaceDialog from '@/components/workspace/WorkspaceDialog.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import LotteryEditor from './LotteryEditor.vue'
 import LotteryActivityCard from './LotteryActivityCard.vue'
 import LotteryAdminDetail from './LotteryAdminDetail.vue'
@@ -13,6 +13,9 @@ const {
   page,
   filter,
   loading,
+  detailLoading,
+  now,
+  closeEditor,
   busy,
   error,
   editorOpen,
@@ -43,11 +46,12 @@ function changePage(delta: number) {
     <p v-if="message" class="lottery-feedback-text" role="status">{{ message }}</p>
     <LotteryEditor
       v-if="editorOpen"
+      :key="`${editing?.id || 0}:${editing?.revision || 'new'}`"
       :activity="editing"
       :busy="busy"
       :error="error"
       @save="save"
-      @close="editorOpen = false"
+      @close="closeEditor"
     />
       <nav class="lottery-tabs lottery-admin-tabs" aria-label="抽奖管理视图">
         <button :class="{ active: section === 'activities' }" @click="section = 'activities'">
@@ -76,7 +80,7 @@ function changePage(delta: number) {
           <div class="lottery-actions lottery-toolbar-actions">
             <small>{{ total }} 场</small>
             <button
-              class="btn btn-primary"
+              class="btn btn-secondary"
               aria-label="刷新抽奖管理"
               :disabled="loading"
               @click="load"
@@ -96,7 +100,7 @@ function changePage(delta: number) {
             v-for="item in items"
             :key="item.id"
             :item="item"
-            :now="Date.now()"
+            :now="now"
             manage
             @detail="detail(item.id)"
             @edit="edit(item)"
@@ -118,18 +122,18 @@ function changePage(delta: number) {
             下一页
           </button>
         </div></template>
-    <WorkspaceDialog
-      :open="!!selected"
+    <BaseDialog
+      :show="!!selected"
       :title="selected?.spec.title || '活动记录'"
-      wide
-      @update:open="selected = null"
-      ><p v-if="error" class="lottery-error" role="alert">{{ error }}</p>
-      <LotteryAdminDetail
-        v-if="selected"
-        :item="selected"
-        :busy="busy"
-        @publish="transition('publish')"
-        @cancel="transition('cancel')"
-    /></WorkspaceDialog>
+      width="wide"
+      content-class="lottery-detail-dialog lottery-admin-dialog"
+      :show-close-button="!busy"
+      :close-on-escape="!busy"
+      @close="!busy && (selected = null)"
+    >
+      <p v-if="error" class="lottery-error" role="alert">{{ error }}</p>
+      <LotteryAdminDetail v-if="selected" :item="selected" :busy="busy" :loading="detailLoading"
+        @edit="edit" @refresh="detail(selected!.id)" @publish="transition('publish')" @cancel="transition('cancel')" />
+    </BaseDialog>
   </section>
 </template>

@@ -39,6 +39,21 @@ describe('工单限额与清理', () => {
     expect(state.busy.value).toBe(false)
     wrapper.unmount()
   })
+  it('切换未读筛选会请求服务端，取消的旧列表不会覆盖新列表', async () => {
+    const { state, wrapper } = setup()
+    await flushPromises()
+    let complete!: (value: object) => void
+    api.list.mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+    const pending = state.loadList()
+    state.filters.unread_only = true
+    api.list.mockResolvedValue({ items: [], total: 3, quota: { can_create: true } })
+    await flushPromises()
+    complete({ items: [], total: 99 })
+    await pending
+    expect(state.result.value?.total).toBe(3)
+    expect(state.filters.unread_only).toBe(true)
+    wrapper.unmount()
+  })
   it('清理完成后返回删除数量并刷新列表', async () => {
     const { state, wrapper } = setup()
     await flushPromises()

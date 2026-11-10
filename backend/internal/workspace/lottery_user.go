@@ -117,6 +117,9 @@ func (h *Handler) getLottery(c *gin.Context) {
 }
 
 func (h *Handler) fillLottery(ctx context.Context, item *lotteryActivity, a actor, detail bool) error {
+	if a.Admin {
+		item.Revision = lotteryRevision(*item)
+	}
 	if err := h.db.QueryRowContext(ctx, `SELECT count(*),COALESCE(bool_or(user_id=$2),false) FROM workspace_lottery_entries WHERE lottery_id=$1`, item.ID, a.ID).Scan(&item.EntryCount, &item.Joined); err != nil {
 		return err
 	}

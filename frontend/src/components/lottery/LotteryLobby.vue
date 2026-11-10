@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
-import WorkspaceDialog from '@/components/workspace/WorkspaceDialog.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import LotteryActivityCard from './LotteryActivityCard.vue'
 import LotteryWinRecords from './LotteryWinRecords.vue'
 import LotteryShareDialog from './LotteryShareDialog.vue'
@@ -158,18 +158,19 @@ function changePage(delta: number, history = false) {
         </button>
       </div></template
     >
-    <WorkspaceDialog
-      :open="!!detail"
+    <BaseDialog
+      :show="!!detail"
       :title="detail?.spec.title || '活动详情'"
-      wide
-      @update:open="detail = null"
+      width="wide"
+      content-class="lottery-detail-dialog lottery-user-dialog"
+      @close="detail = null"
       ><LotteryDetail
         v-if="detail"
         :item="detail"
         :busy="busy !== null"
         @claim="claim"
         @share="openShare"
-    /></WorkspaceDialog>
+    /></BaseDialog>
     <LotteryShareDialog :win="share" @close="share = null" />
   </section>
 </template>

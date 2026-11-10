@@ -68,57 +68,22 @@ func (h *Handler) saveLottery(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	ctx := c.Request.Context()
-	key, err := h.lotteryKey(ctx)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	tx, err := h.db.BeginTx(ctx, nil)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	defer tx.Rollback()
-	item := lotteryActivity{Spec: spec, CreatedBy: a.ID, Status: "draft"}
+	id := int64(0)
 	if c.Param("id") != "" {
-		id, e := positiveID(c)
-		if e != nil {
-			fail(c, e)
-			return
-		}
-		item, e = h.loadLottery(ctx, tx, id, true, key)
-		if e != nil {
-			fail(c, e)
-			return
-		}
-		if item.Status != "draft" {
-			fail(c, badRequest("已发布的活动不能修改规则，请创建新活动。"))
-			return
-		}
-		item.Spec = spec
-	} else {
-		raw, _ := json.Marshal(spec)
-		if err = tx.QueryRowContext(ctx, `INSERT INTO workspace_lotteries(spec,signature,created_by) VALUES($1,'',$2) RETURNING id`, string(raw), a.ID).Scan(&item.ID); err != nil {
+		id, err = positiveID(c)
+		if err != nil {
 			fail(c, err)
 			return
 		}
 	}
-	raw, _ := json.Marshal(spec)
-	item.Signature = lotterySpecSignature(key, item)
-	if _, err = tx.ExecContext(ctx, `UPDATE workspace_lotteries SET spec=$1,signature=$2 WHERE id=$3`, string(raw), item.Signature, item.ID); err != nil {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+	item, err := h.saveLotteryActivity(ctx, a, id, spec, c.GetHeader("If-Match"))
+	if err != nil {
 		fail(c, err)
 		return
 	}
-	if err = lotteryAudit(ctx, tx, item.ID, &a.ID, "save", gin.H{"spec": spec}); err != nil {
-		fail(c, err)
-		return
-	}
-	if err = tx.Commit(); err != nil {
-		fail(c, err)
-		return
-	}
-	response.Success(c, gin.H{"id": item.ID, "status": "draft"})
+	response.Success(c, gin.H{"id": item.ID, "status": item.Status, "revision": lotteryRevision(item)})
 }
 
 func (h *Handler) publishLottery(c *gin.Context) { h.lotteryTransition(c, "publish") }

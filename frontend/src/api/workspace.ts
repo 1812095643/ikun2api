@@ -63,7 +63,7 @@ export interface TicketNotificationDraft extends TicketDraft {
 export function ticketAPI(admin: boolean) {
   const base = admin ? '/admin/workspace/tickets' : '/workspace/tickets'
   return {
-    async list(params: { page: number; search: string; status: string }, signal?: AbortSignal) {
+    async list(params: { page: number; search: string; status: string; unread_only?: boolean }, signal?: AbortSignal) {
       return (await apiClient.get<TicketPage>(base, { params, signal })).data
     },
     async get(id: number, signal?: AbortSignal) {

@@ -4,7 +4,7 @@ import { useLotteryHistory } from '@/composables/workspace/useLotteryHistory'
 import LotteryHistoryFilters from './LotteryHistoryFilters.vue'
 import LotteryHistoryTable from './LotteryHistoryTable.vue'
 const props = withDefaults(
-  defineProps<{ manage?: boolean; lotteryId?: number; revision?: number; busy?: number | null }>(),
+  defineProps<{ manage?: boolean; compact?: boolean; lotteryId?: number; revision?: number; busy?: number | null }>(),
   { manage: false, busy: null }
 )
 defineEmits<{ detail: [id: number]; claim: [win: LotteryWin]; share: [win: LotteryWin] }>()
@@ -12,8 +12,8 @@ const { data, loading, error, page, pages, result, activity, search, load, apply
   useLotteryHistory(props)
 </script>
 <template>
-  <section class="lottery-history">
-    <div v-if="data" class="lottery-history-summary" aria-label="参与情况汇总">
+  <section class="lottery-history" :class="{ 'lottery-history-compact': compact }">
+    <div v-if="data && (!compact || data.summary.won || data.summary.lost || data.summary.cancelled)" class="lottery-history-summary" aria-label="参与情况汇总">
       <span
         >报名 <strong>{{ data.summary.entries }}</strong> 次</span
       ><span
@@ -33,6 +33,7 @@ const { data, loading, error, page, pages, result, activity, search, load, apply
       v-model:activity="activity"
       v-model:search="search"
       :manage="manage"
+      :compact="compact"
       :fixed-activity="!!lotteryId"
       :loading="loading"
       @apply="apply"

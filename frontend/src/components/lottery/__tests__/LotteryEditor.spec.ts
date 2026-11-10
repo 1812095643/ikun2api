@@ -102,3 +102,19 @@ describe('抽奖三步弹窗', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('请检查开奖人数')
   })
 })
+
+describe('已发布活动编辑', () => {
+  it('直接打开开奖设置，已报名的开始时间锁定，确认后保存现有活动', async () => {
+    const activity = { id: 7, status: 'open', entry_count: 56, revision: 'revision-1', spec: { title: '进行中的抽奖', description: '', business_date: '2026-11-10', match: 'all', conditions: [], prizes: [{ key: 'first', amount: '10', count: 1 }], draw_mode: 'either', capacity: 116, start_at: '2026-11-10T00:00:39.123Z', draw_at: '2026-11-10T10:00:00Z' } } as import('@/api/lottery').LotteryActivity
+    const wrapper = mount(LotteryEditor, { props: { activity, busy: false, error: '' }, global: { stubs: { Teleport: true, Icon: true } } })
+    wrappers.push(wrapper)
+    expect(wrapper.text()).toContain('调整进行中的抽奖')
+    expect(button(wrapper, '保存草稿')).toBeUndefined()
+    expect(wrapper.get('input[type="datetime-local"]').attributes('disabled')).toBeDefined()
+    expect(button(wrapper, '保存修改').attributes('disabled')).toBeDefined()
+    await wrapper.findAll('input[type="datetime-local"]')[1].setValue('2026-11-10T19:30')
+    await wrapper.get('.lottery-editor-footer input[type="checkbox"]').setValue(true)
+    await button(wrapper, '保存修改').trigger('click')
+    expect(wrapper.emitted('save')?.[0]).toEqual([expect.objectContaining({ draw_mode: 'either', start_at: '2026-11-10T00:00:39.123Z', draw_at: '2026-11-10T11:30:00.000Z', capacity: 116, title: '进行中的抽奖' }), false])
+  })
+})

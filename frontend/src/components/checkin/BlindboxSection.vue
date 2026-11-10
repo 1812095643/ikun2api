@@ -39,7 +39,7 @@ const profit = computed(() =>
 
 <template>
   <section
-    class="space-y-5 border-t border-gray-200 pt-7 dark:border-dark-700"
+    class="blindbox-section space-y-4 border-t border-gray-200 pt-5 dark:border-dark-700"
     aria-label="每日盲盒活动"
   >
     <div class="flex items-center justify-between gap-3">
@@ -71,9 +71,9 @@ const profit = computed(() =>
     </p>
     <div
       v-if="status"
-      class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_280px]"
+      class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_248px]"
     >
-      <div class="min-w-0 space-y-6">
+      <div class="min-w-0 space-y-4">
         <BlindboxPool :status="status" :busy="busy" @buy="confirmBuy" />
         <BlindboxRecords
           v-if="history"

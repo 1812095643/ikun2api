@@ -41,192 +41,78 @@ onBeforeUnmount(() => clearInterval(timer));
 </script>
 
 <template>
-  <section class="card overflow-hidden" aria-label="当前盲盒奖池">
-    <div class="p-5 sm:p-6">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            每日盲盒
-          </h3>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {{ status.round.date }} ·
-            {{ status.round.spec.draw_time }} 开奖（北京时间）
-          </p>
-        </div>
-        <span
-          class="rounded-md bg-gray-100 px-2.5 py-1 text-xs text-gray-600 dark:bg-dark-800 dark:text-gray-300"
-          >{{
-            status.round.status === "settled"
-              ? "已开奖"
-              : remaining === "00:00:00"
-                ? "等待结算"
-                : `距开奖 ${remaining}`
-          }}</span
-        >
-      </div>
-      <dl class="my-6 grid grid-cols-3 gap-3">
-        <div>
-          <dt class="text-xs text-gray-500 dark:text-gray-400">当前奖池</dt>
-          <dd
-            class="mt-2 text-2xl font-semibold tabular-nums text-gray-900 dark:text-gray-100"
-          >
-            {{ checkinMoney(status.round.total_paid) }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-gray-500 dark:text-gray-400">参与人数</dt>
-          <dd
-            class="mt-2 text-2xl font-semibold tabular-nums text-gray-900 dark:text-gray-100"
-          >
-            {{ status.participants
-            }}<small class="ml-1 text-xs font-normal">人</small>
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-gray-500 dark:text-gray-400">售出份数</dt>
-          <dd
-            class="mt-2 text-2xl font-semibold tabular-nums text-gray-900 dark:text-gray-100"
-          >
-            {{ status.round.count
-            }}<small class="ml-1 text-xs font-normal">份</small>
-          </dd>
-        </div>
-      </dl>
-      <div
-        class="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-gray-50 p-4 dark:bg-dark-800/60"
-      >
-        <div class="text-sm text-gray-700 dark:text-gray-300">
-          <p>
-            今日消费
-            <b class="font-medium tabular-nums">{{
-              checkinMoney(status.eligibility.usage_amount)
-            }}</b>
-          </p>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            可购 {{ status.eligibility.limit }} 份 · 已购
-            {{ status.eligibility.bought }} 份 · 剩余
-            {{ status.eligibility.remaining }} 份
-          </p>
-        </div>
-        <button
-          type="button"
-          class="blindbox-buy btn btn-primary"
-          :disabled="
-            busy || !status.eligibility.can_buy || remaining === '00:00:00'
-          "
-          @click="$emit('buy')"
-        >
-          {{
-            status.eligibility.can_buy
-              ? `支付 ${checkinMoney(status.round.spec.price)} 参与`
-              : status.eligibility.reason
-          }}
-        </button>
-      </div>
-      <div class="mt-6">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
-            奖池与概率公示
-          </h4>
-          <span class="text-xs text-gray-500 dark:text-gray-400"
-            >亏损 {{ percent(status.plan.lose) }} · 保本
-            {{ percent(status.plan.even) }} · 盈利
-            {{ percent(status.plan.win) }}</span
-          >
-        </div>
-        <div
-          v-if="status.plan.tiers.length"
-          class="max-h-64 overflow-y-auto rounded-lg border border-gray-100 dark:border-dark-700"
-        >
-          <table class="w-full text-left text-sm tabular-nums">
-            <thead
-              class="sticky top-0 bg-gray-50 text-xs text-gray-500 dark:bg-dark-800 dark:text-gray-400"
-            >
-              <tr>
-                <th class="px-4 py-2.5 font-medium">返还金额</th>
-                <th class="px-4 py-2.5 font-medium">份数</th>
-                <th class="px-4 py-2.5 text-right font-medium">每份概率</th>
-              </tr>
-            </thead>
-            <tbody
-              class="divide-y divide-gray-100 text-gray-700 dark:divide-dark-700 dark:text-gray-300"
-            >
-              <tr v-for="tier in status.plan.tiers" :key="tier.amount">
-                <td class="px-4 py-2.5">
-                  {{ checkinMoney(tier.amount)
-                  }}<small
-                    class="ml-2 text-xs"
-                    :class="
-                      tier.result === 'win'
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : 'text-gray-400'
-                    "
-                    >{{
-                      tier.result === "win"
-                        ? "盈利"
-                        : tier.result === "even"
-                          ? "保本"
-                          : "亏损"
-                    }}</small
-                  >
-                </td>
-                <td class="px-4 py-2.5">{{ tier.count }}</td>
-                <td class="px-4 py-2.5 text-right">{{ tier.probability }}%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p
-          v-else
-          class="rounded-lg bg-gray-50 px-4 py-5 text-center text-sm text-gray-500 dark:bg-dark-800/50 dark:text-gray-400"
-        >
-          等待首份参与后生成奖池
-        </p>
-        <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
-          概率随售出份数变化，以截止时清单为准；每份同概率随机分配。单份参与原额返还。
-        </p>
-      </div>
-      <details
-        class="mt-5 border-t border-gray-100 pt-4 text-sm dark:border-dark-700"
-        open
-      >
-        <summary
-          class="cursor-pointer font-medium text-gray-800 dark:text-gray-200"
-        >
-          参与规则
-        </summary>
-        <ol
-          class="mt-3 list-decimal space-y-2 pl-5 text-xs leading-5 text-gray-500 dark:text-gray-400"
-        >
-          <li>
-            当天完成签到，且有已入账、金额大于 0 的模型使用记录。消费大于 0 至
-            100 可购 1 份，超过 100 至 200 可购 2
-            份，依此类推。购买盲盒不算模型消费。
-          </li>
-          <li>
-            每次支付 {{ checkinMoney(status.round.spec.price) }} 购买 1
-            份；开奖前截止，服务器时间为准，本场最多 10,000 份。
-          </li>
-          <li>
-            全部购买余额组成奖池，全部返还。每份奖励在
-            {{ checkinMoney(status.round.spec.minimum) }} 至
-            {{ checkinMoney(status.round.spec.maximum) }} 内，目标 30%
-            保本，其余亏损或盈利；人数取整或极窄区间会有微调，实际比例见上表。
-          </li>
-          <li>
-            开奖后自动到账，点击开盒只展示结果。奖励不计入充值资格或邀请返利；断线重试同一笔购买不会重复扣款。
-          </li>
-          <li>
-            首份购买后锁定本场规则。参与榜公示份数；中奖榜仅展示整场净赚用户，不公开邮箱。
-          </li>
-        </ol>
-      </details>
+  <section class="card blindbox-pool" aria-label="当前盲盒奖池">
+    <header class="blindbox-pool-header">
+      <div><h3>本场奖池</h3><p>{{ status.round.date }} · {{ status.round.spec.draw_time }} 开奖（北京时间）</p></div>
+      <span class="blindbox-countdown">{{ status.round.status === 'settled' ? '已开奖' : remaining === '00:00:00' ? '等待结算' : remaining }}</span>
+    </header>
+    <dl class="blindbox-metrics">
+      <div><dt>奖池金额</dt><dd>{{ checkinMoney(status.round.total_paid) }}</dd></div>
+      <div><dt>参与人数</dt><dd>{{ status.participants }}<small>人</small></dd></div>
+      <div><dt>售出份数</dt><dd>{{ status.round.count }}<small>份</small></dd></div>
+    </dl>
+    <div class="blindbox-purchase">
+      <div><p>今日消费 <strong>{{ checkinMoney(status.eligibility.usage_amount) }}</strong></p><small>可购 {{ status.eligibility.limit }} · 已购 {{ status.eligibility.bought }} · 剩余 {{ status.eligibility.remaining }} 份</small></div>
+      <button type="button" class="blindbox-buy btn btn-primary" :disabled="busy || !status.eligibility.can_buy || remaining === '00:00:00'" @click="$emit('buy')">{{ busy ? '处理中…' : status.eligibility.can_buy ? `${checkinMoney(status.round.spec.price)} / 份 · 参与` : status.eligibility.reason }}</button>
     </div>
+    <div class="blindbox-probability-header"><h4>奖励与概率</h4><div><span>亏损 {{ percent(status.plan.lose) }}</span><span>保本 {{ percent(status.plan.even) }}</span><span class="text-blue-600 dark:text-blue-400">盈利 {{ percent(status.plan.win) }}</span></div></div>
+    <div v-if="status.plan.tiers.length" class="blindbox-probability-table">
+      <table><thead><tr><th>返还金额</th><th>份数</th><th>每份概率</th></tr></thead><tbody><tr v-for="tier in status.plan.tiers" :key="tier.amount"><td><strong>{{ checkinMoney(tier.amount) }}</strong><small :class="tier.result === 'win' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'">{{ tier.result === 'win' ? '盈利' : tier.result === 'even' ? '保本' : '亏损' }}</small></td><td>{{ tier.count }}</td><td>{{ tier.probability }}%</td></tr></tbody></table>
+    </div>
+    <p v-else class="py-6 text-center text-xs text-gray-400">等待首份参与后生成奖池</p>
+    <p class="blindbox-probability-note">概率随份数变化，以截止时公示为准；每份同概率随机分配。</p>
+    <details class="blindbox-rules"><summary>参与规则</summary><ol>
+      <li>当天完成签到且有已入账、金额大于 0 的模型消费。消费大于 0 至 100 可购 1 份，超过 100 至 200 可购 2 份，依此类推；盲盒支出不计入模型消费。</li>
+      <li>每份 {{ checkinMoney(status.round.spec.price) }}，开奖前截止，以服务器时间为准；本场最多 10,000 份。</li>
+      <li>购买余额全部组成奖池并返还。每份 {{ checkinMoney(status.round.spec.minimum) }} 至 {{ checkinMoney(status.round.spec.maximum) }}，目标 30% 保本，其余亏损或盈利，实际比例见公示；单份参与原额返还。</li>
+      <li>开奖后自动到账，开盒仅展示结果。奖励不计入充值资格或邀请返利；同一笔购买重试不会重复扣款。</li>
+      <li>首份购买后锁定本场规则；参与榜公示份数，中奖榜仅展示整场净赚用户，不公开邮箱。</li>
+    </ol></details>
   </section>
 </template>
-
 <style scoped>
-.blindbox-buy {
-  @apply from-blue-500 to-blue-600 shadow-blue-500/20 hover:from-blue-600 hover:to-blue-700 hover:shadow-blue-500/20 focus:ring-blue-500/50;
-}
+.blindbox-pool { padding: 20px; color: #111827; }
+.dark .blindbox-pool { color: #f3f4f6; }
+.blindbox-pool-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.blindbox-pool-header h3 { font-size: 14px; font-weight: 600; }
+.blindbox-pool-header p { margin-top: 4px; color: #6b7280; font-size: 11px; }
+.dark .blindbox-pool-header p { color: #94a3b8; }
+.blindbox-countdown { padding: 5px 8px; border-radius: 6px; font-size: 12px; background: #f3f4f6; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dark .blindbox-countdown { background: #0f172a; }
+.blindbox-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; padding: 18px 0; }
+.blindbox-metrics dt { color: #6b7280; font-size: 11px; }
+.dark .blindbox-metrics dt { color: #94a3b8; }
+.blindbox-metrics dd { font-size: 22px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.blindbox-metrics small { font-size: 11px; font-weight: 400; margin-left: 4px; }
+.blindbox-purchase { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px; border-radius: 8px; background: #f9fafb; }
+.dark .blindbox-purchase { background: #0f172a; }
+.blindbox-purchase p { font-size: 12px; }
+.blindbox-purchase small { display: block; margin-top: 4px; font-size: 11px; color: #6b7280; }
+.dark .blindbox-purchase small { color: #94a3b8; }
+.blindbox-probability-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 18px 0 10px; }
+.blindbox-probability-header h4 { font-size: 13px; font-weight: 600; }
+.blindbox-probability-header > div { display: flex; gap: 10px; font-size: 11px; color: #6b7280; }
+.dark .blindbox-probability-header > div { color: #94a3b8; }
+.blindbox-probability-table { max-height: 220px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+.dark .blindbox-probability-table { border-color: #334155; }
+.blindbox-probability-table table { width: 100%; font-size: 12px; text-align: left; font-variant-numeric: tabular-nums; }
+.blindbox-probability-table thead { position: sticky; top: 0; background: #f9fafb; }
+.dark .blindbox-probability-table thead { background: #1e293b; }
+.blindbox-probability-table th { font-weight: 500; color: #6b7280; }
+.dark .blindbox-probability-table th { color: #94a3b8; }
+.blindbox-probability-table td,.blindbox-probability-table th { padding: 9px 12px; }
+.blindbox-probability-table tr + tr { border-top: 1px solid #e5e7eb; }
+.dark .blindbox-probability-table tr + tr { border-color: #334155; }
+.blindbox-probability-table td:last-child,.blindbox-probability-table th:last-child { text-align: right; }
+.blindbox-probability-table small { margin-left: 8px; font-size: 11px; }
+.blindbox-probability-note { font-size: 11px; color: #6b7280; margin-top: 8px; line-height: 1.6; }
+.dark .blindbox-probability-note { color: #94a3b8; }
+.blindbox-rules { margin-top: 14px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; }
+.dark .blindbox-rules { border-color: #334155; }
+.blindbox-rules summary { cursor: pointer; font-weight: 500; }
+.blindbox-rules ol { list-style: decimal; padding-left: 18px; margin-top: 10px; color: #6b7280; font-size: 11px; line-height: 1.8; }
+.dark .blindbox-rules ol { color: #94a3b8; }
+.blindbox-rules li + li { margin-top: 5px; }
+.blindbox-buy { @apply from-blue-500 to-blue-600 shadow-blue-500/20 hover:from-blue-600 hover:to-blue-700 focus:ring-blue-500/50; font-size: 12px; }
+@media(max-width:640px) { .blindbox-pool { padding: 16px; } .blindbox-metrics dd { font-size: 20px; } }
 </style>

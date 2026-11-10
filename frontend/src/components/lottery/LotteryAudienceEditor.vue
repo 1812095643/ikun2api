@@ -2,6 +2,7 @@
 import { conditionNames, type ConditionKind, type LotteryCondition } from '@/api/lottery'
 import Icon from '@/components/icons/Icon.vue'
 import Select from '@/components/common/Select.vue'
+defineProps<{ dateLocked?: boolean }>()
 const conditions = defineModel<LotteryCondition[]>('conditions', { required: true })
 const match = defineModel<'all' | 'any'>('match', { required: true })
 const date = defineModel<string>('date', { required: true })
@@ -48,7 +49,7 @@ function change(index: number, key: 'kind' | 'value', value: string) {
         <label
           >条件关系<Select v-model="match" :options="matchOptions" aria-label="条件关系" /></label
         ><label
-          >统计日期（北京时间）<input v-model="date" class="input" type="date" required
+          >统计日期（北京时间）<input v-model="date" class="input" type="date" :disabled="dateLocked" required
         /></label>
       </div>
       <div class="lottery-condition-editor">

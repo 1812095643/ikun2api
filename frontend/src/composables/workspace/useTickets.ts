@@ -14,7 +14,7 @@ export function useTickets(admin: boolean) {
   const route = useRoute(),
     router = useRouter(),
     api = ticketAPI(admin)
-  const filters = reactive({ page: 1, search: '', status: '' })
+  const filters = reactive({ page: 1, search: '', status: '', unread_only: false })
   const result = ref<TicketPage | null>(null),
     detail = ref<Ticket | null>(null)
   const loading = ref(false),
@@ -33,7 +33,9 @@ export function useTickets(admin: boolean) {
     listRequest = request
     if (!quiet) loading.value = true
     try {
-      result.value = await api.list(filters, request.signal)
+      const next = await api.list(filters, request.signal)
+      if (request.signal.aborted) return
+      result.value = next
       error.value = ''
     } catch (e) {
       if (!request.signal.aborted) error.value = workspaceError(e)
@@ -53,7 +55,7 @@ export function useTickets(admin: boolean) {
     if (!quiet) detailLoading.value = true
     try {
       const next = await api.get(id, request.signal)
-      if (id !== selected.value) return
+      if (request.signal.aborted || id !== selected.value) return
       detail.value = next
       error.value = ''
       if (next.unread_count) {
@@ -79,6 +81,7 @@ export function useTickets(admin: boolean) {
     return router.replace(`${admin ? '/admin' : ''}/tickets`)
   }
   async function create(draft: TicketDraft) {
+    if (busy.value) return false
     busy.value = true
     try {
       const { id } = await api.create(draft)
@@ -95,7 +98,7 @@ export function useTickets(admin: boolean) {
     }
   }
   async function reply(draft: TicketDraft) {
-    if (!selected.value) return false
+    if (!selected.value || busy.value) return false
     busy.value = true
     try {
       await api.reply(selected.value, draft)
@@ -109,7 +112,7 @@ export function useTickets(admin: boolean) {
     }
   }
   async function changeStatus(status: TicketStatus) {
-    if (!selected.value) return
+    if (!selected.value || busy.value) return
     busy.value = true
     try {
       await api.status(selected.value, status)
@@ -157,7 +160,7 @@ export function useTickets(admin: boolean) {
     { immediate: true }
   )
   watch(
-    () => [filters.status, filters.page],
+    () => [filters.status, filters.page, filters.unread_only],
     () => void loadList()
   )
   watch(

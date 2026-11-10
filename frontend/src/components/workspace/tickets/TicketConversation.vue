@@ -31,10 +31,13 @@ const labels: Record<string, string> = {
   closed: '已关闭'
 }
 watch(
-  () => props.ticket.messages?.length,
-  async () => {
+  () => [props.ticket.id, props.ticket.messages?.length],
+  async (value, previous) => {
+    const element = messages.value
+    const nearBottom = !element || element.scrollHeight - element.scrollTop - element.clientHeight < 100
+    const changed = !previous || value[0] !== previous[0]
     await nextTick()
-    if (messages.value) messages.value.scrollTop = messages.value.scrollHeight
+    if (messages.value && (changed || nearBottom)) messages.value.scrollTop = messages.value.scrollHeight
   },
   { immediate: true }
 )
@@ -89,7 +92,7 @@ watch(
           >
             {{ ticket.status === 'closed' ? '重新打开' : '关闭工单' }}
           </button></template
-        ><button v-if="admin" class="ws-button ws-button-danger" :disabled="busy" @click="emit('remove')">删除工单</button>
+        ><button v-if="admin && !['resolved', 'closed'].includes(ticket.status)" type="button" class="ws-button ws-button-quiet" :disabled="busy" @click="emit('status', 'resolved')"><Icon name="check" size="sm" />标记解决</button><button v-if="admin" type="button" class="ws-icon-btn ws-button-danger" :disabled="busy" aria-label="删除工单" @click="emit('remove')"><Icon name="trash" size="sm" /></button>
       </div>
     </header>
     <div
@@ -175,7 +178,7 @@ watch(
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 20px 24px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--ws-line);
 }
 .conversation-heading {
@@ -185,7 +188,7 @@ watch(
   min-width: 0;
 }
 .conversation-heading h2 {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.6;
   margin-top: 4px;
@@ -203,11 +206,11 @@ watch(
 .conversation-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
-  min-height: 140px;
+  padding: 18px;
+  min-height: 100px;
 }
 .ticket-message + .ticket-message {
-  margin-top: 25px;
+  margin-top: 18px;
 }
 .ticket-message header {
   display: flex;
@@ -237,11 +240,11 @@ watch(
 }
 .message-body {
   margin-left: 34px;
-  padding: 14px 16px;
+  padding: 11px 14px;
   border-radius: 0 10px 10px 10px;
   background: var(--ws-soft);
   font-size: 13px;
-  line-height: 1.8;
+  line-height: 1.7;
 }
 .message-body p {
   white-space: pre-wrap;
@@ -268,7 +271,7 @@ watch(
   margin-left: 0;
 }
 .conversation-compose {
-  padding: 18px 24px;
+  padding: 12px 18px;
   border-top: 1px solid var(--ws-line);
 }
 .mobile-back {

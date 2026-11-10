@@ -1,26 +1,18 @@
 <script setup lang="ts">
 import {
-  lotteryDrawText,
   lotteryMoney,
   lotteryTime,
   prizeNames,
   type LotteryActivity,
   type LotteryWin
 } from '@/api/lottery'
-import LotteryPrizeList from './LotteryPrizeList.vue'
-import LotteryRules from './LotteryRules.vue'
+import LotteryOverview from './LotteryOverview.vue'
 defineProps<{ item: LotteryActivity; busy?: boolean }>()
 defineEmits<{ claim: [win: LotteryWin]; share: [win: LotteryWin] }>()
 </script>
 <template>
   <div class="lottery-detail">
-    <p v-if="item.spec.description" class="lottery-description">{{ item.spec.description }}</p>
-    <LotteryPrizeList :prizes="item.spec.prizes" />
-    <LotteryRules :spec="item.spec" />
-    <div class="lottery-detail-facts">
-      <span>{{ item.entry_count }} 人报名 · {{ item.prize_count }} 个中奖名额</span
-      ><span>{{ lotteryDrawText(item.spec) }} · 北京时间</span>
-    </div>
+    <LotteryOverview :item="item" />
     <Transition name="lottery-reveal" mode="out-in">
       <div
         v-if="item.status === 'drawn'"
@@ -35,7 +27,7 @@ defineEmits<{ claim: [win: LotteryWin]; share: [win: LotteryWin] }>()
             <span>${{ lotteryMoney(item.my_win.amount) }}</span>
           </h3>
           <span class="lottery-muted">{{
-            item.my_win.claimed_at ? '奖金已存入余额' : '核验后直接存入你的余额'
+            item.my_win.claimed_at ? '奖金已存入余额' : '待领取'
           }}</span>
           <div class="lottery-actions">
             <button

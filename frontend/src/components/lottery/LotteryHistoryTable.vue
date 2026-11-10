@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
   lotteryMoney,
   participationNames,
@@ -6,13 +7,14 @@ import {
   type LotteryParticipation,
   type LotteryWin
 } from '@/api/lottery'
-defineProps<{
+const props = defineProps<{
   items: LotteryParticipation[]
   manage: boolean
   busy: number | null
   fixedActivity?: boolean
   loading: boolean
 }>()
+const showDrawnColumns = computed(() => !props.fixedActivity || props.items.some(item => item.activity_status === 'drawn'))
 const emit = defineEmits<{
   detail: [id: number]
   claim: [win: LotteryWin]
@@ -59,9 +61,9 @@ function winAction(item: LotteryParticipation, action: 'claim' | 'share') {
           <th v-if="manage">参与用户</th>
           <th>报名时间</th>
           <th>参与结果</th>
-          <th>中奖奖项 / 金额</th>
-          <th>开奖时间</th>
-          <th>到账情况</th>
+          <th v-if="showDrawnColumns">中奖奖项 / 金额</th>
+          <th v-if="showDrawnColumns">开奖时间</th>
+          <th v-if="showDrawnColumns">到账情况</th>
           <th v-if="!manage">操作</th>
         </tr>
       </thead>
@@ -73,9 +75,9 @@ function winAction(item: LotteryParticipation, action: 'claim' | 'share') {
             ><small>活动 #{{ item.lottery_id }} · 报名 #{{ item.id }}</small>
           </td>
           <td v-if="manage" data-label="参与用户">
-            <strong>{{ item.username || `用户 #${item.user_id}` }}</strong
+            <strong>{{ item.username || '用户' }} <span class="lottery-participant-id">#{{ item.user_id }}</span></strong
             ><small>{{ item.email }}</small
-            ><small>用户 #{{ item.user_id }}</small>
+            >
           </td>
           <td data-label="报名时间">{{ recordTime(item.joined_at) }}</td>
           <td data-label="参与结果">
@@ -83,7 +85,7 @@ function winAction(item: LotteryParticipation, action: 'claim' | 'share') {
               participationNames[item.result]
             }}</span>
           </td>
-          <td data-label="中奖奖项 / 金额">
+          <td v-if="showDrawnColumns" data-label="中奖奖项 / 金额">
             <template v-if="item.prize_key"
               ><span>{{ prizeNames[item.prize_key] }}</span
               ><strong class="lottery-history-amount"
@@ -91,8 +93,8 @@ function winAction(item: LotteryParticipation, action: 'claim' | 'share') {
               ></template
             ><span v-else class="lottery-muted">—</span>
           </td>
-          <td data-label="开奖时间">{{ recordTime(item.drawn_at) }}</td>
-          <td data-label="到账情况">
+          <td v-if="showDrawnColumns" data-label="开奖时间">{{ recordTime(item.drawn_at) }}</td>
+          <td v-if="showDrawnColumns" data-label="到账情况">
             <template v-if="item.win_id"
               ><span>{{ item.claimed_at ? '已到账' : '待领取' }}</span
               ><small v-if="item.claimed_at">{{ recordTime(item.claimed_at) }}</small

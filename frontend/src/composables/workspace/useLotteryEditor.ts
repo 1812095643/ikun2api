@@ -24,7 +24,8 @@ function initialSpec(activity: LotteryActivity | null): LotterySpec {
 export function useLotteryEditor(activity: LotteryActivity | null, isBusy: () => boolean) {
   const form = ref(initialSpec(activity))
   const formElement = ref<HTMLFormElement | null>(null)
-  const step = ref(1)
+  const live = activity?.status === 'open'
+  const step = ref(live ? 3 : 1)
   const preview = ref<LotteryPreview | null>(null)
   const previewBusy = ref(false)
   const previewError = ref('')
@@ -39,7 +40,7 @@ export function useLotteryEditor(activity: LotteryActivity | null, isBusy: () =>
 
   function validate() {
     if (!formElement.value?.reportValidity()) return false
-    if (step.value === 1 && !form.value.title.trim()) {
+    if ((step.value === 1 || live) && !form.value.title.trim()) {
       previewError.value = '请填写活动名称。'
       return false
     }
@@ -62,13 +63,19 @@ export function useLotteryEditor(activity: LotteryActivity | null, isBusy: () =>
     step.value = Math.max(1, step.value - 1)
   }
 
+  function goTo(value: number) {
+    if (!isBusy() && !previewBusy.value && validate()) step.value = value
+  }
+
   function payload(): LotterySpec {
     return {
       ...form.value,
       title: form.value.title.trim(),
-      start_at: new Date(`${form.value.start_at}:00+08:00`).toISOString(),
+      start_at: activity && form.value.start_at === inputTime(activity.spec.start_at)
+        ? activity.spec.start_at : new Date(`${form.value.start_at}:00+08:00`).toISOString(),
       draw_at: form.value.draw_mode === 'full' || !form.value.draw_at
-        ? null : new Date(`${form.value.draw_at}:00+08:00`).toISOString(),
+        ? null : activity?.spec.draw_at && form.value.draw_at === inputTime(activity.spec.draw_at)
+          ? activity.spec.draw_at : new Date(`${form.value.draw_at}:00+08:00`).toISOString(),
       capacity: Number(form.value.capacity)
     }
   }
@@ -92,11 +99,12 @@ export function useLotteryEditor(activity: LotteryActivity | null, isBusy: () =>
   }
 
   function submission(publish: boolean) {
-    if (isBusy() || previewBusy.value || step.value !== 3 || !validate()) return null
+    if (isBusy() || previewBusy.value || (!live && step.value !== 3) || !validate()) return null
+    if (live && !confirmPublish.value) return null
     if (publish && (!preview.value || !confirmPublish.value)) return null
     return payload()
   }
 
   onBeforeUnmount(() => { alive = false })
-  return { form, formElement, step, preview, previewBusy, previewError, confirmPublish, next, previous, check, submission }
+  return { form, formElement, step, preview, previewBusy, previewError, confirmPublish, next, previous, goTo, check, submission }
 }

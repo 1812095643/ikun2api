@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
-const props = defineProps<{ open: boolean; title: string; wide?: boolean }>()
+const props = defineProps<{ open: boolean; title: string; wide?: boolean; busy?: boolean }>()
 const emit = defineEmits<{ 'update:open': [open: boolean] }>()
 const dialog = ref<HTMLDialogElement | null>(null)
 watch(
@@ -22,10 +22,10 @@ onBeforeUnmount(() => dialog.value?.close())
     class="workspace-dialog"
     :class="{ 'workspace-dialog-wide': wide }"
     :aria-label="title"
-    @cancel.prevent="emit('update:open', false)"
+    @cancel.prevent="!busy && emit('update:open', false)"
     @click="
       (event) => {
-        if (event.target === dialog) emit('update:open', false)
+        if (!busy && event.target === dialog) emit('update:open', false)
       }
     "
   >
@@ -36,6 +36,7 @@ onBeforeUnmount(() => dialog.value?.close())
           class="ws-icon-btn"
           type="button"
           aria-label="关闭"
+          :disabled="busy"
           @click="emit('update:open', false)"
         >
           <Icon

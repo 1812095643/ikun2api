@@ -71,7 +71,7 @@ async function notificationSent(id: number) {
 </script>
 
 <template>
-  <div class="ws-toolbar">
+  <div class="ws-toolbar ticket-toolbar">
     <div>
       <div
         v-if="result"
@@ -91,7 +91,7 @@ async function notificationSent(id: number) {
       <button v-if="admin && result?.stats.ended" class="ws-button ws-button-danger" :disabled="busy" @click="deleteTarget = { id: 0, subject: '' }">清理已结束（{{ result.stats.ended }}）</button>
       <button
         class="ws-icon-btn"
-        :disabled="loading"
+        :disabled="loading || busy"
         aria-label="刷新工单"
         @click="loadList()"
       >
@@ -114,7 +114,7 @@ async function notificationSent(id: number) {
     </div>
   </div>
   <div v-if="!admin" class="ticket-quota ws-muted" role="status">
-    <span>{{ quota && !quota.can_create ? `今日已提交 1 张 · 北京时间 ${resetsAt} 重置` : '每天可新建 1 张工单，相同问题请在原工单内继续沟通。' }}</span>
+    <span>{{ quota && !quota.can_create ? `今日已提交 1 张 · 北京时间 ${resetsAt} 重置` : '每日可新建 1 张，相同问题请在原工单继续回复。' }}</span>
     <button v-if="quota?.ticket_id" type="button" class="ticket-existing-link" @click="select(quota.ticket_id)">继续沟通</button>
   </div>
   <div
@@ -131,13 +131,17 @@ async function notificationSent(id: number) {
   >
     <aside class="ticket-sidebar">
       <div class="ticket-filters">
+        <div class="ticket-inbox-tabs" aria-label="工单收件箱">
+          <button type="button" :aria-pressed="!filters.unread_only" @click="filters.unread_only = false; filters.page = 1">全部</button>
+          <button type="button" :aria-pressed="filters.unread_only" @click="filters.unread_only = true; filters.page = 1">未读 <span v-if="result?.stats.unread">{{ result.stats.unread }}</span></button>
+        </div>
         <label class="ticket-search"
           ><Icon
             name="search"
             size="sm" /><input
             v-model="filters.search"
             class="ws-input"
-            :placeholder="admin ? '搜索标题、用户邮箱' : '搜索工单标题'"
+            :placeholder="admin ? '标题、邮箱、用户 ID' : '搜索工单标题'"
             aria-label="搜索工单" /></label
         ><select
           v-model="filters.status"
@@ -232,6 +236,7 @@ async function notificationSent(id: number) {
       </div>
       <TicketConversation
         v-else-if="detail"
+        :key="detail.id"
         :ticket="detail"
         :admin="admin"
         :busy="busy"
@@ -263,6 +268,7 @@ async function notificationSent(id: number) {
   <WorkspaceDialog
     :open="!!deleteImage"
     title="删除已阅图片"
+    :busy="busy"
     @update:open="deleteImage = null"
     ><p class="text-sm leading-7">
       这张图片的内容会被删除，对话文字和删除标记会保留。请确认已经阅览并不再需要。
@@ -282,7 +288,7 @@ async function notificationSent(id: number) {
       </button></template
     ></WorkspaceDialog
   >
-  <WorkspaceDialog :open="!!deleteTarget" :title="deleteTarget?.id ? '删除工单' : '清理已结束工单'" @update:open="deleteTarget = null">
+  <WorkspaceDialog :open="!!deleteTarget" :title="deleteTarget?.id ? '删除工单' : '清理已结束工单'" :busy="busy" @update:open="deleteTarget = null">
     <p class="text-sm leading-7">{{ deleteTarget?.id ? `将删除工单 #${deleteTarget.id}「${deleteTarget.subject}」及全部对话和图片，无法恢复。` : `将删除全部 ${result?.stats.ended || 0} 张已解决或已关闭工单及其对话、图片，无法恢复。` }}</p>
     <template #footer><button class="ws-button" :disabled="busy" @click="deleteTarget = null">取消</button><button class="ws-button ws-button-danger" :disabled="busy" @click="confirmDelete">确认删除</button></template>
   </WorkspaceDialog>
@@ -298,14 +304,19 @@ async function notificationSent(id: number) {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin: -8px 0 18px;
+  margin: 0 0 12px; font-size: 11px;
 }
+.ticket-toolbar { margin-bottom: 12px; }
+.ticket-inbox-tabs { display: flex; align-items: center; gap: 4px; }
+.ticket-inbox-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 7px; font-size: 12px; color: var(--ws-muted); }
+.ticket-inbox-tabs button[aria-pressed="true"] { background: var(--ws-soft); color: var(--ws-primary); font-weight: 600; }
+.ticket-inbox-tabs span { font-size: 11px; }
 .ticket-existing-link { color: var(--ws-primary); }
 .ticket-existing-link:hover { text-decoration: underline; }
 .ticket-stats {
   display: flex;
-  gap: 22px;
-  margin-top: 10px;
+  gap: 16px;
+  margin-top: 0;
   font-size: 12px;
   color: var(--ws-muted);
 }
@@ -315,8 +326,8 @@ async function notificationSent(id: number) {
 }
 .ticket-layout {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  height: min(850px, calc(100dvh - 215px));
+  grid-template-columns: 292px minmax(0, 1fr);
+  height: max(440px, calc(100dvh - 190px));
   min-height: 420px;
 }
 .ticket-sidebar {
@@ -326,7 +337,7 @@ async function notificationSent(id: number) {
   min-height: 0;
 }
 .ticket-filters {
-  padding: 18px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -351,8 +362,8 @@ async function notificationSent(id: number) {
 .new-ticket {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 24px;
+  gap: 14px;
+  padding: 18px;
   height: 100%;
   overflow: auto;
 }
@@ -373,7 +384,7 @@ async function notificationSent(id: number) {
 @media (max-width: 900px) {
   .ticket-layout {
     grid-template-columns: 1fr;
-    min-height: 520px;
+    min-height: 420px;
     height: calc(100dvh - 240px);
   }
   .ticket-main {

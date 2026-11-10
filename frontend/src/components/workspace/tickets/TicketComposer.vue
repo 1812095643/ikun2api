@@ -106,7 +106,7 @@ onBeforeUnmount(() => images.value.forEach((image) => URL.revokeObjectURL(image.
       :id="messageId || 'ticket-message'"
       v-model="content"
       class="ws-input"
-      rows="5"
+      rows="3"
       maxlength="50000"
       :disabled="busy || locked"
       :placeholder="placeholder || '描述遇到的问题，可直接粘贴截图…'"
@@ -165,7 +165,7 @@ onBeforeUnmount(() => images.value.forEach((image) => URL.revokeObjectURL(image.
           size="sm"
         />{{ processing ? '处理图片中…' : '添加图片' }}
       </button>
-      <span class="ws-muted">{{ content.length.toLocaleString() }} / 50,000</span>
+      <span class="ws-muted" title="Ctrl+Enter 发送">{{ content.length ? `${content.length.toLocaleString()} / 50,000` : 'Ctrl+Enter 发送' }}</span>
       <button
         class="ws-button ws-button-primary"
         :disabled="disabled || busy || processing || (!content.trim() && !images.length)"
@@ -185,12 +185,12 @@ onBeforeUnmount(() => images.value.forEach((image) => URL.revokeObjectURL(image.
 .ticket-composer {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 .ticket-composer textarea {
   resize: vertical;
-  min-height: 118px;
-  max-height: 400px;
+  min-height: 82px;
+  max-height: 240px;
   line-height: 1.7;
 }
 .composer-footer {

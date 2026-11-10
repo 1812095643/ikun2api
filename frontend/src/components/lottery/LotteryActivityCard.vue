@@ -79,11 +79,11 @@ const label = computed(() =>
       </div>
       <template v-if="manage"
         ><button
-          v-if="item.status === 'draft'"
+          v-if="item.status === 'draft' || item.status === 'open'"
           class="btn btn-secondary lottery-button lottery-primary"
           @click="$emit('edit')"
         >
-          编辑草稿</button
+          {{ item.status === 'draft' ? '编辑草稿' : '调整活动' }}</button
         ><button v-else class="btn btn-secondary lottery-button" @click="$emit('detail')">
           活动记录
         </button></template

@@ -46,6 +46,7 @@ type lotteryActivity struct {
 	ID                 int64          `json:"id"`
 	Spec               lotterySpec    `json:"spec"`
 	Signature          string         `json:"-"`
+	Revision           string         `json:"revision,omitempty"`
 	Status             string         `json:"status"`
 	CreatedBy          int64          `json:"-"`
 	CreatedAt          time.Time      `json:"created_at"`

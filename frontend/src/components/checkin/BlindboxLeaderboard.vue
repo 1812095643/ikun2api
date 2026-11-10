@@ -5,8 +5,8 @@ defineProps<{ status: BlindboxStatus }>();
 </script>
 
 <template>
-  <aside class="space-y-5">
-    <section class="card p-5" aria-label="参与榜">
+  <aside class="space-y-4">
+    <section class="card p-4" aria-label="参与榜">
       <div class="mb-4 flex items-center justify-between gap-3">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
           参与榜
@@ -15,7 +15,7 @@ defineProps<{ status: BlindboxStatus }>();
           >{{ status.participants }} 人 · {{ status.round.count }} 份</small
         >
       </div>
-      <ol v-if="status.ranking.length" class="space-y-3.5">
+      <ol v-if="status.ranking.length" class="space-y-3">
         <li
           v-for="(item, index) in status.ranking"
           :key="index"
@@ -41,7 +41,7 @@ defineProps<{ status: BlindboxStatus }>();
         展示前 20 名
       </p>
     </section>
-    <section class="card p-5" aria-label="盈利中奖公示">
+    <section class="card p-4" aria-label="盈利中奖公示">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
         中奖公示
       </h3>
@@ -70,7 +70,7 @@ defineProps<{ status: BlindboxStatus }>();
           >
         </li>
       </ol>
-      <p v-else class="py-8 text-center text-xs text-gray-400">暂无盈利记录</p>
+      <p v-else class="py-5 text-center text-xs text-gray-400">暂无盈利记录</p>
     </section>
   </aside>
 </template>

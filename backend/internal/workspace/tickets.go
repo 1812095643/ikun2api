@@ -98,6 +98,13 @@ func actorRole(a actor) string {
 	return "user"
 }
 
+func ticketListScope(a actor, status, search string, unreadOnly bool) (string, []any) {
+	where := ` WHERE ($1 OR t.user_id=$2) AND ($3='' OR t.status=$3)
+ AND ($4='' OR t.subject ILIKE '%'||$4||'%' OR ($1 AND (t.user_email ILIKE '%'||$4||'%' OR t.user_name ILIKE '%'||$4||'%' OR t.user_id::text=$4 OR t.id::text=$4)))
+ AND (NOT $5 OR EXISTS(SELECT 1 FROM workspace_ticket_messages unread WHERE unread.ticket_id=t.id AND unread.kind='message' AND unread.author_role<>$6 AND unread.created_at>COALESCE(CASE WHEN $1 THEN t.admin_last_read_at ELSE t.user_last_read_at END,'epoch'::timestamptz)))`
+	return where, []any{a.Admin, a.ID, status, search, unreadOnly, actorRole(a)}
+}
+
 func (h *Handler) listTickets(c *gin.Context) {
 	a, err := h.identity(c)
 	if err != nil {
@@ -117,13 +124,13 @@ func (h *Handler) listTickets(c *gin.Context) {
 		return
 	}
 	ctx := c.Request.Context()
-	where := ` WHERE ($1 OR t.user_id=$2) AND ($3='' OR t.status=$3) AND ($4='' OR t.subject ILIKE '%'||$4||'%' OR ($1 AND t.user_email ILIKE '%'||$4||'%'))`
+	where, args := ticketListScope(a, status, search, c.Query("unread_only") == "true" || c.Query("unread_only") == "1")
 	var total, active, unread, ended int
-	if err = h.db.QueryRowContext(ctx, "SELECT count(*) FROM workspace_tickets t"+where, a.Admin, a.ID, status, search).Scan(&total); err != nil {
+	if err = h.db.QueryRowContext(ctx, "SELECT count(*) FROM workspace_tickets t"+where, args...).Scan(&total); err != nil {
 		fail(c, err)
 		return
 	}
-	rows, err := h.db.QueryContext(ctx, "SELECT "+ticketColumns+`,(SELECT count(*) FROM workspace_ticket_messages m WHERE m.ticket_id=t.id AND m.kind='message' AND m.author_role<>$5 AND m.created_at>COALESCE(CASE WHEN $1 THEN t.admin_last_read_at ELSE t.user_last_read_at END,'epoch'::timestamptz)),COALESCE((SELECT count(*) FROM workspace_tickets q WHERE q.status IN ('open','in_progress','waiting_user') AND (q.created_at,q.id)<=(t.created_at,t.id) AND t.status IN ('open','in_progress','waiting_user')),0)`+" FROM workspace_tickets t"+where+" ORDER BY t.updated_at DESC,t.id DESC LIMIT $6 OFFSET $7", a.Admin, a.ID, status, search, actorRole(a), size, (page-1)*size)
+	rows, err := h.db.QueryContext(ctx, "SELECT "+ticketColumns+`,(SELECT count(*) FROM workspace_ticket_messages m WHERE m.ticket_id=t.id AND m.kind='message' AND m.author_role<>$6 AND m.created_at>COALESCE(CASE WHEN $1 THEN t.admin_last_read_at ELSE t.user_last_read_at END,'epoch'::timestamptz)),COALESCE((SELECT count(*) FROM workspace_tickets q WHERE q.status IN ('open','in_progress','waiting_user') AND (q.created_at,q.id)<=(t.created_at,t.id) AND t.status IN ('open','in_progress','waiting_user')),0)`+" FROM workspace_tickets t"+where+" ORDER BY t.updated_at DESC,t.id DESC LIMIT $7 OFFSET $8", append(args, size, (page-1)*size)...)
 	if err != nil {
 		fail(c, err)
 		return

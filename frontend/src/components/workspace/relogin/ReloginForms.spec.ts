@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { describe, expect, it } from 'vitest'
 import ReloginAuthorizationForm from './ReloginAuthorizationForm.vue'
 import ReloginImportForm from './ReloginImportForm.vue'
@@ -50,7 +51,7 @@ describe('失效重登设置标签', () => {
   }
   const options = { groups: [{ id: 2, name: 'GPT' }], proxies: [{ id: 3, name: '默认代理' }] }
   it('每次只显示一类，切换保留改动并一次保存全部设置', async () => {
-    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false } })
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
     expect(wrapper.get('[aria-selected="true"]').text()).toBe('自动重登')
     expect(wrapper.get('#relogin-settings-panel-account').isVisible()).toBe(false)
     await wrapper.get('#relogin-settings-tab-account').trigger('click')
@@ -65,7 +66,7 @@ describe('失效重登设置标签', () => {
     wrapper.unmount()
   })
   it('隐藏标签内有不合法输入时自动定位对应设置', async () => {
-    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false } })
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
     await wrapper.get('#relogin-settings-panel-quota input[type="number"]').trigger('invalid')
     expect(wrapper.get('[aria-selected="true"]').text()).toBe('额度通知')
     wrapper.unmount()

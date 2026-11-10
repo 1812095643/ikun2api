@@ -50,9 +50,9 @@ const labels: Record<string, string> = {
         <strong>{{ ticket.subject }}</strong
         ><span
           v-if="ticket.unread_count"
-          class="unread-dot"
+          class="unread-count"
           :aria-label="`${ticket.unread_count}条未读`"
-        />
+        >{{ ticket.unread_count > 99 ? '99+' : ticket.unread_count }}</span>
       </div>
       <div class="ticket-row-footer">
         <span
@@ -74,7 +74,7 @@ const labels: Record<string, string> = {
         >
       </div>
       </button>
-      <button v-if="admin" type="button" class="ticket-row-delete" :disabled="busy" :aria-label="`删除工单 #${ticket.id}`" @click="emit('remove', ticket)">删除</button>
+      <button v-if="admin" type="button" class="ticket-row-delete" :disabled="busy" :aria-label="`删除工单 #${ticket.id}`" @click="emit('remove', ticket)"><Icon name="trash" size="sm" /></button>
     </div>
     <div
       v-if="result && result.total > result.page_size"
@@ -127,14 +127,14 @@ const labels: Record<string, string> = {
 .ticket-row-select {
   display: block;
   width: 100%;
-  padding: 18px 20px;
+  padding: 13px 16px;
   text-align: left;
 }
 .ticket-row-delete {
   position: absolute;
   right: 12px;
   bottom: 8px;
-  padding: 10px 4px;
+  padding: 7px; border-radius: 6px;
   color: #dc2626;
   font-size: 11px;
 }
@@ -161,7 +161,7 @@ const labels: Record<string, string> = {
   font-size: 11px;
 }
 .ticket-row-title {
-  margin: 9px 0 13px;
+  margin: 6px 0 9px;
 }
 .ticket-row-title strong {
   font-size: 14px;
@@ -174,20 +174,20 @@ const labels: Record<string, string> = {
   overflow: hidden;
   flex: 1;
 }
-.unread-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 100%;
-  background: #2563eb;
-  flex-shrink: 0;
-}
+.unread-count { min-width: 18px; height: 18px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: #2563eb; color: white; font-size: 10px; font-weight: 600; flex-shrink: 0; }
 .ticket-row-footer {
   gap: 8px;
   padding-right: 34px;
 }
 .urgent {
+  white-space: nowrap;
+  flex-shrink: 0;
   color: #ea580c;
   font-size: 11px;
   margin-left: auto;
 }
+</style>
+
+<style scoped>
+.ticket-row-footer > .truncate { min-width: 0; flex: 1; }
 </style>

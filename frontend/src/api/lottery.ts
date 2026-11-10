@@ -71,6 +71,7 @@ export interface LotteryActivity {
   winners?: LotteryWin[]
   events?: LotteryEvent[]
   result_digest: string
+  revision?: string
 }
 export interface LotteryPage {
   items: LotteryActivity[]
@@ -170,11 +171,11 @@ export const lotteryAPI = {
   async preview(spec: LotterySpec) {
     return (await apiClient.post<LotteryPreview>(`${admin}/lotteries/preview`, spec)).data
   },
-  async save(spec: LotterySpec, id?: number) {
+  async save(spec: LotterySpec, id?: number, revision?: string) {
     return (
       await (id
-        ? apiClient.put<{ id: number }>(`${admin}/lotteries/${id}`, spec)
-        : apiClient.post<{ id: number }>(`${admin}/lotteries`, spec))
+        ? apiClient.put<{ id: number; status: LotteryActivity['status']; revision: string }>(`${admin}/lotteries/${id}`, spec, { headers: revision ? { 'If-Match': revision } : undefined })
+        : apiClient.post<{ id: number; status: LotteryActivity['status']; revision: string }>(`${admin}/lotteries`, spec))
     ).data
   },
   async publish(id: number) {
