@@ -810,7 +810,7 @@ func (s *GatewayService) schedulingConfig() config.GatewaySchedulingConfig {
 		FallbackMaxWaiting:         100,
 		FallbackWaitAnyAccount:     true,
 		StickyCacheGrace:           2 * time.Second,
-		StickyCacheGraceLarge:      30 * time.Second,
+		StickyCacheGraceLarge:      90 * time.Second,
 		StickyCacheGraceMinBytes:   200_000,
 		StickyCacheGraceLargeBytes: 800_000,
 		LoadBatchEnabled:           true,
