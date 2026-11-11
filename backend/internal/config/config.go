@@ -2676,7 +2676,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.fallback_selection_mode", "last_used")
 	viper.SetDefault("gateway.scheduling.fallback_wait_any_account", true)
 	viper.SetDefault("gateway.scheduling.sticky_cache_grace", 2*time.Second)
-	viper.SetDefault("gateway.scheduling.sticky_cache_grace_large", 5*time.Second)
+	viper.SetDefault("gateway.scheduling.sticky_cache_grace_large", 30*time.Second)
 	viper.SetDefault("gateway.scheduling.sticky_cache_grace_min_bytes", 200_000)
 	viper.SetDefault("gateway.scheduling.sticky_cache_grace_large_bytes", 800_000)
 	viper.SetDefault("gateway.scheduling.prefer_soonest_reset", false)
