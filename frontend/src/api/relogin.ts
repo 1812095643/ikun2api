@@ -56,8 +56,17 @@ export interface ReloginSettings {
     proxy_id: number | null
     group_ids: number[]
     concurrency: number
+    load_factor: number | null
     priority: number
     rate_multiplier: number
+    auto_pause_on_expired: boolean
+    extra: {
+      codex_fingerprint_mode: 'off' | 'device' | 'session' | 'full'
+      openai_long_context_billing_enabled: boolean
+      openai_oauth_responses_websockets_v2_mode: 'off' | 'ctx_pool' | 'passthrough' | 'http_bridge'
+      openai_oauth_responses_websockets_v2_enabled: boolean
+    }
+    model_mapping: Record<string, string>
   }
   quota_enabled: boolean
   quota_interval: number

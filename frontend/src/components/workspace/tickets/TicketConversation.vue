@@ -31,7 +31,7 @@ const labels: Record<string, string> = {
   closed: '已关闭'
 }
 watch(
-  () => [props.ticket.id, props.ticket.messages?.length],
+  [() => props.ticket.id, () => props.ticket.messages?.length || 0, () => props.ticket.messages?.at(-1)?.id],
   async (value, previous) => {
     const element = messages.value
     const nearBottom = !element || element.scrollHeight - element.scrollTop - element.clientHeight < 100
@@ -161,6 +161,7 @@ watch(
         v-else
         :busy="busy"
         :submit="submit"
+        compact
       />
     </div>
   </section>
@@ -171,14 +172,15 @@ watch(
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   height: 100%;
 }
 .conversation-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding: 14px 18px;
+  gap: 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--ws-line);
 }
 .conversation-heading {
@@ -191,7 +193,7 @@ watch(
   font-size: 14px;
   font-weight: 600;
   line-height: 1.6;
-  margin-top: 4px;
+  margin-top: 2px;
   overflow-wrap: anywhere;
 }
 .status-select {
@@ -206,17 +208,18 @@ watch(
 .conversation-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 18px;
+  scrollbar-gutter: stable;
+  padding: 12px 14px;
   min-height: 100px;
 }
 .ticket-message + .ticket-message {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 .ticket-message header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   font-size: 12px;
 }
 .ticket-message time {
@@ -228,8 +231,8 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   background: var(--ws-soft);
   border-radius: 8px;
   font-size: 11px;
@@ -239,12 +242,12 @@ watch(
   background: color-mix(in srgb, var(--ws-primary) 10%, var(--ws-surface));
 }
 .message-body {
-  margin-left: 34px;
-  padding: 11px 14px;
+  margin-left: 30px;
+  padding: 8px 11px;
   border-radius: 0 10px 10px 10px;
   background: var(--ws-soft);
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 .message-body p {
   white-space: pre-wrap;
@@ -256,8 +259,8 @@ watch(
 .message-images {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 8px;
 }
 .message-event {
   display: flex;
@@ -271,7 +274,7 @@ watch(
   margin-left: 0;
 }
 .conversation-compose {
-  padding: 12px 18px;
+  padding: 9px 14px;
   border-top: 1px solid var(--ws-line);
 }
 .mobile-back {
@@ -282,12 +285,12 @@ watch(
     display: inline-flex;
   }
   .conversation-header {
-    padding: 16px;
+    padding: 12px;
     flex-wrap: wrap;
   }
   .conversation-messages,
   .conversation-compose {
-    padding: 16px;
+    padding: 12px;
   }
 }
 </style>

@@ -8,26 +8,27 @@ const url = ref(''),
   failed = ref(false),
   preview = ref(false)
 let request: AbortController | null = null
+async function loadImage() {
+  request?.abort()
+  failed.value = false
+  if (props.image.deleted) return
+  const current = new AbortController()
+  request = current
+  try {
+    const blob = await ticketAPI(props.admin).image(props.ticketId, props.image.id, current.signal)
+    if (!current.signal.aborted) url.value = URL.createObjectURL(blob)
+  } catch {
+    if (!current.signal.aborted) failed.value = true
+  }
+}
 watch(
-  () => [props.image.id, props.image.deleted, props.ticketId],
-  async () => {
+  [() => props.image.id, () => props.image.deleted, () => props.ticketId, () => props.admin],
+  () => {
     request?.abort()
+    preview.value = false
     if (url.value) URL.revokeObjectURL(url.value)
     url.value = ''
-    failed.value = false
-    if (props.image.deleted) return
-    const current = new AbortController()
-    request = current
-    try {
-      const blob = await ticketAPI(props.admin).image(
-        props.ticketId,
-        props.image.id,
-        current.signal
-      )
-      if (!current.signal.aborted) url.value = URL.createObjectURL(blob)
-    } catch {
-      if (!current.signal.aborted) failed.value = true
-    }
+    void loadImage()
   },
   { immediate: true }
 )
@@ -44,11 +45,7 @@ onBeforeUnmount(() => {
       class="ws-muted"
       >图片已由管理员删除</span
     >
-    <span
-      v-else-if="failed"
-      class="ws-muted"
-      >图片暂时无法读取</span
-    >
+    <button v-else-if="failed" type="button" class="attachment-preview ws-muted" @click="loadImage">读取失败 · 重试</button>
     <template v-else
       ><button
         type="button"
@@ -96,16 +93,19 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 .attachment-preview {
-  min-width: 80px;
-  min-height: 60px;
+  display: grid;
+  place-items: center;
+  width: 144px;
+  height: 96px;
+  flex: none;
   overflow: hidden;
   border-radius: 8px;
   background: var(--ws-soft);
   border: 1px solid var(--ws-line);
 }
 .attachment-preview img {
-  width: 150px;
-  height: 110px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 .attachment-delete {

@@ -142,6 +142,15 @@ jobs:
         working-directory: frontend
         run: pnpm exec vitest run src/utils/__tests__/ccswitchImport.spec.ts src/utils/__tests__/ccswitchImport.antigravityUrl.spec.ts src/components/keys/__tests__/CcSwitchImportDialog.spec.ts src/components/keys/__tests__/UseKeyModal.spec.ts src/api/__tests__/ccswitch.spec.ts src/utils/__tests__/magpieImport.spec.ts src/components/keys/__tests__/KeyQuickUseDialog.spec.ts src/components/keys/__tests__/MagpieImportDialog.spec.ts
 
+      - name: 失效重登、工单稳定性与画布图片回归
+        run: |
+          cd frontend
+          pnpm exec vitest run src/components/workspace/relogin/ReloginForms.spec.ts src/components/workspace/relogin/ReloginSecretDialog.spec.ts src/views/workspace/ReloginView.spec.ts src/components/workspace/tickets/TicketAttachment.spec.ts src/components/workspace/tickets/TicketConversation.spec.ts src/composables/workspace/useTickets.spec.ts src/components/usage/UsageTokenCounts.spec.ts
+          cd studio
+          node ../node_modules/vitest/vitest.mjs run --config vitest.config.ts
+          cd ../../backend
+          go test -tags unit ./internal/workspace ./internal/service ./internal/config ./internal/server/middleware -run 'Test(Relogin|OpenAIOAuthWSDefaults|LoadOpenAIWSPluginReplacementDefaults|StandaloneStudio)' -count=1 -timeout=180s
+
       # ---------------- 五个平台二进制 ----------------
 
       - name: 释放 runner 磁盘空间
@@ -219,7 +228,7 @@ jobs:
           cp deploy/MIGRATION.md dist/release/MIGRATION.md
           python3 - <<'PY'
           import json,os,pathlib
-          pathlib.Path('dist/release/release-manifest.json').write_text(json.dumps({'version':os.environ['VERSION'],'commit':os.environ['COMMIT'],'repository':'1812095643/ikun2api','upstream_baseline':'0.2.20','schema_forward_only':True,'signature':'Ed25519'},indent=2))
+          pathlib.Path('dist/release/release-manifest.json').write_text(json.dumps({'version':os.environ['VERSION'],'commit':os.environ['COMMIT'],'repository':'1812095643/ikun2api','upstream_baseline':'0.2.21','schema_forward_only':True,'signature':'Ed25519'},indent=2))
           PY
       - name: 生成并签名完整校验清单
         env:

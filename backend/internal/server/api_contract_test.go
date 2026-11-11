@@ -224,7 +224,8 @@ func TestAPIContracts(t *testing.T) {
 				"Content-Type": "application/json",
 			},
 			wantStatus: http.StatusOK,
-			wantJSON: `{
+			wantJSON: `
+			{
 				"code": 0,
 				"message": "success",
 				"data": {
@@ -252,9 +253,12 @@ func TestAPIContracts(t *testing.T) {
 					"window_7d_start": null,
 					"expires_at": null,
 					"created_at": "2025-01-02T03:04:05Z",
-					"updated_at": "2025-01-02T03:04:05Z"
+					"updated_at": "2025-01-02T03:04:05Z",
+					"funding_source": "balance",
+					"group_ids": null
 				}
-			}`,
+			}
+			`,
 		},
 		{
 			name: "GET /api/v1/keys (paginated)",
@@ -273,7 +277,8 @@ func TestAPIContracts(t *testing.T) {
 			method:     http.MethodGet,
 			path:       "/api/v1/keys?page=1&page_size=10",
 			wantStatus: http.StatusOK,
-			wantJSON: `{
+			wantJSON: `
+			{
 				"code": 0,
 				"message": "success",
 				"data": {
@@ -303,7 +308,9 @@ func TestAPIContracts(t *testing.T) {
 							"window_7d_start": null,
 							"expires_at": null,
 							"created_at": "2025-01-02T03:04:05Z",
-							"updated_at": "2025-01-02T03:04:05Z"
+							"updated_at": "2025-01-02T03:04:05Z",
+							"funding_source": "",
+							"group_ids": null
 						}
 					],
 					"total": 1,
@@ -311,7 +318,8 @@ func TestAPIContracts(t *testing.T) {
 					"page_size": 10,
 					"pages": 1
 				}
-			}`,
+			}
+			`,
 		},
 		{
 			name: "GET /api/v1/groups/available",
@@ -583,7 +591,8 @@ func TestAPIContracts(t *testing.T) {
 			method:     http.MethodGet,
 			path:       "/api/v1/usage?page=1&page_size=10",
 			wantStatus: http.StatusOK,
-			wantJSON: `{
+			wantJSON: `
+			{
 				"code": 0,
 				"message": "success",
 				"data": {
@@ -592,29 +601,30 @@ func TestAPIContracts(t *testing.T) {
 							"id": 1,
 							"user_id": 1,
 							"api_key_id": 100,
-							"account_id": 200,
-								"request_id": "req_123",
-								"model": "claude-3",
-								"request_type": "stream",
-								"native_compaction_v2": false,
-								"openai_ws_mode": false,
-								"group_id": null,
-								"subscription_id": null,
+							"request_id": "req_123",
+							"model": "claude-3",
+							"request_type": "stream",
+							"native_compaction_v2": false,
+							"openai_ws_mode": false,
+							"group_id": null,
+							"subscription_id": null,
 							"input_tokens": 10,
 							"output_tokens": 20,
 							"cache_creation_tokens": 1,
 							"cache_read_tokens": 2,
 							"cache_creation_5m_tokens": 0,
 							"cache_creation_1h_tokens": 0,
+							"cache_creation_30m_tokens": 0,
+							"cache_creation_12h_tokens": 0,
 							"input_cost": 0,
 							"output_cost": 0,
 							"cache_creation_cost": 0,
 							"cache_read_cost": 0,
-						"total_cost": 0.5,
-						"actual_cost": 0.5,
-						"rate_multiplier": 1,
-						"long_context_billing_applied": false,
-						"billing_type": 0,
+							"total_cost": 0.5,
+							"actual_cost": 0.5,
+							"rate_multiplier": 1,
+							"long_context_billing_applied": false,
+							"billing_type": 0,
 							"stream": true,
 							"duration_ms": 100,
 							"first_token_ms": 50,
@@ -639,7 +649,8 @@ func TestAPIContracts(t *testing.T) {
 					"page_size": 10,
 					"pages": 1
 				}
-			}`,
+			}
+			`,
 		},
 		{
 			name: "GET /api/v1/admin/settings",
@@ -1019,6 +1030,11 @@ func TestAPIContracts(t *testing.T) {
 					"available_channels_enabled": false,
 					"subscription_enabled": true,
 					"model_plaza_enabled": false,
+					"model_plaza_credits_per_cny": 0,
+					"pool_user_synthetic_banned": 0,
+					"pool_user_synthetic_count": 0,
+					"pool_user_synthetic_platform": "anthropic",
+					"pool_user_visible_group_id": 0,
 					"model_plaza_require_auth": false,
 					"model_plaza_description": "",
 					"plugin_management_enabled": false,
@@ -1352,6 +1368,11 @@ func TestAPIContracts(t *testing.T) {
 					"available_channels_enabled": false,
 					"subscription_enabled": true,
 					"model_plaza_enabled": false,
+					"model_plaza_credits_per_cny": 0,
+					"pool_user_synthetic_banned": 0,
+					"pool_user_synthetic_count": 0,
+					"pool_user_synthetic_platform": "anthropic",
+					"pool_user_visible_group_id": 0,
 					"model_plaza_require_auth": false,
 					"model_plaza_description": "",
 					"plugin_management_enabled": false,

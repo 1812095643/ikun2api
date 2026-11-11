@@ -4,6 +4,7 @@ import Icon from '@/components/icons/Icon.vue'
 import type { TicketDraft } from '@/api/workspace'
 const props = defineProps<{
   busy?: boolean
+  compact?: boolean
   disabled?: boolean
   locked?: boolean
   placeholder?: string
@@ -95,6 +96,7 @@ onBeforeUnmount(() => images.value.forEach((image) => URL.revokeObjectURL(image.
 <template>
   <form
     class="ticket-composer"
+    :class="{ 'ticket-composer-compact': compact }"
     @submit.prevent="send"
   >
     <label
@@ -106,7 +108,7 @@ onBeforeUnmount(() => images.value.forEach((image) => URL.revokeObjectURL(image.
       :id="messageId || 'ticket-message'"
       v-model="content"
       class="ws-input"
-      rows="3"
+      :rows="compact ? 2 : 3"
       maxlength="50000"
       :disabled="busy || locked"
       :placeholder="placeholder || '描述遇到的问题，可直接粘贴截图…'"
@@ -193,6 +195,8 @@ onBeforeUnmount(() => images.value.forEach((image) => URL.revokeObjectURL(image.
   max-height: 240px;
   line-height: 1.7;
 }
+.ticket-composer-compact { gap: 7px; }
+.ticket-composer-compact textarea { min-height: 52px; max-height: 180px; line-height: 1.5; }
 .composer-footer {
   display: flex;
   align-items: center;

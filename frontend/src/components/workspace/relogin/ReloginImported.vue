@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { formatTime } from '@/api/workspace'
 import type { ImportedPage } from '@/api/relogin'
-const props = defineProps<{ result: ImportedPage | null; selected: string[] }>()
-const emit = defineEmits<{ 'update:selected': [values: string[]]; page: [page: number] }>()
+const props = defineProps<{ result: ImportedPage | null; selected: string[]; busy?: boolean }>()
+const emit = defineEmits<{ 'update:selected': [values: string[]]; page: [page: number]; view: [email: string]; remove: [email: string]; login: [email: string] }>()
 function toggle(email: string, checked: boolean) {
   emit(
     'update:selected',
@@ -41,7 +41,7 @@ function togglePage(checked: boolean) {
           <th>验证方式</th>
           <th>已保存资料</th>
           <th>更新时间</th>
-          <th>最近使用</th>
+          <th>最近使用</th><th class="text-right">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -57,7 +57,7 @@ function togglePage(checked: boolean) {
               @change="toggle(item.email, ($event.target as HTMLInputElement).checked)"
             />
           </td>
-          <td class="font-medium">{{ item.email }}</td>
+          <td class="font-medium"><button type="button" class="hover:underline" :disabled="busy" @click="emit('view', item.email)">{{ item.email }}</button></td>
           <td>{{ item.auth_mode === 'email_otp' ? '邮箱验证码' : '密码 / MFA' }}</td>
           <td>
             <div class="ws-actions">
@@ -78,6 +78,11 @@ function togglePage(checked: boolean) {
           </td>
           <td class="ws-muted whitespace-nowrap">{{ formatTime(item.updated_at) }}</td>
           <td class="ws-muted whitespace-nowrap">{{ formatTime(item.last_used_at) }}</td>
+          <td><div class="ws-actions justify-end flex-nowrap">
+            <button type="button" class="ws-button" :disabled="busy" @click="emit('login', item.email)">重登</button>
+            <button type="button" class="ws-button ws-button-quiet" :disabled="busy" @click="emit('view', item.email)">查看资料</button>
+            <button type="button" class="ws-button ws-button-danger" :disabled="busy" @click="emit('remove', item.email)">删除</button>
+          </div></td>
         </tr>
       </tbody>
     </table>

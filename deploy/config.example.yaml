@@ -263,8 +263,10 @@ gateway:
   # Per-instance ingress allocation budget. Unreferenced intermediates are released after each phase.
   # Final bodies (and still-referenced preread buffers) remain charged until the handler returns.
   # Include all concurrent long-lived requests and upload/decode workspace; see EDGE_SECURITY.md.
-  # 实例级请求体分配预算；超出返回 503 + Retry-After，0 禁用。按容器内存预留业务/GC空间。
-  request_body_memory_budget_bytes: 1073741824
+  # Unset (default): 1/4 of the memory limit (min of RAM, cgroup limit, GOMEMLIMIT), at least 1 GiB.
+  # 实例级请求体分配预算；超出返回 503 + Retry-After，0 禁用。
+  # 不配置时自动取内存上限（物理内存/cgroup 限额/GOMEMLIMIT 的最小值）的 1/4，最低 1GiB；显式配置后不再自适应。
+  # request_body_memory_budget_bytes: 1073741824
   # Individual socket read/write idle deadlines, not the entire SSE lifetime; 0 disables.
   # 上传单次读取、下游单次写入/flush 超时（秒），不会限制正常长流的总时长；0 禁用。
   request_body_read_timeout_seconds: 120
@@ -414,8 +416,8 @@ gateway:
     # store=false 且无可复用会话连接时，是否强制新建连接（默认 true，优先会话隔离）
     # 兼容旧配置：仅在 store_disabled_conn_mode 未配置时生效
     store_disabled_force_new_conn: true
-    # 是否启用 WSv2 generate=false 预热（默认 false）
-    prewarm_generate_enabled: false
+    # 是否启用 WSv2 generate=false 预热（默认 true，可显式关闭）
+    prewarm_generate_enabled: true
     # OAuth 新 WS 首轮无搜索时，先声明搜索能力；与生成前预热独立。
     # 环境变量：GATEWAY_OPENAI_WS_SEARCH_INIT_ENABLED=false 可关闭。
     search_init_enabled: true

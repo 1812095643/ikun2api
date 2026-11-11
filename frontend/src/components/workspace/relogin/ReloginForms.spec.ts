@@ -46,7 +46,8 @@ describe('账号授权入口', () => {
 
 describe('失效重登设置标签', () => {
   const settings: ReloginSettings = {
-    auto_enabled: true, template: { proxy_id: null, concurrency: 100, priority: 1, rate_multiplier: 1, group_ids: [2] },
+    auto_enabled: true, template: { proxy_id: null, concurrency: 100, load_factor: 10000, priority: 1, rate_multiplier: 1, group_ids: [2], auto_pause_on_expired: true,
+      extra: { codex_fingerprint_mode: 'full', openai_long_context_billing_enabled: true, openai_oauth_responses_websockets_v2_mode: 'ctx_pool', openai_oauth_responses_websockets_v2_enabled: true }, model_mapping: {} },
     quota_enabled: false, quota_interval: 300, quota_threshold: 20, recipients: ['owner@example.test']
   }
   const options = { groups: [{ id: 2, name: 'GPT' }], proxies: [{ id: 3, name: '默认代理' }] }
@@ -57,12 +58,33 @@ describe('失效重登设置标签', () => {
     await wrapper.get('#relogin-settings-tab-account').trigger('click')
     await wrapper.get('#relogin-settings-panel-account input[type="number"]').setValue(80)
     await wrapper.get('#relogin-settings-tab-quota').trigger('click')
-    await wrapper.get('textarea').setValue('owner@example.test\nsecond@example.test')
+    await wrapper.get('#relogin-settings-panel-quota textarea').setValue('owner@example.test\nsecond@example.test')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('save')?.[0]).toEqual([{
       ...settings, template: { ...settings.template, concurrency: 80 }, recipients: ['owner@example.test', 'second@example.test']
     }])
     expect(settings.template.concurrency).toBe(100)
+    wrapper.unmount()
+  })
+  it('保存收敛档位、模型映射及 WS 关闭选择，输入不回写原设置', async () => {
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
+    await wrapper.get('[aria-label="收敛档位"]').setValue('device')
+    await wrapper.get('[aria-label="WebSocket"]').setValue('off')
+    await wrapper.get('[aria-label="模型映射"]').setValue('{"alias":"target"}')
+    await wrapper.get('form').trigger('submit')
+    const saved = wrapper.emitted('save')?.[0][0] as ReloginSettings
+    expect(saved.template.extra.codex_fingerprint_mode).toBe('device')
+    expect(saved.template.extra.openai_oauth_responses_websockets_v2_enabled).toBe(false)
+    expect(saved.template.model_mapping).toEqual({ alias: 'target' })
+    expect(settings.template.extra.codex_fingerprint_mode).toBe('full')
+    wrapper.unmount()
+  })
+  it('模型映射格式错误时保持输入并阻止提交', async () => {
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
+    await wrapper.get('[aria-label="模型映射"]').setValue('{"alias":null}')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('save')).toBeUndefined()
+    expect(wrapper.get('[role="alert"]').text()).toContain('模型映射')
     wrapper.unmount()
   })
   it('隐藏标签内有不合法输入时自动定位对应设置', async () => {

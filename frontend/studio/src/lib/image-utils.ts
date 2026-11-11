@@ -51,13 +51,19 @@ export function readImageMeta(dataUrl: string) {
     });
 }
 
-export function dataUrlToFile(image: ReferenceImage) {
-    const [header, content] = image.dataUrl.split(",", 2);
-    const mimeType = header.match(/data:(.*?);base64/)?.[1] || image.type || "image/png";
-    const binary = atob(content || "");
+export function dataUrlToBlob(dataUrl: string, fallbackType = "image/png") {
+    const [header, content] = dataUrl.split(",", 2);
+    if (!/^data:[^,]*;base64$/i.test(header) || !content) throw new Error(i18n.t("common.imageReadFailed"));
+    const mimeType = header.slice(5).replace(/;base64$/i, "") || fallbackType;
+    const binary = atob(content);
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) {
         bytes[index] = binary.charCodeAt(index);
     }
-    return new File([bytes], image.name || "reference.png", { type: mimeType });
+    return new Blob([bytes], { type: mimeType });
+}
+
+export function dataUrlToFile(image: ReferenceImage) {
+    const blob = dataUrlToBlob(image.dataUrl, image.type || "image/png");
+    return new File([blob], image.name || "reference.png", { type: blob.type });
 }

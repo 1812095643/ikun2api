@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import i18n from "@/i18n";
 import { withLocalProxy } from "@/stores/use-config-store";
 import { createImageThumbnail } from "@/lib/image-thumbnail";
+import { dataUrlToBlob } from "@/lib/image-utils";
 import { fetchRelayedImage } from "@/services/api/image-relay";
 
 export type UploadedImage = {
@@ -61,6 +62,9 @@ async function storeImage(blob: Blob, options?: ImageReadOptions): Promise<Uploa
 }
 
 async function fetchImageBlob(url: string, options?: ImageReadOptions) {
+    throwIfAborted(options?.signal);
+    // API 已返回的 base64 在本地解码，避免 fetch(data:) 被 CSP 拦截后误报生成失败。
+    if (/^data:[^,]*;base64,/i.test(url)) return dataUrlToBlob(url);
     const controller = new AbortController();
     let timedOut = false;
     const abort = () => controller.abort();

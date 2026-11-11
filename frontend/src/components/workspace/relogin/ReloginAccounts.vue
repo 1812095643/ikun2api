@@ -3,7 +3,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { formatTime } from '@/api/workspace'
 import type { LoginRun, ReloginAccount } from '@/api/relogin'
 defineProps<{ accounts: ReloginAccount[]; runs: LoginRun[]; busy: boolean }>()
-const emit = defineEmits<{ saved: [account: ReloginAccount]; login: [account: ReloginAccount] }>()
+const emit = defineEmits<{ saved: [account: ReloginAccount]; login: [account: ReloginAccount]; view: [account: ReloginAccount]; remove: [account: ReloginAccount] }>()
 </script>
 <template>
   <div class="ws-table-wrap">
@@ -52,7 +52,8 @@ const emit = defineEmits<{ saved: [account: ReloginAccount]; login: [account: Re
             <p class="ws-muted mt-1">{{ account.schedulable ? '参与调度' : '暂停调度' }}</p>
           </td>
           <td>
-            <span class="ws-muted">{{ account.has_imported ? '已保存' : '未保存' }}</span>
+            <button v-if="account.has_imported" type="button" class="text-sm text-primary-600 hover:underline" :disabled="busy" @click="emit('view', account)">查看资料</button>
+            <button v-else type="button" class="text-sm text-gray-500 hover:underline" :disabled="busy || !account.email" @click="emit('view', account)">补充资料</button>
           </td>
           <td class="whitespace-nowrap ws-muted">{{ formatTime(account.updated_at) }}</td>
           <td>
@@ -81,6 +82,7 @@ const emit = defineEmits<{ saved: [account: ReloginAccount]; login: [account: Re
                   重新授权
                 </button></template
               >
+              <button type="button" class="ws-button ws-button-danger" :disabled="busy || runs.some(run => run.email === account.email && (run.status === 'running' || run.status === 'challenge'))" @click="emit('remove', account)">删除</button>
             </div>
           </td>
         </tr>

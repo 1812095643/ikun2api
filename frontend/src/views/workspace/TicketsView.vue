@@ -7,7 +7,7 @@ const route = useRoute()
 const admin = computed(() => route.path.startsWith('/admin/'))
 </script>
 <template>
-  <WorkspaceShell class="workspace-tickets"
+  <WorkspaceShell wide class="workspace-tickets"
     ><TicketWorkspace
       :key="String(admin)"
       :admin="admin"

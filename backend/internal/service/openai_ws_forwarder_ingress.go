@@ -1314,7 +1314,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					FirstTokenMs:                  firstTokenMs,
 				}
 				result.wsAccountFailoverReplayInput = replayCollector.AllItems()
-				if replayInput := replayCollector.Items(); len(replayInput) > 0 {
+				replayInput := replayCollector.Items()
+				if account.IsOpenAIOAuthLike() && lease.initializedWithoutWebSearch() {
+					// Keep complete output while search activation can require a new socket.
+					replayInput = replayCollector.AllItems()
+				}
+				if len(replayInput) > 0 {
 					result.wsReplayInput = replayInput
 					result.wsReplayInputExists = true
 				}
@@ -1396,6 +1401,15 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	defer releaseSessionLease()
 
 	turn := 1
+	defer func() {
+		var failoverErr *UpstreamFailoverError
+		if turn > 1 && errors.As(returnErr, &failoverErr) {
+			// Native ingress does not retain a complete conversation for account
+			// migration. A nil current-turn payload makes the handler close the
+			// client connection instead of replaying its original first message.
+			returnErr = newOpenAIWSCurrentTurnFailoverError(returnErr, nil)
+		}
+	}()
 	rejectedFieldRetryState = newOpenAIResponsesRejectedFieldRetryState(currentPayload)
 	turnRetry := 0
 	turnPrevRecoveryTried := false
@@ -1575,6 +1589,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		boundaryPayload, contextWindowBoundary, boundaryErr := normalizeOpenAIWSContextWindowBoundary(
 			currentPayload,
 			lastTurnWindowID,
+			currentClientPayload,
 		)
 		if boundaryErr != nil {
 			return fmt.Errorf("normalize Codex websocket context-window boundary: %w", boundaryErr)
@@ -1898,6 +1913,10 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			}
 		}
 		if account.IsOpenAIOAuthLike() && sessionLease.missingHostedTools(openAIWSHostedToolsDeclared(currentPayload)) != 0 {
+			// Strict previous-id cleanup must not turn unknown history into a complete root.
+			if !searchTurnComplete {
+				return openAIWSHostedHistoryUnavailable()
+			}
 			if currentPreviousResponseID != "" {
 				if !searchTurnComplete || !searchTurnInputExists {
 					return openAIWSHostedHistoryUnavailable()

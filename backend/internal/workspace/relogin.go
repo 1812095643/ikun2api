@@ -447,9 +447,7 @@ func (h *Handler) applyRun(ctx context.Context, id int64) error {
 				return &requestError{409, "这个邮箱已有关联账号，请选择现有账号重新授权。"}
 			}
 		}
-		note := "由原生失效重登创建"
-		template := settings.Template
-		account, err = h.admin.CreateAccount(ctx, &service.CreateAccountInput{Name: email, Notes: &note, Platform: "openai", Type: "oauth", Credentials: credentials, ProxyID: template.ProxyID, Concurrency: template.Concurrency, Priority: template.Priority, RateMultiplier: &template.RateMultiplier, GroupIDs: template.GroupIDs, SkipDefaultGroupBind: len(template.GroupIDs) == 0})
+		account, err = h.admin.CreateAccount(ctx, settings.Template.createInput(email, credentials))
 	}
 	if err != nil {
 		return err

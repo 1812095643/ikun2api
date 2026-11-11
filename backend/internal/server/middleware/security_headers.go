@@ -186,7 +186,7 @@ func poolShareCSP(policy string) string {
 // retains its existing non-eval policy and endpoint restrictions.
 func standaloneStudioCSP(policy string) string {
 	policy = addToDirective(policy, "script-src", "'unsafe-eval'")
-	for _, origin := range []string{"http://127.0.0.1:*", "http://localhost:*", "ws://127.0.0.1:*", "ws://localhost:*", "wss:"} {
+	for _, origin := range []string{"data:", "blob:", "http://127.0.0.1:*", "http://localhost:*", "ws://127.0.0.1:*", "ws://localhost:*", "wss:"} {
 		policy = addToDirective(policy, "connect-src", origin)
 	}
 	for _, source := range []string{"'self'", "data:", "blob:", "https:"} {

@@ -2,15 +2,23 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReloginView from './ReloginView.vue'
 import ReloginAuthorizationForm from '@/components/workspace/relogin/ReloginAuthorizationForm.vue'
+import ReloginAccounts from '@/components/workspace/relogin/ReloginAccounts.vue'
+import ReloginSecretDialog from '@/components/workspace/relogin/ReloginSecretDialog.vue'
 
 const api = vi.hoisted(() => ({
-  accounts: vi.fn(), history: vi.fn(), settings: vi.fn(), options: vi.fn(), imported: vi.fn(), import: vi.fn(), start: vi.fn()
+  accounts: vi.fn(), history: vi.fn(), settings: vi.fn(), options: vi.fn(), imported: vi.fn(), import: vi.fn(), start: vi.fn(), export: vi.fn(), remove: vi.fn()
 }))
 vi.mock('@/api/relogin', async importOriginal => ({ ...await importOriginal<object>(), reloginAPI: api }))
-vi.mock('@/composables/useStepUp', () => ({ useStepUp: () => ({}) }))
+const stepUpRun = vi.hoisted(() => vi.fn())
+const removeAccount = vi.hoisted(() => vi.fn())
+vi.mock('@/api/admin/accounts', async importOriginal => ({ ...await importOriginal<object>(), deleteAccount: removeAccount }))
+vi.mock('@/composables/useStepUp', () => ({ useStepUp: () => ({ run: stepUpRun }) }))
 
 beforeEach(() => {
   vi.resetAllMocks()
+  stepUpRun.mockImplementation(action => action())
+  api.export.mockResolvedValue([{ email: 'owner@example.test', password: 'synthetic-private', auth_mode: 'password_2fa' }])
+  removeAccount.mockResolvedValue({ message: 'deleted' })
   api.accounts.mockResolvedValue([])
   api.history.mockResolvedValue([])
   api.settings.mockResolvedValue({ settings: { auto_enabled: false }, quota: null })
@@ -26,7 +34,7 @@ async function setup() {
       stubs: {
         WorkspaceShell: { template: '<main><slot /></main>' },
         BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /><slot name="footer" /></div>' },
-        WorkspaceDialog: true, TotpStepUpDialog: true, Icon: true,
+        WorkspaceDialog: { props: ['open'], template: '<div v-if="open"><slot /><slot name="footer" /></div>' }, TotpStepUpDialog: true, Icon: true,
         ReloginAccounts: true, ReloginImported: true, ReloginHistory: true,
         RouterLink: true
       }
@@ -43,6 +51,30 @@ const items = [
 ]
 
 describe('整行资料授权流程', () => {
+  it('账号行查看资料经过二次验证，按该账号邮箱精确读取', async () => {
+    const wrapper = await setup()
+    expect(api.export).not.toHaveBeenCalled()
+    wrapper.getComponent(ReloginAccounts).vm.$emit('view', { id: 7, email: 'owner@example.test', has_imported: true })
+    await flushPromises()
+    expect(stepUpRun).toHaveBeenCalledTimes(1)
+    expect(api.export).toHaveBeenCalledWith(['owner@example.test'])
+    expect(wrapper.getComponent(ReloginSecretDialog).props('secret')?.password).toBe('synthetic-private')
+    wrapper.getComponent(ReloginSecretDialog).vm.$emit('close')
+    await flushPromises()
+    expect(wrapper.getComponent(ReloginSecretDialog).props('secret')).toBeNull()
+    wrapper.unmount()
+  })
+  it('删除渠道账号先确认，且不删除已保存登录资料', async () => {
+    const wrapper = await setup()
+    wrapper.getComponent(ReloginAccounts).vm.$emit('remove', { id: 7, email: 'owner@example.test' })
+    await flushPromises()
+    expect(removeAccount).not.toHaveBeenCalled()
+    await wrapper.findAll('button').find(button => button.text() === '确认删除账号')!.trigger('click')
+    await flushPromises()
+    expect(removeAccount).toHaveBeenCalledWith(7)
+    expect(api.remove).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
   it('先保存资料，再使用保存资料的接口逐条授权并显示记录', async () => {
     const wrapper = await setup()
     wrapper.getComponent(ReloginAuthorizationForm).vm.$emit('import', items, true, true)

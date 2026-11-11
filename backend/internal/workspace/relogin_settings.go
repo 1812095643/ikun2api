@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html"
 	"math"
@@ -9,15 +10,20 @@ import (
 	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/pkg/response"
+	"github.com/MACOS-DO/sub4api/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
 type accountTemplate struct {
-	ProxyID        *int64  `json:"proxy_id"`
-	GroupIDs       []int64 `json:"group_ids"`
-	Concurrency    int     `json:"concurrency"`
-	Priority       int     `json:"priority"`
-	RateMultiplier float64 `json:"rate_multiplier"`
+	ProxyID            *int64               `json:"proxy_id"`
+	GroupIDs           []int64              `json:"group_ids"`
+	Concurrency        int                  `json:"concurrency"`
+	LoadFactor         *int                 `json:"load_factor"`
+	Priority           int                  `json:"priority"`
+	RateMultiplier     float64              `json:"rate_multiplier"`
+	AutoPauseOnExpired bool                 `json:"auto_pause_on_expired"`
+	Extra              accountTemplateExtra `json:"extra"`
+	ModelMapping       map[string]string    `json:"model_mapping"`
 }
 type reloginConfig struct {
 	AutoEnabled    bool            `json:"auto_enabled"`
@@ -29,9 +35,29 @@ type reloginConfig struct {
 }
 
 func (h *Handler) loadReloginSettings(ctx context.Context) (reloginConfig, error) {
-	s := reloginConfig{Template: accountTemplate{GroupIDs: []int64{}, Concurrency: 100, Priority: 1, RateMultiplier: 1}, QuotaInterval: 300, QuotaThreshold: 20, Recipients: []string{}}
-	err := h.getRuntime(ctx, "relogin_settings", &s)
-	return s, err
+	s := defaultReloginConfig()
+	var stored json.RawMessage
+	if err := h.getRuntime(ctx, "relogin_settings", &stored); err != nil {
+		return s, err
+	}
+	if !hasCompleteReloginTemplate(stored) {
+		if legacy, err := h.legacyReloginTemplate(ctx); err != nil {
+			return s, err
+		} else if len(legacy) > 0 {
+			if err := json.Unmarshal(legacy, &s.Template); err != nil {
+				return s, err
+			}
+			// Old host WS=off delegated to the plugin; native requests now use WS directly.
+			s.Template.Extra.OpenAIWSMode = service.OpenAIWSIngressModeCtxPool
+			s.Template.Extra.OpenAIWSEnabled = true
+		}
+	}
+	if len(stored) > 0 {
+		if err := json.Unmarshal(stored, &s); err != nil {
+			return s, err
+		}
+	}
+	return s, normalizeReloginTemplate(&s.Template)
 }
 func (h *Handler) reloginSettings(c *gin.Context) {
 	s, err := h.loadReloginSettings(c.Request.Context())
@@ -55,13 +81,21 @@ func (h *Handler) reloginSettings(c *gin.Context) {
 	response.Success(c, gin.H{"settings": s, "state": state, "quota": quota})
 }
 func (h *Handler) saveReloginSettings(c *gin.Context) {
-	var s reloginConfig
+	s, err := h.loadReloginSettings(c.Request.Context())
+	if err != nil {
+		fail(c, err)
+		return
+	}
 	if err := body(c, &s, 64<<10); err != nil {
 		fail(c, err)
 		return
 	}
 	if s.Template.Concurrency < 1 || s.Template.Concurrency > 10000 || s.Template.Priority < 0 || s.Template.RateMultiplier < 0 || math.IsNaN(s.Template.RateMultiplier) || math.IsInf(s.Template.RateMultiplier, 0) || s.QuotaInterval < 60 || s.QuotaInterval > 86400 || s.QuotaThreshold < 0 || math.IsNaN(s.QuotaThreshold) || math.IsInf(s.QuotaThreshold, 0) || len(s.Recipients) > 20 {
 		fail(c, badRequest("请检查并发数、刷新间隔和额度阈值。"))
+		return
+	}
+	if err := normalizeReloginTemplate(&s.Template); err != nil {
+		fail(c, err)
 		return
 	}
 	ctx := c.Request.Context()

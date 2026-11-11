@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useTickets } from '@/composables/workspace/useTickets'
 import { workspaceError, type TicketDraft, type TicketImage } from '@/api/workspace'
@@ -9,6 +9,29 @@ import TicketComposer from './TicketComposer.vue'
 import TicketConversation from './TicketConversation.vue'
 import TicketNotificationDialog from './TicketNotificationDialog.vue'
 const props = defineProps<{ admin: boolean }>()
+const layout = ref<HTMLElement | null>(null)
+const availableHeight = ref('')
+let resizeObserver: ResizeObserver | undefined
+let resizeFrame = 0
+function fitPanel() {
+  cancelAnimationFrame(resizeFrame)
+  resizeFrame = requestAnimationFrame(() => {
+    if (layout.value) availableHeight.value = `${Math.max(320, window.innerHeight - layout.value.getBoundingClientRect().top - 16)}px`
+  })
+}
+onMounted(() => {
+  fitPanel()
+  window.addEventListener('resize', fitPanel)
+  if (typeof ResizeObserver !== 'undefined' && layout.value?.parentElement) {
+    resizeObserver = new ResizeObserver(fitPanel)
+    resizeObserver.observe(layout.value.parentElement)
+  }
+})
+onBeforeUnmount(() => {
+  cancelAnimationFrame(resizeFrame)
+  window.removeEventListener('resize', fitPanel)
+  resizeObserver?.disconnect()
+})
 const {
   api,
   filters,
@@ -126,7 +149,9 @@ async function notificationSent(id: number) {
     ><button @click="error = ''">关闭</button>
   </div>
   <div
+    ref="layout"
     class="ws-panel ticket-layout"
+    :style="availableHeight ? { height: availableHeight } : undefined"
     :class="{ 'has-detail': selected || creating }"
   >
     <aside class="ticket-sidebar">
@@ -326,9 +351,9 @@ async function notificationSent(id: number) {
 }
 .ticket-layout {
   display: grid;
-  grid-template-columns: 292px minmax(0, 1fr);
-  height: max(440px, calc(100dvh - 190px));
-  min-height: 420px;
+  grid-template-columns: 272px minmax(0, 1fr);
+  height: max(360px, calc(100dvh - 150px));
+  min-height: 320px;
 }
 .ticket-sidebar {
   border-right: 1px solid var(--ws-line);
@@ -337,10 +362,10 @@ async function notificationSent(id: number) {
   min-height: 0;
 }
 .ticket-filters {
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   border-bottom: 1px solid var(--ws-line);
 }
 .ticket-search {
@@ -378,14 +403,14 @@ async function notificationSent(id: number) {
 }
 @media (max-width: 1100px) {
   .ticket-layout {
-    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-columns: 248px minmax(0, 1fr);
   }
 }
 @media (max-width: 900px) {
   .ticket-layout {
     grid-template-columns: 1fr;
-    min-height: 420px;
-    height: calc(100dvh - 240px);
+    min-height: 320px;
+    height: calc(100dvh - 180px);
   }
   .ticket-main {
     display: none;

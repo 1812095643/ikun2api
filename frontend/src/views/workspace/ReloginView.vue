@@ -10,6 +10,8 @@ import ReloginAccounts from '@/components/workspace/relogin/ReloginAccounts.vue'
 import ReloginHistory from '@/components/workspace/relogin/ReloginHistory.vue'
 import ReloginImported from '@/components/workspace/relogin/ReloginImported.vue'
 import ReloginSettingsForm from '@/components/workspace/relogin/ReloginSettingsForm.vue'
+import ReloginSecretDialog from '@/components/workspace/relogin/ReloginSecretDialog.vue'
+import { deleteAccount } from '@/api/admin/accounts'
 import ReloginAuthorizationForm from '@/components/workspace/relogin/ReloginAuthorizationForm.vue'
 import { useRelogin } from '@/composables/workspace/useRelogin'
 import {
@@ -57,6 +59,9 @@ const tabs = [
 const stepUp = useStepUp()
 const credentialRun = ref<LoginRun | null>(null), exportFormat = ref('sub2api')
 const importProgress = ref('')
+const viewedSecret = ref<LoginSecret | null>(null)
+const deletingAccount = ref<ReloginAccount | null>(null)
+const deleteEmails = ref<string[]>([])
 const exportFormats = [
   ['sub2api', 'IKUN2api / Sub2API'], ['codex', 'Codex CLI'], ['cpa', 'CPA'],
   ['cockpit', 'Cockpit'], ['9router', '9Router'], ['axonhub', 'AxonHub'],
@@ -99,6 +104,8 @@ function closeDialog() {
   verifyCode.value = ''
   phoneNumber.value = ''
   challenge.value = null
+  deletingAccount.value = null
+  deleteEmails.value = []
 }
 async function start(payload: LoginSecret & { account_id?: number; apply: boolean }) {
   if (await act(() => reloginAPI.start(payload), '授权任务已开始，可在授权记录中查看进度。')) {
@@ -189,10 +196,50 @@ async function deleteInvalid() {
   }
 }
 async function deleteSelected() {
-  if (await act(() => reloginAPI.remove(selected.value), '所选登录资料已删除。')) {
+  const emails = [...deleteEmails.value]
+  if (!emails.length) return
+  if (await act(() => reloginAPI.remove(emails), '所选登录资料已删除。')) {
     selected.value = []
     closeDialog()
   }
+}
+function confirmDeleteImported(emails: string[]) {
+  if (busy.value || !emails.length) return
+  deleteEmails.value = [...emails]
+  dialog.value = 'delete'
+}
+function confirmDeleteAccount(account: ReloginAccount) {
+  if (busy.value) return
+  deletingAccount.value = account
+  dialog.value = 'delete-account'
+}
+async function removeAccount() {
+  const account = deletingAccount.value
+  if (!account) return
+  if (await act(() => deleteAccount(account.id), '渠道账号已删除，登录资料已保留。')) closeDialog()
+}
+async function showSecret(email: string, hasImported = true) {
+  if (busy.value || !email) return
+  error.value = ''
+  if (!hasImported) {
+    viewedSecret.value = { email, auth_mode: 'password_2fa', password: '', mfa_secret: '', inbox_url: '' }
+    return
+  }
+  busy.value = true
+  try {
+    const items = await stepUp.run(() => reloginAPI.export([email]))
+    const item = items.find(item => item.email.toLowerCase() === email.toLowerCase())
+    if (!item) throw new Error('未找到对应的登录资料。')
+    viewedSecret.value = { ...item }
+  } catch (e) { error.value = workspaceError(e) }
+  finally { busy.value = false }
+}
+async function saveSecret(secret: LoginSecret) {
+  if (await act(() => reloginAPI.import([secret]), '登录资料已保存。')) viewedSecret.value = null
+}
+async function reloginImported(email: string) {
+  await act(() => reloginAPI.start({ email, auth_mode: 'password_2fa', use_saved: true, apply: true }), '已使用保存的资料启动重登。')
+  if (!error.value) tab.value = 'history'
 }
 async function clearHistory() {
   if (await act(() => reloginAPI.clearHistory(), '已完成的授权记录已清理。')) closeDialog()
@@ -392,7 +439,7 @@ async function completeChallenge() {
         ><button
           class="ws-button ws-button-danger"
           :disabled="!selected.length || busy"
-          @click="dialog = 'delete'"
+          @click="confirmDeleteImported(selected)"
         >
           删除所选</button>
       </div>
@@ -429,10 +476,16 @@ async function completeChallenge() {
         :busy="busy"
         @saved="startSaved"
         @login="openLogin"
+        @view="account => showSecret(account.email, account.has_imported)"
+        @remove="confirmDeleteAccount"
       /><ReloginImported
         v-else-if="tab === 'imported'"
         v-model:selected="selected"
         :result="imported"
+        :busy="busy"
+        @view="showSecret"
+        @remove="email => confirmDeleteImported([email])"
+        @login="reloginImported"
         @page="importedPage = $event"
       /><ReloginHistory
         v-else
@@ -605,7 +658,7 @@ async function completeChallenge() {
       title="删除所选登录资料"
       @update:open="closeDialog"
       ><p class="text-sm leading-7">
-        将删除 {{ selected.length }} 条保存的密码和验证资料。此操作不会删除渠道账号。
+        将删除 {{ deleteEmails.length }} 条保存的密码和验证资料。此操作不会删除渠道账号。
       </p>
       <template #footer
         ><button
@@ -622,6 +675,11 @@ async function completeChallenge() {
         </button></template
       ></WorkspaceDialog
     >
+    <WorkspaceDialog :open="dialog === 'delete-account'" title="删除渠道账号" @update:open="closeDialog">
+      <p class="text-sm leading-7">确认删除 {{ deletingAccount?.email || deletingAccount?.name }}？已保存的登录资料和授权记录会保留。</p>
+      <template #footer><button class="ws-button" :disabled="busy" @click="closeDialog">取消</button><button class="ws-button ws-button-danger" :disabled="busy" @click="removeAccount">确认删除账号</button></template>
+    </WorkspaceDialog>
+    <ReloginSecretDialog :secret="viewedSecret" :busy="busy" :error="error" @close="viewedSecret = null; error = ''" @save="saveSecret" />
     <WorkspaceDialog
       :open="dialog === 'clear'"
       title="清理授权记录"

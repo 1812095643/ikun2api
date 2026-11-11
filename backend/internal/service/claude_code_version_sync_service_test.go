@@ -3,12 +3,24 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
 	"github.com/stretchr/testify/require"
 )
+
+// Keep supported fixtures relative to the built-in floor so future CLI upgrades
+// do not turn version-selection tests into unsupported-version tests.
+func claudeCodeTestVersion(patchOffset int) string {
+	var major, minor, patch int
+	if n, err := fmt.Sscanf(claude.CLICurrentVersion, "%d.%d.%d", &major, &minor, &patch); err != nil || n != 3 {
+		panic("invalid built-in Claude Code version")
+	}
+	return fmt.Sprintf("%d.%d.%d", major, minor, patch+patchOffset)
+}
 
 // --- mock: 只实现同步任务用到的读写，其余方法不应被调用 ---
 
@@ -290,7 +302,7 @@ func TestClaudeCodeVersionSyncFallsBackToReleaseList(t *testing.T) {
 func TestClaudeCodeVersionSyncLatestSharesFiltering(t *testing.T) {
 	repo := newClaudeCodeVersionSyncSettingRepoStub(nil)
 	github := &claudeCodeVersionSyncGitHubStub{
-		// 剥掉 v 前缀后不满足基线校验（2.1.9 低于内置基线 2.1.258）的 latest
+		// 剥掉 v 前缀后不满足基线校验（2.1.9 低于内置基线）的 latest
 		// 必须被拒绝而不是直接采信。
 		latest:   &GitHubRelease{TagName: "v2.1.9"},
 		releases: []*GitHubRelease{{TagName: "v2.1.284"}},

@@ -6,6 +6,8 @@ const props = defineProps<{ settings: ReloginSettings; options: ReloginOptions; 
 const emit = defineEmits<{ save: [settings: ReloginSettings] }>()
 const appStore = useAppStore()
 const draft = reactive<ReloginSettings>(JSON.parse(JSON.stringify(props.settings)))
+const modelMapping = ref(JSON.stringify(draft.template.model_mapping || {}, null, 2))
+const validationError = ref('')
 const recipients = ref(props.settings.recipients.join('\n'))
 const activeTab = ref('auto')
 const tabs = [
@@ -23,9 +25,23 @@ async function revealInvalid(event: Event) {
 }
 function save() {
   if (props.busy) return
+  validationError.value = ''
+  let mapping: Record<string, string>
+  try {
+    mapping = JSON.parse(modelMapping.value || '{}')
+    if (!mapping || Array.isArray(mapping) || typeof mapping !== 'object' ||
+        Object.entries(mapping).some(([from, to]) => !from.trim() || typeof to !== 'string' || !to.trim())) throw new Error()
+  } catch {
+    validationError.value = '模型映射应为来源模型与上游模型组成的 JSON 对象。'
+    activeTab.value = 'account'
+    return
+  }
   emit('save', {
     ...draft,
-    template: { ...draft.template },
+    template: { ...draft.template, model_mapping: mapping, extra: {
+      ...draft.template.extra,
+      openai_oauth_responses_websockets_v2_enabled: draft.template.extra.openai_oauth_responses_websockets_v2_mode !== 'off'
+    } },
     recipients: recipients.value
       .split(/[\s,;，；]+/)
       .map((value) => value.trim())
@@ -47,7 +63,7 @@ function save() {
         {{ item.label }}
       </button>
     </div>
-    <p v-if="error" class="ws-error mb-4" role="alert">{{ error }}</p>
+    <p v-if="error || validationError" class="ws-error mb-4" role="alert">{{ error || validationError }}</p>
     <fieldset :disabled="busy" class="relogin-settings-fields">
     <section id="relogin-settings-panel-auto" v-show="activeTab === 'auto'" data-settings-tab="auto"
       class="relogin-settings-panel" role="tabpanel" aria-labelledby="relogin-settings-tab-auto">
@@ -101,7 +117,19 @@ function save() {
             min="0"
             step="0.01"
         /></label>
+        <label class="ws-field">负载系数<input v-model.number="draft.template.load_factor" class="ws-input" type="number" min="1" max="10000" aria-label="负载系数" /></label>
+        <label class="ws-field">收敛档位<select v-model="draft.template.extra.codex_fingerprint_mode" class="ws-input" aria-label="收敛档位">
+          <option value="off">不收敛</option><option value="device">设备</option><option value="session">会话</option><option value="full">完整</option>
+        </select></label>
+        <label class="ws-field">WebSocket<select v-model="draft.template.extra.openai_oauth_responses_websockets_v2_mode" class="ws-input" aria-label="WebSocket">
+          <option value="ctx_pool">开启 · 连接池</option><option value="passthrough">开启 · 直通</option><option value="http_bridge">HTTP 桥接</option><option value="off">关闭</option>
+        </select></label>
       </div>
+      <div class="mt-4">
+        <label class="setting-check"><input v-model="draft.template.auto_pause_on_expired" type="checkbox" />到期自动暂停</label>
+        <label class="setting-check"><input v-model="draft.template.extra.openai_long_context_billing_enabled" type="checkbox" />长上下文计费</label>
+      </div>
+      <label class="ws-field mt-5">模型映射<textarea v-model="modelMapping" class="ws-input font-mono" rows="5" spellcheck="false" aria-label="模型映射" placeholder='{"来源模型": "上游模型"}' /></label>
       <div class="ws-field mt-5">
         <span>分组</span>
         <div class="settings-groups">

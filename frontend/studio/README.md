@@ -11,3 +11,5 @@
 - 可选的本地 Agent、代理或插件仍由使用者自行启动；默认不连接其他站长的服务。
 
 本目录沿用 MIT 许可证，见 `LICENSE`。
+
+图片字节解析回归：先安装主项目 `frontend` 的开发依赖，再在本目录运行 `npm run test:regression`；类型检查运行 `npm run typecheck`。

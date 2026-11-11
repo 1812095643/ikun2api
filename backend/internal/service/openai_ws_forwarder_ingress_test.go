@@ -1127,3 +1127,18 @@ func TestOpenAIWSReplaySequenceSharesBodies(t *testing.T) {
 		require.Same(t, &payload[start], &items[1][0], "prefix 命中应转移当前 items 所有权并共享 payload 底层数组")
 	})
 }
+
+func TestNormalizeOpenAIWSContextWindowBoundaryUsesClientSource(t *testing.T) {
+	normalized := []byte(`{"previous_response_id":"resp_previous","client_metadata":{"x-codex-window-id":"generated-window"},"input":[]}`)
+	source := []byte(`{"previous_response_id":"resp_previous","input":[]}`)
+	unchanged, boundary, err := normalizeOpenAIWSContextWindowBoundary(normalized, "previous-generated-window", source)
+	require.NoError(t, err)
+	require.False(t, boundary.Changed)
+	require.Equal(t, string(normalized), string(unchanged))
+	source = []byte(`{"client_metadata":{"x-codex-window-id":"actual-new-window"},"input":[]}`)
+	updated, boundary, err := normalizeOpenAIWSContextWindowBoundary(normalized, "actual-old-window", source)
+	require.NoError(t, err)
+	require.True(t, boundary.Changed)
+	require.True(t, boundary.PreviousResponseIDRemoved)
+	require.False(t, gjson.GetBytes(updated, "previous_response_id").Exists())
+}
