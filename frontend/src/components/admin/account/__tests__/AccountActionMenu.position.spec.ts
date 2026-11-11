@@ -40,6 +40,18 @@ async function mountMenu(anchorRect = new DOMRect(950, 720, 32, 24)) {
 enableAutoUnmount(afterEach)
 
 describe('AccountActionMenu viewport positioning', () => {
+  it('keeps manual recovery available after the proxy cooldown expires', async () => {
+    const wrapper = await mountMenu()
+    await wrapper.setProps({ account: { ...account, rate_limit_reset_at: null,
+      temp_unschedulable_until: '2000-01-01T00:00:00Z',
+      extra: { proxy_failure_guard: { generation: 'paused', not_before: '2000-01-01T00:00:00Z' } }
+    } })
+    await flushPromises()
+    const button = Array.from(getMenu().querySelectorAll('button')).find(item => item.textContent?.includes('admin.accounts.recoverState'))!
+    expect(button).toBeTruthy()
+    button.click()
+    expect(wrapper.emitted('recover-state')?.[0]?.[0]).toMatchObject({ id: 1 })
+  })
   beforeEach(() => {
     menuHeight = 305
     setViewport(1024, 768)

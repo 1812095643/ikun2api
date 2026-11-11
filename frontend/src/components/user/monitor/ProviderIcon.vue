@@ -1,6 +1,7 @@
 <template>
+  <TypeSafeIcon v-if="provider === 'typesafe'" :width="size" :height="size" />
   <svg
-    v-if="iconInfo"
+    v-else-if="iconInfo"
     :width="size"
     :height="size"
     viewBox="0 0 24 24"
@@ -26,6 +27,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import TypeSafeIcon from '@/components/common/TypeSafeIcon.vue'
 import type { Provider } from '@/api/admin/channelMonitor'
 
 interface IconData {

@@ -90,6 +90,47 @@ func isOpenAIAccount(account *Account) bool {
 	return account != nil && (account.Platform == PlatformOpenAI || account.Platform == PlatformGrok)
 }
 
+func (s *OpenAIGatewayService) setOpenAICapacityModelCooldown(
+	ctx context.Context,
+	account *Account,
+	model string,
+	statusCode int,
+	delay time.Duration,
+) bool {
+	if s == nil || s.rateLimitService == nil || s.rateLimitService.accountRepo == nil ||
+		account == nil || account.Platform != PlatformOpenAI || delay <= 0 {
+		return false
+	}
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return false
+	}
+	until := time.Now().Add(delay)
+	if existing := account.modelRateLimitResetAt(model); existing != nil && existing.After(until) {
+		until = *existing
+	}
+	const reason = "openai_capacity_shed_retry_after"
+	if err := s.rateLimitService.accountRepo.SetModelRateLimit(ctx, account.ID, model, until, reason); err != nil {
+		slog.Warn("openai_capacity_shed_model_cooldown_set_failed",
+			"account_id", account.ID,
+			"model", model,
+			"status_code", statusCode,
+			"error", err,
+		)
+		// Stop same-account replay for this request even if persistence failed.
+		return true
+	}
+	setAccountModelRateLimitSnapshot(account, model, until, reason, time.Now())
+	slog.Info("openai_capacity_shed_model_cooldown_set",
+		"account_id", account.ID,
+		"model", model,
+		"status_code", statusCode,
+		"retry_after", delay,
+		"until", until,
+	)
+	return true
+}
+
 // handleOpenAIAccountUpstreamError expects canonicalModel to be the model used
 // for scheduling after applying account mapping exactly once.
 func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte, canonicalModel ...string) bool {
@@ -104,13 +145,31 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	// Capacity shedding describes this request, not account health. Keep the
 	// account schedulable while the request-local retry budget handles recovery.
 	if account != nil && account.Platform == PlatformOpenAI && isOpenAIRequestScopedCapacityShed("", responseBody) {
-		// An explicit model-scoped rule overrides the default retry policy without
-		// turning a request-level overload into an account-wide health failure.
+		// Explicit model-scoped rules keep their configured duration when it is
+		// longer. Otherwise use the upstream Retry-After as a persistent
+		// (account, model) cooldown, without blocking the account's other models.
 		model := firstRequestedModel(canonicalModel)
-		if s != nil && s.rateLimitService != nil && model != "" && account.IsTempUnschedulableEnabled() {
+		if model != "" {
 			ruleBody := openAICapacityShedRuleBody(responseBody)
-			matches := matchTempUnschedulableRules(account, statusCode, ruleBody)
-			if len(matches) > 0 && matches[0].rule.Scope == TempUnschedScopeModel {
+			var configuredModelCooldown time.Duration
+			if s != nil && s.rateLimitService != nil && account.IsTempUnschedulableEnabled() {
+				matches := matchTempUnschedulableRules(account, statusCode, ruleBody)
+				if len(matches) > 0 && matches[0].rule.Scope == TempUnschedScopeModel {
+					configuredModelCooldown = time.Duration(matches[0].rule.DurationMinutes) * time.Minute
+				}
+			}
+			upstreamCooldown := openAIRequestScopedCapacityCooldownDelay(headers, responseBody)
+			if configuredModelCooldown > upstreamCooldown {
+				stateCtx, cancel := openAIAccountStateContext(ctx)
+				defer cancel()
+				return s.rateLimitService.HandleTempUnschedulable(stateCtx, account, statusCode, ruleBody, model)
+			}
+			if upstreamCooldown > 0 {
+				stateCtx, cancel := openAIAccountStateContext(ctx)
+				defer cancel()
+				return s.setOpenAICapacityModelCooldown(stateCtx, account, model, statusCode, upstreamCooldown)
+			}
+			if configuredModelCooldown > 0 {
 				stateCtx, cancel := openAIAccountStateContext(ctx)
 				defer cancel()
 				return s.rateLimitService.HandleTempUnschedulable(stateCtx, account, statusCode, ruleBody, model)

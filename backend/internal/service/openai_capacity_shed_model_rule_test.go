@@ -215,3 +215,42 @@ func TestOpenAICapacityShedModelRule_OtherPlatformKeepsDefault(t *testing.T) {
 	require.True(t, failover.RetryableOnSameAccount)
 	require.True(t, failover.RequestScopedTransient)
 }
+
+func TestOpenAICapacityShedRetryAfterPersistsModelCooldown(t *testing.T) {
+	repo := &modelNotFoundAccountRepoStub{}
+	svc := &OpenAIGatewayService{rateLimitService: &RateLimitService{accountRepo: repo}}
+	account := openAICapacityShedModelRuleAccount(AccountTypeOAuth)
+	payload := []byte(`{"type":"error","error":{"code":"server_is_overloaded","message":"Our servers are currently overloaded. Please try again later.","headers":{"retry-after":"319","retry-after-ms":"319000","x-retry-metadata":"NO_MORE_RETRY"}}}`)
+
+	failover := svc.newOpenAIStreamFailoverErrorWithModel(
+		nil, account, false, "", payload,
+		"Our servers are currently overloaded. Please try again later.",
+		"gpt-6.1-sol", http.Header{},
+	)
+
+	require.False(t, failover.RetryableOnSameAccount, "do not replay this account/model before the upstream cooldown expires")
+	require.True(t, failover.RequestScopedTransient)
+	require.Len(t, repo.modelRateLimitCalls, 1)
+	call := repo.modelRateLimitCalls[0]
+	require.Equal(t, account.ID, call.accountID)
+	require.Equal(t, "gpt-6.1-sol", call.scope)
+	require.Equal(t, "openai_capacity_shed_retry_after", call.reason)
+	require.WithinDuration(t, time.Now().Add(319*time.Second), call.resetAt, time.Second)
+	require.Zero(t, repo.tempCalls, "capacity cooling must stay model scoped")
+	require.False(t, account.IsSchedulableForModelWithContext(context.Background(), "alias"))
+	require.True(t, account.IsSchedulableForModelWithContext(context.Background(), "gpt-5.3"), "other models on the account remain schedulable")
+	setAccountModelRateLimitSnapshot(account, call.scope, time.Now().Add(-time.Second), call.reason, time.Now())
+	require.True(t, account.IsSchedulableForModelWithContext(context.Background(), "alias"), "the model returns to scheduling after the cooldown expires")
+}
+
+func TestOpenAIRequestScopedCapacityCooldownDelayUsesFullRetryAfterAndCapsExtremeValues(t *testing.T) {
+	body := []byte(`{"error":{"code":"server_is_overloaded","headers":{"retry-after":"319","retry-after-ms":"319000"}}}`)
+	require.Equal(t, 319*time.Second, openAIRequestScopedCapacityCooldownDelay(http.Header{}, body))
+	require.Equal(t, 45*time.Second, openAIRequestScopedCapacityCooldownDelay(
+		http.Header{"Retry-After-Ms": []string{"45000"}}, nil,
+	))
+	require.Equal(t, openAIRequestScopedModelCooldownMax, openAIRequestScopedCapacityCooldownDelay(
+		http.Header{"Retry-After": []string{"999999"}}, nil,
+	))
+	require.Zero(t, openAIRequestScopedCapacityCooldownDelay(http.Header{}, []byte(`{"error":{"code":"server_is_overloaded"}}`)))
+}

@@ -67,13 +67,14 @@
       </div>
 
       <div class="card p-6">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
-            <div v-if="isFilterVisible('api_key_id')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-api_key_id">
+        <UsageFilterLayout>
+          <template #default>
+          <template v-if="activeTab === 'errors'">
+            <div v-if="isFilterVisible('api_key_id')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-api_key_id">
               <label class="input-label">{{ t('usage.errors.keyName') }}</label>
               <Select v-model="errorFilter.api_key_id" :options="errorKeyOptions" @change="applyErrorFilters" />
             </div>
-            <div v-if="isFilterVisible('model')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-model">
+            <div v-if="isFilterVisible('model')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-model">
               <label class="input-label">{{ t('usage.errors.model') }}</label>
               <Select
                 v-model="errorFilter.model"
@@ -85,47 +86,48 @@
                 @change="applyErrorFilters"
               />
             </div>
-            <div v-if="isFilterVisible('category')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-category">
+            <div v-if="isFilterVisible('category')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-category">
               <label class="input-label">{{ t('usage.errors.category') }}</label>
               <Select v-model="errorFilter.category" :options="errorCategoryOptions" @change="applyErrorFilters" />
             </div>
-            <div v-if="isFilterVisible('status_code')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-status_code">
+            <div v-if="isFilterVisible('status_code')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-status_code">
               <label class="input-label">{{ t('usage.errors.status') }}</label>
               <Select v-model="errorFilter.status_code" :options="errorStatusOptions" @change="applyErrorFilters" />
             </div>
-          </div>
-          <div v-else class="flex flex-1 flex-wrap items-end gap-4">
-            <div v-if="isFilterVisible('api_key_id')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-api_key_id">
+          </template>
+          <template v-else>
+            <div v-if="isFilterVisible('api_key_id')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-api_key_id">
               <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
               <Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" />
             </div>
-            <div v-if="isFilterVisible('model')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-model">
+            <div v-if="isFilterVisible('model')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-model">
               <label class="input-label">{{ t('usage.model') }}</label>
               <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
             </div>
-            <div v-if="isFilterVisible('group_id')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-group_id">
+            <div v-if="isFilterVisible('group_id')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-group_id">
               <label class="input-label">{{ t('admin.usage.group') }}</label>
               <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
             </div>
-            <div v-if="isFilterVisible('request_type')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-request_type">
+            <div v-if="isFilterVisible('request_type')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-request_type">
               <label class="input-label">{{ t('usage.type') }}</label>
               <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
             </div>
-            <div v-if="isFilterVisible('native_compaction_v2')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-native_compaction_v2">
+            <div v-if="isFilterVisible('native_compaction_v2')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-native_compaction_v2">
               <label class="input-label">{{ t('usage.compactionFilter') }}</label>
               <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="applyFilters" />
             </div>
-            <div v-if="subscriptionFeatureEnabled && isFilterVisible('billing_type')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-billing_type">
+            <div v-if="subscriptionFeatureEnabled && isFilterVisible('billing_type')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-billing_type">
               <label class="input-label">{{ t('admin.usage.billingType') }}</label>
               <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
             </div>
-            <div v-if="isFilterVisible('billing_mode')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-billing_mode">
+            <div v-if="isFilterVisible('billing_mode')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-billing_mode">
               <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
               <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
             </div>
-          </div>
+          </template>
+          </template>
 
-          <div class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+          <template #actions>
             <button type="button" @click="refreshData" :disabled="activeTab === 'errors' ? errorLoading : loading" class="btn btn-secondary">
               {{ t('common.refresh') }}
             </button>
@@ -164,8 +166,8 @@
             <button v-if="activeTab !== 'errors'" type="button" @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
               {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
             </button>
-          </div>
-        </div>
+          </template>
+        </UsageFilterLayout>
       </div>
 
       <div v-if="errorViewEnabled" class="flex gap-2 border-b border-gray-200 dark:border-dark-700">
@@ -237,6 +239,7 @@ import EndpointDistributionChart from '@/components/charts/EndpointDistributionC
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import Icon from '@/components/icons/Icon.vue'
 import FilterSettingsDropdown from '@/components/common/FilterSettingsDropdown.vue'
+import UsageFilterLayout from '@/components/usage/UsageFilterLayout.vue'
 import { useUsageFilterVisibility } from '@/composables/useUsageFilterVisibility'
 import UserErrorRequestsTable from '@/components/user/UserErrorRequestsTable.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'

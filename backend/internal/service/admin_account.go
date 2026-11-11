@@ -1409,6 +1409,11 @@ func (s *adminServiceImpl) RefreshAccountCredentials(ctx context.Context, id int
 }
 
 func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Account, error) {
+	if s.proxyGuard != nil {
+		if err := s.proxyGuard.ResetAccount(ctx, id); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.accountRepo.ClearError(ctx, id); err != nil {
 		return nil, err
 	}

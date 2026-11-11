@@ -567,8 +567,8 @@ export default {
         viewTempUnschedDetails: '查看临时不可调度详情',
         tempUnschedulableUntil: '预计 {time} 恢复',
         proxyWaitingRecovery: '等待代理恢复',
-        proxyRecoveryNotBefore: '最早 {time} 探测，代理恢复后才解除停调',
-        proxyRecoveryProbeRequired: '冷却后仍需代理探测成功；禁止回退直连'
+        proxyRecoveryNotBefore: '最早 {time} 自动探测，也可手动恢复',
+        proxyRecoveryProbeRequired: '等待代理探测恢复，也可手动恢复'
       },
       tempUnschedulable: {
         title: '临时不可调度',

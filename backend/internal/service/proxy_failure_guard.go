@@ -18,8 +18,9 @@ import (
 )
 
 const ProxyFailureGuardExtraKey = "proxy_failure_guard"
+const ProxyFailureResetEpochExtraKey = "proxy_failure_guard_reset_epoch"
 const ProxyFailureCooldown = 3 * time.Minute
-const ProxyFailureReason = "proxy_failure_guard: 代理连接异常，至少冷却三分钟且仅在代理探测恢复后解除"
+const ProxyFailureReason = "proxy_failure_guard: 代理连接异常，冷却后自动探测或由管理员手动恢复"
 
 var ErrProxyQuarantined = errors.New("account proxy is quarantined; direct fallback is forbidden")
 
@@ -33,14 +34,15 @@ type ProxyFailureState struct {
 }
 
 type AccountProxySnapshot struct {
-	AccountID int64
-	Platform  string
-	Type      string
-	Active    bool
-	ProxyID   *int64
-	OriginID  *int64
-	Proxy     *Proxy
-	State     *ProxyFailureState
+	AccountID  int64
+	Platform   string
+	Type       string
+	Active     bool
+	ProxyID    *int64
+	OriginID   *int64
+	Proxy      *Proxy
+	State      *ProxyFailureState
+	ResetEpoch string
 }
 
 func (s AccountProxySnapshot) RequiresProxy() bool {
@@ -61,6 +63,10 @@ type ProxyRecoveryProber interface {
 	ProbeAccountProxy(context.Context, string, string) error
 }
 
+type proxyQuarantineResetter interface {
+	ResetAccountProxyQuarantine(context.Context, *AccountProxySnapshot) (bool, error)
+}
+
 func (a *Account) IsProxyQuarantined() bool {
 	if a == nil {
 		return false
@@ -78,6 +84,10 @@ func MergeProxyFailureGuardExtra(next, current map[string]any) map[string]any {
 	if value, ok := current[ProxyFailureGuardExtraKey]; ok && value != nil {
 		next[ProxyFailureGuardExtraKey] = value
 	}
+	delete(next, ProxyFailureResetEpochExtraKey)
+	if value, ok := current[ProxyFailureResetEpochExtraKey]; ok && value != nil {
+		next[ProxyFailureResetEpochExtraKey] = value
+	}
 	return next
 }
 
@@ -93,27 +103,30 @@ func DecodeProxyFailureState(raw []byte) (*ProxyFailureState, error) {
 }
 
 type proxyFailureLocal struct {
-	snapshot *AccountProxySnapshot
-	state    ProxyFailureState
+	snapshot  *AccountProxySnapshot
+	state     ProxyFailureState
+	persisted bool
 }
 
 type ProxyFailureGuard struct {
-	repo      ProxyFailureGuardRepository
-	prober    ProxyRecoveryProber
-	mu        sync.Mutex
-	active    map[int64]map[*ProxyRequestLease]context.CancelCauseFunc
-	blocks    map[int64]proxyFailureLocal
-	now       func() time.Time
-	stop      chan struct{}
-	once      sync.Once
-	wg        sync.WaitGroup
-	recoverMu sync.Mutex
-	cursor    int64
+	repo              ProxyFailureGuardRepository
+	prober            ProxyRecoveryProber
+	mu                sync.Mutex
+	active            map[int64]map[*ProxyRequestLease]context.CancelCauseFunc
+	blocks            map[int64]proxyFailureLocal
+	epochs            map[int64]uint64
+	now               func() time.Time
+	stop              chan struct{}
+	once              sync.Once
+	wg                sync.WaitGroup
+	recoverMu         sync.Mutex
+	cursor            int64
+	accountOperations [64]sync.Mutex
 }
 
 func NewProxyFailureGuard(repo ProxyFailureGuardRepository, prober ProxyRecoveryProber) *ProxyFailureGuard {
 	return &ProxyFailureGuard{repo: repo, prober: prober, active: make(map[int64]map[*ProxyRequestLease]context.CancelCauseFunc),
-		blocks: make(map[int64]proxyFailureLocal), now: time.Now, stop: make(chan struct{})}
+		blocks: make(map[int64]proxyFailureLocal), epochs: make(map[int64]uint64), now: time.Now, stop: make(chan struct{})}
 }
 
 type ProxyRequestLease struct {
@@ -123,6 +136,7 @@ type ProxyRequestLease struct {
 	cancel   context.CancelCauseFunc
 	origin   string
 	once     sync.Once
+	epoch    uint64
 }
 
 func (l *ProxyRequestLease) Context() context.Context { return l.ctx }
@@ -144,6 +158,12 @@ func (g *ProxyFailureGuard) Begin(ctx context.Context, accountID int64, supplied
 	if snapshot.State != nil {
 		return nil, ErrProxyQuarantined
 	}
+	g.mu.Lock()
+	if local, blocked := g.blocks[accountID]; blocked &&
+		(local.persisted || local.snapshot.ResetEpoch != snapshot.ResetEpoch) {
+		delete(g.blocks, accountID)
+	}
+	g.mu.Unlock()
 	child, cancel := context.WithCancelCause(ctx)
 	lease := &ProxyRequestLease{guard: g, snapshot: snapshot, ctx: child, cancel: cancel, origin: proxyRecoveryOrigin(probeURL)}
 	if snapshot.RequiresProxy() {
@@ -165,6 +185,7 @@ func (g *ProxyFailureGuard) Begin(ctx context.Context, accountID int64, supplied
 		g.active[accountID] = make(map[*ProxyRequestLease]context.CancelCauseFunc)
 	}
 	g.active[accountID][lease] = cancel
+	lease.epoch = g.epochs[accountID]
 	g.mu.Unlock()
 	return lease, nil
 }
@@ -227,7 +248,14 @@ func (l *ProxyRequestLease) Close() {
 }
 
 func (g *ProxyFailureGuard) trip(l *ProxyRequestLease) {
+	operation := &g.accountOperations[uint64(l.snapshot.AccountID)%64]
+	operation.Lock()
+	defer operation.Unlock()
 	g.mu.Lock()
+	if l.epoch != g.epochs[l.snapshot.AccountID] {
+		g.mu.Unlock()
+		return // An administrator reset superseded this in-flight failure.
+	}
 	if _, exists := g.blocks[l.snapshot.AccountID]; exists {
 		g.mu.Unlock()
 		return
@@ -246,10 +274,19 @@ func (g *ProxyFailureGuard) trip(l *ProxyRequestLease) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if _, err := g.repo.QuarantineAccountProxy(ctx, l.snapshot, state); err != nil {
+	if ok, err := g.repo.QuarantineAccountProxy(ctx, l.snapshot, state); err != nil {
 		slog.Error("proxy_failure_guard.persist_failed", "account_id", l.snapshot.AccountID)
-	} else {
+	} else if ok {
+		g.mu.Lock()
+		g.blocks[l.snapshot.AccountID] = proxyFailureLocal{snapshot: l.snapshot, state: state, persisted: true}
+		g.mu.Unlock()
 		slog.Warn("proxy_failure_guard.account_quarantined", "account_id", l.snapshot.AccountID, "until", state.NotBefore)
+	} else if current, snapshotErr := g.repo.GetAccountProxySnapshot(ctx, l.snapshot.AccountID); snapshotErr == nil && current != nil && current.ResetEpoch != l.snapshot.ResetEpoch {
+		g.mu.Lock()
+		if local, exists := g.blocks[l.snapshot.AccountID]; exists && local.state.Generation == state.Generation {
+			delete(g.blocks, l.snapshot.AccountID)
+		}
+		g.mu.Unlock()
 	}
 	// If persistence fails, the local block remains and is retried by recovery.
 }
@@ -324,6 +361,9 @@ func (g *ProxyFailureGuard) CheckRecovery() {
 }
 
 func (g *ProxyFailureGuard) recoverOne(ctx context.Context, id int64) {
+	operation := &g.accountOperations[uint64(id)%64]
+	operation.Lock()
+	defer operation.Unlock()
 	snapshot, err := g.repo.GetAccountProxySnapshot(ctx, id)
 	if err != nil || snapshot == nil || !snapshot.Active {
 		return
@@ -332,9 +372,29 @@ func (g *ProxyFailureGuard) recoverOne(ctx context.Context, id int64) {
 	local, locallyBlocked := g.blocks[id]
 	g.mu.Unlock()
 	if snapshot.State == nil && locallyBlocked {
+		if local.persisted {
+			g.mu.Lock()
+			delete(g.blocks, id)
+			g.mu.Unlock()
+			return
+		}
+		if local.snapshot.ResetEpoch != snapshot.ResetEpoch {
+			g.mu.Lock()
+			if current, exists := g.blocks[id]; exists && current.state.Generation == local.state.Generation {
+				delete(g.blocks, id)
+			}
+			g.mu.Unlock()
+			return
+		}
 		if ok, err := g.repo.QuarantineAccountProxy(ctx, snapshot, local.state); err != nil || !ok {
 			return
 		}
+		g.mu.Lock()
+		if current, exists := g.blocks[id]; exists && current.state.Generation == local.state.Generation {
+			current.persisted = true
+			g.blocks[id] = current
+		}
+		g.mu.Unlock()
 		snapshot.State = &local.state
 	}
 	state := snapshot.State
@@ -360,4 +420,43 @@ func (g *ProxyFailureGuard) recoverOne(ctx context.Context, id int64) {
 	}
 	g.mu.Unlock()
 	slog.Info("proxy_failure_guard.account_recovered", "account_id", id)
+}
+
+// ResetAccount is an explicit administrator action. It bypasses the cooldown
+// and probe, but never changes the proxy route or authorizes direct fallback.
+func (g *ProxyFailureGuard) ResetAccount(ctx context.Context, id int64) error {
+	if g == nil || g.repo == nil || id <= 0 {
+		return fmt.Errorf("proxy recovery service unavailable")
+	}
+	operation := &g.accountOperations[uint64(id)%64]
+	operation.Lock()
+	defer operation.Unlock()
+	snapshot, err := g.repo.GetAccountProxySnapshot(ctx, id)
+	if err != nil {
+		return err
+	}
+	if snapshot == nil {
+		return ErrAccountNotFound
+	}
+	g.mu.Lock()
+	local, blocked := g.blocks[id]
+	g.mu.Unlock()
+	resetter, ok := g.repo.(proxyQuarantineResetter)
+	if !ok {
+		return fmt.Errorf("manual proxy recovery unavailable")
+	}
+	ok, err = resetter.ResetAccountProxyQuarantine(ctx, snapshot)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("account proxy state changed; retry recovery")
+	}
+	g.mu.Lock()
+	g.epochs[id]++
+	if current, exists := g.blocks[id]; blocked && exists && current.state.Generation == local.state.Generation {
+		delete(g.blocks, id)
+	}
+	g.mu.Unlock()
+	return nil
 }

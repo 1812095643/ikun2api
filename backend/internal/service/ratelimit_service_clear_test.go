@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,6 +28,29 @@ type rateLimitClearRepoStub struct {
 	clearAntigravityErr       error
 	clearModelRateLimitErr    error
 	clearTempUnschedulableErr error
+}
+
+func TestRateLimitServiceManualRecoveryResetsProxyButSuccessfulTestDoesNot(t *testing.T) {
+	for _, manual := range []bool{false, true} {
+		t.Run(fmt.Sprintf("manual=%t", manual), func(t *testing.T) {
+			guard, store, _, now := proxyGuardFixture()
+			store.snapshots[7].State = &ProxyFailureState{Generation: "paused", NotBefore: now.Add(time.Minute)}
+			repo := &rateLimitClearRepoStub{getByIDAccount: &Account{ID: 7, Status: StatusActive,
+				Extra: map[string]any{ProxyFailureGuardExtraKey: map[string]any{"generation": "paused"}}}}
+			cache := &tempUnschedCacheRecorder{}
+			svc := NewRateLimitService(repo, nil, &config.Config{}, nil, cache)
+			svc.proxyGuard = guard
+			_, err := svc.RecoverAccountState(context.Background(), 7, AccountRecoveryOptions{ResetProxyQuarantine: manual})
+			require.NoError(t, err)
+			if manual {
+				require.Nil(t, store.snapshots[7].State)
+				require.Equal(t, []int64{7}, cache.deletedIDs)
+			} else {
+				require.NotNil(t, store.snapshots[7].State)
+				require.Zero(t, store.resetCount)
+			}
+		})
+	}
 }
 
 func (r *rateLimitClearRepoStub) GetByID(ctx context.Context, id int64) (*Account, error) {

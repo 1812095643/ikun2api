@@ -16,6 +16,8 @@ type proxyGuardStoreStub struct {
 	snapshots  map[int64]*AccountProxySnapshot
 	persistErr error
 	clearCount int
+	resetErr   error
+	resetCount int
 }
 
 func (s *proxyGuardStoreStub) GetAccountProxySnapshot(_ context.Context, id int64) (*AccountProxySnapshot, error) {
@@ -39,6 +41,9 @@ func (s *proxyGuardStoreStub) QuarantineAccountProxy(_ context.Context, a *Accou
 		return false, s.persistErr
 	}
 	current := s.snapshots[a.AccountID]
+	if current.ResetEpoch != a.ResetEpoch {
+		return false, nil
+	}
 	if current.State != nil && current.State.Generation != state.Generation {
 		return false, nil
 	}
@@ -66,6 +71,115 @@ func (s *proxyGuardStoreStub) ListProxyQuarantinedAccounts(_ context.Context, af
 		}
 	}
 	return ids, nil
+}
+
+func (s *proxyGuardStoreStub) ResetAccountProxyQuarantine(_ context.Context, a *AccountProxySnapshot) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.resetErr != nil {
+		return false, s.resetErr
+	}
+	current := s.snapshots[a.AccountID]
+	if (current.State == nil) != (a.State == nil) ||
+		(current.State != nil && current.State.Generation != a.State.Generation) {
+		return false, nil
+	}
+	if current.ResetEpoch != a.ResetEpoch {
+		return false, nil
+	}
+	current.State = nil
+	current.ResetEpoch = "epoch-reset-" + time.Now().UTC().Format(time.RFC3339Nano)
+	s.resetCount++
+	return true, nil
+}
+
+func TestProxyFailureGuardManualResetClearsDurableAndLocalBlockBeforeCooldown(t *testing.T) {
+	g, store, probe, _ := proxyGuardFixture()
+	lease, err := g.Begin(context.Background(), 7, "socks5://127.0.0.1:1080", "https://api.anthropic.com/")
+	require.NoError(t, err)
+	defer lease.Close()
+	require.ErrorIs(t, lease.Failure(&net.OpError{Op: "dial", Err: errors.New("down")}), ErrProxyQuarantined)
+	require.NotNil(t, store.snapshots[7].State)
+	require.NoError(t, g.ResetAccount(context.Background(), 7))
+	require.Nil(t, store.snapshots[7].State)
+	require.Empty(t, g.blocks)
+	require.Zero(t, probe.calls, "manual reset must not wait for the automatic probe")
+	g.CheckRecovery()
+	require.Nil(t, store.snapshots[7].State, "recovery must not resurrect the reset marker")
+	next, err := g.Begin(context.Background(), 7, "socks5://127.0.0.1:1080", "https://api.anthropic.com/")
+	require.NoError(t, err)
+	next.Close()
+	_, err = g.Begin(context.Background(), 7, "", "https://api.anthropic.com/")
+	require.ErrorIs(t, err, ErrProxyQuarantined, "manual recovery must never enable direct fallback")
+}
+
+func TestProxyFailureGuardManualResetKeepsBlockOnPersistenceFailure(t *testing.T) {
+	g, store, _, _ := proxyGuardFixture()
+	lease, err := g.Begin(context.Background(), 7, "socks5://127.0.0.1:1080", "https://api.anthropic.com/")
+	require.NoError(t, err)
+	defer lease.Close()
+	lease.Failure(&net.OpError{Op: "dial", Err: errors.New("down")})
+	store.resetErr = errors.New("storage unavailable")
+	require.Error(t, g.ResetAccount(context.Background(), 7))
+	require.NotNil(t, store.snapshots[7].State)
+	require.Contains(t, g.blocks, int64(7))
+}
+
+func TestProxyFailureGuardManualResetHandlesUnpersistedFailure(t *testing.T) {
+	g, store, _, _ := proxyGuardFixture()
+	store.persistErr = errors.New("write unavailable")
+	lease, err := g.Begin(context.Background(), 7, "socks5://127.0.0.1:1080", "https://api.anthropic.com/")
+	require.NoError(t, err)
+	defer lease.Close()
+	lease.Failure(&net.OpError{Op: "dial", Err: errors.New("down")})
+	require.Nil(t, store.snapshots[7].State)
+	require.Contains(t, g.blocks, int64(7))
+	require.NoError(t, g.ResetAccount(context.Background(), 7))
+	require.Empty(t, g.blocks)
+}
+
+func TestProxyFailureGuardManualResetDoesNotRequarantineFromAnOlderLease(t *testing.T) {
+	g, store, _, now := proxyGuardFixture()
+	lease, err := g.Begin(context.Background(), 7, "socks5://127.0.0.1:1080", "https://api.anthropic.com/")
+	require.NoError(t, err)
+	defer lease.Close()
+	store.snapshots[7].State = &ProxyFailureState{Generation: "manual-reset", NotBefore: now.Add(time.Minute)}
+	require.NoError(t, g.ResetAccount(context.Background(), 7))
+	require.ErrorIs(t, lease.Failure(&net.OpError{Op: "dial", Err: errors.New("late transport failure")}), ErrProxyQuarantined)
+	require.Nil(t, store.snapshots[7].State, "pre-reset requests cannot re-create the reset quarantine")
+	require.Empty(t, g.blocks)
+}
+
+func TestProxyFailureGuardObservesResetFromAnotherProcess(t *testing.T) {
+	g, store, _, _ := proxyGuardFixture()
+	lease, err := g.Begin(context.Background(), 7, "socks5://127.0.0.1:1080", "https://api.anthropic.com/")
+	require.NoError(t, err)
+	defer lease.Close()
+	otherProcessSnapshot, err := store.GetAccountProxySnapshot(context.Background(), 7)
+	require.NoError(t, err)
+	resetOK, err := store.ResetAccountProxyQuarantine(context.Background(), otherProcessSnapshot)
+	require.NoError(t, err)
+	require.True(t, resetOK)
+	lease.Failure(&net.OpError{Op: "dial", Err: errors.New("late failure after reset")})
+	require.Nil(t, store.snapshots[7].State, "stale lease must not write after another process reset")
+	g.CheckRecovery()
+	require.Empty(t, g.blocks)
+}
+
+func TestProxyFailureGuardResetEpochChangesEvenBeforeFailureIsPersisted(t *testing.T) {
+	g, store, _, _ := proxyGuardFixture()
+	lease, err := g.Begin(context.Background(), 7, "socks5://127.0.0.1:1080", "https://api.anthropic.com/")
+	require.NoError(t, err)
+	defer lease.Close()
+	otherProcessSnapshot, err := store.GetAccountProxySnapshot(context.Background(), 7)
+	require.NoError(t, err)
+	resetOK, err := store.ResetAccountProxyQuarantine(context.Background(), otherProcessSnapshot)
+	require.NoError(t, err)
+	require.True(t, resetOK, "reset must advance the database epoch even with no persisted quarantine marker")
+	lease.Failure(&net.OpError{Op: "dial", Err: errors.New("older request failure")})
+	require.Nil(t, store.snapshots[7].State, "old request cannot persist a quarantine across a reset on another process")
+	g.CheckRecovery()
+	require.Empty(t, g.blocks)
 }
 
 type proxyGuardProberStub struct {
@@ -201,9 +315,11 @@ func TestProxyFailureGuardStateIsNotAnExpiringSchedulerHint(t *testing.T) {
 	a := &Account{Status: StatusActive, Schedulable: true, TempUnschedulableUntil: &past, Extra: map[string]any{ProxyFailureGuardExtraKey: map[string]any{"generation": "x"}}}
 	require.False(t, a.IsSchedulable())
 	require.False(t, a.IsCredentialUsableForShadow())
-	current := map[string]any{ProxyFailureGuardExtraKey: "runtime-only"}
+	current := map[string]any{ProxyFailureGuardExtraKey: "runtime-only", ProxyFailureResetEpochExtraKey: "epoch-1"}
 	merged := MergeProxyFailureGuardExtra(map[string]any{ProxyFailureGuardExtraKey: "forged", "name": "keep"}, current)
 	require.Equal(t, "runtime-only", merged[ProxyFailureGuardExtraKey])
+	require.Equal(t, "epoch-1", merged[ProxyFailureResetEpochExtraKey])
 	require.Equal(t, "keep", merged["name"])
 	require.NotContains(t, MergeProxyFailureGuardExtra(map[string]any{ProxyFailureGuardExtraKey: "forged"}, nil), ProxyFailureGuardExtraKey)
+	require.NotContains(t, MergeProxyFailureGuardExtra(map[string]any{ProxyFailureResetEpochExtraKey: "forged"}, nil), ProxyFailureResetEpochExtraKey)
 }

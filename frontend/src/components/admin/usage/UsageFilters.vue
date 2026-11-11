@@ -1,11 +1,9 @@
 <template>
   <div :class="flat ? 'p-4 sm:p-6' : 'card p-6'">
-    <!-- Toolbar: left filters (multi-line) + right actions -->
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <!-- Left: filters (allowed to wrap to multiple rows) -->
-      <div class="flex flex-1 flex-wrap items-end gap-4">
+    <UsageFilterLayout>
+      <template #default>
         <!-- User Search -->
-        <div v-if="isFilterVisible('user_id')" ref="userSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]" data-testid="usage-filter-field-user_id">
+        <div v-if="isFilterVisible('user_id')" ref="userSearchRef" class="usage-filter-field usage-filter-dropdown relative min-w-0" data-testid="usage-filter-field-user_id">
           <label class="input-label">{{ t('admin.usage.userFilter') }}</label>
           <input
             v-model="userKeyword"
@@ -42,7 +40,7 @@
         </div>
 
         <!-- API Key Search -->
-        <div v-if="isFilterVisible('api_key_id')" ref="apiKeySearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]" data-testid="usage-filter-field-api_key_id">
+        <div v-if="isFilterVisible('api_key_id')" ref="apiKeySearchRef" class="usage-filter-field usage-filter-dropdown relative min-w-0" data-testid="usage-filter-field-api_key_id">
           <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
           <input
             v-model="apiKeyKeyword"
@@ -79,13 +77,13 @@
         </div>
 
         <!-- Model Filter -->
-        <div v-if="isFilterVisible('model')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-model">
+        <div v-if="isFilterVisible('model')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-model">
           <label class="input-label">{{ t('usage.model') }}</label>
           <Select v-model="filters.model" :options="modelOptions" searchable @change="emitChange" />
         </div>
 
         <!-- Account Filter -->
-        <div v-if="isFilterVisible('account_id')" ref="accountSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-account_id">
+        <div v-if="isFilterVisible('account_id')" ref="accountSearchRef" class="usage-filter-field usage-filter-dropdown relative min-w-0" data-testid="usage-filter-field-account_id">
           <label class="input-label">{{ t('admin.usage.account') }}</label>
           <input
             v-model="accountKeyword"
@@ -122,62 +120,61 @@
         </div>
 
         <!-- Request Type Filter (usage only) -->
-        <div v-if="mode !== 'errors' && isFilterVisible('request_type')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-request_type">
+        <div v-if="mode !== 'errors' && isFilterVisible('request_type')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-request_type">
           <label class="input-label">{{ t('usage.type') }}</label>
           <Select v-model="filters.request_type" :options="requestTypeOptions" @change="emitChange" />
         </div>
 
         <!-- Native compaction is independent of the transport request type. -->
-        <div v-if="mode !== 'errors' && isFilterVisible('native_compaction_v2')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-native_compaction_v2">
+        <div v-if="mode !== 'errors' && isFilterVisible('native_compaction_v2')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-native_compaction_v2">
           <label class="input-label">{{ t('usage.compactionFilter') }}</label>
           <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="emitChange" />
         </div>
 
         <!-- Billing Type Filter (usage only) -->
-        <div v-if="mode !== 'errors' && isFilterVisible('billing_type')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-billing_type">
+        <div v-if="mode !== 'errors' && isFilterVisible('billing_type')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-billing_type">
           <label class="input-label">{{ t('admin.usage.billingType') }}</label>
           <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="emitChange" />
         </div>
 
         <!-- Billing Mode Filter (usage only；用户排行的 user-breakdown 接口不支持该维度) -->
-        <div v-if="mode === 'usage' && isFilterVisible('billing_mode')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-billing_mode">
+        <div v-if="mode === 'usage' && isFilterVisible('billing_mode')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-billing_mode">
           <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
           <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="emitChange" />
         </div>
 
-        <div v-if="mode === 'usage' && isFilterVisible('upstream_model_mismatch')" class="w-full sm:w-auto sm:min-w-[220px]" data-testid="usage-filter-field-upstream_model_mismatch">
+        <div v-if="mode === 'usage' && isFilterVisible('upstream_model_mismatch')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-upstream_model_mismatch">
           <label class="input-label">{{ t('admin.usage.upstreamModelAudit') }}</label>
           <Select v-model="filters.upstream_model_mismatch" :options="upstreamModelMismatchOptions" @change="emitChange" />
         </div>
 
         <!-- Error Phase Filter (errors only) -->
-        <div v-if="mode === 'errors' && isFilterVisible('error_phase')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-error_phase">
+        <div v-if="mode === 'errors' && isFilterVisible('error_phase')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-error_phase">
           <label class="input-label">{{ t('admin.ops.errorLog.type') }}</label>
           <Select v-model="filters.error_phase" :options="errorPhaseOptions" @change="emitChange" />
         </div>
 
         <!-- Error Category Filter (errors only) -->
-        <div v-if="mode === 'errors' && isFilterVisible('error_category')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-error_category">
+        <div v-if="mode === 'errors' && isFilterVisible('error_category')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-error_category">
           <label class="input-label">{{ t('usage.errors.category') }}</label>
           <Select v-model="filters.error_category" :options="errorCategoryOptions" @change="emitChange" />
         </div>
 
         <!-- Status Code Filter (errors only) -->
-        <div v-if="mode === 'errors' && isFilterVisible('status_code')" class="w-full sm:w-auto sm:min-w-[180px]" data-testid="usage-filter-field-status_code">
+        <div v-if="mode === 'errors' && isFilterVisible('status_code')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-status_code">
           <label class="input-label">{{ t('admin.ops.errorLog.status') }}</label>
           <Select v-model="filters.status_code" :options="statusCodeOptions" @change="emitChange" />
         </div>
 
         <!-- Group Filter -->
-        <div v-if="isFilterVisible('group_id')" class="w-full sm:w-auto sm:min-w-[200px]" data-testid="usage-filter-field-group_id">
+        <div v-if="isFilterVisible('group_id')" class="usage-filter-field min-w-0" data-testid="usage-filter-field-group_id">
           <label class="input-label">{{ t('admin.usage.group') }}</label>
           <Select v-model="filters.group_id" :options="groupOptions" searchable @change="emitChange" />
         </div>
 
-      </div>
+      </template>
 
-      <!-- Right: actions -->
-      <div v-if="showActions" class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+      <template v-if="showActions" #actions>
         <button type="button" @click="$emit('refresh')" class="btn btn-secondary">
           {{ t('common.refresh') }}
         </button>
@@ -194,8 +191,8 @@
             {{ t('usage.exportExcel') }}
           </button>
         </template>
-      </div>
-    </div>
+      </template>
+    </UsageFilterLayout>
   </div>
 </template>
 
@@ -205,6 +202,7 @@ import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
 import FilterSettingsDropdown from '@/components/common/FilterSettingsDropdown.vue'
+import UsageFilterLayout from '@/components/usage/UsageFilterLayout.vue'
 import { useUsageFilterVisibility } from '@/composables/useUsageFilterVisibility'
 import { COMMON_ERROR_STATUS_CODES } from '@/utils/errorBadges'
 import type { SimpleApiKey, SimpleUser } from '@/api/admin/usage'

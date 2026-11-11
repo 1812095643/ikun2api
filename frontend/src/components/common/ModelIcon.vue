@@ -1,6 +1,7 @@
 <template>
+  <TypeSafeIcon v-if="isTypeSafe" :width="size" :height="size" class="model-icon" />
   <svg
-    v-if="iconInfo"
+    v-else-if="iconInfo"
     :width="size"
     :height="size"
     viewBox="0 0 24 24"
@@ -18,6 +19,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import TypeSafeIcon from './TypeSafeIcon.vue'
 
 const props = withDefaults(defineProps<{
   model: string
@@ -158,6 +160,7 @@ const iconData: Record<string, IconData> = {
 }
 
 const fallbackText = computed(() => props.model.charAt(0).toUpperCase())
+const isTypeSafe = computed(() => /(?:^|[/:])(?:jev(?:[-/:]|$)|typesafe(?:[/:]|$))/i.test(props.model))
 
 const iconKey = computed(() => {
   const modelLower = props.model.toLowerCase()

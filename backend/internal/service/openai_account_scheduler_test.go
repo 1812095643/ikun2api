@@ -474,6 +474,26 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_DefaultDisabledUsesLega
 	require.False(t, decision.StickyPreviousHit)
 }
 
+func TestDefaultOpenAIAccountScheduler_RejectsPersistedModelCooldown(t *testing.T) {
+	resetAt := time.Now().Add(10 * time.Minute).Format(time.RFC3339)
+	account := &Account{
+		ID: 36099, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Status: StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials: map[string]any{"model_mapping": map[string]any{"alias": "gpt-5.4"}},
+		Extra: map[string]any{modelRateLimitsKey: map[string]any{
+			"gpt-5.4": map[string]any{"rate_limit_reset_at": resetAt},
+		}},
+	}
+	scheduler := &defaultOpenAIAccountScheduler{service: &OpenAIGatewayService{cfg: &config.Config{}}}
+
+	compatible, reason := scheduler.isAccountRequestCompatibleReason(context.Background(), account, OpenAIAccountScheduleRequest{
+		Platform: PlatformOpenAI, RequestedModel: "alias",
+	})
+	require.False(t, compatible)
+	require.Equal(t, "model_rate_limited", reason)
+	require.True(t, account.IsSchedulableForModelWithContext(context.Background(), "gpt-5.3"), "the account remains available for unrelated models")
+}
+
 // Regression: the legacy load-batch path had two bare ErrNoAvailableAccounts
 // exits that bypassed the diagnostics added for both the advanced scheduler and
 // the non-batched legacy selector. This is the default path when load batching

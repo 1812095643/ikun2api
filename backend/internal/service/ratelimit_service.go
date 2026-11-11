@@ -31,6 +31,7 @@ type RateLimitService struct {
 	settingService        *SettingService
 	tokenCacheInvalidator TokenCacheInvalidator
 	runtimeBlocker        AccountRuntimeBlocker
+	proxyGuard            *ProxyFailureGuard
 	// ollamaCloudUsageProbe is the optional Ollama Cloud usage probe scheduler
 	// injected via SetOllamaCloudUsageProbeScheduler. See
 	// ratelimit_service_ollama_429.go for how real-Ollama 429s schedule an async
@@ -57,7 +58,8 @@ type SuccessfulTestRecoveryResult struct {
 
 // AccountRecoveryOptions 控制账号恢复时的附加行为。
 type AccountRecoveryOptions struct {
-	InvalidateToken bool
+	InvalidateToken      bool
+	ResetProxyQuarantine bool
 }
 
 type geminiUsageCacheEntry struct {
@@ -2236,6 +2238,15 @@ func (s *RateLimitService) RecoverAccountState(ctx context.Context, accountID in
 	}
 
 	result := &SuccessfulTestRecoveryResult{}
+	if options.ResetProxyQuarantine {
+		if s.proxyGuard != nil {
+			if err := s.proxyGuard.ResetAccount(ctx, accountID); err != nil {
+				return nil, err
+			}
+		} else if account.IsProxyQuarantined() {
+			return nil, fmt.Errorf("proxy recovery service unavailable")
+		}
+	}
 	if account.Status == StatusError {
 		if err := s.accountRepo.ClearError(ctx, accountID); err != nil {
 			return nil, err
@@ -2248,7 +2259,7 @@ func (s *RateLimitService) RecoverAccountState(ctx context.Context, accountID in
 		}
 	}
 
-	if hasRecoverableRuntimeState(account) {
+	if hasRecoverableRuntimeState(account) || (options.ResetProxyQuarantine && account.IsProxyQuarantined()) {
 		if err := s.ClearRateLimit(ctx, accountID); err != nil {
 			return nil, err
 		}

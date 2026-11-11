@@ -363,8 +363,8 @@ export default {
         viewTempUnschedDetails: 'View temp unschedulable details',
         tempUnschedulableUntil: 'Resumes {time}',
         proxyWaitingRecovery: 'Waiting for proxy recovery',
-        proxyRecoveryNotBefore: 'Probe after {time}; resumes only after proxy recovery',
-        proxyRecoveryProbeRequired: 'A successful proxy probe is required after cooldown; direct fallback is blocked'
+        proxyRecoveryNotBefore: 'Automatic probe after {time}; manual recovery is available',
+        proxyRecoveryProbeRequired: 'Waiting for proxy recovery; manual recovery is available'
       },
       columns: {
         name: 'Name',

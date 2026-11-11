@@ -195,9 +195,24 @@ func isOpenAIRequestScopedCapacityShed(upstreamMsg string, upstreamBody []byte) 
 		(!gjson.ValidBytes(upstreamBody) && isOpenAICapacityShedMessage(string(upstreamBody)))
 }
 
-const openAIRequestScopedRetryMaxDelay = 8 * time.Second
+const (
+	openAIRequestScopedRetryMaxDelay      = 8 * time.Second
+	openAIRequestScopedModelCooldownMax   = 24 * time.Hour
+)
 
 func openAIRequestScopedRetryDelay(responseHeaders http.Header, responseBody []byte) time.Duration {
+	return openAIRequestScopedDelay(responseHeaders, responseBody, openAIRequestScopedRetryMaxDelay)
+}
+
+// openAIRequestScopedCapacityCooldownDelay returns the upstream's full model
+// cooldown hint. Request-local retries stay short and bounded, but scheduling
+// the same account/model before Retry-After expires would immediately repeat
+// a known capacity failure.
+func openAIRequestScopedCapacityCooldownDelay(responseHeaders http.Header, responseBody []byte) time.Duration {
+	return openAIRequestScopedDelay(responseHeaders, responseBody, openAIRequestScopedModelCooldownMax)
+}
+
+func openAIRequestScopedDelay(responseHeaders http.Header, responseBody []byte, maxDelay time.Duration) time.Duration {
 	type retryAfterValue struct {
 		raw          string
 		milliseconds bool
@@ -224,8 +239,8 @@ func openAIRequestScopedRetryDelay(responseHeaders http.Header, responseBody []b
 		if !ok || delay <= 0 {
 			continue
 		}
-		if delay > openAIRequestScopedRetryMaxDelay {
-			return openAIRequestScopedRetryMaxDelay
+		if maxDelay > 0 && delay > maxDelay {
+			return maxDelay
 		}
 		return delay
 	}

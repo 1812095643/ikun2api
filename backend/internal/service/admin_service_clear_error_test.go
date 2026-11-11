@@ -86,3 +86,14 @@ func TestAdminService_ClearAccountError_AlsoClearsRecoverableRuntimeState(t *tes
 	require.Empty(t, updated.TempUnschedulableReason)
 	require.Equal(t, []int64{31}, blocker.clearedIDs)
 }
+
+func TestAdminService_ClearAccountErrorResetsProxyQuarantine(t *testing.T) {
+	guard, store, _, now := proxyGuardFixture()
+	store.snapshots[7].State = &ProxyFailureState{Generation: "paused", NotBefore: now.Add(time.Minute)}
+	repo := &accountRepoStubForClearAccountError{account: &Account{ID: 7, Status: StatusActive}}
+	svc := &adminServiceImpl{accountRepo: repo, proxyGuard: guard}
+	_, err := svc.ClearAccountError(context.Background(), 7)
+	require.NoError(t, err)
+	require.Equal(t, 1, store.resetCount)
+	require.Nil(t, store.snapshots[7].State)
+}

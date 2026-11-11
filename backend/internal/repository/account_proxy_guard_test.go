@@ -20,7 +20,7 @@ func TestProxyFailureGuardRepositoryAtomicQuarantineAndRecoveryContracts(t *test
 	require.NoError(t, err)
 	require.Len(t, store.execQueries, 1)
 	q := normalizeSQLWhitespace(store.execQueries[0])
-	for _, part := range []string{"WITH updated AS", "proxy_failure_guard", "a.proxy_id IS NOT DISTINCT FROM $5", "p.updated_at=$6", "INSERT INTO scheduler_outbox"} {
+	for _, part := range []string{"WITH updated AS", "proxy_failure_guard", "a.proxy_id IS NOT DISTINCT FROM $5", "p.updated_at=$6", "proxy_failure_guard_reset_epoch','')=$8", "INSERT INTO scheduler_outbox"} {
 		require.Contains(t, q, part)
 	}
 	_, err = repo.ClearAccountProxyQuarantine(context.Background(), snapshot)
@@ -30,6 +30,16 @@ func TestProxyFailureGuardRepositoryAtomicQuarantineAndRecoveryContracts(t *test
 	for _, part := range []string{"a.status='active'", "a.proxy_id=$2", "'generation'=$3", "p.updated_at=$4", "'not_before')::timestamptz <= NOW()", "ELSE a.temp_unschedulable_until", "INSERT INTO scheduler_outbox"} {
 		require.Contains(t, q, part)
 	}
+	_, err = repo.ResetAccountProxyQuarantine(context.Background(), snapshot)
+	require.NoError(t, err)
+	require.Len(t, store.execQueries, 3)
+	q = normalizeSQLWhitespace(store.execQueries[2])
+	for _, part := range []string{"-'proxy_failure_guard'", "'generation' IS NOT DISTINCT FROM $3::text", "reset_epoch','')=$2", "a.proxy_id IS NOT DISTINCT FROM $4::bigint", "to_jsonb($5::text)", "ELSE a.temp_unschedulable_until", "INSERT INTO scheduler_outbox"} {
+		require.Contains(t, q, part)
+	}
+	require.NotContains(t, q, "not_before", "manual recovery does not wait for cooldown")
+	require.NotContains(t, q, "state='active'", "manual recovery can reset active quarantine regardless of elapsed cooldown")
+	require.NotContains(t, q, "extra->'proxy_failure_guard' IS NOT NULL", "reset also advances the epoch if a failure was never persisted")
 }
 
 func TestProxyFailureGuardSchedulerProjectionAndForgedUpdates(t *testing.T) {

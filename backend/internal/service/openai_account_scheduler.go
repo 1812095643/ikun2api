@@ -1788,6 +1788,10 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatibleReason(ctx con
 	if s != nil && s.service != nil && s.service.isOpenAIAccountRequestRuntimeBlockedContext(ctx, account, req.RequestedModel, req.RequireCompact) {
 		return false, "runtime_blocked"
 	}
+	if req.RequestedModel != "" && account.IsSchedulable() &&
+		!account.IsSchedulableForModelWithContext(ctx, req.RequestedModel) {
+		return false, "model_rate_limited"
+	}
 	if s != nil && s.service != nil && s.service.isOpenAIProxyStreamQuarantined(ctx, account) {
 		return false, "proxy_stream_quarantined"
 	}
