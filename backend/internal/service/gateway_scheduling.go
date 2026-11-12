@@ -623,7 +623,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 								Timeout:        cfg.StickySessionWaitTimeout,
 								MaxWaiting:     cfg.StickySessionMaxWaiting,
 							}
-							s.attachStickyWaitAlternates(ctx, cfg, plan, sessionHash, func() []*Account {
+							s.attachStickyWaitAlternates(ctx, cfg, plan, account, waitingCount, sessionHash, func() []*Account {
 								others, _ := s.filterLoadAwareCandidates(ctx, accounts, func(id int64) bool { return id == accountID || isExcluded(id) }, isChannelRestricted, platform, useMixed, requestedModel)
 								return others
 							})
@@ -809,8 +809,8 @@ func (s *GatewayService) schedulingConfig() config.GatewaySchedulingConfig {
 		FallbackWaitTimeout:        30 * time.Second,
 		FallbackMaxWaiting:         100,
 		FallbackWaitAnyAccount:     true,
-		StickyCacheGrace:           2 * time.Second,
-		StickyCacheGraceLarge:      90 * time.Second,
+		StickyCacheGrace:           1500 * time.Millisecond,
+		StickyCacheGraceLarge:      4 * time.Second,
 		StickyCacheGraceMinBytes:   200_000,
 		StickyCacheGraceLargeBytes: 800_000,
 		LoadBatchEnabled:           true,

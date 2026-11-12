@@ -93,10 +93,18 @@ func (s *GatewayService) HydrateWaitAlternate(ctx context.Context, account *Acco
 
 // 粘性会话的缓存感知等待。
 //
-// 上游提示词缓存按账号隔离：同一会话换号后缓存命中率从约 96% 掉到约 18%，
-// 5 万 token 以上的请求首字中位数因此多出 1.5–4.7 秒。粘性账号忙时，先只等原账号
-// 一个宽限期（按请求大小估算换号代价），过后再允许改用其他空出的账号；
+// 上游提示词缓存按账号隔离：同一会话换号后缓存命中率从约 96% 掉到约 18%，首字因重新
+// 预填充变慢——5–20 万 token 约多 1.5 秒，20 万 token 以上约多 4.7 秒（2026-11 线上中位数）。
+// 粘性账号忙时，只在「等原账号」大概率比「换号重新预填充」更快时才短暂等它：
+//   - 宽限期不超过换号的首字代价，并硬性封顶 maxStickyCacheGrace；等得比这更久，
+//     省下的预填充时间就全被排队吃掉了，用户看到的首字只会更慢；
+//   - 原账号已有人在排队时不等（先来先得，前面的人先拿到空位，我们要等更久）；
+//   - 只对 Anthropic 账号生效：其它平台（如 OpenAI）首字主要慢在上游本身，
+//     缓存也不按这种方式计费，等原账号换不来更快的首字。
 // 小请求没有缓存可丢，宽限期为 0，立即可换。
+
+// maxStickyCacheGrace 是宽限期的硬上限，配置得再大也不会超过它。
+const maxStickyCacheGrace = 10 * time.Second
 
 type promptSizeHintKey struct{}
 
@@ -117,21 +125,35 @@ func promptSizeHintFromContext(ctx context.Context) int {
 
 // stickyCacheGrace 返回粘性等待中只等原账号的时长；请求大小未知时按普通宽限期处理。
 func stickyCacheGrace(cfg config.GatewaySchedulingConfig, bodyBytes int) time.Duration {
+	var grace time.Duration
 	switch {
 	case bodyBytes <= 0:
-		return cfg.StickyCacheGrace
+		grace = cfg.StickyCacheGrace
 	case cfg.StickyCacheGraceLargeBytes > 0 && bodyBytes >= cfg.StickyCacheGraceLargeBytes:
-		return cfg.StickyCacheGraceLarge
+		grace = cfg.StickyCacheGraceLarge
 	case bodyBytes >= cfg.StickyCacheGraceMinBytes:
-		return cfg.StickyCacheGrace
-	default:
+		grace = cfg.StickyCacheGrace
+	}
+	if grace < 0 {
 		return 0
 	}
+	if grace > maxStickyCacheGrace {
+		return maxStickyCacheGrace
+	}
+	return grace
+}
+
+// stickyWaitGrace 结合账号与排队情况决定实际宽限期，见上方说明。
+func stickyWaitGrace(cfg config.GatewaySchedulingConfig, bound *Account, waitingAhead int, bodyBytes int) time.Duration {
+	if bound == nil || bound.Platform != PlatformAnthropic || waitingAhead > 0 {
+		return 0
+	}
+	return stickyCacheGrace(cfg, bodyBytes)
 }
 
 // attachStickyWaitAlternates 为粘性等待计划补上可替换账号与宽限期。
-// others 只在需要时调用，返回除粘性账号外仍可调度的候选。
-func (s *GatewayService) attachStickyWaitAlternates(ctx context.Context, cfg config.GatewaySchedulingConfig, plan *AccountWaitPlan, sessionHash string, others func() []*Account) {
+// waitingAhead 是粘性账号上已在排队的请求数；others 只在需要时调用，返回除粘性账号外仍可调度的候选。
+func (s *GatewayService) attachStickyWaitAlternates(ctx context.Context, cfg config.GatewaySchedulingConfig, plan *AccountWaitPlan, bound *Account, waitingAhead int, sessionHash string, others func() []*Account) {
 	if !cfg.FallbackWaitAnyAccount || plan == nil {
 		return
 	}
@@ -142,6 +164,6 @@ func (s *GatewayService) attachStickyWaitAlternates(ctx context.Context, cfg con
 	sortByQueuePressure(candidates, func(acc *Account) *Account { return acc }, s.freshQueuePressure(ctx, candidates))
 	plan.Alternates = s.fallbackWaitAlternates(cfg, plan.AccountID, candidates, sessionHash)
 	if len(plan.Alternates) > 0 {
-		plan.AlternatesAfter = stickyCacheGrace(cfg, promptSizeHintFromContext(ctx))
+		plan.AlternatesAfter = stickyWaitGrace(cfg, bound, waitingAhead, promptSizeHintFromContext(ctx))
 	}
 }

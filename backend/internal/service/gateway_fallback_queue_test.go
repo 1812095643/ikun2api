@@ -282,3 +282,32 @@ func TestApplyGatewayTiming(t *testing.T) {
 	applyGatewayTiming(untouched, nil)
 	require.Nil(t, untouched.PreForwardMs)
 }
+
+func TestStickyWait_NoGraceWhenOthersAlreadyQueued(t *testing.T) {
+	svc, ctx := newStickyBusyTestService(1_000_000)
+	svc.concurrencyService = NewConcurrencyService(&mockConcurrencyCache{
+		acquireResults:  map[int64]bool{1: false, 2: true, 3: true},
+		waitCounts:      map[int64]int{1: 1},
+		skipDefaultLoad: true,
+		loadMap:         map[int64]*AccountLoadInfo{1: {AccountID: 1, CurrentConcurrency: 5}},
+	})
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "sticky", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.WaitPlan.Alternates)
+	require.Zero(t, result.WaitPlan.AlternatesAfter, "someone is already ahead in the bound account's queue")
+}
+
+func TestStickyWaitGrace_CappedAndAnthropicOnly(t *testing.T) {
+	cfg := testConfig().Gateway.Scheduling
+	cfg.StickyCacheGrace = 2 * time.Second
+	cfg.StickyCacheGraceLarge = 90 * time.Second
+	cfg.StickyCacheGraceMinBytes = 200_000
+	cfg.StickyCacheGraceLargeBytes = 800_000
+
+	claude := &Account{ID: 1, Platform: PlatformAnthropic}
+	require.Equal(t, maxStickyCacheGrace, stickyWaitGrace(cfg, claude, 0, 1_000_000), "misconfigured 90s is capped")
+	require.Equal(t, 2*time.Second, stickyWaitGrace(cfg, claude, 0, 300_000))
+	require.Zero(t, stickyWaitGrace(cfg, claude, 0, 50_000))
+	require.Zero(t, stickyWaitGrace(cfg, &Account{ID: 2, Platform: PlatformOpenAI}, 0, 1_000_000), "GPT latency is upstream-bound; never hold it")
+	require.Zero(t, stickyWaitGrace(cfg, claude, 2, 1_000_000))
+}

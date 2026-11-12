@@ -625,8 +625,9 @@ gateway:
     # before taking another free account (switching drops the upstream prompt cache).
     # 粘性会话缓存感知等待：绑定账号忙时先只等它一个宽限期，再改用其他空出的账号
     # （换号会丢失上游提示词缓存）。请求体 < min_bytes 不等；>= large_bytes 等 grace_large。
-    sticky_cache_grace: 2s
-    sticky_cache_grace_large: 90s
+    # 宽限期应不超过换号的首字代价（约 1.5–5s），代码硬性封顶 10s；原账号已有人排队或非 Claude 账号时不等。
+    sticky_cache_grace: 1500ms
+    sticky_cache_grace_large: 4s
     sticky_cache_grace_min_bytes: 200000
     sticky_cache_grace_large_bytes: 800000
     # Prefer the account whose session window resets soonest (use-it-or-lose-it).
