@@ -3,6 +3,7 @@ package service
 import (
 	"strconv"
 	"sync"
+	"time"
 )
 
 // 槽位释放唤醒。
@@ -148,4 +149,44 @@ func (w *SlotReleaseWatch) Poke() {
 	case w.ch <- struct{}{}:
 	default:
 	}
+}
+
+// 账号槽位占用时长统计。
+//
+// 粘性账号忙时要估算「等它空出一个槽位要多久」：并发 c、前面已有 n 人排队、单次占用
+// 平均 D 时，期望等待约 (n+1)·D/c。D 按账号在本进程内做指数滑动平均，释放槽位时更新。
+
+const accountHoldEWMAAlpha = 0.2
+
+type accountHoldStats struct {
+	mu   sync.Mutex
+	ewma map[int64]float64 // 秒
+}
+
+func (h *accountHoldStats) observe(accountID int64, d time.Duration) {
+	if h == nil || d <= 0 {
+		return
+	}
+	sec := d.Seconds()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if prev, ok := h.ewma[accountID]; ok {
+		h.ewma[accountID] = prev + accountHoldEWMAAlpha*(sec-prev)
+	} else {
+		h.ewma[accountID] = sec
+	}
+}
+
+// AccountMeanHold 返回本进程观测到的该账号单次槽位平均占用时长。
+func (s *ConcurrencyService) AccountMeanHold(accountID int64) (time.Duration, bool) {
+	if s == nil || s.holdStats == nil {
+		return 0, false
+	}
+	s.holdStats.mu.Lock()
+	defer s.holdStats.mu.Unlock()
+	sec, ok := s.holdStats.ewma[accountID]
+	if !ok {
+		return 0, false
+	}
+	return time.Duration(sec * float64(time.Second)), true
 }

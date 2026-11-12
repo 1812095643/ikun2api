@@ -1595,6 +1595,14 @@ type GatewaySchedulingConfig struct {
 	StickyCacheGraceLarge      time.Duration `mapstructure:"sticky_cache_grace_large"`
 	StickyCacheGraceMinBytes   int           `mapstructure:"sticky_cache_grace_min_bytes"`
 	StickyCacheGraceLargeBytes int           `mapstructure:"sticky_cache_grace_large_bytes"`
+	// StickyCacheWarmWindow：距上次在绑定账号上成功请求超过该时长，视为上游提示词缓存已过期
+	// （Anthropic 默认 5 分钟），不再为保缓存等原账号。0 表示不判断。
+	StickyCacheWarmWindow time.Duration `mapstructure:"sticky_cache_warm_window"`
+	// StickyExpectedHoldDefault：账号还没有占用时长样本时，估算等待用的单次平均占用时长。
+	StickyExpectedHoldDefault time.Duration `mapstructure:"sticky_expected_hold_default"`
+	// NewSessionQuotaSoftPercent：新会话放置时避开额度使用（5h/7d 等）已达该百分比的账号，
+	// 让快到暂停阈值的账号只服务已有会话。0 表示关闭。
+	NewSessionQuotaSoftPercent int `mapstructure:"new_session_quota_soft_percent"`
 
 	// PreferSoonestReset 开启后，负载感知选择会优先选用「会话窗口最早重置」的账号
 	// （use-it-or-lose-it：先用尽即将重置的账号，保留重置时间还很久的账号）。
@@ -2679,6 +2687,9 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.sticky_cache_grace_large", 4*time.Second)
 	viper.SetDefault("gateway.scheduling.sticky_cache_grace_min_bytes", 200_000)
 	viper.SetDefault("gateway.scheduling.sticky_cache_grace_large_bytes", 800_000)
+	viper.SetDefault("gateway.scheduling.sticky_cache_warm_window", 5*time.Minute)
+	viper.SetDefault("gateway.scheduling.sticky_expected_hold_default", 10*time.Second)
+	viper.SetDefault("gateway.scheduling.new_session_quota_soft_percent", 85)
 	viper.SetDefault("gateway.scheduling.prefer_soonest_reset", false)
 	viper.SetDefault("gateway.scheduling.load_batch_enabled", true)
 	viper.SetDefault("gateway.scheduling.load_batch_cache_ttl_ms", 200)

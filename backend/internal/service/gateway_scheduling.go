@@ -532,6 +532,9 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		}
 	}
 
+	// stickyPreferredID 是缓存仍热、但这次没有直接等它的粘性账号；兜底排队时优先排它。
+	var stickyPreferredID int64
+
 	// ============ Layer 1.5: 粘性会话（仅在无模型路由配置时生效） ============
 	if len(routingAccountIDs) == 0 && sessionHash != "" && stickyAccountID > 0 && !isExcluded(stickyAccountID) {
 		accountID := stickyAccountID
@@ -607,7 +610,18 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					}
 
 					waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, accountID)
-					if waitingCount < cfg.StickySessionMaxWaiting {
+					decision := s.decideStickyWait(ctx, cfg, groupID, sessionHash, account, waitingCount)
+					if decision.warm {
+						stickyPreferredID = accountID
+					}
+					if !decision.wait {
+						slog.Debug("sticky.layer1_5_no_routing_switch",
+							"account_id", accountID,
+							"session", shortSessionHash(sessionHash),
+							"reason", decision.reason,
+						)
+					}
+					if decision.wait && waitingCount < cfg.StickySessionMaxWaiting {
 						// 会话数量限制检查（等待计划也需要占用会话配额）
 						if !s.checkAndRegisterSession(ctx, account, sessionHash) {
 							// 会话限制已满，继续到 Layer 2
@@ -623,7 +637,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 								Timeout:        cfg.StickySessionWaitTimeout,
 								MaxWaiting:     cfg.StickySessionMaxWaiting,
 							}
-							s.attachStickyWaitAlternates(ctx, cfg, plan, account, waitingCount, sessionHash, func() []*Account {
+							s.attachStickyWaitAlternates(ctx, cfg, plan, decision.grace, sessionHash, func() []*Account {
 								others, _ := s.filterLoadAwareCandidates(ctx, accounts, func(id int64) bool { return id == accountID || isExcluded(id) }, isChannelRestricted, platform, useMixed, requestedModel)
 								return others
 							})
@@ -710,6 +724,9 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			}
 		}
 
+		// 新会话放置：避开额度快到暂停阈值的账号（见 gateway_session_placement.go）
+		available = preferQuotaHeadroom(available, cfg.NewSessionQuotaSoftPercent, time.Now())
+
 		// 分层过滤选择：优先级（叠加分组 7d 高权重）→（可选）5h 重置 → 负载率 → LRU
 		for len(available) > 0 {
 			// 1. 取优先级最小的集合
@@ -756,6 +773,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	weeklyOrder.sortAccounts(candidates)
 	// 上面的顺序只作为同压力时的先后；按实时排队压力重排，避免整波溢出请求排到同一个账号。
 	sortByQueuePressure(candidates, func(acc *Account) *Account { return acc }, s.freshQueuePressure(ctx, candidates))
+	movePreferredFirst(candidates, stickyPreferredID)
 	for _, acc := range candidates {
 		// 会话数量限制检查（等待计划也需要占用会话配额）
 		if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
@@ -813,6 +831,9 @@ func (s *GatewayService) schedulingConfig() config.GatewaySchedulingConfig {
 		StickyCacheGraceLarge:      4 * time.Second,
 		StickyCacheGraceMinBytes:   200_000,
 		StickyCacheGraceLargeBytes: 800_000,
+		StickyCacheWarmWindow:      5 * time.Minute,
+		StickyExpectedHoldDefault:  10 * time.Second,
+		NewSessionQuotaSoftPercent: 85,
 		LoadBatchEnabled:           true,
 		SlotCleanupInterval:        30 * time.Second,
 	}

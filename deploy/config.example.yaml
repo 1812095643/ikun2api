@@ -630,6 +630,17 @@ gateway:
     sticky_cache_grace_large: 4s
     sticky_cache_grace_min_bytes: 200000
     sticky_cache_grace_large_bytes: 800000
+    # Sticky session counts as cold (prompt cache expired) after this idle time; cold sessions
+    # switch freely instead of waiting for the bound account. 0 disables the check.
+    # 会话距上次请求超过该时长视为缓存已冷（Anthropic 默认 5 分钟），冷会话直接去空闲账号，不再等原账号。
+    sticky_cache_warm_window: 5m
+    # Fallback average slot hold time used to estimate the wait for a busy sticky account
+    # 估算粘性账号空出槽位要等多久时，账号还没有样本时使用的平均占用时长
+    sticky_expected_hold_default: 10s
+    # New sessions avoid accounts whose 5h/7d usage reached this percent (0 disables);
+    # existing sessions keep using them until the hard scheduling threshold.
+    # 新会话避开额度使用已达该百分比的账号（0 关闭），这些账号只继续服务已有会话直到硬阈值。
+    new_session_quota_soft_percent: 85
     # Prefer the account whose session window resets soonest (use-it-or-lose-it).
     # 负载感知选择时优先用尽「会话窗口最早重置」的账号；false 保持
     # 原有「优先级 → 负载率 → LRU」行为（默认）。

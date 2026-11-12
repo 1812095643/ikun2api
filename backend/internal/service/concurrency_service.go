@@ -236,7 +236,8 @@ type ConcurrencyService struct {
 	accountLoadCache    map[string]cachedAccountLoadBatch
 	accountLoadGroup    singleflight.Group
 
-	waitHub *slotWaitHub
+	waitHub   *slotWaitHub
+	holdStats *accountHoldStats
 }
 
 type cachedAccountLoadBatch struct {
@@ -250,6 +251,7 @@ func NewConcurrencyService(cache ConcurrencyCache) *ConcurrencyService {
 		cache:            cache,
 		accountLoadCache: make(map[string]cachedAccountLoadBatch),
 		waitHub:          newSlotWaitHub(),
+		holdStats:        &accountHoldStats{ewma: make(map[int64]float64)},
 	}
 	svc.SetAccountLoadBatchCacheTTL(defaultAccountLoadBatchCacheTTL)
 	return svc
@@ -360,9 +362,11 @@ func (s *ConcurrencyService) AcquireAccountSlot(ctx context.Context, accountID i
 	}
 
 	if acquired {
+		acquiredAt := time.Now()
 		return &AcquireResult{
 			Acquired: true,
 			ReleaseFunc: func() {
+				s.holdStats.observe(accountID, time.Since(acquiredAt))
 				bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				if err := s.cache.ReleaseAccountSlot(bgCtx, accountID, requestID); err != nil {

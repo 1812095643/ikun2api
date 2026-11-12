@@ -95,13 +95,9 @@ func (s *GatewayService) HydrateWaitAlternate(ctx context.Context, account *Acco
 //
 // 上游提示词缓存按账号隔离：同一会话换号后缓存命中率从约 96% 掉到约 18%，首字因重新
 // 预填充变慢——5–20 万 token 约多 1.5 秒，20 万 token 以上约多 4.7 秒（2026-11 线上中位数）。
-// 粘性账号忙时，只在「等原账号」大概率比「换号重新预填充」更快时才短暂等它：
-//   - 宽限期不超过换号的首字代价，并硬性封顶 maxStickyCacheGrace；等得比这更久，
-//     省下的预填充时间就全被排队吃掉了，用户看到的首字只会更慢；
-//   - 原账号已有人在排队时不等（先来先得，前面的人先拿到空位，我们要等更久）；
-//   - 只对 Anthropic 账号生效：其它平台（如 OpenAI）首字主要慢在上游本身，
-//     缓存也不按这种方式计费，等原账号换不来更快的首字。
-// 小请求没有缓存可丢，宽限期为 0，立即可换。
+// stickyCacheGrace 给出按请求大小估算的换号首字代价，作为等原账号的预算上限，
+// 并硬性封顶 maxStickyCacheGrace；是否真的等由 decideStickyWait 结合预计等待决定。
+// 小请求没有缓存可丢，预算为 0。
 
 // maxStickyCacheGrace 是宽限期的硬上限，配置得再大也不会超过它。
 const maxStickyCacheGrace = 10 * time.Second
@@ -143,17 +139,9 @@ func stickyCacheGrace(cfg config.GatewaySchedulingConfig, bodyBytes int) time.Du
 	return grace
 }
 
-// stickyWaitGrace 结合账号与排队情况决定实际宽限期，见上方说明。
-func stickyWaitGrace(cfg config.GatewaySchedulingConfig, bound *Account, waitingAhead int, bodyBytes int) time.Duration {
-	if bound == nil || bound.Platform != PlatformAnthropic || waitingAhead > 0 {
-		return 0
-	}
-	return stickyCacheGrace(cfg, bodyBytes)
-}
-
-// attachStickyWaitAlternates 为粘性等待计划补上可替换账号与宽限期。
-// waitingAhead 是粘性账号上已在排队的请求数；others 只在需要时调用，返回除粘性账号外仍可调度的候选。
-func (s *GatewayService) attachStickyWaitAlternates(ctx context.Context, cfg config.GatewaySchedulingConfig, plan *AccountWaitPlan, bound *Account, waitingAhead int, sessionHash string, others func() []*Account) {
+// attachStickyWaitAlternates 为粘性等待计划补上可替换账号与宽限期（见 decideStickyWait）。
+// others 只在需要时调用，返回除粘性账号外仍可调度的候选。
+func (s *GatewayService) attachStickyWaitAlternates(ctx context.Context, cfg config.GatewaySchedulingConfig, plan *AccountWaitPlan, grace time.Duration, sessionHash string, others func() []*Account) {
 	if !cfg.FallbackWaitAnyAccount || plan == nil {
 		return
 	}
@@ -164,6 +152,6 @@ func (s *GatewayService) attachStickyWaitAlternates(ctx context.Context, cfg con
 	sortByQueuePressure(candidates, func(acc *Account) *Account { return acc }, s.freshQueuePressure(ctx, candidates))
 	plan.Alternates = s.fallbackWaitAlternates(cfg, plan.AccountID, candidates, sessionHash)
 	if len(plan.Alternates) > 0 {
-		plan.AlternatesAfter = stickyWaitGrace(cfg, bound, waitingAhead, promptSizeHintFromContext(ctx))
+		plan.AlternatesAfter = grace
 	}
 }
