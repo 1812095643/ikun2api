@@ -123,6 +123,7 @@ func NewGatewayHandler(
 // Messages handles Claude API compatible messages endpoint
 // POST /v1/messages
 func (h *GatewayHandler) Messages(c *gin.Context) {
+	requestStart := time.Now()
 	// 从context获取apiKey和user（ApiKeyAuth中间件已设置）
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
@@ -146,6 +147,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	// 读取请求体
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
+	bodyReadDone := time.Now()
 	if err != nil {
 		if handleRequestBodyReadError(c, reqLog, err) {
 			return
@@ -226,6 +228,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	// 在请求上下文中记录 thinking 状态，供 Antigravity 最终模型 key 推导/模型维度限流使用
 	c.Request = c.Request.WithContext(service.WithThinkingEnabled(c.Request.Context(), parsedReq.ThinkingEnabled, h.metadataBridgeEnabled()))
+	// 请求体大小供调度估算换号丢失提示词缓存的代价（粘性等待宽限期）。
+	c.Request = c.Request.WithContext(service.WithPromptSizeHint(c.Request.Context(), len(body)))
 
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
@@ -454,18 +458,20 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if err == nil && canWait {
 					accountWaitCounted = true
 				}
+				waitAccountID := account.ID
 				releaseWait := func() {
 					if accountWaitCounted {
-						h.concurrencyHelper.DecrementAccountWaitCount(c.Request.Context(), account.ID)
+						h.concurrencyHelper.DecrementAccountWaitCount(c.Request.Context(), waitAccountID)
 						accountWaitCounted = false
 					}
 				}
 
-				accountReleaseFunc, err = h.concurrencyHelper.AcquireAccountSlotWithWaitTimeout(
+				var waitedAccount *service.Account
+				waitedAccount, accountReleaseFunc, err = h.concurrencyHelper.AcquireSlotFromWaitPlan(
 					c,
-					account.ID,
-					selection.WaitPlan.MaxConcurrency,
-					selection.WaitPlan.Timeout,
+					account,
+					selection.WaitPlan,
+					h.revalidateWaitAlternate(reqModel),
 					reqStream,
 					&streamStarted,
 				)
@@ -477,6 +483,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
+				if waitedAccount != nil && waitedAccount.ID != account.ID {
+					h.gatewayService.ReleaseAccountSession(c.Request.Context(), account, sessionKey)
+				}
+				account = switchToWaitedAccount(c, reqLog, selection, account, waitedAccount)
 			}
 			// 终检与准入后绑定使用选号结果携带的门（见 responses 同名注释）。
 			admissionCtx := service.ContextWithSelectionProfitGate(c.Request.Context(), selection)
@@ -498,7 +508,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			selection.Account = latest
 			// 等待路径保持既有 eager 绑定（无门时 helper 直接绑定）；调度器已
 			// 抢槽的直达路径无门时由选号内部绑定，这里只在门下补准入后绑定。
-			if selection.ProfitGateActive() || !selection.Acquired {
+			if (!service.IsClaudeOAuthSchedulingAccount(account) || h.cfg == nil || !h.cfg.Gateway.Scheduling.LoadBatchEnabled || !h.cfg.Gateway.Scheduling.FallbackWaitAnyAccount) && (selection.ProfitGateActive() || !selection.Acquired) {
 				if err := h.gatewayService.BindStickySessionAfterProfitAdmission(admissionCtx, apiKey.GroupID, sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
@@ -514,6 +524,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
 			writerSizeBeforeForward := c.Writer.Size()
+			forwardStart := time.Now()
 			if account.Platform == service.PlatformAntigravity {
 				result, err = h.antigravityGatewayService.ForwardGemini(
 					requestCtx,
@@ -616,8 +627,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 			sessionID := service.ExtractClientSessionID(c)
 			channelUsageFields := clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel)
+			usageTiming := gatewayRequestTiming(c, requestStart, bodyReadDone, forwardStart, fs.SwitchCount)
 			h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+					Timing:             usageTiming,
 					Result:             result,
 					QuotaPlatform:      quotaPlatform,
 					APIKey:             apiKey,
@@ -797,18 +810,20 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if err == nil && canWait {
 					accountWaitCounted = true
 				}
+				waitAccountID := account.ID
 				releaseWait := func() {
 					if accountWaitCounted {
-						h.concurrencyHelper.DecrementAccountWaitCount(c.Request.Context(), account.ID)
+						h.concurrencyHelper.DecrementAccountWaitCount(c.Request.Context(), waitAccountID)
 						accountWaitCounted = false
 					}
 				}
 
-				accountReleaseFunc, err = h.concurrencyHelper.AcquireAccountSlotWithWaitTimeout(
+				var waitedAccount *service.Account
+				waitedAccount, accountReleaseFunc, err = h.concurrencyHelper.AcquireSlotFromWaitPlan(
 					c,
-					account.ID,
-					selection.WaitPlan.MaxConcurrency,
-					selection.WaitPlan.Timeout,
+					account,
+					selection.WaitPlan,
+					h.revalidateWaitAlternate(reqModel),
 					reqStream,
 					&streamStarted,
 				)
@@ -820,6 +835,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
+				if waitedAccount != nil && waitedAccount.ID != account.ID {
+					h.gatewayService.ReleaseAccountSession(c.Request.Context(), account, sessionKey)
+				}
+				account = switchToWaitedAccount(c, reqLog, selection, account, waitedAccount)
 			}
 			// 终检与准入后绑定使用选号结果携带的门（见 responses 同名注释）。
 			admissionCtx := service.ContextWithSelectionProfitGate(c.Request.Context(), selection)
@@ -846,7 +865,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			sessionSlotAccounts[account.ID] = account
 			// 等待路径保持既有 eager 绑定（无门时 helper 直接绑定）；调度器已
 			// 抢槽的直达路径无门时由选号内部绑定，这里只在门下补准入后绑定。
-			if selection.ProfitGateActive() || !selection.Acquired {
+			if (!service.IsClaudeOAuthSchedulingAccount(account) || h.cfg == nil || !h.cfg.Gateway.Scheduling.LoadBatchEnabled || !h.cfg.Gateway.Scheduling.FallbackWaitAnyAccount) && (selection.ProfitGateActive() || !selection.Acquired) {
 				if err := h.gatewayService.BindStickySessionAfterProfitAdmission(admissionCtx, currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
@@ -933,6 +952,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
 			writerSizeBeforeForward := c.Writer.Size()
+			forwardStart := time.Now()
 			if account.Platform == service.PlatformAntigravity && account.Type != service.AccountTypeAPIKey {
 				result, err = h.antigravityGatewayService.Forward(requestCtx, c, account, attemptBody, hasBoundSession)
 			} else {
@@ -980,8 +1000,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				quotaPlatform := service.QuotaPlatform(c.Request.Context(), currentAPIKey)
 				sessionID := service.ExtractClientSessionID(c)
 				channelUsageFields := clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel)
+				usageTiming := gatewayRequestTiming(c, requestStart, bodyReadDone, forwardStart, fs.SwitchCount)
 				h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+						Timing:             usageTiming,
 						Result:             result,
 						QuotaPlatform:      quotaPlatform,
 						APIKey:             currentAPIKey,
@@ -1140,11 +1162,18 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			// 绑定粘性会话（成功转发后绑定/刷新）
 			// - 无现有绑定（首次请求）：创建绑定
 			// - 选中账号与粘性账号一致：刷新 TTL
-			// - 粘性账号因负载/RPM 被跳过、选中了其他账号：不覆盖原绑定，
-			//   下次请求粘性账号恢复后仍可命中
-			if sessionKey != "" && (sessionBoundAccountID == 0 || sessionBoundAccountID == account.ID) {
+			// - 粘性账号因负载/RPM 被跳过、选中了其他账号：默认保留原绑定
+			// - 等待计划明确允许迁移的缓存冷会话或粘性等待，成功后绑定到实际承接账号
+			rebindStickyFromWait := service.IsClaudeOAuthSchedulingAccount(account) && h.cfg != nil && h.cfg.Gateway.Scheduling.LoadBatchEnabled && h.cfg.Gateway.Scheduling.FallbackWaitAnyAccount
+			if rebindStickyFromWait {
+				if err := h.gatewayService.BindClaudeOAuthSessionAfterSuccess(admissionCtx, currentAPIKey.GroupID, sessionKey, account); err != nil {
+					reqLog.Warn("gateway.bind_claude_oauth_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+				}
+			} else if sessionKey != "" && (sessionBoundAccountID == 0 || sessionBoundAccountID == account.ID) {
 				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+				} else if rebindStickyFromWait {
+					sessionBoundAccountID = account.ID
 				}
 			}
 

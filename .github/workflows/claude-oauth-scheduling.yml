@@ -1,0 +1,62 @@
+name: Claude OAuth 调度回归
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/internal/**'
+      - 'backend/migrations/**'
+      - 'frontend/src/components/usage/**'
+      - '.github/workflows/claude-oauth-scheduling.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GOMAXPROCS: '2'
+      GOFLAGS: '-p=2'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: OAuth 范围、额度、排队、用量及配置回归
+        working-directory: backend
+        run: >-
+          go test -tags unit ./internal/service ./internal/handler ./internal/repository ./internal/config
+          -run 'Test(ClaudeOAuth|Fallback|FreshQueuePressure|StickyWait|DecideStickyWait|PreferQuotaHeadroom|NewSessionPlacement|MovePreferredFirst|AcquireSlotFromWaitPlan|SwitchToWaitedAccount|WaitForPlannedAccountSlot|PollSlotWithPing|SlotWaitHub|ConcurrencyService_ReleaseWakesWaiter|ApplyGatewayTiming|PrepareUsageLogInsert|BuildUsageLog|ScanUsageLog|UsageLogStaticInsertShape|LoadDefaultSchedulingConfig|GatewayServiceRecordUsage_PersistsGatewayTiming|ClaudeWeeklyReset)'
+          -count=1 -timeout=180s
+      - name: 排队与唤醒竞态检查
+        working-directory: backend
+        run: >-
+          go test -race -tags unit ./internal/service ./internal/handler
+          -run 'Test(SlotWaitHub|ConcurrencyService_ReleaseWakesWaiter|AcquireSlotFromWaitPlan|WaitForPlannedAccountSlot|ClaudeOAuth|FallbackQueue|StickyWait)'
+          -count=1 -timeout=180s
+      - name: PostgreSQL 迁移、旧记录与用量写入回读
+        working-directory: backend
+        run: >-
+          go test -tags integration ./internal/repository
+          -run 'TestUsageLog_GatewayTimingPreservesCacheAndLegacyRows|TestUsageLogRepositoryCreate_BatchPathConcurrent'
+          -count=1 -timeout=240s
+      - name: 前端延迟与吞吐量口径
+        working-directory: frontend
+        run: >-
+          pnpm install --frozen-lockfile &&
+          pnpm exec vitest run src/components/usage/__tests__/UsageLatencyCell.spec.ts src/utils/__tests__/outputRate.spec.ts &&
+          pnpm build
+      - name: 编译服务端
+        working-directory: backend
+        run: CGO_ENABLED=0 go build -tags embed -trimpath -o /tmp/ikun2api ./cmd/server

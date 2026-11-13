@@ -252,3 +252,23 @@ func TestComputeRuleMetricNewIndicators(t *testing.T) {
 		})
 	}
 }
+
+func TestComputeRuleMetric_TTFTPercentiles(t *testing.T) {
+	t.Parallel()
+
+	p90, p95 := 12000, 18000
+	now := time.Now().UTC()
+	svc := &OpsAlertEvaluatorService{
+		opsService: &OpsService{},
+		opsRepo:    &stubOpsRepo{overview: &OpsDashboardOverview{TTFT: OpsPercentiles{P90: &p90, P95: &p95}}},
+	}
+	for metric, want := range map[string]float64{"ttft_p90_ms": 12000, "ttft_p95_ms": 18000} {
+		val, ok := svc.computeRuleMetric(context.Background(), &OpsAlertRule{MetricType: metric}, nil, now.Add(-5*time.Minute), now, "", nil)
+		require.True(t, ok, metric)
+		require.InDelta(t, want, val, 0.0001, metric)
+	}
+
+	empty := &OpsAlertEvaluatorService{opsService: &OpsService{}, opsRepo: &stubOpsRepo{overview: &OpsDashboardOverview{}}}
+	_, ok := empty.computeRuleMetric(context.Background(), &OpsAlertRule{MetricType: "ttft_p95_ms"}, nil, now.Add(-5*time.Minute), now, "", nil)
+	require.False(t, ok, "no samples must not fire the alert")
+}

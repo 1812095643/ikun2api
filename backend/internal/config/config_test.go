@@ -530,6 +530,9 @@ func TestLoadDefaultSchedulingConfig(t *testing.T) {
 	if cfg.Gateway.Scheduling.FallbackMaxWaiting != 100 {
 		t.Fatalf("FallbackMaxWaiting = %d, want 100", cfg.Gateway.Scheduling.FallbackMaxWaiting)
 	}
+	if !cfg.Gateway.Scheduling.FallbackWaitAnyAccount {
+		t.Fatalf("FallbackWaitAnyAccount = false, want true")
+	}
 	if !cfg.Gateway.Scheduling.LoadBatchEnabled {
 		t.Fatalf("LoadBatchEnabled = false, want true")
 	}

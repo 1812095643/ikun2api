@@ -8,15 +8,55 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	middleware2 "github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 const gatewayStreamHeartbeatBytesKey = "gateway_stream_heartbeat_bytes"
+
+// gatewaySlotWaitKey 累计本请求等待用户/账号并发槽位的总时长（写入用量记录）。
+const gatewaySlotWaitKey = "gateway_slot_wait_duration"
+
+func addGatewayWait(c *gin.Context, d time.Duration) {
+	if c == nil || d <= 0 {
+		return
+	}
+	c.Set(gatewaySlotWaitKey, gatewayWaitDuration(c)+d)
+}
+
+// gatewayRequestTiming 在请求热路径上拍下网关侧耗时快照，供异步用量记录使用。
+func gatewayRequestTiming(c *gin.Context, requestStart, bodyReadDone, forwardStart time.Time, switchCount int) *service.GatewayRequestTiming {
+	if requestStart.IsZero() || forwardStart.IsZero() {
+		return nil
+	}
+	timing := &service.GatewayRequestTiming{
+		SlotWait:    gatewayWaitDuration(c),
+		PreForward:  forwardStart.Sub(requestStart),
+		SwitchCount: switchCount + c.GetInt("gateway_wait_account_switch_count"),
+	}
+	if !bodyReadDone.IsZero() {
+		timing.Upload = bodyReadDone.Sub(requestStart)
+	}
+	return timing
+}
+
+func gatewayWaitDuration(c *gin.Context) time.Duration {
+	if c == nil {
+		return 0
+	}
+	if v, ok := c.Get(gatewaySlotWaitKey); ok {
+		if d, ok := v.(time.Duration); ok {
+			return d
+		}
+	}
+	return 0
+}
 
 func recordGatewayStreamHeartbeat(c *gin.Context, written int) {
 	if c == nil || written <= 0 {
@@ -375,14 +415,25 @@ func (h *ConcurrencyHelper) waitForSlotWithPing(c *gin.Context, slotType string,
 
 // waitForSlotWithPingTimeout waits for a concurrency slot with a custom timeout.
 func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType string, id int64, maxConcurrency int, timeout time.Duration, isStream bool, streamStarted *bool, tryImmediate bool) (func(), error) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
-	defer cancel()
-
-	acquireSlot := func() (*service.AcquireResult, error) {
+	return h.pollSlotWithPing(c, slotType, timeout, isStream, streamStarted, tryImmediate, nil, func(ctx context.Context) (*service.AcquireResult, error) {
 		if slotType == "user" {
 			return h.concurrencyService.AcquireUserSlot(ctx, id, maxConcurrency)
 		}
 		return h.concurrencyService.AcquireAccountSlot(ctx, id, maxConcurrency)
+	})
+}
+
+// pollSlotWithPing 按退避间隔反复调用 acquire 直到拿到槽位、超时或客户端断开；
+// wake 可读时（本进程有对应槽位被释放）立即再试一次，不必等退避计时。
+// 流式请求在等待期间按 pingInterval 发送 ping。acquire 收到的 ctx 带有等待超时。
+func (h *ConcurrencyHelper) pollSlotWithPing(c *gin.Context, slotType string, timeout time.Duration, isStream bool, streamStarted *bool, tryImmediate bool, wake <-chan struct{}, acquire func(ctx context.Context) (*service.AcquireResult, error)) (func(), error) {
+	waitStart := time.Now()
+	defer func() { addGatewayWait(c, time.Since(waitStart)) }()
+	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+	defer cancel()
+
+	acquireSlot := func() (*service.AcquireResult, error) {
+		return acquire(ctx)
 	}
 
 	if tryImmediate {
@@ -446,6 +497,16 @@ func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType 
 			recordGatewayStreamHeartbeat(c, written)
 			flusher.Flush()
 
+		case <-wake:
+			// 有槽位刚被释放：立即抢，不打乱退避节奏
+			result, err := acquireSlot()
+			if err != nil {
+				return nil, err
+			}
+			if result.Acquired {
+				return result.ReleaseFunc, nil
+			}
+
 		case <-timer.C:
 			// Try to acquire slot
 			result, err := acquireSlot()
@@ -465,6 +526,177 @@ func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType 
 // AcquireAccountSlotWithWaitTimeout acquires an account slot with a custom timeout (keeps SSE ping).
 func (h *ConcurrencyHelper) AcquireAccountSlotWithWaitTimeout(c *gin.Context, accountID int64, maxConcurrency int, timeout time.Duration, isStream bool, streamStarted *bool) (func(), error) {
 	return h.waitForSlotWithPingTimeout(c, "account", accountID, maxConcurrency, timeout, isStream, streamStarted, true)
+}
+
+// WaitForPlannedAccountSlot 先在计划账号上登记排队计数，再按等待计划等槽位，
+// 返回时撤销计数。登记让排队请求计入该账号负载率与 MaxWaiting；队列已满返回
+// *WaitQueueFullError，计数本身出错时放行（与 Messages 路径一致的失败开放）。
+func (h *ConcurrencyHelper) WaitForPlannedAccountSlot(c *gin.Context, account *service.Account, plan *service.AccountWaitPlan, resolve func(context.Context, *service.Account) (*service.Account, error), isStream bool, streamStarted *bool) (*service.Account, func(), error) {
+	if account == nil || plan == nil {
+		return account, nil, fmt.Errorf("missing wait-plan account")
+	}
+	if !plan.ClaudeOAuthScheduling || !service.IsClaudeOAuthSchedulingAccount(account) {
+		release, err := h.AcquireAccountSlotWithWaitTimeout(c, account.ID, plan.MaxConcurrency, plan.Timeout, isStream, streamStarted)
+		return account, release, err
+	}
+	counted, err := h.IncrementAccountWaitCount(c.Request.Context(), account.ID, plan.MaxWaiting)
+	if err == nil && !counted {
+		return account, nil, &WaitQueueFullError{SlotType: "account"}
+	}
+	if err == nil {
+		defer h.DecrementAccountWaitCount(c.Request.Context(), account.ID)
+	}
+	return h.AcquireSlotFromWaitPlan(c, account, plan, resolve, isStream, streamStarted)
+}
+
+// switchToWaitedAccount 在等待计划改用替换账号后，同步选号结果与 ops 上下文，
+// 返回此后应使用的账号。
+func switchToWaitedAccount(c *gin.Context, reqLog *zap.Logger, selection *service.AccountSelectionResult, planned, acquired *service.Account) *service.Account {
+	if acquired == nil || planned == nil {
+		return planned
+	}
+	if acquired.ID == planned.ID {
+		selection.Account = acquired
+		return acquired
+	}
+	reqLog.Info("gateway.account_wait_switched",
+		zap.Int64("planned_account_id", planned.ID),
+		zap.Int64("account_id", acquired.ID),
+	)
+	selection.Account = acquired
+	c.Set("gateway_wait_account_switch_count", c.GetInt("gateway_wait_account_switch_count")+1)
+	setOpsSelectedAccount(c, acquired.ID, acquired.Platform)
+	return acquired
+}
+
+func (h *GatewayHandler) revalidateWaitAlternate(requestedModel string) func(context.Context, *service.Account) (*service.Account, error) {
+	return func(ctx context.Context, account *service.Account) (*service.Account, error) {
+		return h.gatewayService.RevalidateWaitAlternate(ctx, account, requestedModel)
+	}
+}
+
+// AcquireSlotFromWaitPlan 按等待计划等待账号槽位。计划带 Alternates 时，每次轮询先试
+// 计划账号，再按顺序试替换账号，谁先空出槽位就用谁，返回实际拿到槽位的账号。
+// resolve 用于补全替换账号（如 GatewayService.HydrateWaitAlternate）；补全失败的账号
+// 立即释放槽位，并在本次等待内不再尝试。超时、断开与 ping 行为与单账号等待一致。
+func (h *ConcurrencyHelper) AcquireSlotFromWaitPlan(c *gin.Context, account *service.Account, plan *service.AccountWaitPlan, resolve func(context.Context, *service.Account) (*service.Account, error), isStream bool, streamStarted *bool) (*service.Account, func(), error) {
+	if account == nil || plan == nil {
+		return account, nil, fmt.Errorf("missing wait-plan account")
+	}
+	if !plan.ClaudeOAuthScheduling || !service.IsClaudeOAuthSchedulingAccount(account) {
+		release, err := h.AcquireAccountSlotWithWaitTimeout(c, account.ID, plan.MaxConcurrency, plan.Timeout, isStream, streamStarted)
+		return account, release, err
+	}
+	if plan.RevalidateAccount != nil {
+		resolve = plan.RevalidateAccount
+	}
+
+	acquired := account
+	skipped := make(map[int64]struct{})
+	watch := h.concurrencyService.WatchSlotRelease(service.SlotKindAccount, account.ID)
+	defer watch.Close()
+
+	alternateIDs := make([]int64, 0, len(plan.Alternates))
+	for _, alt := range plan.Alternates {
+		if service.IsClaudeOAuthSchedulingAccount(alt) && alt.ID != account.ID {
+			alternateIDs = append(alternateIDs, alt.ID)
+		}
+	}
+	var alternatesOpen atomic.Bool
+	openAlternates := func() {
+		if alternatesOpen.CompareAndSwap(false, true) {
+			watch.Add(service.SlotKindAccount, alternateIDs...)
+			watch.Poke()
+		}
+	}
+	if plan.AlternatesAfter <= 0 {
+		openAlternates()
+	} else {
+		graceTimer := time.AfterFunc(plan.AlternatesAfter, openAlternates)
+		defer graceTimer.Stop()
+	}
+
+	release, err := h.pollSlotWithPing(c, "account", plan.Timeout, isStream, streamStarted, true, watch.C(), func(ctx context.Context) (*service.AcquireResult, error) {
+		result := &service.AcquireResult{}
+		if _, skip := skipped[account.ID]; !skip {
+			var acquireErr error
+			result, acquireErr = h.concurrencyService.AcquireAccountSlot(ctx, account.ID, plan.MaxConcurrency)
+			if acquireErr != nil {
+				return nil, acquireErr
+			}
+			if result.Acquired {
+				resolved := account
+				if resolve != nil {
+					var resolveErr error
+					resolved, resolveErr = resolve(ctx, account)
+					if resolveErr != nil || resolved == nil {
+						if result.ReleaseFunc != nil {
+							result.ReleaseFunc()
+						}
+						skipped[account.ID] = struct{}{}
+						openAlternates()
+						result = &service.AcquireResult{}
+					} else {
+						acquired = resolved
+						return result, nil
+					}
+				} else {
+					acquired = resolved
+					return result, nil
+				}
+			}
+		}
+		if !alternatesOpen.Load() {
+			return result, nil
+		}
+		for _, alt := range plan.Alternates {
+			if !service.IsClaudeOAuthSchedulingAccount(alt) || alt.ID == account.ID {
+				continue
+			}
+			if _, skip := skipped[alt.ID]; skip {
+				continue
+			}
+			altResult, altErr := h.concurrencyService.AcquireAccountSlot(ctx, alt.ID, alt.Concurrency)
+			if altErr != nil || !altResult.Acquired {
+				continue
+			}
+			resolved := alt
+			if resolve != nil {
+				var resolveErr error
+				resolved, resolveErr = resolve(ctx, alt)
+				if resolveErr != nil || resolved == nil {
+					if altResult.ReleaseFunc != nil {
+						altResult.ReleaseFunc()
+					}
+					skipped[alt.ID] = struct{}{}
+					continue
+				}
+			}
+			acquired = resolved
+			return altResult, nil
+		}
+		viable := false
+		if _, invalid := skipped[account.ID]; !invalid {
+			viable = true
+		}
+		for _, alt := range plan.Alternates {
+			if !service.IsClaudeOAuthSchedulingAccount(alt) || alt.ID == account.ID {
+				continue
+			}
+			if _, invalid := skipped[alt.ID]; !invalid {
+				viable = true
+				break
+			}
+		}
+		if !viable {
+			return nil, service.ErrNoAvailableAccounts
+		}
+		return result, nil
+	})
+	if err != nil {
+		return account, nil, err
+	}
+	return acquired, h.concurrencyService.TrackClaudeOAuthHold(acquired.ID, release), nil
 }
 
 // nextBackoff 计算下一次退避时间

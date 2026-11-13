@@ -141,6 +141,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			stickySource = "cache"
 		}
 	}
+	stickyCacheCold := false
 
 	// [DEBUG-STICKY] 调度器入口日志
 	slog.Info("sticky.scheduler_entry",
@@ -245,6 +246,35 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		return excluded
 	}
 
+	if bound := accountByID[stickyAccountID]; s.claudeOAuthSchedulingEnabled(bound) && cfg.StickyCacheWarmWindow > 0 {
+		if idle, ok := s.stickySessionIdle(ctx, groupID, sessionHash); ok && idle > cfg.StickyCacheWarmWindow {
+			stickyCacheCold = true
+		}
+	}
+	// Capture the resolved group/model, including fallback and composite route decisions.
+	defer func() {
+		if routeErr != nil || routeSelection == nil || !s.claudeOAuthSchedulingEnabled(routeSelection.Account) {
+			return
+		}
+		if routeSelection.Acquired && routeSelection.ReleaseFunc != nil {
+			routeSelection.ReleaseFunc = s.concurrencyService.TrackClaudeOAuthHold(routeSelection.Account.ID, routeSelection.ReleaseFunc)
+		}
+		if plan := routeSelection.WaitPlan; plan != nil {
+			plan.ClaudeOAuthScheduling = true
+			resolvedGroupID := groupID
+			if groupID != nil {
+				copied := *groupID
+				resolvedGroupID = &copied
+			}
+			resolvedSelection := routeSelection
+			resolvedModel, resolvedSession, boundID := requestedModel, sessionHash, stickyAccountID
+			plan.RevalidateAccount = func(waitCtx context.Context, candidate *Account) (*Account, error) {
+				waitCtx = ContextWithSelectionProfitGate(waitCtx, resolvedSelection)
+				return s.revalidateClaudeOAuthWaitAccount(waitCtx, candidate, resolvedModel, resolvedGroupID, resolvedSession, boundID)
+			}
+		}
+	}()
+
 	// upstream 计费基准的渠道模型限制以账号映射后的上游模型为准，只能逐账号判定；
 	// 负载感知各层的候选过滤与粘性 gate 共用这一判定。
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
@@ -252,6 +282,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		return needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel)
 	}
 
+	var stickyPreferredID int64
 	// 获取模型路由配置（anthropic / openai 目标平台；composite 分组按目标平台判断）
 	var routingAccountIDs []int64
 	if group != nil && requestedModel != "" &&
@@ -330,6 +361,16 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			}
 			routingCandidates = append(routingCandidates, account)
 		}
+		boundAccountInRouting := false
+		for _, account := range routingCandidates {
+			if account.ID == stickyAccountID && stickyAccountID > 0 {
+				boundAccountInRouting = true
+				break
+			}
+		}
+		if cfg.FallbackWaitAnyAccount && (stickyAccountID == 0 || stickyCacheCold || !boundAccountInRouting) {
+			routingCandidates = preferQuotaHeadroomAccounts(routingCandidates, cfg.NewSessionQuotaSoftPercent, time.Now())
+		}
 
 		if s.debugModelRoutingEnabled() {
 			logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed candidates: group_id=%v model=%s routed=%d candidates=%d filtered(excluded=%d missing=%d unsched=%d platform=%d model_scope=%d model_mapping=%d channel_restricted=%d window_cost=%d)",
@@ -390,7 +431,11 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 							if stickyCacheMissReason == "" {
 								waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, stickyAccountID)
-								if waitingCount < cfg.StickySessionMaxWaiting {
+								decision := s.decideStickyWait(ctx, cfg, groupID, sessionHash, stickyAccount, waitingCount)
+								if decision.warm && s.claudeOAuthSchedulingEnabled(stickyAccount) {
+									stickyPreferredID = stickyAccountID
+								}
+								if decision.wait && waitingCount < cfg.StickySessionMaxWaiting {
 									// 会话数量限制检查（等待计划也需要占用会话配额）
 									if !s.checkAndRegisterSession(ctx, stickyAccount, sessionHash) {
 										stickyCacheMissReason = "session_limit"
@@ -399,12 +444,13 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 										// 必须走 newSelectionResult 以 hydrate 账号凭证：
 										// 调度快照中的账号是精简版（OAuth token 等被剥离），
 										// 直接返回会导致后续转发缺少凭证而鉴权失败。
-										return s.newSelectionResult(ctx, stickyAccount, false, nil, &AccountWaitPlan{
-											AccountID:      stickyAccountID,
-											MaxConcurrency: stickyAccount.Concurrency,
-											Timeout:        cfg.StickySessionWaitTimeout,
-											MaxWaiting:     cfg.StickySessionMaxWaiting,
-										})
+										plan := &AccountWaitPlan{AccountID: stickyAccountID, MaxConcurrency: stickyAccount.Concurrency, Timeout: cfg.StickySessionWaitTimeout, MaxWaiting: cfg.StickySessionMaxWaiting}
+										if s.claudeOAuthSchedulingEnabled(stickyAccount) {
+											s.attachStickyWaitAlternates(ctx, cfg, plan, decision.grace, sessionHash, func() []*Account {
+												return routingCandidates
+											})
+										}
+										return s.newSelectionResult(ctx, stickyAccount, false, nil, plan)
 									}
 								} else {
 									stickyCacheMissReason = "wait_queue_full"
@@ -491,7 +537,9 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 							continue
 						}
 						if sessionHash != "" && s.cache != nil {
-							_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, item.account.ID)
+							if !s.claudeOAuthSchedulingEnabled(item.account) {
+								_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, item.account.ID)
+							}
 						}
 						if s.debugModelRoutingEnabled() {
 							logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed select: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), item.account.ID)
@@ -500,8 +548,18 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					}
 				}
 
-				// 5. 所有路由账号槽位满，尝试返回等待计划（选择负载最低的）
-				// 遍历找到第一个满足会话限制的账号
+				// 5. 所有路由账号槽位满，尝试返回等待计划（选择排队压力最低的）
+				// 上面的负载率来自短 TTL 缓存，这里按实时排队压力重排后再找第一个满足会话限制的账号
+				routedAccounts := make([]*Account, 0, len(routingAvailable))
+				for _, item := range routingAvailable {
+					routedAccounts = append(routedAccounts, item.account)
+				}
+				if cfg.FallbackWaitAnyAccount {
+					sortByQueuePressure(routingAvailable, func(item accountWithLoad) *Account { return item.account }, s.freshQueuePressure(ctx, routedAccounts))
+				}
+				for i := range routingAvailable {
+					routedAccounts[i] = routingAvailable[i].account
+				}
 				for _, item := range routingAvailable {
 					if !s.checkAndRegisterSession(ctx, item.account, sessionHash) {
 						continue // 会话限制已满，尝试下一个
@@ -514,6 +572,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 						MaxConcurrency: item.account.Concurrency,
 						Timeout:        cfg.StickySessionWaitTimeout,
 						MaxWaiting:     cfg.StickySessionMaxWaiting,
+						Alternates:     s.fallbackWaitAlternates(cfg, item.account.ID, routedAccounts, sessionHash),
 					})
 				}
 				// 所有路由账号会话限制都已满，继续到 Layer 2 回退
@@ -522,6 +581,9 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			logger.LegacyPrintf("service.gateway", "[ModelRouting] All routed accounts unavailable for model=%s, falling back to normal selection", requestedModel)
 		}
 	}
+
+	// cacheColdSession 表示会话已没有可复用的原账号缓存，后续放置按新会话处理。
+	cacheColdSession := stickyCacheCold
 
 	// ============ Layer 1.5: 粘性会话（仅在无模型路由配置时生效） ============
 	if len(routingAccountIDs) == 0 && sessionHash != "" && stickyAccountID > 0 && !isExcluded(stickyAccountID) {
@@ -585,7 +647,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 								"session", shortSessionHash(sessionHash),
 								"result", "slot_acquired",
 							)
-							if s.cache != nil {
+							if s.cache != nil && !s.claudeOAuthSchedulingEnabled(account) {
 								_ = s.cache.RefreshSessionTTL(ctx, derefGroupID(groupID), sessionHash, stickySessionTTL)
 							}
 							return s.newSelectionResult(ctx, account, true, result.ReleaseFunc, nil)
@@ -598,7 +660,21 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					}
 
 					waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, accountID)
-					if waitingCount < cfg.StickySessionMaxWaiting {
+					decision := s.decideStickyWait(ctx, cfg, groupID, sessionHash, account, waitingCount)
+					if decision.warm && s.claudeOAuthSchedulingEnabled(account) {
+						stickyPreferredID = accountID
+					}
+					if decision.reason == "cache_cold" {
+						cacheColdSession = true
+					}
+					if !decision.wait {
+						slog.Debug("sticky.layer1_5_no_routing_switch",
+							"account_id", accountID,
+							"session", shortSessionHash(sessionHash),
+							"reason", decision.reason,
+						)
+					}
+					if decision.wait && waitingCount < cfg.StickySessionMaxWaiting {
 						// 会话数量限制检查（等待计划也需要占用会话配额）
 						if !s.checkAndRegisterSession(ctx, account, sessionHash) {
 							// 会话限制已满，继续到 Layer 2
@@ -608,12 +684,19 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 								"session", shortSessionHash(sessionHash),
 								"result", "wait_plan",
 							)
-							return s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
+							plan := &AccountWaitPlan{
 								AccountID:      accountID,
 								MaxConcurrency: account.Concurrency,
 								Timeout:        cfg.StickySessionWaitTimeout,
 								MaxWaiting:     cfg.StickySessionMaxWaiting,
-							})
+							}
+							if s.claudeOAuthSchedulingEnabled(account) {
+								s.attachStickyWaitAlternates(ctx, cfg, plan, decision.grace, sessionHash, func() []*Account {
+									others, _ := s.filterLoadAwareCandidates(ctx, accounts, func(id int64) bool { return id == accountID || isExcluded(id) }, isChannelRestricted, platform, useMixed, requestedModel)
+									return others
+								})
+							}
+							return s.newSelectionResult(ctx, account, false, nil, plan)
 						}
 					}
 				} else if !clearSticky {
@@ -652,49 +735,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		"reason", "sticky_not_used_falling_back_to_load_balance",
 		"total_accounts", len(accounts),
 	)
-	candidates := make([]*Account, 0, len(accounts))
-	channelRestrictedCount := 0
-	for i := range accounts {
-		acc := &accounts[i]
-		if isExcluded(acc.ID) {
-			continue
-		}
-		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
-		// re-check schedulability here so recently rate-limited/overloaded accounts
-		// are not selected again before the bucket is rebuilt.
-		if !s.isAccountSchedulableForSelection(acc) {
-			continue
-		}
-		if !s.isGatewayAccountProfitEligible(ctx, acc) {
-			continue
-		}
-		if !s.isAccountAllowedForPlatform(acc, platform, useMixed) {
-			continue
-		}
-		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
-			continue
-		}
-		if isChannelRestricted(acc) {
-			channelRestrictedCount++
-			continue
-		}
-		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
-			continue
-		}
-		// 配额检查
-		if !s.isAccountSchedulableForQuota(acc) {
-			continue
-		}
-		// 窗口费用检查（非粘性会话路径）
-		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
-			continue
-		}
-		// RPM 检查（非粘性会话路径）
-		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
-			continue
-		}
-		candidates = append(candidates, acc)
-	}
+	candidates, channelRestrictedCount := s.filterLoadAwareCandidates(ctx, accounts, isExcluded, isChannelRestricted, platform, useMixed, requestedModel)
 
 	if len(candidates) == 0 {
 		if channelRestrictedCount > 0 {
@@ -738,6 +779,11 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			}
 		}
 
+		// 新会话放置：避开额度快到暂停阈值的账号（见 gateway_session_placement.go）
+		if cfg.FallbackWaitAnyAccount {
+			available = preferQuotaHeadroom(available, cfg.NewSessionQuotaSoftPercent, time.Now())
+		}
+
 		// 分层过滤选择：优先级（叠加分组 7d 高权重）→（可选）5h 重置 → 负载率 → LRU
 		for len(available) > 0 {
 			// 1. 取优先级最小的集合
@@ -761,7 +807,9 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					result.ReleaseFunc() // 释放槽位，继续尝试下一个账号
 				} else {
 					if sessionHash != "" && s.cache != nil {
-						_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.account.ID)
+						if !s.claudeOAuthSchedulingEnabled(selected.account) {
+							_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.account.ID)
+						}
 					}
 					return s.newSelectionResult(ctx, selected.account, true, result.ReleaseFunc, nil)
 				}
@@ -780,8 +828,27 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	}
 
 	// ============ Layer 3: 兜底排队 ============
+	// 新会话、已冷缓存或原绑定账号当前不可调度的会话，优先从额度余量更充足的账号排队。
+	boundAccountAvailable := false
+	if stickyAccountID > 0 {
+		for _, candidate := range candidates {
+			if candidate != nil && candidate.ID == stickyAccountID {
+				boundAccountAvailable = true
+				break
+			}
+		}
+	}
+	newSessionPlacement := stickyAccountID == 0 || cacheColdSession || !boundAccountAvailable
+	if cfg.FallbackWaitAnyAccount && newSessionPlacement {
+		candidates = preferQuotaHeadroomAccounts(candidates, cfg.NewSessionQuotaSoftPercent, time.Now())
+	}
 	s.sortCandidatesForFallback(candidates, preferOAuth, cfg.FallbackSelectionMode)
 	weeklyOrder.sortAccounts(candidates)
+	// 上面的顺序只作为同压力时的先后；按实时排队压力重排，避免整波溢出请求排到同一个账号。
+	if cfg.FallbackWaitAnyAccount {
+		sortByQueuePressure(candidates, func(acc *Account) *Account { return acc }, s.freshQueuePressure(ctx, candidates))
+	}
+	movePreferredFirst(candidates, stickyPreferredID)
 	for _, acc := range candidates {
 		// 会话数量限制检查（等待计划也需要占用会话配额）
 		if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
@@ -792,6 +859,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			MaxConcurrency: acc.Concurrency,
 			Timeout:        cfg.FallbackWaitTimeout,
 			MaxWaiting:     cfg.FallbackMaxWaiting,
+			Alternates:     s.fallbackWaitAlternates(cfg, acc.ID, candidates, sessionHash),
 		})
 	}
 	return nil, ErrNoAvailableAccounts
@@ -810,7 +878,7 @@ func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates
 				result.ReleaseFunc() // 释放槽位，继续尝试下一个账号
 				continue
 			}
-			if sessionHash != "" && s.cache != nil {
+			if sessionHash != "" && s.cache != nil && !s.claudeOAuthSchedulingEnabled(acc) {
 				_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, acc.ID)
 			}
 			selection, err := s.newSelectionResult(ctx, acc, true, result.ReleaseFunc, nil)
@@ -829,12 +897,20 @@ func (s *GatewayService) schedulingConfig() config.GatewaySchedulingConfig {
 		return s.cfg.Gateway.Scheduling
 	}
 	return config.GatewaySchedulingConfig{
-		StickySessionMaxWaiting:  3,
-		StickySessionWaitTimeout: 45 * time.Second,
-		FallbackWaitTimeout:      30 * time.Second,
-		FallbackMaxWaiting:       100,
-		LoadBatchEnabled:         true,
-		SlotCleanupInterval:      30 * time.Second,
+		StickySessionMaxWaiting:    3,
+		StickySessionWaitTimeout:   45 * time.Second,
+		FallbackWaitTimeout:        30 * time.Second,
+		FallbackMaxWaiting:         100,
+		FallbackWaitAnyAccount:     true,
+		StickyCacheGrace:           1500 * time.Millisecond,
+		StickyCacheGraceLarge:      4 * time.Second,
+		StickyCacheGraceMinBytes:   200_000,
+		StickyCacheGraceLargeBytes: 800_000,
+		StickyCacheWarmWindow:      5 * time.Minute,
+		StickyExpectedHoldDefault:  10 * time.Second,
+		NewSessionQuotaSoftPercent: 85,
+		LoadBatchEnabled:           true,
+		SlotCleanupInterval:        30 * time.Second,
 	}
 }
 
@@ -1193,6 +1269,54 @@ func (s *GatewayService) isAccountInGroup(account *Account, groupID *int64) bool
 		}
 	}
 	return false
+}
+
+// filterLoadAwareCandidates 返回负载感知选择（Layer 2）可用的候选账号，以及因渠道定价限制被排除的数量。
+func (s *GatewayService) filterLoadAwareCandidates(ctx context.Context, accounts []Account, isExcluded func(int64) bool, isChannelRestricted func(*Account) bool, platform string, useMixed bool, requestedModel string) ([]*Account, int) {
+	candidates := make([]*Account, 0, len(accounts))
+	channelRestrictedCount := 0
+	for i := range accounts {
+		acc := &accounts[i]
+		if isExcluded(acc.ID) {
+			continue
+		}
+		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
+		// re-check schedulability here so recently rate-limited/overloaded accounts
+		// are not selected again before the bucket is rebuilt.
+		if !s.isAccountSchedulableForSelection(acc) {
+			continue
+		}
+		if !s.isGatewayAccountProfitEligible(ctx, acc) {
+			continue
+		}
+		if !s.isAccountAllowedForPlatform(acc, platform, useMixed) {
+			continue
+		}
+		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
+			continue
+		}
+		if isChannelRestricted(acc) {
+			channelRestrictedCount++
+			continue
+		}
+		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
+			continue
+		}
+		// 配额检查
+		if !s.isAccountSchedulableForQuota(acc) {
+			continue
+		}
+		// 窗口费用检查（非粘性会话路径）
+		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
+			continue
+		}
+		// RPM 检查（非粘性会话路径）
+		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
+			continue
+		}
+		candidates = append(candidates, acc)
+	}
+	return candidates, channelRestrictedCount
 }
 
 func (s *GatewayService) tryAcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int) (*AcquireResult, error) {

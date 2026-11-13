@@ -53,6 +53,11 @@ func (c *gatewayCache) SetSessionAccountID(ctx context.Context, groupID int64, s
 	return c.rdb.Set(ctx, key, accountID, ttl).Err()
 }
 
+// GetSessionTTL 返回粘性会话绑定的剩余 TTL；用于推算会话距上次成功请求过了多久。
+func (c *gatewayCache) GetSessionTTL(ctx context.Context, groupID int64, sessionHash string) (time.Duration, error) {
+	return c.rdb.PTTL(ctx, buildSessionKey(groupID, sessionHash)).Result()
+}
+
 func (c *gatewayCache) RefreshSessionTTL(ctx context.Context, groupID int64, sessionHash string, ttl time.Duration) error {
 	key := buildSessionKey(groupID, sessionHash)
 	return c.rdb.Expire(ctx, key, ttl).Err()

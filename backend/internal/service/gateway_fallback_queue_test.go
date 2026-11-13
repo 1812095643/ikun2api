@@ -1,0 +1,439 @@
+//go:build unit
+
+package service
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/MACOS-DO/sub4api/internal/pkg/ctxkey"
+	"github.com/stretchr/testify/require"
+)
+
+// newFallbackQueueTestService 构造所有账号都抢不到槽位、负载按 loads 返回的调度服务，
+// 用于直接落到 Layer 3 兜底排队。
+func newFallbackQueueTestService(accounts []Account, loads map[int64]*AccountLoadInfo, waitAny bool) *GatewayService {
+	repo := &mockAccountRepoForPlatform{accounts: accounts, accountsByID: map[int64]*Account{}}
+	acquire := map[int64]bool{}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+		acquire[repo.accounts[i].ID] = false
+	}
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	cfg.Gateway.Scheduling.FallbackWaitAnyAccount = waitAny
+	return &GatewayService{
+		accountRepo: repo,
+		cache:       &mockGatewayCacheForPlatform{},
+		cfg:         cfg,
+		concurrencyService: NewConcurrencyService(&mockConcurrencyCache{
+			acquireResults:  acquire,
+			loadMap:         loads,
+			skipDefaultLoad: true,
+		}),
+	}
+}
+
+func fallbackQueueAccount(id int64, priority, concurrency int) Account {
+	return Account{ID: id, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Priority: priority, Status: StatusActive, Schedulable: true, Concurrency: concurrency}
+}
+
+func waitAlternateIDs(plan *AccountWaitPlan) []int64 {
+	ids := make([]int64, 0, len(plan.Alternates))
+	for _, acc := range plan.Alternates {
+		ids = append(ids, acc.ID)
+	}
+	return ids
+}
+
+func TestFallbackQueue_WaitsOnLeastPressuredAccount(t *testing.T) {
+	svc := newFallbackQueueTestService(
+		[]Account{fallbackQueueAccount(1, 1, 5), fallbackQueueAccount(2, 1, 5), fallbackQueueAccount(3, 1, 5)},
+		map[int64]*AccountLoadInfo{
+			1: {AccountID: 1, CurrentConcurrency: 5, WaitingCount: 10, LoadRate: 300},
+			2: {AccountID: 2, CurrentConcurrency: 5, WaitingCount: 2, LoadRate: 140},
+			3: {AccountID: 3, CurrentConcurrency: 5, WaitingCount: 6, LoadRate: 220},
+		},
+		true,
+	)
+
+	result, err := svc.SelectAccountWithLoadAwareness(context.Background(), nil, "", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.WaitPlan)
+	require.Equal(t, int64(2), result.Account.ID)
+	require.Equal(t, int64(2), result.WaitPlan.AccountID)
+	require.Equal(t, []int64{3, 1}, waitAlternateIDs(result.WaitPlan), "alternates follow queue pressure")
+}
+
+func TestFallbackQueue_PressureUsesLoadFactor(t *testing.T) {
+	// 账号 1：10 并发跑满、无人排队 → 压力 1.0；账号 2：2 并发跑满、1 人排队 → 压力 1.5。
+	svc := newFallbackQueueTestService(
+		[]Account{fallbackQueueAccount(2, 1, 2), fallbackQueueAccount(1, 1, 10)},
+		map[int64]*AccountLoadInfo{
+			1: {AccountID: 1, CurrentConcurrency: 10},
+			2: {AccountID: 2, CurrentConcurrency: 2, WaitingCount: 1},
+		},
+		true,
+	)
+
+	result, err := svc.SelectAccountWithLoadAwareness(context.Background(), nil, "", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), result.WaitPlan.AccountID)
+}
+
+func TestFallbackQueue_EqualPressureKeepsPriorityOrder(t *testing.T) {
+	svc := newFallbackQueueTestService(
+		[]Account{fallbackQueueAccount(1, 2, 5), fallbackQueueAccount(2, 1, 5)},
+		map[int64]*AccountLoadInfo{
+			1: {AccountID: 1, CurrentConcurrency: 5, WaitingCount: 1},
+			2: {AccountID: 2, CurrentConcurrency: 5, WaitingCount: 1},
+		},
+		true,
+	)
+
+	result, err := svc.SelectAccountWithLoadAwareness(context.Background(), nil, "", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), result.WaitPlan.AccountID, "lower priority value wins a pressure tie")
+	require.Equal(t, []int64{1}, waitAlternateIDs(result.WaitPlan))
+}
+
+func TestFallbackQueue_AlternatesDisabledByConfig(t *testing.T) {
+	svc := newFallbackQueueTestService(
+		[]Account{fallbackQueueAccount(1, 1, 5), fallbackQueueAccount(2, 1, 5)},
+		map[int64]*AccountLoadInfo{
+			1: {AccountID: 1, CurrentConcurrency: 5},
+			2: {AccountID: 2, CurrentConcurrency: 5},
+		},
+		false,
+	)
+
+	result, err := svc.SelectAccountWithLoadAwareness(context.Background(), nil, "", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.WaitPlan)
+	require.Empty(t, result.WaitPlan.Alternates)
+}
+
+func TestFallbackWaitAlternates_SkipsSessionLimitedAccounts(t *testing.T) {
+	svc := &GatewayService{sessionLimitCache: newSessionLimitReleaseCacheStub()}
+	cfg := testConfig().Gateway.Scheduling
+	cfg.FallbackWaitAnyAccount = true
+
+	limited := &Account{ID: 2, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Extra: map[string]any{"max_sessions": 3}}
+	unlimitedOAuth := &Account{ID: 3, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
+	apiKey := &Account{ID: 4, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Extra: map[string]any{"max_sessions": 3}}
+	chosen := &Account{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
+	ordered := []*Account{chosen, limited, unlimitedOAuth, apiKey}
+
+	got := svc.fallbackWaitAlternates(cfg, chosen.ID, ordered, "session-1")
+	require.Equal(t, []int64{3}, waitAlternateIDs(&AccountWaitPlan{Alternates: got}))
+
+	// 无会话 ID 时会话配额不生效，受限账号也可替换。
+	got = svc.fallbackWaitAlternates(cfg, chosen.ID, ordered, "")
+	require.Equal(t, []int64{2, 3}, waitAlternateIDs(&AccountWaitPlan{Alternates: got}))
+}
+
+func TestFallbackWaitAlternates_Capped(t *testing.T) {
+	svc := &GatewayService{}
+	cfg := testConfig().Gateway.Scheduling
+	cfg.FallbackWaitAnyAccount = true
+	ordered := make([]*Account, 0, 20)
+	for i := int64(1); i <= 20; i++ {
+		ordered = append(ordered, &Account{ID: i, Platform: PlatformAnthropic, Type: AccountTypeOAuth})
+	}
+	require.Len(t, svc.fallbackWaitAlternates(cfg, 1, ordered, ""), maxFallbackWaitAlternates)
+}
+
+func TestFreshQueuePressure_LoadErrorKeepsOrder(t *testing.T) {
+	accounts := []*Account{{ID: 1, Concurrency: 5, Platform: PlatformAnthropic, Type: AccountTypeOAuth}, {ID: 2, Concurrency: 5, Platform: PlatformAnthropic, Type: AccountTypeOAuth}}
+	pressure := freshQueuePressure(context.Background(), NewConcurrencyService(&mockConcurrencyCache{loadBatchErr: errors.New("redis down")}), accounts)
+	require.Nil(t, pressure)
+
+	sortByQueuePressure(accounts, func(acc *Account) *Account { return acc }, pressure)
+	require.Equal(t, int64(1), accounts[0].ID)
+	require.Equal(t, int64(2), accounts[1].ID)
+}
+
+// 复现分组 19：开启「优先周额度最早重置」时，原实现把整波溢出请求排到重置最早的账号；
+// 现在它排队最长时应让位给排队最短的账号，重置顺序只在压力相同时生效。
+func TestFallbackQueue_WeeklyResetPreferenceYieldsToQueuePressure(t *testing.T) {
+	now := time.Now()
+	groupID := int64(19)
+	group := &Group{ID: groupID, Platform: PlatformAnthropic, Status: StatusActive, Hydrated: true, PreferSoonestWeeklyReset: true}
+	repo := &mockAccountRepoForPlatform{accountsByID: map[int64]*Account{}}
+	resets := map[int64]time.Duration{29: 24 * time.Hour, 26: 2 * 24 * time.Hour, 30: 3 * 24 * time.Hour}
+	for _, id := range []int64{29, 26, 30} {
+		repo.accounts = append(repo.accounts, Account{ID: id, Type: AccountTypeOAuth, Platform: PlatformAnthropic, Status: StatusActive, Schedulable: true, Priority: 1, Concurrency: 5, AccountGroups: []AccountGroup{{GroupID: groupID}}, Extra: map[string]any{"passive_usage_7d_reset": now.Add(resets[id]).Unix(), "passive_usage_7d_utilization": 0.5}})
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	cfg.Gateway.Scheduling.FallbackWaitAnyAccount = true
+	cache := &mockConcurrencyCache{
+		acquireResults:  map[int64]bool{29: false, 26: false, 30: false},
+		skipDefaultLoad: true,
+		loadMap: map[int64]*AccountLoadInfo{
+			29: {AccountID: 29, CurrentConcurrency: 5, WaitingCount: 14},
+			26: {AccountID: 26, CurrentConcurrency: 5, WaitingCount: 1},
+			30: {AccountID: 30, CurrentConcurrency: 5, WaitingCount: 1},
+		},
+	}
+	svc := &GatewayService{accountRepo: repo, groupRepo: &mockGroupRepoForGateway{groups: map[int64]*Group{groupID: group}}, cfg: cfg, concurrencyService: NewConcurrencyService(cache)}
+	ctx := context.WithValue(context.Background(), ctxkey.Group, group)
+
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, &groupID, "", "claude-sonnet-4-6", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.WaitPlan)
+	require.Equal(t, int64(26), result.WaitPlan.AccountID, "26 resets sooner than 30 and ties on pressure")
+	require.Equal(t, []int64{30, 29}, waitAlternateIDs(result.WaitPlan))
+}
+
+func newStickyBusyTestService(hint int) (*GatewayService, context.Context) {
+	repo := &mockAccountRepoForPlatform{accountsByID: map[int64]*Account{}}
+	for _, id := range []int64{1, 2, 3} {
+		repo.accounts = append(repo.accounts, Account{ID: id, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Priority: 1, Status: StatusActive, Schedulable: true, Concurrency: 5})
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	cfg.Gateway.Scheduling.StickySessionMaxWaiting = 3
+	cfg.Gateway.Scheduling.FallbackWaitAnyAccount = true
+	cfg.Gateway.Scheduling.StickyCacheGrace = 2 * time.Second
+	cfg.Gateway.Scheduling.StickyCacheGraceLarge = 5 * time.Second
+	cfg.Gateway.Scheduling.StickyCacheGraceMinBytes = 200_000
+	cfg.Gateway.Scheduling.StickyCacheGraceLargeBytes = 800_000
+	cfg.Gateway.Scheduling.StickyCacheWarmWindow = 5 * time.Minute
+	cfg.Gateway.Scheduling.StickyExpectedHoldDefault = 10 * time.Second
+	svc := &GatewayService{
+		accountRepo: repo,
+		cache:       &mockGatewayCacheForPlatform{sessionBindings: map[string]int64{"sticky": 1}},
+		cfg:         cfg,
+		concurrencyService: NewConcurrencyService(&mockConcurrencyCache{
+			acquireResults:  map[int64]bool{1: false, 2: true, 3: true},
+			waitCounts:      map[int64]int{1: 0},
+			skipDefaultLoad: true,
+			loadMap: map[int64]*AccountLoadInfo{
+				1: {AccountID: 1, CurrentConcurrency: 5},
+				2: {AccountID: 2, CurrentConcurrency: 4},
+				3: {AccountID: 3, CurrentConcurrency: 1},
+			},
+		}),
+	}
+	return svc, WithPromptSizeHint(context.Background(), hint)
+}
+
+func TestStickyWait_WaitsOnlyWhenWorthIt(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		bytes    int
+		waitPlan bool
+		grace    time.Duration
+	}{
+		{"unknown size waits normal budget", 0, true, 2 * time.Second},
+		{"small request switches to a free account", 50_000, false, 0},
+		{"medium request waits its budget", 300_000, true, 2 * time.Second},
+		{"large request waits longer budget", 1_000_000, true, 5 * time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, ctx := newStickyBusyTestService(tc.bytes)
+			result, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "sticky", "claude-3-5-sonnet-20241022", nil, "", 0)
+			require.NoError(t, err)
+			if !tc.waitPlan {
+				require.True(t, result.Acquired, "takes a free slot right away")
+				require.NotEqual(t, int64(1), result.Account.ID)
+				return
+			}
+			require.NotNil(t, result.WaitPlan, "busy sticky account keeps its wait plan")
+			require.Equal(t, int64(1), result.WaitPlan.AccountID)
+			require.Equal(t, cfgStickyTimeout(svc), result.WaitPlan.Timeout)
+			require.Equal(t, []int64{3, 2}, waitAlternateIDs(result.WaitPlan), "alternates ordered by queue pressure")
+			require.Equal(t, tc.grace, result.WaitPlan.AlternatesAfter)
+		})
+	}
+}
+
+func TestStickyWait_NoAlternatesWhenDisabled(t *testing.T) {
+	svc, ctx := newStickyBusyTestService(300_000)
+	svc.cfg.Gateway.Scheduling.FallbackWaitAnyAccount = false
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "sticky", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), result.WaitPlan.AccountID)
+	require.Empty(t, result.WaitPlan.Alternates)
+	require.Zero(t, result.WaitPlan.AlternatesAfter)
+}
+
+func cfgStickyTimeout(svc *GatewayService) time.Duration {
+	return svc.cfg.Gateway.Scheduling.StickySessionWaitTimeout
+}
+
+func TestApplyGatewayTiming(t *testing.T) {
+	upstream := 1800
+	log := &UsageLog{FirstTokenMs: &upstream}
+	applyGatewayTiming(log, &GatewayRequestTiming{Upload: 400 * time.Millisecond, SlotWait: 3 * time.Second, PreForward: 3500 * time.Millisecond, SwitchCount: 2})
+	require.Equal(t, 400, *log.UploadMs)
+	require.Equal(t, 3000, *log.GatewayWaitMs)
+	require.Equal(t, 3500, *log.PreForwardMs)
+	require.Equal(t, 2, *log.AccountSwitchCount)
+	require.Equal(t, 5300, *log.ClientFirstTokenMs)
+
+	nonStream := &UsageLog{}
+	applyGatewayTiming(nonStream, &GatewayRequestTiming{PreForward: time.Second})
+	require.Nil(t, nonStream.ClientFirstTokenMs, "no upstream first token, no client first token")
+	require.Equal(t, 1000, *nonStream.PreForwardMs)
+
+	untouched := &UsageLog{FirstTokenMs: &upstream}
+	applyGatewayTiming(untouched, nil)
+	require.Nil(t, untouched.PreForwardMs)
+}
+
+// stickyTTLCache 在测试用粘性缓存上补充剩余 TTL，模拟会话的空闲时长。
+type stickyTTLCache struct {
+	*mockGatewayCacheForPlatform
+	idle time.Duration
+}
+
+func (c *stickyTTLCache) GetSessionTTL(context.Context, int64, string) (time.Duration, error) {
+	return stickySessionTTL - c.idle, nil
+}
+
+func TestStickyWait_SwitchesWhenExpectedWaitExceedsBudget(t *testing.T) {
+	// 并发 5、平均占用 10s、前面已有 1 人：预计 4s，超过中等请求 2s 的预算 → 立即换号。
+	svc, ctx := newStickyBusyTestService(300_000)
+	svc.concurrencyService = NewConcurrencyService(&mockConcurrencyCache{
+		acquireResults:  map[int64]bool{1: false, 2: true, 3: true},
+		waitCounts:      map[int64]int{1: 1},
+		skipDefaultLoad: true,
+		loadMap:         map[int64]*AccountLoadInfo{1: {AccountID: 1, CurrentConcurrency: 5}},
+	})
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "sticky", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.True(t, result.Acquired)
+	require.NotEqual(t, int64(1), result.Account.ID)
+
+	// 同样排队，但大请求的预算 5s 够等 → 仍等原账号。
+	svc2, ctx2 := newStickyBusyTestService(1_000_000)
+	svc2.concurrencyService = svc.concurrencyService
+	result, err = svc2.SelectAccountWithLoadAwareness(ctx2, nil, "sticky", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.WaitPlan)
+	require.Equal(t, int64(1), result.WaitPlan.AccountID)
+}
+
+func TestStickyWait_ColdCacheSwitchesImmediately(t *testing.T) {
+	svc, ctx := newStickyBusyTestService(1_000_000)
+	base := svc.cache.(*mockGatewayCacheForPlatform)
+	svc.cache = &stickyTTLCache{mockGatewayCacheForPlatform: base, idle: 10 * time.Minute}
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "sticky", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.True(t, result.Acquired, "no cache left on the bound account: take a free one")
+	require.NotEqual(t, int64(1), result.Account.ID)
+
+	require.Equal(t, int64(1), base.sessionBindings["sticky"], "selection must not move a binding before success")
+	require.NoError(t, svc.BindClaudeOAuthSessionAfterSuccess(ctx, nil, "sticky", result.Account))
+	require.Equal(t, result.Account.ID, base.sessionBindings["sticky"], "successful forward moves the cache owner")
+	result.ReleaseFunc()
+
+	warm, warmCtx := newStickyBusyTestService(1_000_000)
+	warm.cache = &stickyTTLCache{mockGatewayCacheForPlatform: warm.cache.(*mockGatewayCacheForPlatform), idle: 2 * time.Minute}
+	result, err = warm.SelectAccountWithLoadAwareness(warmCtx, nil, "sticky", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.WaitPlan, "warm cache: worth a short wait")
+	require.Equal(t, int64(1), result.WaitPlan.AccountID)
+}
+
+func TestExpectedStickyWait_UsesObservedHoldTime(t *testing.T) {
+	cfg := testConfig().Gateway.Scheduling
+	cfg.StickyExpectedHoldDefault = 10 * time.Second
+	svc := &GatewayService{concurrencyService: NewConcurrencyService(&mockConcurrencyCache{})}
+	bound := &Account{ID: 7, Concurrency: 5}
+	require.Equal(t, 2*time.Second, svc.expectedStickyWait(cfg, bound, 0), "default hold 10s / 5 slots")
+	require.Equal(t, 6*time.Second, svc.expectedStickyWait(cfg, bound, 2))
+
+	svc.concurrencyService.holdStats.observe(7, 4*time.Second)
+	require.Equal(t, 800*time.Millisecond, svc.expectedStickyWait(cfg, bound, 0))
+	svc.concurrencyService.holdStats.observe(7, 14*time.Second) // EWMA: 4 + 0.2*(14-4) = 6s
+	require.Equal(t, 1200*time.Millisecond, svc.expectedStickyWait(cfg, bound, 0))
+}
+
+func TestStickyCacheGrace_Capped(t *testing.T) {
+	cfg := testConfig().Gateway.Scheduling
+	cfg.StickyCacheGrace = 2 * time.Second
+	cfg.StickyCacheGraceLarge = 90 * time.Second
+	cfg.StickyCacheGraceMinBytes = 200_000
+	cfg.StickyCacheGraceLargeBytes = 800_000
+	require.Equal(t, maxStickyCacheGrace, stickyCacheGrace(cfg, 1_000_000), "misconfigured 90s is capped")
+	require.Equal(t, 2*time.Second, stickyCacheGrace(cfg, 300_000))
+	require.Zero(t, stickyCacheGrace(cfg, 50_000))
+}
+
+func TestDecideStickyWait_NonAnthropicNeverHeld(t *testing.T) {
+	cfg := testConfig().Gateway.Scheduling
+	cfg.FallbackWaitAnyAccount = true
+	cfg.StickyCacheGrace = 2 * time.Second
+	svc := &GatewayService{}
+	d := svc.decideStickyWait(WithPromptSizeHint(context.Background(), 1_000_000), cfg, nil, "s", &Account{ID: 2, Platform: PlatformOpenAI, Concurrency: 5}, 0)
+	require.True(t, d.wait)
+	require.Zero(t, d.grace, "GPT latency is upstream-bound; alternates are usable immediately")
+}
+
+func TestPreferQuotaHeadroom(t *testing.T) {
+	now := time.Now()
+	end := now.Add(2 * time.Hour)
+	mk := func(id int64, used float64) accountWithLoad {
+		return accountWithLoad{account: &Account{ID: id, Platform: PlatformAnthropic, Type: AccountTypeOAuth, SessionWindowEnd: &end, Extra: map[string]any{"session_window_utilization": used}}}
+	}
+	ids := func(items []accountWithLoad) []int64 {
+		out := make([]int64, 0, len(items))
+		for _, it := range items {
+			out = append(out, it.account.ID)
+		}
+		return out
+	}
+	items := []accountWithLoad{mk(1, 0.90), mk(2, 0.40), mk(3, 0.86), mk(4, 0.10)}
+	require.Equal(t, []int64{2, 4}, ids(preferQuotaHeadroom(items, 85, now)))
+	require.Equal(t, []int64{1, 3}, ids(preferQuotaHeadroom([]accountWithLoad{mk(1, 0.90), mk(3, 0.86)}, 85, now)), "all near the limit: keep them rather than reject")
+	require.Len(t, preferQuotaHeadroom(items, 0, now), 4, "disabled")
+
+	expired := now.Add(-time.Minute)
+	stale := accountWithLoad{account: &Account{ID: 5, Platform: PlatformAnthropic, Type: AccountTypeOAuth, SessionWindowEnd: &expired, Extra: map[string]any{"session_window_utilization": 0.99}}}
+	require.Equal(t, []int64{5, 2}, ids(preferQuotaHeadroom([]accountWithLoad{stale, mk(2, 0.40)}, 85, now)), "an expired window no longer counts")
+}
+
+func TestNewSessionPlacement_AvoidsAccountsNearQuotaLimit(t *testing.T) {
+	end := time.Now().Add(2 * time.Hour)
+	near := fallbackQueueAccount(1, 1, 5)
+	near.SessionWindowEnd = &end
+	near.Extra = map[string]any{"session_window_utilization": 0.9}
+	fresh := fallbackQueueAccount(2, 1, 5)
+	fresh.SessionWindowEnd = &end
+	fresh.Extra = map[string]any{"session_window_utilization": 0.3}
+	repo := &mockAccountRepoForPlatform{accounts: []Account{near, fresh}, accountsByID: map[int64]*Account{}}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	cfg.Gateway.Scheduling.NewSessionQuotaSoftPercent = 85
+	cfg.Gateway.Scheduling.FallbackWaitAnyAccount = true
+	svc := &GatewayService{accountRepo: repo, cache: &mockGatewayCacheForPlatform{}, cfg: cfg, concurrencyService: NewConcurrencyService(&mockConcurrencyCache{
+		skipDefaultLoad: true,
+		loadMap:         map[int64]*AccountLoadInfo{1: {AccountID: 1}, 2: {AccountID: 2, CurrentConcurrency: 3, LoadRate: 60}},
+	})}
+	result, err := svc.SelectAccountWithLoadAwareness(context.Background(), nil, "new-session", "claude-3-5-sonnet-20241022", nil, "", 0)
+	require.NoError(t, err)
+	require.True(t, result.Acquired)
+	require.Equal(t, int64(2), result.Account.ID, "the idle account at 90%% would be paused soon; place the session where it can stay")
+}
+
+func TestMovePreferredFirst(t *testing.T) {
+	accs := []*Account{{ID: 1}, {ID: 2}, {ID: 3}}
+	movePreferredFirst(accs, 3)
+	require.Equal(t, []int64{3, 1, 2}, []int64{accs[0].ID, accs[1].ID, accs[2].ID})
+	movePreferredFirst(accs, 9)
+	require.Equal(t, int64(3), accs[0].ID)
+}

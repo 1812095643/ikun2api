@@ -498,15 +498,19 @@ WHERE created_at >= $1 AND created_at < $2
 	{
 		q := `
 SELECT
-  percentile_cont(0.50) WITHIN GROUP (ORDER BY first_token_ms) AS p50,
-  percentile_cont(0.90) WITHIN GROUP (ORDER BY first_token_ms) AS p90,
-  percentile_cont(0.95) WITHIN GROUP (ORDER BY first_token_ms) AS p95,
-  percentile_cont(0.99) WITHIN GROUP (ORDER BY first_token_ms) AS p99,
-  AVG(first_token_ms) AS avg_ms,
-  MAX(first_token_ms) AS max_ms
-FROM usage_logs
-WHERE created_at >= $1 AND created_at < $2
-  AND first_token_ms IS NOT NULL`
+  percentile_cont(0.50) WITHIN GROUP (ORDER BY ttft_ms) AS p50,
+  percentile_cont(0.90) WITHIN GROUP (ORDER BY ttft_ms) AS p90,
+  percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms) AS p95,
+  percentile_cont(0.99) WITHIN GROUP (ORDER BY ttft_ms) AS p99,
+  AVG(ttft_ms) AS avg_ms,
+  MAX(ttft_ms) AS max_ms
+FROM (
+  -- 用户实际首字（含网关排队与换号）；旧记录回退到上游首字
+  SELECT COALESCE(client_first_token_ms, first_token_ms) AS ttft_ms
+  FROM usage_logs
+  WHERE created_at >= $1 AND created_at < $2
+    AND first_token_ms IS NOT NULL
+) t`
 
 		var p50, p90, p95, p99 sql.NullFloat64
 		var avg sql.NullFloat64

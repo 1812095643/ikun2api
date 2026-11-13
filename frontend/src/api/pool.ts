@@ -197,6 +197,11 @@ export interface UserPoolUsage {
   created_at: string
   duration_ms: number | null
   first_token_ms: number | null
+  gateway_wait_ms?: number | null
+  pre_forward_ms?: number | null
+  account_switch_count?: number | null
+  client_first_token_ms?: number | null
+  upload_ms?: number | null
   stream: boolean
   input_tokens: number
   output_tokens: number

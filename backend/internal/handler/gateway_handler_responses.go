@@ -46,6 +46,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 
 	// Read request body
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
+	bodyReadDone := time.Now()
 	if err != nil {
 		if handleRequestBodyReadError(c, reqLog, err) {
 			return
@@ -181,6 +182,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	// Parse request for session hash
 	bodyRef := service.NewRequestBodyRef(body)
 	parsedReq, _ := service.ParseGatewayRequest(bodyRef, "responses")
+	c.Request = c.Request.WithContext(service.WithPromptSizeHint(c.Request.Context(), len(body)))
 	if parsedReq == nil {
 		parsedReq = &service.ParsedRequest{Model: reqModel, Stream: reqStream, Body: bodyRef}
 	}
@@ -244,11 +246,12 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				h.responsesErrorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts")
 				return
 			}
-			accountReleaseFunc, err = h.concurrencyHelper.AcquireAccountSlotWithWaitTimeout(
+			var waitedAccount *service.Account
+			waitedAccount, accountReleaseFunc, err = h.concurrencyHelper.WaitForPlannedAccountSlot(
 				c,
-				account.ID,
-				selection.WaitPlan.MaxConcurrency,
-				selection.WaitPlan.Timeout,
+				account,
+				selection.WaitPlan,
+				h.revalidateWaitAlternate(reqModel),
 				reqStream,
 				&streamStarted,
 			)
@@ -257,6 +260,10 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				h.handleConcurrencyError(c, err, "account", streamStarted)
 				return
 			}
+			if waitedAccount != nil && waitedAccount.ID != account.ID {
+				h.gatewayService.ReleaseAccountSession(c.Request.Context(), account, sessionHash)
+			}
+			account = switchToWaitedAccount(c, reqLog, selection, account, waitedAccount)
 		}
 		// 终检与准入后绑定必须使用选号结果携带的门：门安装在调度栈的局部
 		// ctx 上（composite/fallback 还可能解析出与入口分组不同的门），直接用
@@ -286,6 +293,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 
 		// 5. Forward request
 		writerSizeBeforeForward := c.Writer.Size()
+		forwardStart := time.Now()
 		forwardBody := body
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
@@ -325,8 +333,10 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			sessionID := service.ExtractClientSessionID(c)
 			stampForwardRequestedReasoningEffort(res, service.RequestedReasoningEffortFromContext(c.Request.Context()))
 			channelUsageFields := clientRequestedUsageFields(c, channelMapping, reqModel, res.UpstreamModel)
+			usageTiming := gatewayRequestTiming(c, requestStart, bodyReadDone, forwardStart, fs.SwitchCount)
 			h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 				if usageErr := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+					Timing:             usageTiming,
 					Result:             res,
 					QuotaPlatform:      quotaPlatform,
 					APIKey:             apiKey,
@@ -386,6 +396,10 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		}
 
 		// 6. Record usage
+		if err := h.gatewayService.BindClaudeOAuthSessionAfterSuccess(admissionCtx, apiKey.GroupID, sessionHash, account); err != nil {
+			reqLog.Warn("gateway.bind_claude_oauth_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+		}
+
 		submitForwardUsage(result)
 		return
 	}

@@ -613,9 +613,21 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 			return 0, false
 		}
 		return overview.UpstreamErrorRate * 100, true
+	case "ttft_p90_ms":
+		// 用户实际首字（含网关排队与换号），见 queryUsageLatency。
+		return percentileMetric(overview.TTFT.P90)
+	case "ttft_p95_ms":
+		return percentileMetric(overview.TTFT.P95)
 	default:
 		return 0, false
 	}
+}
+
+func percentileMetric(v *int) (float64, bool) {
+	if v == nil {
+		return 0, false
+	}
+	return float64(*v), true
 }
 
 func compareMetric(value float64, operator string, threshold float64) bool {
