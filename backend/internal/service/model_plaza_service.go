@@ -222,7 +222,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 		m.Pricing = groupPricing
 		// 分组模型级固定价就是实收价，不能再被分组图片兜底档位覆盖。
 		// 否则模型广场会显示 image_price_1k/2k/4k，而实际按 model_pricing 扣费。
-		if groupPricing.BillingMode == BillingModeImage || groupPricing.BillingMode == BillingModePerRequest {
+		if groupPricing.BillingMode == BillingModeImage || groupPricing.BillingMode == BillingModePerRequest || groupPricing.BillingMode == BillingModeVideo {
 			return
 		}
 	}
@@ -242,6 +242,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 		}
 	}
 	m.Pricing = plazaImageDisplayPricing(m.Pricing, g)
+	m.Pricing = s.plazaVideoDisplayPricing(ctx, m.Pricing, g, m.Name)
 }
 
 // plazaPricingFromSchedule 把阶梯表压成展示用的 ChannelModelPricing：
@@ -331,6 +332,50 @@ func plazaImageDisplayPricing(p *ChannelModelPricing, g *Group) *ChannelModelPri
 		})
 	}
 	return &clone
+}
+
+// plazaVideoDisplayPricing mirrors per-resolution video billing without charging:
+// group video prices override channel tiers; uncovered resolutions use the same
+// per-unit calculation as real billing. Group model cards returned above win first.
+func (s *ModelPlazaService) plazaVideoDisplayPricing(ctx context.Context, p *ChannelModelPricing, g *Group, model string) *ChannelModelPricing {
+	if p == nil || p.BillingMode != BillingModeVideo || g == nil || s.billingService == nil || s.resolver == nil {
+		return p
+	}
+	resolutions := []string{VideoBillingResolution480P, VideoBillingResolution720P, VideoBillingResolution1080P}
+	hasOverride := false
+	for _, resolution := range resolutions {
+		if g.GetVideoPriceForModel(model, resolution) != nil {
+			hasOverride = true
+			break
+		}
+	}
+	if !hasOverride {
+		return p
+	}
+
+	out := p.Clone()
+	out.PerRequestPrice = nil
+	out.Intervals = make([]PricingInterval, 0, len(resolutions))
+	resolved := s.resolver.resolveConfiguredPricing(p, model, PricingSourceChannel)
+	for i, resolution := range resolutions {
+		var price float64
+		if groupPrice := g.GetVideoPriceForModel(model, resolution); groupPrice != nil {
+			price = *groupPrice
+		} else {
+			cost, err := s.billingService.CalculateCostUnified(CostInput{
+				Ctx: ctx, Model: model, Group: g, UsageUnits: 1, SizeTier: resolution,
+				RateMultiplier: 1, Resolver: s.resolver, Resolved: resolved,
+			})
+			if err != nil || cost == nil {
+				return p
+			}
+			price = cost.TotalCost
+		}
+		out.Intervals = append(out.Intervals, PricingInterval{
+			TierLabel: resolution, PerRequestPrice: &price, SortOrder: i,
+		})
+	}
+	return &out
 }
 
 // lookupOfficialPricing 查询模型的官方参考价（LiteLLM → 已识别型号的内置价 → 模型策略），

@@ -1,7 +1,7 @@
 <template>
   <div class="plaza-pricing-table overflow-x-auto" :style="accentStyle">
-    <table class="w-full min-w-[1000px] table-auto border-collapse text-sm tabular-nums">
-      <colgroup>
+    <table class="w-full table-auto border-collapse text-sm tabular-nums" :class="showTokenColumns ? 'min-w-[1000px]' : 'min-w-[600px]'">
+      <colgroup v-if="showTokenColumns">
         <col class="w-[25%]" />
         <col class="w-[11%]" />
         <col class="w-[9%]" />
@@ -11,39 +11,46 @@
         <col class="w-[14%]" />
         <col class="w-[8%]" />
       </colgroup>
+      <colgroup v-else>
+        <col class="w-[30%]" />
+        <col class="w-[30%]" />
+        <col class="w-[25%]" />
+        <col class="w-[15%]" />
+      </colgroup>
       <thead>
         <tr
           class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400"
         >
           <th
-            rowspan="2"
+            :rowspan="showTokenColumns ? 2 : 1"
             class="border-r border-gray-100 py-2.5 pl-5 pr-4 text-left align-middle dark:border-dark-700/60"
           >
             {{ t('modelPlaza.table.model') }}
           </th>
-          <th colspan="3" class="pz-bg pt-2 text-center">
+          <th :colspan="priceColumnSpan" class="pz-bg pt-2 text-center">
             <div class="pz-title border-b pb-2 font-semibold">
               {{ t('modelPlaza.table.paidPrice') }}
-              <span class="pz-unit ml-1 normal-case font-normal">{{ currency === 'cny' ? '¥ / 1M token' : t('modelPlaza.table.unitPerMillion') }}</span>
+              <span v-if="paidHeaderUnit" class="pz-unit ml-1 normal-case font-normal">{{ paidHeaderUnit }}</span>
             </div>
           </th>
           <th
-            colspan="3"
+            :colspan="priceColumnSpan"
             class="border-l border-gray-100 pt-2 text-center dark:border-dark-700/60"
           >
             <div class="border-b border-gray-200 pb-2 text-gray-400 dark:border-dark-600 dark:text-dark-500">
               {{ t('modelPlaza.table.officialPrice') }}
-              <span class="ml-1 normal-case font-normal text-gray-400 dark:text-dark-500">{{ t('modelPlaza.table.unitPerMillion') }}</span>
+              <span v-if="showTokenColumns" class="ml-1 normal-case font-normal text-gray-400 dark:text-dark-500">{{ t('modelPlaza.table.unitPerMillion') }}</span>
             </div>
           </th>
           <th
-            rowspan="2"
+            :rowspan="showTokenColumns ? 2 : 1"
             class="border-l border-gray-100 py-2.5 pl-3 pr-5 text-right align-middle dark:border-dark-700/60"
           >
             {{ t('modelPlaza.table.rate') }}
           </th>
         </tr>
         <tr
+          v-if="showTokenColumns"
           class="border-b border-gray-200 text-left text-[11px] font-medium uppercase leading-4 tracking-wide text-gray-400 dark:border-dark-700 dark:text-dark-500"
         >
           <th class="pz-bg px-3 py-2 font-medium">{{ t('modelPlaza.table.input') }}</th>
@@ -87,7 +94,7 @@
                 {{ platformLabel(m.platform) }}
               </span>
               <span
-                v-if="billingMode(m) !== BILLING_MODE_TOKEN"
+                v-if="billingMode(m) !== BILLING_MODE_TOKEN || hasMixedBillingModes"
                 class="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-dark-700/70 dark:text-dark-300"
               >
                 {{ billingModeLabel(m) }}
@@ -187,9 +194,9 @@
             </td>
           </template>
 
-          <!-- 按次 / 按图片计费:实付区整体合并,阶梯芯片或单一按次价 -->
+          <!-- 非 token 模式按各自单位展示：次、张、秒。 -->
           <template v-else>
-            <td colspan="3" class="pz-cell px-3 py-2.5 align-middle">
+            <td :colspan="priceColumnSpan" class="pz-cell px-3 py-2.5 align-middle">
               <div
                 v-if="requestIntervals(m).length"
                 class="flex flex-wrap items-center gap-1.5"
@@ -215,6 +222,7 @@
           </template>
 
           <!-- 官方价格(参考价,不乘倍率;官方有阶梯时每档一行) -->
+          <template v-if="showTokenColumns">
           <td
             class="border-l border-gray-100 px-3 py-2.5 align-middle font-mono text-xs text-gray-500 dark:border-dark-700/60 dark:text-dark-400"
           >
@@ -290,6 +298,9 @@
             <span v-else class="text-gray-400 dark:text-dark-500">-</span>
           </td>
 
+          </template>
+          <td v-else class="border-l border-gray-100 px-3 py-2.5 text-center text-gray-400 dark:border-dark-700/60 dark:text-dark-500">-</td>
+
           <!-- 折扣倍率(分时时段行展示 生效倍率×时段倍率;生图独立倍率行展示独立倍率;专属倍率划线展示原倍率) -->
           <td
             class="border-l border-gray-100 py-2.5 pl-3 pr-5 text-right align-middle font-mono text-xs dark:border-dark-700/60"
@@ -321,7 +332,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
-import { modelPlazaDisplayModel, modelPlazaOriginalPricing, modelPlazaPaidPrice, type ModelPlazaCurrency } from '@/utils/modelPlazaPricing'
+import { modelPlazaBillingUnit, modelPlazaDisplayModel, modelPlazaOriginalPricing, modelPlazaPaidPrice, type ModelPlazaCurrency } from '@/utils/modelPlazaPricing'
 import { platformAccentColor, platformBadgeLightClass, platformLabel } from '@/utils/platformColors'
 import {
   BILLING_MODE_TOKEN,
@@ -376,6 +387,26 @@ const accentStyle = computed(() => ({ '--plaza-accent': platformAccentColor(prop
 
 const PER_MILLION = 1_000_000
 
+const billingModes = computed(() => new Set(props.models.map(billingMode)))
+const hasMixedBillingModes = computed(() => billingModes.value.size > 1)
+const showTokenColumns = computed(() => billingModes.value.has(BILLING_MODE_TOKEN) || props.models.some(model => {
+  const pricing = model.official_pricing
+  return pricing != null && (
+    [pricing.input_price, pricing.output_price, pricing.cache_read_price, pricing.cache_write_price,
+      pricing.cache_write_1h_price, pricing.cache_write_12h_price].some(price => price != null) ||
+    (pricing.intervals?.length ?? 0) > 0
+  )
+}))
+const priceColumnSpan = computed(() => showTokenColumns.value ? 3 : 1)
+const paidHeaderUnit = computed(() => {
+  if (billingModes.value.size !== 1) return ''
+  const mode = [...billingModes.value][0]!
+  if (mode === BILLING_MODE_TOKEN) {
+    return props.currency === 'cny' ? '¥ / 1M token' : t('modelPlaza.table.unitPerMillion')
+  }
+  return (props.currency === 'cny' ? '¥ ' : '$ ') + t('modelPlaza.table.' + modelPlazaBillingUnit(mode).suffix)
+})
+
 /**
  * 展示顺序:
  * 1. token 计费的排在前,按图/按次计费的沉到末尾——它们的官方 token 价与实付的按张/按次价不同量纲,混排无意义;
@@ -406,9 +437,7 @@ function billingMode(m: PlazaModel): BillingMode {
 }
 
 function billingModeLabel(m: PlazaModel): string {
-  return billingMode(m) === BILLING_MODE_IMAGE
-    ? t('modelPlaza.table.perImage')
-    : t('modelPlaza.table.perRequest')
+  return t('modelPlaza.table.' + modelPlazaBillingUnit(billingMode(m)).label)
 }
 
 /** 价格统一保底 2 位小数,更长的有效小数原样保留。 */
@@ -473,11 +502,9 @@ function official(value: number | null | undefined): string {
   return formatScaled(value, PER_MILLION, MIN_DECIMALS)
 }
 
-/** 非 token 计费的单位后缀:按图片 → “/ 张”,按次 → “/ 次”。 */
+/** 单位与计费模式一一对应，视频价格按秒展示。 */
 function perUnitSuffix(m: PlazaModel): string {
-  return billingMode(m) === BILLING_MODE_IMAGE
-    ? t('modelPlaza.table.perUnitImage')
-    : t('modelPlaza.table.perUnitRequest')
+  return t('modelPlaza.table.' + modelPlazaBillingUnit(billingMode(m)).suffix)
 }
 
 function hasCachePricing(m: PlazaModel): boolean {

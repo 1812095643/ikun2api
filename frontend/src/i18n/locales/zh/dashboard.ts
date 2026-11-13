@@ -762,6 +762,9 @@ export default {
       rate: '折扣倍率',
       unitPerMillion: '$ / 1M token',
       perUnitRequest: '/ 次',
+      perUnitToken: '/ 1M token',
+      perUnitSecond: '/ 秒',
+      perSecond: '按秒计费',
       perUnitImage: '/ 张',
       perRequest: '按次计费',
       perImage: '按图片计费'

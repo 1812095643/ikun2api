@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ModelCard from './ModelCard.vue'
 import type { ModelEntry } from '@/composables/workspace/useModelSquare'
 import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
+
+vi.mock('vue-i18n', async () => {
+  const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
+  return { ...actual, useI18n: () => ({ t: (key: string) => key }) }
+})
 
 function entry(name: string, platform: string, withOriginal = true): ModelEntry {
   return {
@@ -76,4 +81,44 @@ it('卡片实付人民币价格响应币种和充值比例切换', async () => {
   await wrapper.setProps({ currency: 'usd' })
   expect(row().find('strong').text()).toBe('$0.20')
   wrapper.unmount()
+})
+
+
+it('video cards show a per-second price using the video-specific rate', async () => {
+  const value = entry('muse-video', 'grok', false)
+  value.offers[0].model.pricing!.billing_mode = 'video'
+  value.offers[0].model.pricing!.per_request_price = 0.1
+  value.offers[0].group.video_rate_independent = true
+  value.offers[0].group.video_rate_multiplier = 0.5
+  const wrapper = mount(ModelCard, { props: { entry: value } })
+  try {
+    expect(wrapper.find('[data-billing-mode="video"]').text()).toContain('$0.05')
+    expect(wrapper.text()).toContain('modelPlaza.table.perUnitSecond')
+    expect(wrapper.text()).not.toContain('/ 次')
+    await wrapper.setProps({ currency: 'cny', creditsPerCny: 10 })
+    expect(wrapper.find('[data-billing-mode="video"]').text()).toContain('¥0.005')
+  } finally {
+    wrapper.unmount()
+  }
+})
+
+it('mixed per-request and per-second offers display separate prices', () => {
+  const value = entry('muse-video', 'grok', false)
+  value.offers[0].model.pricing!.billing_mode = 'video'
+  value.offers[0].model.pricing!.per_request_price = 0.2
+  const perRequest = structuredClone(value.offers[0])
+  perRequest.group.id = 2
+  perRequest.model.pricing!.billing_mode = 'per_request'
+  perRequest.model.pricing!.per_request_price = 0.01
+  value.offers.push(perRequest)
+  const wrapper = mount(ModelCard, { props: { entry: value } })
+  try {
+    expect(wrapper.find('[data-billing-mode="video"]').text()).toContain('$0.10')
+    expect(wrapper.find('[data-billing-mode="video"]').text()).toContain('modelPlaza.table.perUnitSecond')
+    expect(wrapper.find('[data-billing-mode="per_request"]').text()).toContain('$0.005')
+    expect(wrapper.find('[data-billing-mode="per_request"]').text()).toContain('modelPlaza.table.perUnitRequest')
+    expect(wrapper.findAll('.model-media')).toHaveLength(2)
+  } finally {
+    wrapper.unmount()
+  }
 })

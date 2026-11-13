@@ -1,5 +1,18 @@
 import type { PlazaModel } from '@/api/modelPlaza'
+import type { BillingMode } from '@/constants/channel'
 import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
+
+/** Billing units are shared by cards and detailed tables. Video prices are per second. */
+const billingUnits: Record<BillingMode, { label: string; suffix: string }> = {
+  token: { label: 'perUnitToken', suffix: 'perUnitToken' },
+  per_request: { label: 'perRequest', suffix: 'perUnitRequest' },
+  image: { label: 'perImage', suffix: 'perUnitImage' },
+  video: { label: 'perSecond', suffix: 'perUnitSecond' }
+}
+
+export function modelPlazaBillingUnit(mode: BillingMode) {
+  return billingUnits[mode] ?? billingUnits.token
+}
 
 export type ModelPlazaTokenPriceKey =
   | 'input_price'

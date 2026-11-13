@@ -680,3 +680,83 @@ func TestWorkspacePlazaOriginalPricingUsesIdentifiedCatalogAliases(t *testing.T)
 	require.InDelta(t, 4e-6, *model.OfficialPricing.InputPrice, 1e-15)
 	require.InDelta(t, 5e-6, *model.Pricing.InputPrice, 1e-15)
 }
+
+func TestListPlazaGroups_VideoPricesMatchBillingPerSecond(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		group Group
+	}{
+		{"flat group overrides", Group{VideoPrice480P: testPtrFloat64(0.1), VideoPrice720P: testPtrFloat64(0.2)}},
+		{"model overrides and free resolution", Group{
+			VideoPrice480P: testPtrFloat64(0.8), VideoPrice720P: testPtrFloat64(0.9),
+			VideoModelPrices: map[string]map[string]float64{"muse-video": {"480p": 0.04, "720p": 0}},
+		}},
+		{"group model card wins", Group{
+			VideoPrice480P: testPtrFloat64(9), VideoPrice720P: testPtrFloat64(9),
+			ModelPricing: []ChannelModelPricing{{
+				Models: []string{"muse-video"}, BillingMode: BillingModeVideo, PerRequestPrice: testPtrFloat64(0.1),
+			}},
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			group := tc.group
+			group.ID = 27
+			group.Platform = PlatformGrok
+			group.RateMultiplier = 7
+			group.VideoRateIndependent = true
+			group.VideoRateMultiplier = 0.5
+			channels := []Channel{{
+				ID: 1, Name: "video", Status: StatusActive, GroupIDs: []int64{group.ID},
+				ModelPricing: []ChannelModelPricing{{
+					Platform: PlatformGrok, Models: []string{"muse-video"}, BillingMode: BillingModeVideo,
+					PerRequestPrice: testPtrFloat64(0.3),
+					Intervals:       []PricingInterval{{TierLabel: "1080p", PerRequestPrice: testPtrFloat64(0.6)}},
+				}},
+			}}
+			original := channels[0].ModelPricing[0].Clone()
+			svc := newPlazaServiceWithBilling(channels, []Group{group}, map[int64]string{group.ID: PlatformGrok}, nil)
+			result, err := svc.ListGroups(context.Background())
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			pricing := result[0].Models[0].Pricing
+			require.NotNil(t, pricing)
+			require.Equal(t, BillingModeVideo, pricing.BillingMode)
+			require.Equal(t, original, channels[0].ModelPricing[0], "display must not mutate channel prices")
+			require.Equal(t, 0.5, result[0].VideoRateMultiplier)
+
+			gateway := &OpenAIGatewayService{billingService: svc.billingService, resolver: svc.resolver}
+			key := &APIKey{GroupID: &group.ID, Group: &group}
+			for _, resolution := range []string{"480p", "720p", "1080p"} {
+				shown := pricing.PerRequestPrice
+				for _, tier := range pricing.Intervals {
+					if tier.TierLabel == resolution {
+						shown = tier.PerRequestPrice
+					}
+				}
+				require.NotNil(t, shown)
+				cost := gateway.calculateOpenAIVideoCost(context.Background(), "muse-video", key, &OpenAIForwardResult{
+					VideoCount: 1, VideoDurationSeconds: 8, VideoResolution: resolution,
+				}, 0.5)
+				require.InDelta(t, *shown*8*0.5, cost.ActualCost, 1e-12, resolution)
+			}
+		})
+	}
+}
+
+func TestListPlazaGroups_VideoGroupPricesDoNotChangePerRequestModels(t *testing.T) {
+	channels := []Channel{{
+		ID: 1, Name: "search", Status: StatusActive, GroupIDs: []int64{27},
+		ModelPricing: []ChannelModelPricing{{
+			Platform: PlatformGrok, Models: []string{"search-tool"},
+			BillingMode: BillingModePerRequest, PerRequestPrice: testPtrFloat64(0.01),
+		}},
+	}}
+	groups := []Group{{ID: 27, Platform: PlatformGrok, VideoPrice480P: testPtrFloat64(0.1)}}
+	svc := newPlazaServiceWithBilling(channels, groups, map[int64]string{27: PlatformGrok}, nil)
+	result, err := svc.ListGroups(context.Background())
+	require.NoError(t, err)
+	pricing := result[0].Models[0].Pricing
+	require.Equal(t, BillingModePerRequest, pricing.BillingMode)
+	require.InDelta(t, 0.01, *pricing.PerRequestPrice, 1e-12)
+	require.Empty(t, pricing.Intervals)
+}

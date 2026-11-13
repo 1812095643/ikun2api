@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
-import { modelPrice, modelOfficialPrice, mediaPrice, type ModelEntry } from '@/composables/workspace/useModelSquare'
-import type { ModelPlazaCurrency, ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
+import { modelPrice, modelOfficialPrice, mediaPriceRows, type ModelEntry } from '@/composables/workspace/useModelSquare'
+import { modelPlazaBillingUnit, type ModelPlazaCurrency, type ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
 import { platformLabel } from '@/utils/platformColors'
 const props = defineProps<{ entry: ModelEntry; currency?: ModelPlazaCurrency; creditsPerCny?: number }>()
 const emit = defineEmits<{ detail: [] }>()
 const copied = ref(false), copyError = ref(false)
-const billing = computed(() => props.entry.offers[0]?.model.pricing?.billing_mode || 'token')
+const { t } = useI18n()
+const hasTokenOffers = computed(() => !props.entry.offers.length || props.entry.offers.some(
+  offer => (offer.model.pricing?.billing_mode || 'token') === 'token'
+))
+const mediaRows = computed(() => mediaPriceRows(props.entry, props.currency, props.creditsPerCny).map(row => ({
+  ...row,
+  suffix: t('modelPlaza.table.' + modelPlazaBillingUnit(row.mode).suffix)
+})))
 const priceFields: { label: string; key: ModelPlazaTokenPriceKey }[] = [
   { label: '输入', key: 'input_price' },
   { label: '输出', key: 'output_price' },
@@ -39,12 +47,12 @@ async function copy() {
       <div class="model-identity"><span>{{ platformLabel(entry.platform) }}</span><button class="model-name" @click="emit('detail')">{{ entry.name }}</button></div>
       <button class="copy-model" :aria-label="'复制模型名 ' + entry.name" @click="copy"><Icon :name="copied ? 'check' : 'copy'" size="sm" /></button>
     </header>
-    <div v-if="billing === 'token'" class="model-prices">
+    <div v-if="hasTokenOffers" class="model-prices">
       <div v-if="rows.length" class="model-price-head"><span>/ 1M</span><span>实付价格</span><span>官方价格</span></div>
       <div v-for="row in rows" :key="row.key" class="model-price-row" :data-price-field="row.key"><span>{{ row.label }}</span><strong>{{ row.paid }}</strong><span class="model-original-price">{{ row.official }}</span></div>
       <p v-if="!rows.length" class="ws-muted">查看分组计价</p>
     </div>
-    <div v-else class="model-media"><strong>{{ mediaPrice(entry, currency, creditsPerCny) }}</strong><span>{{ billing === 'image' ? '/ 张' : '/ 次' }}</span></div>
+    <div v-for="row in mediaRows" :key="row.mode" class="model-media" :data-billing-mode="row.mode"><strong>{{ row.price }}</strong><span>{{ row.suffix }}</span></div>
     <footer class="model-footer">
       <span v-if="copied" class="copy-feedback" role="status">模型名已复制</span>
       <span v-else-if="copyError" class="copy-feedback" role="alert">请手动复制模型名</span>

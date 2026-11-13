@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import type { BillingMode } from '@/constants/channel'
 import { useNavigationStore } from '@/stores/navigation'
 import {
   getWorkspaceModels,
@@ -49,21 +50,45 @@ export function modelOfficialPrice(entry: ModelEntry, key: ModelPlazaTokenPriceK
   })
   return prices.length ? formatScaled(Math.min(...prices), 1000000, 2) : '—'
 }
-export function mediaPrice(entry: ModelEntry, currency: ModelPlazaCurrency = 'usd', creditsPerCny = 0): string {
+type MediaBillingMode = Exclude<BillingMode, 'token'>
+
+const mediaBillingModes: MediaBillingMode[] = ['image', 'video', 'per_request']
+
+export function mediaPrice(
+  entry: ModelEntry,
+  currency: ModelPlazaCurrency = 'usd',
+  creditsPerCny = 0,
+  billingMode?: MediaBillingMode
+): string {
+  const modes = mediaBillingModes.filter(mode => entry.offers.some(offer => offer.model.pricing?.billing_mode === mode))
+  // A dollar per second cannot be compared with a dollar per request.
+  if (!billingMode && modes.length > 1) return '按分组查看'
+  const selectedMode = billingMode ?? modes[0]
   const prices = entry.offers.flatMap(({ group, model }) => {
-    const value = model.pricing?.per_request_price
-    if (value == null) return []
-    const mode = model.pricing?.billing_mode
-    const rate =
-      mode === 'image' && group.image_rate_independent
-        ? group.image_rate_multiplier
-        : mode === 'video' && group.video_rate_independent
-          ? group.video_rate_multiplier
-          : (group.user_rate_multiplier ?? group.rate_multiplier)
-    return [value * rate]
+    const pricing = model.pricing
+    if (!pricing || pricing.billing_mode !== selectedMode) return []
+    const tierPrices = (pricing.intervals ?? []).flatMap(interval =>
+      interval.per_request_price != null && Number.isFinite(interval.per_request_price) && interval.per_request_price >= 0
+        ? [interval.per_request_price] : [])
+    const values = tierPrices.length ? tierPrices : [pricing.per_request_price]
+    const rate = selectedMode === 'image' && group.image_rate_independent
+      ? group.image_rate_multiplier
+      : selectedMode === 'video' && group.video_rate_independent
+        ? group.video_rate_multiplier
+        : (group.user_rate_multiplier ?? group.rate_multiplier)
+    if (!Number.isFinite(rate)) return []
+    return values.flatMap(value => value != null && Number.isFinite(value) && value >= 0
+      ? [value * Math.max(0, rate)] : [])
   })
   return prices.length ? modelPlazaPaidPrice(Math.min(...prices), 1, currency, creditsPerCny) : '按档位查看'
 }
+
+export function mediaPriceRows(entry: ModelEntry, currency: ModelPlazaCurrency = 'usd', creditsPerCny = 0) {
+  return mediaBillingModes
+    .filter(mode => entry.offers.some(offer => offer.model.pricing?.billing_mode === mode))
+    .map(mode => ({ mode, price: mediaPrice(entry, currency, creditsPerCny, mode) }))
+}
+
 export function useModelSquare() {
   const data = ref<ModelPlazaResponse | null>(null),
     loading = ref(false),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mediaPrice, modelPrice, modelOfficialPrice, type ModelEntry } from './useModelSquare'
 import { modelPlazaDisplayModel, modelPlazaPaidPrice, type ModelPlazaTokenPriceKey } from '@/utils/modelPlazaPricing'
-import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
+import type { ModelPlazaGroup } from '@/api/modelPlaza'
 
 const cases: [ModelPlazaTokenPriceKey, string, string, string][] = [
   ['input_price', '$2.00', '$4.00', '$2.50'],
@@ -125,4 +125,42 @@ describe('模型广场展示价格', () => {
     expect(modelPrice(value, 'input_price', 'usd', 20)).toBe('$2.00')
     expect(modelOfficialPrice(value, 'input_price')).toBe('$4.00')
   })
+})
+
+
+it('media minima use displayed resolution tiers rather than an overridden default price', () => {
+  const value = pricedModel('muse-video', 'grok')
+  const { model, group } = value.offers[0]
+  model.pricing!.billing_mode = 'video'
+  model.pricing!.per_request_price = 0.01
+  model.pricing!.intervals = [0.1, 0.2].map((per_request_price, index) => ({
+    min_tokens: 0, max_tokens: null, tier_label: index ? '720p' : '480p',
+    input_price: null, output_price: null, cache_write_price: null, cache_read_price: null,
+    per_request_price
+  }))
+  group.video_rate_independent = true
+  group.video_rate_multiplier = 0.5
+  expect(mediaPrice(value)).toBe('$0.05')
+  group.video_rate_multiplier = 0
+  expect(mediaPrice(value)).toBe('$0.00')
+})
+
+it('media prices never compare per-request and per-second amounts', () => {
+  const value = pricedModel('muse-video', 'grok')
+  value.offers[0].model.pricing!.billing_mode = 'video'
+  value.offers[0].model.pricing!.per_request_price = 0.2
+  const perRequest = structuredClone(value.offers[0])
+  perRequest.model.pricing!.billing_mode = 'per_request'
+  perRequest.model.pricing!.per_request_price = 0.01
+  value.offers.push(perRequest)
+  expect(mediaPrice(value)).toBe('按分组查看')
+  expect(mediaPrice(value, 'usd', 0, 'video')).toBe('$0.10')
+  expect(mediaPrice(value, 'usd', 0, 'per_request')).toBe('$0.005')
+})
+
+it.each([NaN, Infinity, -1])('invalid media price %s does not become a cheapest offer', price => {
+  const value = pricedModel('muse-video', 'grok')
+  value.offers[0].model.pricing!.billing_mode = 'video'
+  value.offers[0].model.pricing!.per_request_price = price
+  expect(mediaPrice(value)).toBe('按档位查看')
 })

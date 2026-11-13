@@ -758,6 +758,9 @@ export default {
       rate: 'Rate',
       unitPerMillion: '$ / 1M tokens',
       perUnitRequest: '/ request',
+      perUnitToken: '/ 1M tokens',
+      perUnitSecond: '/ second',
+      perSecond: 'Per second',
       perUnitImage: '/ image',
       perRequest: 'Per request',
       perImage: 'Per image'

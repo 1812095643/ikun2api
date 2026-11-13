@@ -266,7 +266,7 @@ describe('PlazaModelPricingTable', () => {
     })
 
     const wrapper = mountTable([pricier, image, cheaper], 1)
-    const names = wrapper.findAll('tbody tr').map((tr) => tr.find('td').text())
+    const names = wrapper.findAll('tbody tr').map((tr) => tr.find('td span.font-medium').text())
     expect(names[0]).toBe('gpt-5.6-terra')
     expect(names[1]).toBe('gpt-5.6-luna')
     // 首列含「按图片计费」徽章文本,只断言模型名
@@ -919,4 +919,88 @@ describe('人民币展示与原价保护', () => {
     expect(cells[4].text()).toContain('$6.00')
     wrapper.unmount()
   })
+})
+
+
+it('video billing uses seconds throughout the table without token headings', () => {
+  const model = tokenModel({ name: 'muse-video', platform: 'grok', official_pricing: null })
+  model.pricing!.billing_mode = 'video'
+  model.pricing!.per_request_price = 0.1
+  const wrapper = mountTable([model], 1)
+  try {
+    expect(wrapper.text()).toContain('modelPlaza.table.perSecond')
+    expect(wrapper.text()).toContain('modelPlaza.table.perUnitSecond')
+    expect(wrapper.text()).toContain('$0.10')
+    expect(wrapper.text()).not.toContain('modelPlaza.table.perRequest')
+    expect(wrapper.text()).not.toContain('modelPlaza.table.unitPerMillion')
+    expect(wrapper.find('thead').text()).not.toContain('modelPlaza.table.input')
+    expect(wrapper.find('thead').text()).not.toContain('modelPlaza.table.output')
+    expect(wrapper.find('thead').text()).not.toContain('modelPlaza.table.cache')
+    expect(wrapper.findAll('tbody tr td')).toHaveLength(4)
+  } finally {
+    wrapper.unmount()
+  }
+})
+
+
+it('mixed token and video rows keep their own units', () => {
+  const video = tokenModel({ name: 'muse-video', platform: 'grok', official_pricing: null })
+  video.pricing!.billing_mode = 'video'
+  video.pricing!.per_request_price = 0.1
+  const wrapper = mountTable([tokenModel(), video], 1)
+  try {
+    expect(wrapper.find('thead').text()).toContain('modelPlaza.table.input')
+    expect(wrapper.find('.pz-title').text()).not.toContain('modelPlaza.table.unitPerMillion')
+    const videoRow = wrapper.findAll('tbody tr').find(row => row.text().includes('muse-video'))!
+    expect(videoRow.text()).toContain('modelPlaza.table.perSecond')
+    expect(videoRow.text()).toContain('modelPlaza.table.perUnitSecond')
+    expect(videoRow.text()).not.toContain('modelPlaza.table.perUnitRequest')
+    const tokenRow = wrapper.findAll('tbody tr').find(row => row.text().includes('claude-sonnet'))!
+    expect(tokenRow.text()).toContain('modelPlaza.table.perUnitToken')
+  } finally {
+    wrapper.unmount()
+  }
+})
+
+it('video unit, compact layout and currency update with props', async () => {
+  const model = tokenModel({ name: 'muse-video', platform: 'grok', official_pricing: null })
+  model.pricing!.billing_mode = 'per_request'
+  model.pricing!.per_request_price = 0.1
+  const wrapper = mountTable([model], 1)
+  try {
+    expect(wrapper.text()).toContain('modelPlaza.table.perRequest')
+    const video = structuredClone(model)
+    video.pricing!.billing_mode = 'video'
+    await wrapper.setProps({ models: [video], currency: 'cny', creditsPerCny: 10 })
+    expect(wrapper.text()).toContain('modelPlaza.table.perSecond')
+    expect(wrapper.text()).toContain('modelPlaza.table.perUnitSecond')
+    expect(wrapper.text()).toContain('¥0.01')
+    expect(wrapper.text()).not.toContain('modelPlaza.table.perUnitRequest')
+    await wrapper.setProps({ models: [tokenModel()] })
+    expect(wrapper.find('thead').text()).toContain('modelPlaza.table.input')
+    expect(wrapper.findAll('tbody tr td')).toHaveLength(8)
+  } finally {
+    wrapper.unmount()
+  }
+})
+
+it('video resolution tiers apply the independent rate and seconds suffix', () => {
+  const model = tokenModel({ name: 'muse-video', official_pricing: null })
+  model.pricing!.billing_mode = 'video'
+  model.pricing!.per_request_price = null
+  model.pricing!.intervals = ['480p', '720p', '1080p'].map((tier_label, index) => ({
+    min_tokens: 0, max_tokens: null, tier_label,
+    input_price: null, output_price: null, cache_write_price: null, cache_read_price: null,
+    per_request_price: (index + 1) / 10
+  }))
+  const wrapper = mountTable([model], 9, 0.9, { videoRateIndependent: true, videoRateMultiplier: 0.5 })
+  try {
+    for (const text of ['480p', '720p', '1080p', '$0.05', '$0.10', '$0.15']) {
+      expect(wrapper.text()).toContain(text)
+    }
+    expect(wrapper.findAll('tbody tr td').at(-1)!.text()).toBe('0.5x')
+    expect(wrapper.text()).not.toContain('modelPlaza.table.perUnitRequest')
+  } finally {
+    wrapper.unmount()
+  }
 })
