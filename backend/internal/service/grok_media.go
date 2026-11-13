@@ -855,11 +855,7 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 		return nil, err
 	}
 
-	contentURL, err := grokMediaSignedVideoContentURL(statusBody, requestID)
-	if err != nil {
-		SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
-		return nil, err
-	}
+	contentURL := grokMediaSignedVideoContentURL(statusBody, requestID)
 	signedContent := contentURL != ""
 	if !signedContent {
 		contentURL, err = buildGrokMediaURL(account, s.cfg, GrokMediaEndpointVideoContent, requestID)
@@ -901,7 +897,7 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 	defer func() { _ = contentResp.Body.Close() }()
 	contentRequestID := firstNonEmpty(contentResp.Header.Get("x-request-id"), contentResp.Header.Get("xai-request-id"), statusRequestID)
 	if contentResp.StatusCode >= 300 && contentResp.StatusCode < 400 {
-		return nil, fmt.Errorf("grok media signed content redirect is not allowed")
+		return nil, fmt.Errorf("grok media content redirect is not allowed")
 	}
 	if contentResp.StatusCode >= 400 && contentResp.StatusCode != http.StatusRequestedRangeNotSatisfiable {
 		return s.handleGrokMediaErrorResponse(ctx, contentResp, c, account, contentRequestID, "")
@@ -932,25 +928,21 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 	return result, nil
 }
 
-func grokMediaSignedVideoContentURL(body []byte, requestID string) (string, error) {
+// Only validated xAI signed URLs may select a download destination. All other
+// video URLs use the configured account's authenticated content endpoint instead;
+// never request an arbitrary status-provided URL or send it account credentials.
+func grokMediaSignedVideoContentURL(body []byte, requestID string) string {
 	rawURL := strings.TrimSpace(gjson.GetBytes(body, "video.url").String())
-	if rawURL == "" {
-		return "", nil
-	}
-	// An upstream Sub2API rewrites protected content URLs to its own proxy
-	// endpoint. Treat that as an authenticated relay path, not as a signed URL;
-	// the caller will rebuild it against the configured account base URL and
-	// attach the upstream API key.
-	if isGrokMediaVideoContentURL(rawURL, requestID) {
-		return "", nil
+	if rawURL == "" || isGrokMediaVideoContentURL(rawURL, requestID) {
+		return ""
 	}
 	parsed, err := url.Parse(rawURL)
 	if err != nil || !strings.EqualFold(parsed.Scheme, "https") ||
 		!strings.EqualFold(parsed.Hostname(), "vidgen.x.ai") ||
 		(parsed.Port() != "" && parsed.Port() != "443") || parsed.User != nil {
-		return "", fmt.Errorf("grok media status returned an unsupported video content URL")
+		return ""
 	}
-	return parsed.String(), nil
+	return parsed.String()
 }
 
 func isGrokCLIProxyTarget(rawURL string) bool {
