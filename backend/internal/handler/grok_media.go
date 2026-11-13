@@ -546,7 +546,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				}
 			}
 		}
-		// Status poll OR content download can observe official done+video.url.
+		// Status polling and content download can observe a validated video completion.
 		// Both paths share the same claim key so the customer is charged once.
 		if endpoint == service.SeedanceEndpointStatus {
 			if billResult := prepareSeedanceCompletionBilling(requestCtx, h, apiKey, subject, requestID, result); billResult != nil {
@@ -631,7 +631,7 @@ func shouldRecordGrokMediaUsage(endpoint service.GrokMediaEndpoint, requestModel
 	return result.ImageCount > 0
 }
 
-// prepareGrokVideoCompletionBilling claims one-shot billing for official done+video.url
+// prepareGrokVideoCompletionBilling claims once for official done or scoped Muse completed
 // observations (status poll or content download). Duration/model prefer status body;
 // resolution uses create-time request (status response does not document resolution).
 func prepareGrokVideoCompletionBilling(
@@ -646,7 +646,7 @@ func prepareGrokVideoCompletionBilling(
 	if h == nil || h.gatewayService == nil || apiKey == nil || statusResult == nil {
 		return nil
 	}
-	// Forward already set VideoCount only when status=done && video.url (official).
+	// Forward validates official done or scoped Muse completed before setting VideoCount.
 	if statusResult.VideoCount <= 0 {
 		return nil
 	}

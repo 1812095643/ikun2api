@@ -767,6 +767,17 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	}
 	writeGrokMediaResponse(c, resp, respBody, s.responseHeaderFilter)
 	usage := grokMediaUsageFromResponse(endpoint, requestInfo, respBody)
+	if endpoint == GrokMediaEndpointVideoStatus && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		if billed := s.extractMuseVideoCompletedBilling(ctx, c, account, respBody, requestID); billed != nil {
+			usage.ResponseID = billed.ResponseID
+			usage.Model = billed.Model
+			usage.BillingModel = billed.BillingModel
+			usage.VideoCount = billed.VideoCount
+			usage.VideoResolution = billed.VideoResolution
+			usage.VideoDurationSeconds = billed.VideoDurationSeconds
+			upstreamModel = billed.UpstreamModel
+		}
+	}
 	resultModel := requestModel
 	resultBillingModel := requestModel
 	if endpoint == GrokMediaEndpointVideoStatus {
@@ -908,7 +919,7 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 		return nil, err
 	}
 	// Content download is an alternate completion observation: when status body is
-	// official done+video.url, attach billable units so the handler can claim once
+	// official done or scoped Muse completed with video.url, attach units to claim once
 	// (same path as status polling). Pending snapshot is merged in the handler.
 	result := &OpenAIForwardResult{
 		RequestID:       contentRequestID,
@@ -916,7 +927,11 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 		ResponseHeaders: contentResp.Header.Clone(),
 		Duration:        time.Since(startTime),
 	}
-	if billed := ExtractGrokVideoBillingFromStatusBody(statusBody, nil, requestID); billed != nil {
+	billed := ExtractGrokVideoBillingFromStatusBody(statusBody, nil, requestID)
+	if billed == nil && contentResp.StatusCode >= 200 && contentResp.StatusCode < 300 {
+		billed = s.extractMuseVideoCompletedBilling(ctx, c, account, statusBody, requestID)
+	}
+	if billed != nil {
 		result.ResponseID = firstNonEmpty(billed.ResponseID, strings.TrimSpace(requestID))
 		result.Model = billed.Model
 		result.BillingModel = billed.BillingModel

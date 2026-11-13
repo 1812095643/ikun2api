@@ -420,3 +420,55 @@ func TestGrokMediaVideoCompletionStillClaimsBillingOnce(t *testing.T) {
 	}
 	require.Len(t, bindings.billed, 1)
 }
+
+func TestMuseVideoStatusAndContentShareSingleBillingClaim(t *testing.T) {
+	h, _, bindings, upstream := newGrokMediaSlotHandler(t, false, false)
+	account := &service.Account{
+		ID: 1, Platform: service.PlatformGrok, Type: service.AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "muse-test-key", "base_url": "https://ai.windking.shop/v1"},
+	}
+	pending := service.GrokVideoPendingBilling{
+		Model: "muse-video", BillingModel: "muse-video", UpstreamModel: "muse-video", OriginalModel: "muse-video",
+		VideoResolution: "720p", VideoDurationSeconds: 10,
+	}
+	require.NoError(t, h.gatewayService.StoreGrokVideoPendingBilling(t.Context(), "task", 10, 20, pending))
+	upstream.call = func(req *http.Request, _ int64) (*http.Response, error) {
+		require.Equal(t, http.MethodGet, req.Method, "polls must not create another video")
+		require.Equal(t, "ai.windking.shop", req.URL.Hostname(), "never fetch the arbitrary media URL")
+		require.Equal(t, "Bearer muse-test-key", req.Header.Get("Authorization"))
+		if strings.HasSuffix(req.URL.Path, "/content") {
+			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"video/mp4"}},
+				Body: io.NopCloser(strings.NewReader("video-payload"))}, nil
+		}
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`{"status":"completed","video":{"url":"http://87.83.206.209:18610/v1/media/video.mp4"}}`))}, nil
+	}
+
+	for i := range 10 {
+		c, recorder := grokMediaSlotContext(t.Context(), false)
+		key, ok := middleware2.GetAPIKeyFromContext(c)
+		require.True(t, ok)
+		endpoint := service.GrokMediaEndpointVideoStatus
+		if i%2 == 1 {
+			endpoint = service.GrokMediaEndpointVideoContent
+			c.Request.URL.Path += "/content"
+		}
+		result, err := h.gatewayService.ForwardGrokMedia(t.Context(), c, account, endpoint, "task", nil, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, recorder.Code)
+		require.Equal(t, 1, result.VideoCount)
+		bill := prepareGrokVideoCompletionBilling(t.Context(), h, zap.NewNop(), key,
+			middleware2.AuthSubject{UserID: 10, Concurrency: 5}, "task", result)
+		if i == 0 {
+			require.NotNil(t, bill)
+			require.Equal(t, "muse-video", bill.BillingModel)
+			require.Equal(t, "720p", bill.VideoResolution)
+			require.Equal(t, 10, bill.VideoDurationSeconds)
+			require.Equal(t, service.StableGrokVideoBillingRequestID("task"), bill.RequestID)
+		} else {
+			require.Nil(t, bill, "status polls and repeated downloads must share the same claim")
+		}
+	}
+	require.Len(t, bindings.billed, 1)
+	require.Equal(t, 15, upstream.calls, "only status and existing content requests are allowed")
+}
