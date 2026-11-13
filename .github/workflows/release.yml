@@ -152,6 +152,19 @@ jobs:
           cd ../../backend
           go test -tags unit ./internal/workspace ./internal/service ./internal/config ./internal/server/middleware -run 'Test(Relogin|OpenAIOAuthWSDefaults|LoadOpenAIWSPluginReplacementDefaults|StandaloneStudio)' -count=1 -timeout=180s
 
+      - name: Claude OAuth 排队与用量回归
+        working-directory: backend
+        run: >-
+          go test -tags unit ./internal/service ./internal/handler ./internal/repository ./internal/config
+          -run 'Test(ClaudeOAuth|Fallback|FreshQueuePressure|StickyWait|DecideStickyWait|PreferQuotaHeadroom|NewSessionPlacement|MovePreferredFirst|AcquireSlotFromWaitPlan|SwitchToWaitedAccount|WaitForPlannedAccountSlot|PollSlotWithPing|SlotWaitHub|ConcurrencyService_ReleaseWakesWaiter|ApplyGatewayTiming|PrepareUsageLogInsert|BuildUsageLog|ScanUsageLog|UsageLogStaticInsertShape|LoadDefaultSchedulingConfig|GatewayServiceRecordUsage_PersistsGatewayTiming)'
+          -count=1 -timeout=180s
+      - name: 视频下载与 Muse 完成计费回归
+        working-directory: backend
+        run: >-
+          go test -tags unit ./internal/service ./internal/handler
+          -run 'Test(MuseVideo|ForwardMuseVideo|IsGrokVideoStatusBillable|ExtractGrokVideoBilling|GrokMediaUsageFromResponseVideo|ForwardGrokMediaContent|GrokMediaSignedVideoContentURL|ForwardGrokVideoStatus|RewriteGrokMediaVideoContentURLs|GrokMediaVideoCompletionStillClaimsBillingOnce|GrokVideo|OpenAIGatewayServiceRecordUsage_(GrokVideo|GroupVideo|HydratesGroupVideo))'
+          -count=1 -timeout=180s
+
       # ---------------- 五个平台二进制 ----------------
 
       - name: 释放 runner 磁盘空间
