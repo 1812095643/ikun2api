@@ -40,6 +40,7 @@ export interface ChannelTimePricing {
 }
 
 export interface ChannelModelPricing {
+  apply_to_downstream?: boolean
   id?: number
   platform: string
   models: string[]

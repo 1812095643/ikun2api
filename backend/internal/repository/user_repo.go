@@ -153,6 +153,7 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		SetNillableLastLoginAt(userIn.LastLoginAt).
 		SetNillableLastActiveAt(userIn.LastActiveAt).
 		SetRpmLimit(userIn.RPMLimit).
+		SetIsDownstream(userIn.IsDownstream).
 		SetRestrictPublicGroups(userIn.RestrictPublicGroups).
 		Save(txCtx)
 	if err != nil {
@@ -317,6 +318,10 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 	if fields.Status {
 		updateOp = updateOp.SetStatus(userIn.Status)
 	}
+	if fields.IsDownstream {
+		updateOp.SetIsDownstream(userIn.IsDownstream)
+	}
+
 	if fields.RestrictPublicGroups {
 		updateOp = updateOp.SetRestrictPublicGroups(userIn.RestrictPublicGroups)
 	}
@@ -543,6 +548,10 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 	}
 
 	q := r.client.User.Query()
+
+	if filters.IsDownstream != nil {
+		q = q.Where(dbuser.IsDownstreamEQ(*filters.IsDownstream))
+	}
 
 	if filters.Status != "" {
 		q = q.Where(dbuser.StatusEQ(filters.Status))

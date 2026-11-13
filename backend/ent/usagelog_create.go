@@ -51,6 +51,20 @@ func (_c *UsageLogCreate) SetRequestID(v string) *UsageLogCreate {
 	return _c
 }
 
+// SetServiceTierMultiplier sets the "service_tier_multiplier" field.
+func (_c *UsageLogCreate) SetServiceTierMultiplier(v float64) *UsageLogCreate {
+	_c.mutation.SetServiceTierMultiplier(v)
+	return _c
+}
+
+// SetNillableServiceTierMultiplier sets the "service_tier_multiplier" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableServiceTierMultiplier(v *float64) *UsageLogCreate {
+	if v != nil {
+		_c.SetServiceTierMultiplier(*v)
+	}
+	return _c
+}
+
 // SetModel sets the "model" field.
 func (_c *UsageLogCreate) SetModel(v string) *UsageLogCreate {
 	_c.mutation.SetModel(v)
@@ -1013,6 +1027,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 		_node.RequestID = value
 	}
+	if value, ok := _c.mutation.ServiceTierMultiplier(); ok {
+		_spec.SetField(usagelog.FieldServiceTierMultiplier, field.TypeFloat64, value)
+		_node.ServiceTierMultiplier = &value
+	}
 	if value, ok := _c.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)
 		_node.Model = value
@@ -1367,6 +1385,30 @@ func (u *UsageLogUpsert) SetRequestID(v string) *UsageLogUpsert {
 // UpdateRequestID sets the "request_id" field to the value that was provided on create.
 func (u *UsageLogUpsert) UpdateRequestID() *UsageLogUpsert {
 	u.SetExcluded(usagelog.FieldRequestID)
+	return u
+}
+
+// SetServiceTierMultiplier sets the "service_tier_multiplier" field.
+func (u *UsageLogUpsert) SetServiceTierMultiplier(v float64) *UsageLogUpsert {
+	u.Set(usagelog.FieldServiceTierMultiplier, v)
+	return u
+}
+
+// UpdateServiceTierMultiplier sets the "service_tier_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateServiceTierMultiplier() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldServiceTierMultiplier)
+	return u
+}
+
+// AddServiceTierMultiplier adds v to the "service_tier_multiplier" field.
+func (u *UsageLogUpsert) AddServiceTierMultiplier(v float64) *UsageLogUpsert {
+	u.Add(usagelog.FieldServiceTierMultiplier, v)
+	return u
+}
+
+// ClearServiceTierMultiplier clears the value of the "service_tier_multiplier" field.
+func (u *UsageLogUpsert) ClearServiceTierMultiplier() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldServiceTierMultiplier)
 	return u
 }
 
@@ -2266,6 +2308,34 @@ func (u *UsageLogUpsertOne) SetRequestID(v string) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateRequestID() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateRequestID()
+	})
+}
+
+// SetServiceTierMultiplier sets the "service_tier_multiplier" field.
+func (u *UsageLogUpsertOne) SetServiceTierMultiplier(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetServiceTierMultiplier(v)
+	})
+}
+
+// AddServiceTierMultiplier adds v to the "service_tier_multiplier" field.
+func (u *UsageLogUpsertOne) AddServiceTierMultiplier(v float64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddServiceTierMultiplier(v)
+	})
+}
+
+// UpdateServiceTierMultiplier sets the "service_tier_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateServiceTierMultiplier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateServiceTierMultiplier()
+	})
+}
+
+// ClearServiceTierMultiplier clears the value of the "service_tier_multiplier" field.
+func (u *UsageLogUpsertOne) ClearServiceTierMultiplier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearServiceTierMultiplier()
 	})
 }
 
@@ -3464,6 +3534,34 @@ func (u *UsageLogUpsertBulk) SetRequestID(v string) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateRequestID() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateRequestID()
+	})
+}
+
+// SetServiceTierMultiplier sets the "service_tier_multiplier" field.
+func (u *UsageLogUpsertBulk) SetServiceTierMultiplier(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetServiceTierMultiplier(v)
+	})
+}
+
+// AddServiceTierMultiplier adds v to the "service_tier_multiplier" field.
+func (u *UsageLogUpsertBulk) AddServiceTierMultiplier(v float64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddServiceTierMultiplier(v)
+	})
+}
+
+// UpdateServiceTierMultiplier sets the "service_tier_multiplier" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateServiceTierMultiplier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateServiceTierMultiplier()
+	})
+}
+
+// ClearServiceTierMultiplier clears the value of the "service_tier_multiplier" field.
+func (u *UsageLogUpsertBulk) ClearServiceTierMultiplier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearServiceTierMultiplier()
 	})
 }
 

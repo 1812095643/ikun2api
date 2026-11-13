@@ -129,7 +129,7 @@ func TestPrepareUsageLogInsert_UpstreamRequestIDArgWiring(t *testing.T) {
 	})
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
 
-	idx := len(prepared.args) - 11
+	idx := len(prepared.args) - 12
 	arg, ok := prepared.args[idx].(sql.NullString)
 	require.True(t, ok, "upstream_request_id arg should be sql.NullString, got %T", prepared.args[idx])
 	require.True(t, arg.Valid)
@@ -161,7 +161,7 @@ func TestPrepareUsageLogInsert_GatewayTimingArgWiring(t *testing.T) {
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
 	n := len(prepared.args)
 	for i, want := range []int64{3000, 3500, 2, 5300, 1200} {
-		idx := n - 6 + i
+		idx := n - 7 + i
 		arg, ok := prepared.args[idx].(sql.NullInt64)
 		require.True(t, ok, "arg %d should be sql.NullInt64, got %T", idx, prepared.args[idx])
 		require.True(t, arg.Valid)
@@ -170,7 +170,7 @@ func TestPrepareUsageLogInsert_GatewayTimingArgWiring(t *testing.T) {
 	}
 
 	absent := prepareUsageLogInsert(&service.UsageLog{UserID: 1, APIKeyID: 2, RequestID: "client:no-timing", Model: "gpt-5", CreatedAt: time.Now().UTC()})
-	for idx := n - 6; idx < n-1; idx++ {
+	for idx := n - 7; idx < n-2; idx++ {
 		require.Equal(t, sql.NullInt64{}, absent.args[idx], "missing timing must persist as NULL")
 	}
 }

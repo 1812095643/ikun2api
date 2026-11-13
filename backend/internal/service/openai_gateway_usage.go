@@ -175,7 +175,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if !isGrokVideoUsageResult(result, nil) {
 		ApplyOpenAIImageBillingResolution(result)
 	}
-	logServiceTierBillingDowngrade("service.openai_gateway", account, result.RequestID, ApplyOpenAIServiceTierBillingResolution(billingAccount, result))
+	requestedServiceTier := optionalStringValue(result.ServiceTier)
+	tierResolution := ApplyOpenAIServiceTierBillingResolution(billingAccount, result)
+	logServiceTierBillingDowngrade("service.openai_gateway", account, result.RequestID, tierResolution)
 	for _, round := range result.hostedSearchRounds {
 		ApplyOpenAIImageBillingResolution(round)
 		ApplyOpenAIServiceTierBillingResolution(billingAccount, round)
@@ -258,6 +260,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		longContextBillingGate,
 		modelLongContextExempt,
 		pricingAt,
+		account,
 	)
 	if err != nil {
 		if !isUsagePricingUnavailableError(err) {
@@ -290,7 +293,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 			responseModels := s.filterCNProviderBillingModelCandidates(ctx, account, apiKey, usageBillingModelCandidates(responseModel))
 			responseCost, responseErr := s.calculateOpenAIRecordUsageCost(
 				ctx, result, apiKey, responseModels, multiplier, imageMultiplier,
-				videoMultiplier, baseMultiplier, tokens, serviceTier, longContextBillingGate, modelLongContextExempt, pricingAt,
+				videoMultiplier, baseMultiplier, tokens, serviceTier, longContextBillingGate, modelLongContextExempt, pricingAt, account,
 			)
 			// 基线定价源以 baselineBillingModel 为准：它正是 calculateOpenAIRecordUsageCost
 			// 内部做渠道定价判断时使用的模型，且"首候选有渠道价"必然意味着首候选就是实际
@@ -302,6 +305,20 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 				billingModels = responseModels
 				cost = responseCost
 			}
+		}
+	}
+
+	// Custom tier prices need not follow the nominal tier ranking. An upstream
+	// downgrade must never increase the customer's charge above the requested tier.
+	if tierResolution.Downgraded {
+		requestedCost, requestedErr := s.calculateOpenAIRecordUsageCost(ctx, result, apiKey, billingModels,
+			multiplier, imageMultiplier, videoMultiplier, baseMultiplier, tokens, requestedServiceTier,
+			longContextBillingGate, modelLongContextExempt, pricingAt, account)
+		if requestedErr == nil && requestedCost != nil && cost != nil && requestedCost.ActualCost < cost.ActualCost {
+			cost = requestedCost
+			serviceTier = requestedServiceTier
+			billedTier := requestedServiceTier
+			result.ServiceTier = &billedTier
 		}
 	}
 
@@ -323,6 +340,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 			longContextBillingGate,
 			modelLongContextExempt,
 			pricingAt,
+			account,
 		)
 		if standardErr != nil && !isUsagePricingUnavailableError(standardErr) {
 			return standardErr
@@ -331,6 +349,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		// usage row instead of dropping it on the Standard re-evaluation.
 		if standardErr == nil && cost != nil && standardCost != nil {
 			cost.ActualCost = standardCost.ActualCost
+			cost.ServiceTierMultiplier = 1
 		}
 	}
 
@@ -401,6 +420,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		UpstreamResponseModel:    optionalTrimmedStringPtr(result.UpstreamResponseModel),
 		UpstreamModelMismatch:    upstreamModelMismatch(sentModel, result.UpstreamResponseModel),
 		ServiceTier:              result.ServiceTier,
+		ServiceTierMultiplier:    serviceTierBillingSnapshot(serviceTier, cost),
 		ReasoningEffort:          result.ReasoningEffort,
 		RequestedReasoningEffort: coalesceRequestedReasoningEffort(result.RequestedReasoningEffort, result.ReasoningEffort),
 		InboundEndpoint:          optionalTrimmedStringPtr(input.InboundEndpoint),
@@ -602,7 +622,12 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	longContextBillingGate *bool,
 	modelLongContextExempt bool,
 	pricingAt time.Time,
+	accounts ...*Account,
 ) (*CostBreakdown, error) {
+	var tierAccount *Account
+	if len(accounts) > 0 {
+		tierAccount = accounts[0]
+	}
 	if result != nil && len(result.hostedSearchRounds) > 0 {
 		var total *CostBreakdown
 		var perRequest *CostBreakdown
@@ -612,7 +637,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 			if serviceTier == optionalStringValue(result.ServiceTier) {
 				roundTier = optionalStringValue(round.ServiceTier)
 			}
-			cost, err := s.calculateOpenAIRecordUsageCost(ctx, round, apiKey, billingModels, multiplier, imageMultiplier, videoMultiplier, webSearchMultiplier, openAIResponsesWebSearchTokens(round.Usage), roundTier, longContextBillingGate, modelLongContextExempt, pricingAt)
+			cost, err := s.calculateOpenAIRecordUsageCost(ctx, round, apiKey, billingModels, multiplier, imageMultiplier, videoMultiplier, webSearchMultiplier, openAIResponsesWebSearchTokens(round.Usage), roundTier, longContextBillingGate, modelLongContextExempt, pricingAt, tierAccount)
 			if err != nil {
 				return nil, err
 			}
@@ -645,7 +670,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 		if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved != nil &&
 			(resolved.Mode == BillingModePerRequest) {
 			gid := apiKey.Group.ID
-			return s.billingService.CalculateCostUnified(CostInput{
+			return s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 				Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
 				UsageUnits: result.AudioUsage.DurationOrUnits, SizeTier: result.AudioUsage.Mode,
 				RateMultiplier: webSearchMultiplier, Resolver: s.resolver, Resolved: resolved,
@@ -687,6 +712,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 				optionalStringValue(result.ReasoningEffort),
 				longContextBillingGate,
 				modelLongContextExempt,
+				tierAccount,
 			)
 			if err == nil {
 				tokenCost = cost
@@ -782,24 +808,24 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageTokenCost(
 	reasoningEffort string,
 	longContextBillingGate *bool,
 	modelLongContextExempt bool,
+	accounts ...*Account,
 ) (*CostBreakdown, error) {
-	if s.resolver != nil && apiKey.Group != nil {
-		gid := apiKey.Group.ID
-		return s.billingService.CalculateCostUnified(CostInput{
-			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
-			Tokens: tokens, RequestCount: 1, RateMultiplier: multiplier, PricingAt: pricingAt,
-			ServiceTier: serviceTier, ReasoningEffort: reasoningEffort, Resolver: s.resolver,
-			LongContextBillingEnabled:      longContextBillingGate,
-			DisableModelLongContextPricing: modelLongContextExempt,
-		})
+	var tierAccount *Account
+	if len(accounts) > 0 {
+		tierAccount = accounts[0]
 	}
-	return s.billingService.calculateCostWithServiceTierPolicy(
-		billingModel,
-		tokens,
-		multiplier,
-		serviceTier,
-		(longContextBillingGate == nil || *longContextBillingGate) && !modelLongContextExempt,
-	)
+	input := CostInput{IsDownstream: isDownstreamAPIKey(apiKey), Ctx: ctx, Model: billingModel,
+		Tokens: tokens, RequestCount: 1, RateMultiplier: multiplier, PricingAt: pricingAt,
+		ServiceTier: serviceTier, ServiceTierMultiplier: openAIAccountServiceTierMultiplier(tierAccount, billingModel, serviceTier),
+		ReasoningEffort: reasoningEffort, LongContextBillingEnabled: longContextBillingGate,
+		DisableModelLongContextPricing: modelLongContextExempt,
+	}
+	if apiKey != nil && apiKey.Group != nil {
+		input.Group = apiKey.Group
+		input.GroupID = &apiKey.Group.ID
+		input.Resolver = s.resolver
+	}
+	return s.billingService.CalculateCostUnified(input)
 }
 
 func (s *OpenAIGatewayService) calculateOpenAIImageCost(
@@ -814,7 +840,7 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	if resolved != nil && resolved.Source == PricingSourceGroup &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		gid := apiKey.Group.ID
-		cost, err := s.billingService.CalculateCostUnified(CostInput{
+		cost, err := s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
 			RequestCount: result.ImageCount, SizeTier: sizeTier,
 			RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved,
@@ -838,7 +864,7 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	if resolved != nil && resolved.Source == PricingSourceChannel &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		gid := apiKey.Group.ID
-		cost, err := s.billingService.CalculateCostUnified(CostInput{
+		cost, err := s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 			Ctx:             ctx,
 			Model:           billingModel,
 			GroupID:         &gid,
@@ -875,7 +901,7 @@ func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
 	resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey)
 	if resolved != nil && resolved.Source == PricingSourceGroup && resolved.Mode == BillingModeVideo {
 		gid := apiKey.Group.ID
-		cost, err := s.billingService.CalculateCostUnified(CostInput{
+		cost, err := s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
 			UsageUnits: float64(videoCount * durationSeconds), SizeTier: resolution,
 			RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved,
@@ -904,7 +930,7 @@ func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
 		if resolved.Mode == BillingModeVideo {
 			units = float64(videoCount * durationSeconds)
 		}
-		cost, err := s.billingService.CalculateCostUnified(CostInput{
+		cost, err := s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 			Ctx:             ctx,
 			Model:           billingModel,
 			GroupID:         &gid,
@@ -1017,7 +1043,7 @@ func (s *OpenAIGatewayService) resolveOpenAIChannelPricing(ctx context.Context, 
 		return nil
 	}
 	gid := apiKey.Group.ID
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group})
+	resolved := s.resolver.Resolve(ctx, PricingInput{IsDownstream: isDownstreamAPIKey(apiKey), Model: billingModel, GroupID: &gid, Group: apiKey.Group})
 	if resolved.Source == PricingSourceGroup || resolved.Source == PricingSourceChannel {
 		return resolved
 	}

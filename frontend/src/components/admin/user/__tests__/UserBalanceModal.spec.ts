@@ -25,3 +25,31 @@ describe('balance operation error feedback', () => {
     expect(w.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
   })
 })
+
+
+describe('credit on account', () => {
+  it('submits a credit flag and keeps the operation id stable across an ambiguous retry', async () => {
+    mocks.updateBalance.mockRejectedValue({ message: 'timeout' })
+    const w = mount(UserBalanceModal, { props: { show: true, operation: 'add', user: { id: 8, email: 'reseller@example.invalid', balance: 5 } as AdminUser },
+      global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' } } } })
+    await w.get('input[type="number"]').setValue('10.12345678')
+    await w.get('[data-test="on-account-toggle"]').setValue(true)
+    await w.get('form').trigger('submit'); await flushPromises()
+    await w.get('form').trigger('submit'); await flushPromises()
+    const first = mocks.updateBalance.mock.calls[0]
+    expect(first.slice(0, 5)).toEqual([8, 10.12345678, 'add', '', false])
+    expect(first[5].operationKey).toMatch(/^[0-9a-f-]{36}$/)
+    expect(mocks.updateBalance.mock.calls[1][5]).toEqual(first[5])
+    expect(w.emitted('close')).toBeUndefined()
+  })
+  it('does not allow a recharge to be a gift and credit at the same time', async () => {
+    const w = mount(UserBalanceModal, { props: { show: true, operation: 'add', user: { id: 8, email: 'reseller@example.invalid', balance: 5 } as AdminUser },
+      global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' } } } })
+    const boxes = w.findAll('input[type="checkbox"]')
+    await boxes[0].setValue(true)
+    await w.get('[data-test="on-account-toggle"]').setValue(true)
+    expect((boxes[0].element as HTMLInputElement).checked).toBe(false)
+    await boxes[0].setValue(true)
+    expect((w.get('[data-test="on-account-toggle"]').element as HTMLInputElement).checked).toBe(false)
+  })
+})

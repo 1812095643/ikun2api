@@ -194,6 +194,7 @@ func (h *Handler) Register(v1 *gin.RouterGroup, jwt, admin, audit, backendGuard,
 	user.POST("/blindbox/entries/:id/open", h.openBlindbox)
 	manage := v1.Group("/admin/workspace", admin, limit, audit, middleware.AdminComplianceGuard(h.settings), func(c *gin.Context) { c.Set("workspace_admin", true); c.Next() })
 	h.registerAccountTools(manage)
+	h.registerBusinessAdmin(manage)
 	manage.GET("/navigation", h.navigation)
 	manage.GET("/upstream-balances", h.listUpstreamBalances)
 	manage.PUT("/upstream-balances/:id", h.saveUpstreamBalance)

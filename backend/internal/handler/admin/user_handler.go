@@ -60,6 +60,7 @@ func NewUserHandler(
 
 // CreateUserRequest represents admin create user request
 type CreateUserRequest struct {
+	IsDownstream         bool     `json:"is_downstream"`
 	Email                string   `json:"email" binding:"required,email"`
 	Password             string   `json:"password" binding:"required,min=6"`
 	Username             string   `json:"username"`
@@ -75,6 +76,7 @@ type CreateUserRequest struct {
 // UpdateUserRequest represents admin update user request
 // 使用指针类型来区分"未提供"和"设置为0"
 type UpdateUserRequest struct {
+	IsDownstream         *bool    `json:"is_downstream"`
 	Email                string   `json:"email" binding:"omitempty,email"`
 	Password             string   `json:"password" binding:"omitempty,min=6"`
 	Username             *string  `json:"username"`
@@ -93,10 +95,12 @@ type UpdateUserRequest struct {
 
 // UpdateBalanceRequest represents balance update request
 type UpdateBalanceRequest struct {
-	Balance   float64 `json:"balance" binding:"required,gt=0"`
-	Operation string  `json:"operation" binding:"required,oneof=set add subtract"`
-	Notes     string  `json:"notes"`
-	Gift      bool    `json:"gift"`
+	Balance      float64 `json:"balance" binding:"required,gt=0"`
+	Operation    string  `json:"operation" binding:"required,oneof=set add subtract"`
+	Notes        string  `json:"notes"`
+	Gift         bool    `json:"gift"`
+	OnAccount    bool    `json:"on_account"`
+	OperationKey string  `json:"operation_key"`
 }
 
 type BindUserAuthIdentityRequest struct {
@@ -146,6 +150,15 @@ func (h *UserHandler) List(c *gin.Context) {
 			filters.APIKeyGroupID = id
 		}
 	}
+	if raw, ok := c.GetQuery("is_downstream"); ok {
+		value, parseErr := strconv.ParseBool(raw)
+		if parseErr != nil {
+			response.BadRequest(c, "Invalid downstream filter")
+			return
+		}
+		filters.IsDownstream = &value
+	}
+
 	sortBy := c.DefaultQuery("sort_by", "created_at")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 	if raw, ok := c.GetQuery("include_subscriptions"); ok {
@@ -294,6 +307,10 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if adminaccess.RestrictedFromContext(c.Request.Context()) != nil && req.IsDownstream {
+		response.Forbidden(c, "仅站点管理员可设置下游")
+		return
+	}
 	// 创建管理员账号属权限敏感操作：需最近完成 step-up 2FA 验证。
 	if req.Role == service.RoleAdmin {
 		if !middleware.EnforceStepUp(c, h.totpService, h.userService, h.settingService) {
@@ -302,6 +319,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 
 	user, err := h.adminService.CreateUser(c.Request.Context(), &service.CreateUserInput{
+		IsDownstream:         req.IsDownstream,
 		Email:                req.Email,
 		Password:             req.Password,
 		Username:             req.Username,
@@ -337,6 +355,10 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
+	if adminaccess.RestrictedFromContext(c.Request.Context()) != nil && req.IsDownstream != nil {
+		response.Forbidden(c, "仅站点管理员可设置下游")
+		return
+	}
 	// 防锁死保护：管理员不能把自己降级为普通用户(单管理员场景下会失去后台访问权)。
 	// 与既有"不能禁用/删除 admin"保护一致。降级其他管理员仍然允许。
 	if req.Role == service.RoleUser && userID == getAdminIDFromContext(c) {
@@ -361,6 +383,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 
 	// 使用指针类型直接传递，nil 表示未提供该字段
 	user, err := h.adminService.UpdateUser(c.Request.Context(), userID, &service.UpdateUserInput{
+		IsDownstream:         req.IsDownstream,
 		Email:                req.Email,
 		Password:             req.Password,
 		Username:             req.Username,
@@ -416,6 +439,14 @@ func (h *UserHandler) UpdateBalance(c *gin.Context) {
 		return
 	}
 
+	if req.OnAccount && (req.Operation != "add" || req.Gift) {
+		response.BadRequest(c, "记账跑付仅支持非赠送充值")
+		return
+	}
+	if req.OnAccount && adminaccess.RestrictedFromContext(c.Request.Context()) != nil {
+		response.Forbidden(c, "仅站点管理员可操作记账")
+		return
+	}
 	idempotencyPayload := struct {
 		UserID int64                `json:"user_id"`
 		Body   UpdateBalanceRequest `json:"body"`
@@ -424,6 +455,21 @@ func (h *UserHandler) UpdateBalance(c *gin.Context) {
 		Body:   req,
 	}
 	executeAdminIdempotentJSONWithResponse(c, "admin.users.balance.update", idempotencyPayload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+		if req.OnAccount {
+			ledger, ok := h.adminService.(service.AdminReceivableService)
+			if !ok {
+				return nil, service.ErrReceivablesUnavailable
+			}
+			subject, found := middleware.GetAuthSubjectFromContext(c)
+			if !found {
+				return nil, service.ErrReceivablesUnavailable
+			}
+			u, ledgerErr := ledger.CreditUserOnAccount(ctx, userID, req.Balance, req.Notes, subject.UserID, req.OperationKey)
+			if ledgerErr != nil {
+				return nil, ledgerErr
+			}
+			return dto.UserFromServiceAdmin(u), nil
+		}
 		notes := req.Notes
 		if req.Gift && req.Operation == "add" {
 			notes = "[赠送] " + notes

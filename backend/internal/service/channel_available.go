@@ -93,6 +93,7 @@ func (s *ChannelService) ListAvailable(ctx context.Context) ([]AvailableChannel,
 		ch.normalizeBillingModelSource()
 
 		supported := ch.SupportedModels()
+		filterSupportedDownstreamPricing(ctx, supported)
 		fillGlobalPricingFallback(s.pricingService, supported)
 
 		out = append(out, AvailableChannel{

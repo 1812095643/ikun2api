@@ -268,6 +268,7 @@ type SystemSettings struct {
 	OpenAICodexTicketPromptTemplate        string // empty selects the embedded shared probe template
 	// CodexAutoDegradationCheck 自动降智检测运行器配置；请求未携带（nil）时
 	// 保存路径跳过写入，读取路径由 parseSettings 始终填充（缺失回退默认值）。
+	OpenAIRequestTimezoneSettings        *OpenAIRequestTimezoneSettings `json:"openai_request_timezone_settings"`
 	CodexAutoDegradationCheck            *CodexAutoDegradationCheckSettings
 	MinCodexVersion                      string // codex_cli_only 最低 Codex 引擎版本；空=不检查
 	MaxCodexVersion                      string // codex_cli_only 最高 Codex 引擎版本；空=不检查

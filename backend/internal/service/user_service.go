@@ -81,6 +81,7 @@ type UserListFilters struct {
 	// IncludeDeleted 为 true 时绕过软删除过滤，返回含已删除（deleted_at 非空）的用户。
 	// 仅供 /admin/usage 的 SearchUsers 端点使用，其他列表调用方不要设置。
 	IncludeDeleted bool
+	IsDownstream   *bool
 }
 
 // UserUpdateFields 声明 UserRepository.Update 允许写回的列。
@@ -114,6 +115,7 @@ type UserUpdateFields struct {
 	AllowedGroups bool
 	// RestrictPublicGroups 覆盖 restrict_public_groups 列。
 	RestrictPublicGroups bool
+	IsDownstream         bool
 }
 
 // BalanceChange 记录一次余额变更前后的值。

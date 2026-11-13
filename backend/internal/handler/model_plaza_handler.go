@@ -147,12 +147,22 @@ func (h *ModelPlazaHandler) get(c *gin.Context, workspace bool) {
 		return
 	}
 
+	pricingCtx := c.Request.Context()
+	if authed {
+		var pricingErr error
+		pricingCtx, pricingErr = h.apiKeyService.UserPricingContext(pricingCtx, subject.UserID)
+		if pricingErr != nil {
+			response.ErrorFrom(c, pricingErr)
+			return
+		}
+		c.Header("Cache-Control", "private, no-store")
+	}
 	var groups []service.PlazaGroup
 	var err error
 	if workspace {
-		groups, err = h.plazaService.ListWorkspaceGroups(c.Request.Context(), h.workspaceModelIDs)
+		groups, err = h.plazaService.ListWorkspaceGroups(pricingCtx, h.workspaceModelIDs)
 	} else {
-		groups, err = h.plazaService.ListGroups(c.Request.Context())
+		groups, err = h.plazaService.ListGroups(pricingCtx)
 	}
 	if err != nil {
 		response.ErrorFrom(c, err)

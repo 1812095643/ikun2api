@@ -4455,6 +4455,14 @@
             </div>
           </div>
 
+          <section class="card" data-testid="gateway-request-timezone-settings">
+            <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"><h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('openaiServiceTiers.requestTimezoneTitle') }}</h2></div>
+            <div class="space-y-4 p-6">
+              <div class="flex items-center justify-between gap-4"><label for="openai-timezone-auto" class="text-sm font-medium">{{ t('openaiServiceTiers.autoProxyTimezone') }}</label><Toggle id="openai-timezone-auto" v-model="form.openai_request_timezone_settings.auto_detect_proxy" /></div>
+              <OpenAIRequestTimezoneField v-model="form.openai_request_timezone_settings.default_timezone" :allow-inherit="false" :bordered="false" :label="t('openaiServiceTiers.fallbackTimezone')" />
+            </div>
+          </section>
+
           <!-- Codex Settings -->
           <div class="card">
             <div
@@ -8832,6 +8840,7 @@
 </template>
 
 <script setup lang="ts">
+import OpenAIRequestTimezoneField from "@/components/account/OpenAIRequestTimezoneField.vue";
 import { DEFAULT_SITE_NAME } from '@/utils/branding'
 import MenuManagementSettings from "./settings/MenuManagementSettings.vue";
 import CodexTicketCadenceSettings from '@/components/admin/account/CodexTicketCadenceSettings.vue'
@@ -9650,7 +9659,7 @@ function platformQuotaRows(map: DefaultPlatformQuotasMap | undefined): string[] 
   return listPlatformIds().filter((platform) => !!map?.[platform]);
 }
 
-const form = reactive<SettingsForm>({
+const form = reactive<SettingsForm & { openai_request_timezone_settings: { auto_detect_proxy: boolean; default_timezone: string } }>({
   registration_enabled: true,
   email_verify_enabled: false,
   registration_email_suffix_whitelist: [],
@@ -9914,6 +9923,7 @@ const form = reactive<SettingsForm>({
   // 只读展示：自动同步任务写入的官方最新稳定版，不参与提交（提交载荷按字段显式构造）
   claude_code_client_version_synced: "",
   claude_code_version_auto_sync_enabled: true,
+  openai_request_timezone_settings: { auto_detect_proxy: true, default_timezone: "Asia/Singapore" },
   openai_codex_ticket_enabled: false,
   openai_codex_ticket_allow_without_ticket: true,
   openai_codex_ticket_prompt_template: "",
@@ -11669,6 +11679,7 @@ async function saveSettings() {
       claude_code_client_version: form.claude_code_client_version?.trim() || "",
       claude_code_version_auto_sync_enabled:
         form.claude_code_version_auto_sync_enabled,
+      openai_request_timezone_settings: form.openai_request_timezone_settings,
       openai_codex_ticket_enabled: form.openai_codex_ticket_enabled,
       openai_codex_ticket_allow_without_ticket: form.openai_codex_ticket_allow_without_ticket,
       openai_codex_ticket_prompt_template:

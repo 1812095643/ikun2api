@@ -185,3 +185,10 @@ func (s *ProxyProbeServiceSuite) TestParseChatGPTTrace_NoIP() {
 func TestProxyProbeServiceSuite(t *testing.T) {
 	suite.Run(t, new(ProxyProbeServiceSuite))
 }
+
+func TestProxyProbeCapturesExitTimezone(t *testing.T) {
+	prober := &proxyProbeService{}
+	info, _, err := prober.parseIPAPI([]byte(`{"status":"success","query":"192.0.2.10","countryCode":"US","city":"Los Angeles","timezone":"America/Los_Angeles"}`), 12)
+	require.NoError(t, err)
+	require.Equal(t, "America/Los_Angeles", info.Timezone)
+}

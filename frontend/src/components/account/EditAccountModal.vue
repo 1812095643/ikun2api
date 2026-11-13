@@ -3382,6 +3382,11 @@
         </div>
       </div>
 
+      <OpenAIServiceTierSettings
+        v-if="account.platform === 'openai' && ['oauth', 'setup-token', 'apikey'].includes(account.type)"
+        v-model="openAIServiceTierDraft"
+      />
+
       <!-- Group Selection - 仅标准模式显示 -->
       <GroupSelector
         v-model="form.group_ids"
@@ -3557,6 +3562,8 @@ import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
 import { supportsWebSearchEmulation } from '@/utils/webSearchEmulation'
 import { supportsAccountQuota } from '@/utils/accountQuota'
 import { getAccountExpiryTimestamp } from '@/components/account/accountExpiry'
+import OpenAIServiceTierSettings from '@/components/account/OpenAIServiceTierSettings.vue'
+import { readOpenAIServiceTierDraft, serializeOpenAIServiceTierDraft } from '@/utils/openaiServiceTiers'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
 import {
@@ -4236,9 +4243,10 @@ const customBaseUrl = ref('')
 
 // OpenAI 自动透传开关（OAuth/API Key）
 const openaiPassthroughEnabled = ref(false)
-const openAIRequestTimezone = ref('Asia/Singapore')
+const openAIRequestTimezone = ref('')
 // OpenAI Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
 const openaiFlattenNamespacesEnabled = ref(false)
+const openAIServiceTierDraft = ref(readOpenAIServiceTierDraft())
 const openAILongContextBillingEnabled = ref(false)
 // 自建推理上游（OpenAI API Key）：按 GPU 时间付费，缺省关闭即保持原有计费语义
 const cancelUpstreamOnClientDisconnect = ref(false)
@@ -4768,9 +4776,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 
   // Load OpenAI passthrough toggle (OpenAI OAuth/SetupToken/API Key)
   openaiPassthroughEnabled.value = false
-  openAIRequestTimezone.value = 'Asia/Singapore'
+  openAIRequestTimezone.value = ''
   openaiFlattenNamespacesEnabled.value = false
   openAILongContextBillingEnabled.value = false
+  openAIServiceTierDraft.value = readOpenAIServiceTierDraft()
   cancelUpstreamOnClientDisconnect.value =
     newAccount.platform === 'openai' && newAccount.type === 'apikey' && extra?.cancel_upstream_on_client_disconnect === true
   responsesNonstreamKeepalive.value =
@@ -4792,9 +4801,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   webSearchEmulationMode.value = 'default'
   if (newAccount.platform === 'openai' && (newAccount.type === 'oauth' || newAccount.type === 'setup-token' || newAccount.type === 'apikey')) {
     openaiPassthroughEnabled.value = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
-    openAIRequestTimezone.value = typeof extra?.openai_request_timezone === 'string' ? extra.openai_request_timezone : 'Asia/Singapore'
+    openAIRequestTimezone.value = typeof extra?.openai_request_timezone === 'string' ? extra.openai_request_timezone : ''
     openaiFlattenNamespacesEnabled.value =
       newAccount.type === 'oauth' && extra?.openai_responses_flatten_namespaces === true
+    openAIServiceTierDraft.value = readOpenAIServiceTierDraft(extra as Record<string, unknown>)
     const longContextBillingValue = extra?.openai_long_context_billing_enabled
     openAILongContextBillingEnabled.value = longContextBillingValue === true
     // plan_type 手动覆盖仅 OAuth 有实际调度语义(IsOpenAIChatGPTSubscription 要求 oauth),故只对 oauth 回填
@@ -6328,7 +6338,8 @@ const handleSubmit = async () => {
     if (props.account.platform === 'openai' && (props.account.type === 'oauth' || props.account.type === 'setup-token' || props.account.type === 'apikey')) {
       const currentExtra = (props.account.extra as Record<string, unknown>) || {}
       const newExtra: Record<string, unknown> = { ...currentExtra }
-      newExtra.openai_request_timezone = openAIRequestTimezone.value
+      if (openAIRequestTimezone.value) newExtra.openai_request_timezone = openAIRequestTimezone.value
+      else delete newExtra.openai_request_timezone
       const hadCodexCLIOnlyEnabled = currentExtra.codex_cli_only === true
       if (props.account.type === 'oauth' || props.account.type === 'setup-token') {
         newExtra.openai_oauth_responses_websockets_v2_mode = openaiOAuthResponsesWebSocketV2Mode.value
@@ -6356,6 +6367,7 @@ const handleSubmit = async () => {
       } else {
         newExtra.openai_long_context_billing_enabled = openAILongContextBillingEnabled.value
       }
+      newExtra.openai_service_tiers = serializeOpenAIServiceTierDraft(openAIServiceTierDraft.value)
       // 缺省关闭不写入，避免 extra 里堆积默认项
       for (const item of selfHostedUpstreamToggles) {
         if (props.account.type === 'apikey' && item.state.value) {

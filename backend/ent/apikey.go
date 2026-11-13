@@ -36,6 +36,8 @@ type APIKey struct {
 	GroupID *int64 `json:"group_id,omitempty"`
 	// Ordered smart-routing groups; empty uses group_id
 	RouteGroupIds []int64 `json:"route_group_ids,omitempty"`
+	// ForcedServiceTier holds the value of the "forced_service_tier" field.
+	ForcedServiceTier string `json:"forced_service_tier,omitempty"`
 	// FundingSource holds the value of the "funding_source" field.
 	FundingSource string `json:"funding_source,omitempty"`
 	// Status holds the value of the "status" field.
@@ -131,7 +133,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID, apikey.FieldUserID, apikey.FieldGroupID:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldKey, apikey.FieldName, apikey.FieldFundingSource, apikey.FieldStatus:
+		case apikey.FieldKey, apikey.FieldName, apikey.FieldForcedServiceTier, apikey.FieldFundingSource, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
 		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldLastUsedAt, apikey.FieldExpiresAt, apikey.FieldWindow5hStart, apikey.FieldWindow1dStart, apikey.FieldWindow7dStart:
 			values[i] = new(sql.NullTime)
@@ -207,6 +209,12 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				if err := json.Unmarshal(*value, &_m.RouteGroupIds); err != nil {
 					return fmt.Errorf("unmarshal field route_group_ids: %w", err)
 				}
+			}
+		case apikey.FieldForcedServiceTier:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field forced_service_tier", values[i])
+			} else if value.Valid {
+				_m.ForcedServiceTier = value.String
 			}
 		case apikey.FieldFundingSource:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -397,6 +405,9 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("route_group_ids=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RouteGroupIds))
+	builder.WriteString(", ")
+	builder.WriteString("forced_service_tier=")
+	builder.WriteString(_m.ForcedServiceTier)
 	builder.WriteString(", ")
 	builder.WriteString("funding_source=")
 	builder.WriteString(_m.FundingSource)

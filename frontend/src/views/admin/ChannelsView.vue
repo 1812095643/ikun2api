@@ -452,6 +452,7 @@
               </div>
               <div v-else class="space-y-2">
                 <PricingEntryCard
+                  enable-downstream-scope
                   v-for="(entry, idx) in section.model_pricing"
                   :key="idx"
                   :entry="entry"
@@ -1104,6 +1105,7 @@ function accountStatsRulesToAPI(): AccountStatsPricingRule[] {
             platform: section.platform,
             models: p.models,
             billing_mode: p.billing_mode,
+        apply_to_downstream: p.apply_to_downstream !== false,
             input_price: mTokToPerToken(p.input_price),
             output_price: mTokToPerToken(p.output_price),
             cache_write_price: mTokToPerToken(p.cache_write_price),
@@ -1149,6 +1151,7 @@ function formToAPI(): { group_ids: number[], model_pricing: ChannelModelPricing[
         platform: section.platform,
         models: entry.models,
         billing_mode: entry.billing_mode,
+        apply_to_downstream: entry.apply_to_downstream !== false,
         input_price: mTokToPerToken(entry.input_price),
         output_price: mTokToPerToken(entry.output_price),
         cache_write_price: mTokToPerToken(entry.cache_write_price),

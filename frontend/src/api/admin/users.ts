@@ -68,6 +68,7 @@ export async function list(
   page: number = 1,
   pageSize: number = 20,
   filters?: {
+    is_downstream?: boolean
     status?: 'active' | 'disabled'
     role?: 'admin' | 'user'
     search?: string
@@ -86,6 +87,7 @@ export async function list(
   const params: Record<string, any> = {
     page,
     page_size: pageSize,
+    is_downstream: filters?.is_downstream,
     status: filters?.status,
     role: filters?.role,
     search: filters?.search,
@@ -129,6 +131,7 @@ export async function getById(id: number, includeDeleted = false): Promise<Admin
  * @returns Created user
  */
 export async function create(userData: {
+  is_downstream?: boolean
   email: string
   password: string
   username?: string
@@ -177,14 +180,16 @@ export async function updateBalance(
   balance: number,
   operation: 'set' | 'add' | 'subtract' = 'set',
   notes?: string,
-  gift: boolean = false
+  gift: boolean = false,
+  onAccount?: { operationKey: string }
 ): Promise<AdminUser> {
   const { data } = await apiClient.post<AdminUser>(`/admin/users/${id}/balance`, {
     balance,
     operation,
     notes: notes || '',
-    ...(gift ? { gift: true } : {})
-  })
+    ...(gift ? { gift: true } : {}),
+    ...(onAccount ? { on_account: true, operation_key: onAccount.operationKey } : {})
+  }, onAccount ? { headers: { 'Idempotency-Key': onAccount.operationKey } } : undefined)
   return data
 }
 

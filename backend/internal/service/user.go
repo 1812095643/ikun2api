@@ -26,6 +26,7 @@ type User struct {
 	// RestrictPublicGroups narrows the public groups this user may bind to the
 	// ones listed in AllowedGroups. False keeps the default, where every public
 	// group is bindable.
+	IsDownstream         bool
 	RestrictPublicGroups bool
 	TokenVersion         int64 // Incremented on password change to invalidate existing tokens
 	// TokenVersionResolved indicates TokenVersion already contains the fingerprint-derived

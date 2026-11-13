@@ -54,6 +54,7 @@
         />
         <p class="input-hint">{{ t('admin.users.form.rpmLimitHint') }}</p>
       </div>
+      <DownstreamFields v-model:enabled="form.is_downstream" />
     </form>
     <template #footer>
       <div class="flex justify-end gap-3">
@@ -73,6 +74,7 @@
 import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'; import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'
+import DownstreamFields from '@/components/admin/business/DownstreamFields.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from '@/composables/useStepUp'
@@ -82,10 +84,12 @@ const props = defineProps<{ show: boolean }>()
 const emit = defineEmits(['close', 'success']); const { t } = useI18n()
 const appStore = useAppStore()
 
-const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as 'user' | 'admin', balance: '', concurrency: 1, rpm_limit: 0 })
+const form = reactive({ is_downstream: false, email: '', password: '', username: '', notes: '', role: 'user' as 'user' | 'admin', balance: '', concurrency: 1, rpm_limit: 0 })
 
 const stepUp = useStepUp()
 const loading = ref(false)
+
+watch(() => props.show, (show) => { if (show) { form.is_downstream = false } })
 
 const submit = async () => {
   if (loading.value) return

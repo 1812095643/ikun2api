@@ -42,6 +42,7 @@ type User struct {
 // 注意：普通用户接口不得返回 notes 等管理员备注信息。
 type AdminUser struct {
 	User
+	IsDownstream bool `json:"is_downstream"`
 
 	Notes      string     `json:"notes"`
 	LastUsedAt *time.Time `json:"last_used_at"`
@@ -54,23 +55,24 @@ type AdminUser struct {
 }
 
 type APIKey struct {
-	FundingSource string     `json:"funding_source"`
-	ID            int64      `json:"id"`
-	UserID        int64      `json:"user_id"`
-	Key           string     `json:"key"`
-	Name          string     `json:"name"`
-	GroupID       *int64     `json:"group_id"`
-	GroupIDs      []int64    `json:"group_ids"`
-	Status        string     `json:"status"`
-	IPWhitelist   []string   `json:"ip_whitelist"`
-	IPBlacklist   []string   `json:"ip_blacklist"`
-	LastUsedAt    *time.Time `json:"last_used_at"`
-	LastUsedIP    *string    `json:"last_used_ip"`
-	Quota         float64    `json:"quota"`      // Quota limit in USD (0 = unlimited)
-	QuotaUsed     float64    `json:"quota_used"` // Used quota amount in USD
-	ExpiresAt     *time.Time `json:"expires_at"` // Expiration time (nil = never expires)
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	FundingSource     string     `json:"funding_source"`
+	ForcedServiceTier string     `json:"forced_service_tier"`
+	ID                int64      `json:"id"`
+	UserID            int64      `json:"user_id"`
+	Key               string     `json:"key"`
+	Name              string     `json:"name"`
+	GroupID           *int64     `json:"group_id"`
+	GroupIDs          []int64    `json:"group_ids"`
+	Status            string     `json:"status"`
+	IPWhitelist       []string   `json:"ip_whitelist"`
+	IPBlacklist       []string   `json:"ip_blacklist"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	LastUsedIP        *string    `json:"last_used_ip"`
+	Quota             float64    `json:"quota"`      // Quota limit in USD (0 = unlimited)
+	QuotaUsed         float64    `json:"quota_used"` // Used quota amount in USD
+	ExpiresAt         *time.Time `json:"expires_at"` // Expiration time (nil = never expires)
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 	// CurrentConcurrency is the real-time active request count for this API key.
 	CurrentConcurrency int `json:"current_concurrency"`
 
@@ -178,7 +180,8 @@ type AdminGroup struct {
 	Group
 	PreferSoonestWeeklyReset bool `json:"prefer_soonest_weekly_reset"`
 	// ForceOpenAIFast 是管理端请求策略，用户侧分组 DTO 无需暴露。
-	ForceOpenAIFast bool `json:"force_openai_fast"`
+	ForceOpenAIFast      bool `json:"force_openai_fast"`
+	ForceOpenAIUltrafast bool `json:"force_openai_ultrafast"`
 	// FreeOpenAIFast 是管理端计费策略，用户侧分组 DTO 无需暴露。
 	FreeOpenAIFast bool `json:"free_openai_fast"`
 
@@ -616,7 +619,8 @@ type UsageLog struct {
 	RequestID string `json:"request_id"`
 	Model     string `json:"model"`
 	// ServiceTier records the OpenAI service tier used for billing, e.g. "priority" / "flex".
-	ServiceTier *string `json:"service_tier,omitempty"`
+	ServiceTier           *string  `json:"service_tier,omitempty"`
+	ServiceTierMultiplier *float64 `json:"service_tier_multiplier,omitempty"`
 	// ReasoningEffort is the client-requested effort (mapping-hidden, like Model).
 	// OpenAI: "low"/"medium"/"high"/"xhigh"; Claude: "low"/"medium"/"high"/"max".
 	// Historical rows without requested_reasoning_effort fall back to the stored effective value.

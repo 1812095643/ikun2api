@@ -51,6 +51,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetName(key.Name).
 		SetStatus(key.Status).
 		SetFundingSource(apiKeyFundingSourceOrDefault(key.FundingSource)).
+		SetForcedServiceTier(key.ForcedServiceTier).
 		SetNillableGroupID(key.GroupID).
 		SetRouteGroupIds(key.RouteGroupIDs).
 		SetNillableLastUsedAt(key.LastUsedAt).
@@ -140,6 +141,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldGroupID,
 			apikey.FieldRouteGroupIds,
 			apikey.FieldFundingSource,
+			apikey.FieldForcedServiceTier,
 			apikey.FieldName,
 			apikey.FieldStatus,
 			apikey.FieldIPWhitelist,
@@ -220,6 +222,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldAllowMessagesDispatch,
 				group.FieldAllowLive,
 				group.FieldForceOpenaiFast,
+				group.FieldForceOpenaiUltrafast,
 				group.FieldFreeOpenaiFast,
 				group.FieldDefaultMappedModel,
 				group.FieldMessagesDispatchModelConfig,
@@ -309,6 +312,9 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 		} else {
 			builder.ClearWindow7dStart()
 		}
+	}
+	if fields.ForcedServiceTier {
+		builder.SetForcedServiceTier(key.ForcedServiceTier)
 	}
 	if fields.FundingSource {
 		builder.SetFundingSource(key.FundingSource)
@@ -888,31 +894,32 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		return nil
 	}
 	out := &service.APIKey{
-		ID:            m.ID,
-		UserID:        m.UserID,
-		Key:           m.Key,
-		Name:          m.Name,
-		Status:        m.Status,
-		IPWhitelist:   m.IPWhitelist,
-		IPBlacklist:   m.IPBlacklist,
-		LastUsedAt:    m.LastUsedAt,
-		CreatedAt:     m.CreatedAt,
-		UpdatedAt:     m.UpdatedAt,
-		GroupID:       m.GroupID,
-		RouteGroupIDs: append([]int64(nil), m.RouteGroupIds...),
-		FundingSource: m.FundingSource,
-		Quota:         m.Quota,
-		QuotaUsed:     m.QuotaUsed,
-		ExpiresAt:     m.ExpiresAt,
-		RateLimit5h:   m.RateLimit5h,
-		RateLimit1d:   m.RateLimit1d,
-		RateLimit7d:   m.RateLimit7d,
-		Usage5h:       m.Usage5h,
-		Usage1d:       m.Usage1d,
-		Usage7d:       m.Usage7d,
-		Window5hStart: m.Window5hStart,
-		Window1dStart: m.Window1dStart,
-		Window7dStart: m.Window7dStart,
+		ID:                m.ID,
+		UserID:            m.UserID,
+		Key:               m.Key,
+		Name:              m.Name,
+		Status:            m.Status,
+		IPWhitelist:       m.IPWhitelist,
+		IPBlacklist:       m.IPBlacklist,
+		LastUsedAt:        m.LastUsedAt,
+		CreatedAt:         m.CreatedAt,
+		UpdatedAt:         m.UpdatedAt,
+		GroupID:           m.GroupID,
+		RouteGroupIDs:     append([]int64(nil), m.RouteGroupIds...),
+		FundingSource:     m.FundingSource,
+		ForcedServiceTier: m.ForcedServiceTier,
+		Quota:             m.Quota,
+		QuotaUsed:         m.QuotaUsed,
+		ExpiresAt:         m.ExpiresAt,
+		RateLimit5h:       m.RateLimit5h,
+		RateLimit1d:       m.RateLimit1d,
+		RateLimit7d:       m.RateLimit7d,
+		Usage5h:           m.Usage5h,
+		Usage1d:           m.Usage1d,
+		Usage7d:           m.Usage7d,
+		Window5hStart:     m.Window5hStart,
+		Window1dStart:     m.Window1dStart,
+		Window7dStart:     m.Window7dStart,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)
@@ -954,6 +961,7 @@ func userEntityToService(u *dbent.User) *service.User {
 		TotpEnabledAt:              u.TotpEnabledAt,
 		BalanceNotifyEnabled:       u.BalanceNotifyEnabled,
 		RestrictPublicGroups:       u.RestrictPublicGroups,
+		IsDownstream:               u.IsDownstream,
 		BalanceNotifyThresholdType: u.BalanceNotifyThresholdType,
 		BalanceNotifyThreshold:     u.BalanceNotifyThreshold,
 		TotalRecharged:             u.TotalRecharged,
@@ -1035,6 +1043,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		AllowMessagesDispatch:           g.AllowMessagesDispatch,
 		AllowLive:                       g.AllowLive,
 		ForceOpenAIFast:                 g.ForceOpenaiFast,
+		ForceOpenAIUltrafast:            g.ForceOpenaiUltrafast,
 		FreeOpenAIFast:                  g.FreeOpenaiFast,
 		RequireOAuthOnly:                g.RequireOauthOnly,
 		RequirePrivacySet:               g.RequirePrivacySet,

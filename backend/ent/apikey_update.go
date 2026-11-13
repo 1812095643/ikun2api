@@ -138,6 +138,20 @@ func (_u *APIKeyUpdate) ClearRouteGroupIds() *APIKeyUpdate {
 	return _u
 }
 
+// SetForcedServiceTier sets the "forced_service_tier" field.
+func (_u *APIKeyUpdate) SetForcedServiceTier(v string) *APIKeyUpdate {
+	_u.mutation.SetForcedServiceTier(v)
+	return _u
+}
+
+// SetNillableForcedServiceTier sets the "forced_service_tier" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableForcedServiceTier(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetForcedServiceTier(*v)
+	}
+	return _u
+}
+
 // SetFundingSource sets the "funding_source" field.
 func (_u *APIKeyUpdate) SetFundingSource(v string) *APIKeyUpdate {
 	_u.mutation.SetFundingSource(v)
@@ -587,6 +601,11 @@ func (_u *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ForcedServiceTier(); ok {
+		if err := apikey.ForcedServiceTierValidator(v); err != nil {
+			return &ValidationError{Name: "forced_service_tier", err: fmt.Errorf(`ent: validator failed for field "APIKey.forced_service_tier": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.FundingSource(); ok {
 		if err := apikey.FundingSourceValidator(v); err != nil {
 			return &ValidationError{Name: "funding_source", err: fmt.Errorf(`ent: validator failed for field "APIKey.funding_source": %w`, err)}
@@ -640,6 +659,9 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.RouteGroupIdsCleared() {
 		_spec.ClearField(apikey.FieldRouteGroupIds, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ForcedServiceTier(); ok {
+		_spec.SetField(apikey.FieldForcedServiceTier, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.FundingSource(); ok {
 		_spec.SetField(apikey.FieldFundingSource, field.TypeString, value)
@@ -973,6 +995,20 @@ func (_u *APIKeyUpdateOne) AppendRouteGroupIds(v []int64) *APIKeyUpdateOne {
 // ClearRouteGroupIds clears the value of the "route_group_ids" field.
 func (_u *APIKeyUpdateOne) ClearRouteGroupIds() *APIKeyUpdateOne {
 	_u.mutation.ClearRouteGroupIds()
+	return _u
+}
+
+// SetForcedServiceTier sets the "forced_service_tier" field.
+func (_u *APIKeyUpdateOne) SetForcedServiceTier(v string) *APIKeyUpdateOne {
+	_u.mutation.SetForcedServiceTier(v)
+	return _u
+}
+
+// SetNillableForcedServiceTier sets the "forced_service_tier" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableForcedServiceTier(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetForcedServiceTier(*v)
+	}
 	return _u
 }
 
@@ -1438,6 +1474,11 @@ func (_u *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ForcedServiceTier(); ok {
+		if err := apikey.ForcedServiceTierValidator(v); err != nil {
+			return &ValidationError{Name: "forced_service_tier", err: fmt.Errorf(`ent: validator failed for field "APIKey.forced_service_tier": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.FundingSource(); ok {
 		if err := apikey.FundingSourceValidator(v); err != nil {
 			return &ValidationError{Name: "funding_source", err: fmt.Errorf(`ent: validator failed for field "APIKey.funding_source": %w`, err)}
@@ -1508,6 +1549,9 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.RouteGroupIdsCleared() {
 		_spec.ClearField(apikey.FieldRouteGroupIds, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ForcedServiceTier(); ok {
+		_spec.SetField(apikey.FieldForcedServiceTier, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.FundingSource(); ok {
 		_spec.SetField(apikey.FieldFundingSource, field.TypeString, value)

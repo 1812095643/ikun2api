@@ -111,6 +111,7 @@ func TestUsageLogRepositoryCreateSyncRequestTypeAndLegacyFields(t *testing.T) {
 			sqlmock.AnyArg(), // account_switch_count
 			sqlmock.AnyArg(), // client_first_token_ms
 			sqlmock.AnyArg(), // upload_ms
+			sqlmock.AnyArg(), // service_tier_multiplier
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(99), createdAt))
@@ -215,6 +216,7 @@ func TestUsageLogRepositoryCreate_PersistsServiceTier(t *testing.T) {
 			sqlmock.AnyArg(), // account_switch_count
 			sqlmock.AnyArg(), // client_first_token_ms
 			sqlmock.AnyArg(), // upload_ms
+			sqlmock.AnyArg(), // service_tier_multiplier
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(100), createdAt))
@@ -296,8 +298,8 @@ func TestPrepareUsageLogInsert_PersistsNativeCompactionV2WithoutChangingRequestT
 	prepared := prepareUsageLogInsert(log)
 
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
-	require.Equal(t, "boolean", usageLogInsertArgTypes[len(usageLogInsertArgTypes)-9])
-	require.Equal(t, true, prepared.args[len(prepared.args)-9])
+	require.Equal(t, "boolean", usageLogInsertArgTypes[len(usageLogInsertArgTypes)-10])
+	require.Equal(t, true, prepared.args[len(prepared.args)-10])
 	require.Equal(t, int16(service.RequestTypeStream), prepared.args[30])
 	require.Equal(t, service.RequestTypeStream, log.RequestType)
 	require.True(t, log.Stream)
@@ -979,14 +981,15 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},
 			sql.NullString{}, // upstream_request_id
 			sql.NullString{},
-			false,           // native_compaction_v2
-			0,               // cache_creation_30m_tokens
-			0,               // cache_creation_12h_tokens
-			sql.NullInt64{}, // gateway_wait_ms
-			sql.NullInt64{}, // pre_forward_ms
-			sql.NullInt64{}, // account_switch_count
-			sql.NullInt64{}, // client_first_token_ms
-			sql.NullInt64{}, // upload_ms
+			false,             // native_compaction_v2
+			0,                 // cache_creation_30m_tokens
+			0,                 // cache_creation_12h_tokens
+			sql.NullInt64{},   // gateway_wait_ms
+			sql.NullInt64{},   // pre_forward_ms
+			sql.NullInt64{},   // account_switch_count
+			sql.NullInt64{},   // client_first_token_ms
+			sql.NullInt64{},   // upload_ms
+			sql.NullFloat64{}, // service_tier_multiplier
 			now,
 		}})
 		require.NoError(t, err)
@@ -1076,6 +1079,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullInt64{},   // account_switch_count
 			sql.NullInt64{},   // client_first_token_ms
 			sql.NullInt64{},   // upload_ms
+			sql.NullFloat64{}, // service_tier_multiplier
 			now,
 		}})
 		require.NoError(t, err)
@@ -1148,6 +1152,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullInt64{},   // account_switch_count
 			sql.NullInt64{},   // client_first_token_ms
 			sql.NullInt64{},   // upload_ms
+			sql.NullFloat64{}, // service_tier_multiplier
 			now,
 		}})
 		require.NoError(t, err)
@@ -1221,6 +1226,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullInt64{},   // account_switch_count
 			sql.NullInt64{},   // client_first_token_ms
 			sql.NullInt64{},   // upload_ms
+			sql.NullFloat64{}, // service_tier_multiplier
 			now,
 		}})
 		require.NoError(t, err)

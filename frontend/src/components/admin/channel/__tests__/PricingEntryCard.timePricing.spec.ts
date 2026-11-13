@@ -159,3 +159,18 @@ describe('PricingEntryCard request multipliers', () => {
     })
   })
 })
+
+
+describe('reseller price scope', () => {
+  it('defaults existing price cards to applying to resellers and can turn it off', async () => {
+    const wrapper = shallowMount(PricingEntryCard, { props: { entry: createEntry(), enableDownstreamScope: true } })
+    const checkbox = wrapper.get('[data-test="pricing-downstream-scope"]')
+    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
+    await checkbox.setValue(false)
+    expect(wrapper.emitted('update')?.[0]?.[0]).toMatchObject({ apply_to_downstream: false })
+  })
+  it('keeps account statistics cards separate from reseller billing', () => {
+    const wrapper = shallowMount(PricingEntryCard, { props: { entry: createEntry() } })
+    expect(wrapper.find('[data-test="pricing-downstream-scope"]').exists()).toBe(false)
+  })
+})

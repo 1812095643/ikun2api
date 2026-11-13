@@ -88,6 +88,33 @@ func (_u *UsageLogUpdate) SetNillableRequestID(v *string) *UsageLogUpdate {
 	return _u
 }
 
+// SetServiceTierMultiplier sets the "service_tier_multiplier" field.
+func (_u *UsageLogUpdate) SetServiceTierMultiplier(v float64) *UsageLogUpdate {
+	_u.mutation.ResetServiceTierMultiplier()
+	_u.mutation.SetServiceTierMultiplier(v)
+	return _u
+}
+
+// SetNillableServiceTierMultiplier sets the "service_tier_multiplier" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableServiceTierMultiplier(v *float64) *UsageLogUpdate {
+	if v != nil {
+		_u.SetServiceTierMultiplier(*v)
+	}
+	return _u
+}
+
+// AddServiceTierMultiplier adds value to the "service_tier_multiplier" field.
+func (_u *UsageLogUpdate) AddServiceTierMultiplier(v float64) *UsageLogUpdate {
+	_u.mutation.AddServiceTierMultiplier(v)
+	return _u
+}
+
+// ClearServiceTierMultiplier clears the value of the "service_tier_multiplier" field.
+func (_u *UsageLogUpdate) ClearServiceTierMultiplier() *UsageLogUpdate {
+	_u.mutation.ClearServiceTierMultiplier()
+	return _u
+}
+
 // SetModel sets the "model" field.
 func (_u *UsageLogUpdate) SetModel(v string) *UsageLogUpdate {
 	_u.mutation.SetModel(v)
@@ -1180,6 +1207,15 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.ServiceTierMultiplier(); ok {
+		_spec.SetField(usagelog.FieldServiceTierMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedServiceTierMultiplier(); ok {
+		_spec.AddField(usagelog.FieldServiceTierMultiplier, field.TypeFloat64, value)
+	}
+	if _u.mutation.ServiceTierMultiplierCleared() {
+		_spec.ClearField(usagelog.FieldServiceTierMultiplier, field.TypeFloat64)
+	}
 	if value, ok := _u.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)
 	}
@@ -1653,6 +1689,33 @@ func (_u *UsageLogUpdateOne) SetNillableRequestID(v *string) *UsageLogUpdateOne 
 	if v != nil {
 		_u.SetRequestID(*v)
 	}
+	return _u
+}
+
+// SetServiceTierMultiplier sets the "service_tier_multiplier" field.
+func (_u *UsageLogUpdateOne) SetServiceTierMultiplier(v float64) *UsageLogUpdateOne {
+	_u.mutation.ResetServiceTierMultiplier()
+	_u.mutation.SetServiceTierMultiplier(v)
+	return _u
+}
+
+// SetNillableServiceTierMultiplier sets the "service_tier_multiplier" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableServiceTierMultiplier(v *float64) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetServiceTierMultiplier(*v)
+	}
+	return _u
+}
+
+// AddServiceTierMultiplier adds value to the "service_tier_multiplier" field.
+func (_u *UsageLogUpdateOne) AddServiceTierMultiplier(v float64) *UsageLogUpdateOne {
+	_u.mutation.AddServiceTierMultiplier(v)
+	return _u
+}
+
+// ClearServiceTierMultiplier clears the value of the "service_tier_multiplier" field.
+func (_u *UsageLogUpdateOne) ClearServiceTierMultiplier() *UsageLogUpdateOne {
+	_u.mutation.ClearServiceTierMultiplier()
 	return _u
 }
 
@@ -2777,6 +2840,15 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ServiceTierMultiplier(); ok {
+		_spec.SetField(usagelog.FieldServiceTierMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedServiceTierMultiplier(); ok {
+		_spec.AddField(usagelog.FieldServiceTierMultiplier, field.TypeFloat64, value)
+	}
+	if _u.mutation.ServiceTierMultiplierCleared() {
+		_spec.ClearField(usagelog.FieldServiceTierMultiplier, field.TypeFloat64)
 	}
 	if value, ok := _u.mutation.Model(); ok {
 		_spec.SetField(usagelog.FieldModel, field.TypeString, value)

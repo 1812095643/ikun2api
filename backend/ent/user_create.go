@@ -270,6 +270,20 @@ func (_c *UserCreate) SetNillableLastActiveAt(v *time.Time) *UserCreate {
 	return _c
 }
 
+// SetIsDownstream sets the "is_downstream" field.
+func (_c *UserCreate) SetIsDownstream(v bool) *UserCreate {
+	_c.mutation.SetIsDownstream(v)
+	return _c
+}
+
+// SetNillableIsDownstream sets the "is_downstream" field if the given value is not nil.
+func (_c *UserCreate) SetNillableIsDownstream(v *bool) *UserCreate {
+	if v != nil {
+		_c.SetIsDownstream(*v)
+	}
+	return _c
+}
+
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
 func (_c *UserCreate) SetRestrictPublicGroups(v bool) *UserCreate {
 	_c.mutation.SetRestrictPublicGroups(v)
@@ -650,6 +664,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultSignupSource
 		_c.mutation.SetSignupSource(v)
 	}
+	if _, ok := _c.mutation.IsDownstream(); !ok {
+		v := user.DefaultIsDownstream
+		_c.mutation.SetIsDownstream(v)
+	}
 	if _, ok := _c.mutation.RestrictPublicGroups(); !ok {
 		v := user.DefaultRestrictPublicGroups
 		_c.mutation.SetRestrictPublicGroups(v)
@@ -747,6 +765,9 @@ func (_c *UserCreate) check() error {
 		if err := user.SignupSourceValidator(v); err != nil {
 			return &ValidationError{Name: "signup_source", err: fmt.Errorf(`ent: validator failed for field "User.signup_source": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.IsDownstream(); !ok {
+		return &ValidationError{Name: "is_downstream", err: errors.New(`ent: missing required field "User.is_downstream"`)}
 	}
 	if _, ok := _c.mutation.RestrictPublicGroups(); !ok {
 		return &ValidationError{Name: "restrict_public_groups", err: errors.New(`ent: missing required field "User.restrict_public_groups"`)}
@@ -864,6 +885,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.LastActiveAt(); ok {
 		_spec.SetField(user.FieldLastActiveAt, field.TypeTime, value)
 		_node.LastActiveAt = &value
+	}
+	if value, ok := _c.mutation.IsDownstream(); ok {
+		_spec.SetField(user.FieldIsDownstream, field.TypeBool, value)
+		_node.IsDownstream = value
 	}
 	if value, ok := _c.mutation.RestrictPublicGroups(); ok {
 		_spec.SetField(user.FieldRestrictPublicGroups, field.TypeBool, value)
@@ -1409,6 +1434,18 @@ func (u *UserUpsert) ClearLastActiveAt() *UserUpsert {
 	return u
 }
 
+// SetIsDownstream sets the "is_downstream" field.
+func (u *UserUpsert) SetIsDownstream(v bool) *UserUpsert {
+	u.Set(user.FieldIsDownstream, v)
+	return u
+}
+
+// UpdateIsDownstream sets the "is_downstream" field to the value that was provided on create.
+func (u *UserUpsert) UpdateIsDownstream() *UserUpsert {
+	u.SetExcluded(user.FieldIsDownstream)
+	return u
+}
+
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
 func (u *UserUpsert) SetRestrictPublicGroups(v bool) *UserUpsert {
 	u.Set(user.FieldRestrictPublicGroups, v)
@@ -1853,6 +1890,20 @@ func (u *UserUpsertOne) UpdateLastActiveAt() *UserUpsertOne {
 func (u *UserUpsertOne) ClearLastActiveAt() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.ClearLastActiveAt()
+	})
+}
+
+// SetIsDownstream sets the "is_downstream" field.
+func (u *UserUpsertOne) SetIsDownstream(v bool) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetIsDownstream(v)
+	})
+}
+
+// UpdateIsDownstream sets the "is_downstream" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateIsDownstream() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateIsDownstream()
 	})
 }
 
@@ -2484,6 +2535,20 @@ func (u *UserUpsertBulk) UpdateLastActiveAt() *UserUpsertBulk {
 func (u *UserUpsertBulk) ClearLastActiveAt() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.ClearLastActiveAt()
+	})
+}
+
+// SetIsDownstream sets the "is_downstream" field.
+func (u *UserUpsertBulk) SetIsDownstream(v bool) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetIsDownstream(v)
+	})
+}
+
+// UpdateIsDownstream sets the "is_downstream" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateIsDownstream() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateIsDownstream()
 	})
 }
 

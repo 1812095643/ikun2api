@@ -75,6 +75,11 @@ func RequestID(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldRequestID, v))
 }
 
+// ServiceTierMultiplier applies equality check predicate on the "service_tier_multiplier" field. It's identical to ServiceTierMultiplierEQ.
+func ServiceTierMultiplier(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldServiceTierMultiplier, v))
+}
+
 // Model applies equality check predicate on the "model" field. It's identical to ModelEQ.
 func Model(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldModel, v))
@@ -418,6 +423,56 @@ func RequestIDEqualFold(v string) predicate.UsageLog {
 // RequestIDContainsFold applies the ContainsFold predicate on the "request_id" field.
 func RequestIDContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldRequestID, v))
+}
+
+// ServiceTierMultiplierEQ applies the EQ predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldServiceTierMultiplier, v))
+}
+
+// ServiceTierMultiplierNEQ applies the NEQ predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierNEQ(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldServiceTierMultiplier, v))
+}
+
+// ServiceTierMultiplierIn applies the In predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldServiceTierMultiplier, vs...))
+}
+
+// ServiceTierMultiplierNotIn applies the NotIn predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierNotIn(vs ...float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldServiceTierMultiplier, vs...))
+}
+
+// ServiceTierMultiplierGT applies the GT predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierGT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldServiceTierMultiplier, v))
+}
+
+// ServiceTierMultiplierGTE applies the GTE predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierGTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldServiceTierMultiplier, v))
+}
+
+// ServiceTierMultiplierLT applies the LT predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierLT(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldServiceTierMultiplier, v))
+}
+
+// ServiceTierMultiplierLTE applies the LTE predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierLTE(v float64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldServiceTierMultiplier, v))
+}
+
+// ServiceTierMultiplierIsNil applies the IsNil predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldServiceTierMultiplier))
+}
+
+// ServiceTierMultiplierNotNil applies the NotNil predicate on the "service_tier_multiplier" field.
+func ServiceTierMultiplierNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldServiceTierMultiplier))
 }
 
 // ModelEQ applies the EQ predicate on the "model" field.

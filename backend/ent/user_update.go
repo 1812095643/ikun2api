@@ -321,6 +321,20 @@ func (_u *UserUpdate) ClearLastActiveAt() *UserUpdate {
 	return _u
 }
 
+// SetIsDownstream sets the "is_downstream" field.
+func (_u *UserUpdate) SetIsDownstream(v bool) *UserUpdate {
+	_u.mutation.SetIsDownstream(v)
+	return _u
+}
+
+// SetNillableIsDownstream sets the "is_downstream" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableIsDownstream(v *bool) *UserUpdate {
+	if v != nil {
+		_u.SetIsDownstream(*v)
+	}
+	return _u
+}
+
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
 func (_u *UserUpdate) SetRestrictPublicGroups(v bool) *UserUpdate {
 	_u.mutation.SetRestrictPublicGroups(v)
@@ -1082,6 +1096,9 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.LastActiveAtCleared() {
 		_spec.ClearField(user.FieldLastActiveAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.IsDownstream(); ok {
+		_spec.SetField(user.FieldIsDownstream, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RestrictPublicGroups(); ok {
 		_spec.SetField(user.FieldRestrictPublicGroups, field.TypeBool, value)
@@ -2014,6 +2031,20 @@ func (_u *UserUpdateOne) ClearLastActiveAt() *UserUpdateOne {
 	return _u
 }
 
+// SetIsDownstream sets the "is_downstream" field.
+func (_u *UserUpdateOne) SetIsDownstream(v bool) *UserUpdateOne {
+	_u.mutation.SetIsDownstream(v)
+	return _u
+}
+
+// SetNillableIsDownstream sets the "is_downstream" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableIsDownstream(v *bool) *UserUpdateOne {
+	if v != nil {
+		_u.SetIsDownstream(*v)
+	}
+	return _u
+}
+
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
 func (_u *UserUpdateOne) SetRestrictPublicGroups(v bool) *UserUpdateOne {
 	_u.mutation.SetRestrictPublicGroups(v)
@@ -2805,6 +2836,9 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if _u.mutation.LastActiveAtCleared() {
 		_spec.ClearField(user.FieldLastActiveAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.IsDownstream(); ok {
+		_spec.SetField(user.FieldIsDownstream, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RestrictPublicGroups(); ok {
 		_spec.SetField(user.FieldRestrictPublicGroups, field.TypeBool, value)

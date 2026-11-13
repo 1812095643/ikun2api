@@ -61,15 +61,19 @@ func NewModelPricingResolver(channelService *ChannelService, billingService *Bil
 
 // PricingInput 定价解析输入
 type PricingInput struct {
-	Model   string
-	GroupID *int64 // nil 表示不检查渠道
-	Group   *Group
+	IsDownstream bool
+	Model        string
+	GroupID      *int64 // nil 表示不检查渠道
+	Group        *Group
 }
 
 // Resolve 解析模型定价。
 // 1. 获取基础定价（LiteLLM → Fallback）
 // 2. 如果指定了 GroupID，查找渠道定价并覆盖
 func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) *ResolvedPricing {
+	if input.IsDownstream {
+		ctx = WithDownstreamPricing(ctx, true)
+	}
 	longContextPricingEnabled := input.Group == nil || input.Group.LongContextPricingEnabled
 	if groupPricing := matchGroupModelPricing(input.Group, input.Model); groupPricing != nil {
 		// Group token cards only override the first-tier / flat rates.
@@ -193,13 +197,20 @@ func (r *ModelPricingResolver) lookupChannelPricingNormalized(ctx context.Contex
 		return nil
 	}
 	if pricing := r.channelService.GetChannelModelPricing(ctx, groupID, model); pricing != nil {
-		return pricing
+		if channelPricingApplies(pricing, isDownstreamPricing(ctx)) {
+			return pricing
+		}
+		return nil
 	}
 	normalized := normalizeKnownOpenAICodexModel(model)
 	if normalized == "" || strings.EqualFold(normalized, strings.TrimSpace(model)) {
 		return nil
 	}
-	return r.channelService.GetChannelModelPricing(ctx, groupID, normalized)
+	pricing := r.channelService.GetChannelModelPricing(ctx, groupID, normalized)
+	if !channelPricingApplies(pricing, isDownstreamPricing(ctx)) {
+		return nil
+	}
+	return pricing
 }
 
 // applyChannelOverrides 应用渠道定价覆盖

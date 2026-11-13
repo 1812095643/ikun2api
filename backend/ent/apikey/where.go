@@ -90,6 +90,11 @@ func GroupID(v int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldGroupID, v))
 }
 
+// ForcedServiceTier applies equality check predicate on the "forced_service_tier" field. It's identical to ForcedServiceTierEQ.
+func ForcedServiceTier(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldForcedServiceTier, v))
+}
+
 // FundingSource applies equality check predicate on the "funding_source" field. It's identical to FundingSourceEQ.
 func FundingSource(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldFundingSource, v))
@@ -483,6 +488,71 @@ func RouteGroupIdsIsNil() predicate.APIKey {
 // RouteGroupIdsNotNil applies the NotNil predicate on the "route_group_ids" field.
 func RouteGroupIdsNotNil() predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotNull(FieldRouteGroupIds))
+}
+
+// ForcedServiceTierEQ applies the EQ predicate on the "forced_service_tier" field.
+func ForcedServiceTierEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierNEQ applies the NEQ predicate on the "forced_service_tier" field.
+func ForcedServiceTierNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierIn applies the In predicate on the "forced_service_tier" field.
+func ForcedServiceTierIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldForcedServiceTier, vs...))
+}
+
+// ForcedServiceTierNotIn applies the NotIn predicate on the "forced_service_tier" field.
+func ForcedServiceTierNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldForcedServiceTier, vs...))
+}
+
+// ForcedServiceTierGT applies the GT predicate on the "forced_service_tier" field.
+func ForcedServiceTierGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierGTE applies the GTE predicate on the "forced_service_tier" field.
+func ForcedServiceTierGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierLT applies the LT predicate on the "forced_service_tier" field.
+func ForcedServiceTierLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierLTE applies the LTE predicate on the "forced_service_tier" field.
+func ForcedServiceTierLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierContains applies the Contains predicate on the "forced_service_tier" field.
+func ForcedServiceTierContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierHasPrefix applies the HasPrefix predicate on the "forced_service_tier" field.
+func ForcedServiceTierHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierHasSuffix applies the HasSuffix predicate on the "forced_service_tier" field.
+func ForcedServiceTierHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierEqualFold applies the EqualFold predicate on the "forced_service_tier" field.
+func ForcedServiceTierEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldForcedServiceTier, v))
+}
+
+// ForcedServiceTierContainsFold applies the ContainsFold predicate on the "forced_service_tier" field.
+func ForcedServiceTierContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldForcedServiceTier, v))
 }
 
 // FundingSourceEQ applies the EQ predicate on the "funding_source" field.

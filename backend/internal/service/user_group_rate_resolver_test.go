@@ -50,14 +50,14 @@ func TestUserGroupRateResolverResolve_InvalidCacheEntryLoadsRepoAndCaches(t *tes
 	rate := 1.7
 	repo := &userGroupRateResolverRepoStub{rate: &rate}
 	cache := gocache.New(time.Minute, time.Minute)
-	cache.Set("101:202", "bad-cache", time.Minute)
+	cache.Set(userGroupRateCacheKey(101, 202), "bad-cache", time.Minute)
 	resolver := newUserGroupRateResolver(repo, cache, time.Minute, nil, "service.test")
 
 	got := resolver.Resolve(context.Background(), 101, 202, 1.2)
 	require.Equal(t, rate, got)
 	require.Equal(t, 1, repo.calls)
 
-	cached, ok := cache.Get("101:202")
+	cached, ok := cache.Get(userGroupRateCacheKey(101, 202))
 	require.True(t, ok)
 	require.Equal(t, rate, cached)
 

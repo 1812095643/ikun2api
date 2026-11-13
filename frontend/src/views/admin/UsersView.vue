@@ -35,6 +35,7 @@
               />
             </div>
 
+            <div v-if="visibleFilters.has('downstream')" class="w-full sm:w-36"><Select v-model="filters.downstream" :options="[{value:'',label:t('business.mark')},{value:'true',label:t('business.downstream')},{value:'false',label:t('business.regularUser')}]" @change="applyFilter" /></div>
             <!-- Status Filter (visible when enabled) -->
             <div v-if="visibleFilters.has('status')" class="w-full sm:w-32">
               <Select
@@ -290,7 +291,7 @@
           @sort="handleSort"
           @update:selected-keys="handleSelectedKeysUpdate"
         >
-          <template #cell-email="{ value }">
+          <template #cell-email="{ value, row }">
             <div class="flex items-center gap-2">
               <div
                 class="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30"
@@ -299,7 +300,7 @@
                   {{ value.charAt(0).toUpperCase() }}
                 </span>
               </div>
-              <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span><router-link v-if="row.is_downstream" to="/admin/downstreams" class="badge badge-primary">{{ t('business.downstream') }}</router-link>
             </div>
           </template>
 
@@ -1105,6 +1106,7 @@ const apiKeyGroupFilterOptions = computed(() =>
 
 // Filter values (role, status, and custom attributes)
 const filters = reactive({
+  downstream: '',
   role: '',
   status: '',
   group: '',  // group name for fuzzy match, '' = all
@@ -1135,6 +1137,7 @@ const filterableAttributes = computed(() =>
 
 // Built-in filter definitions
 const builtInFilters = computed(() => [
+  { key: 'downstream', name: t('business.downstream'), type: 'select' as const },
   { key: 'role', name: t('admin.users.columns.role'), type: 'select' as const },
   { key: 'status', name: t('admin.users.columns.status'), type: 'select' as const },
   { key: 'group', name: t('admin.users.authorizedGroupFilter'), type: 'select' as const },
@@ -1154,6 +1157,7 @@ const loadSavedFilters = () => {
     const savedValues = localStorage.getItem(FILTER_VALUES_KEY)
     if (savedValues) {
       const parsed = JSON.parse(savedValues)
+      if (parsed.downstream === 'true' || parsed.downstream === 'false') filters.downstream = parsed.downstream
       if (parsed.role) filters.role = parsed.role
       if (parsed.status) filters.status = parsed.status
       if (parsed.group) filters.group = parsed.group
@@ -1174,6 +1178,7 @@ const saveFiltersToStorage = () => {
     localStorage.setItem(VISIBLE_FILTERS_KEY, JSON.stringify([...visibleFilters]))
     // Save filter values
     const values = {
+      downstream: filters.downstream,
       role: filters.role,
       status: filters.status,
       group: filters.group,
@@ -1574,6 +1579,7 @@ const loadUsers = async () => {
       pagination.page,
       pagination.page_size,
       {
+        is_downstream: filters.downstream === '' ? undefined : filters.downstream === 'true',
         role: filters.role as any,
         status: filters.status as any,
         search: searchQuery.value || undefined,
@@ -1666,6 +1672,7 @@ const getAttributeDefinitionName = (attrId: number): string => {
 const toggleBuiltInFilter = (key: string) => {
   if (visibleFilters.has(key)) {
     visibleFilters.delete(key)
+    if (key === 'downstream') filters.downstream = ''
     if (key === 'role') filters.role = ''
     if (key === 'status') filters.status = ''
     if (key === 'group') filters.group = ''

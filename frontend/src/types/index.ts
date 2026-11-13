@@ -102,6 +102,7 @@ export interface User {
 }
 
 export interface AdminUser extends User {
+  is_downstream?: boolean
   // 管理员备注（普通用户接口不返回）
   notes: string
   last_used_at?: string | null
@@ -651,6 +652,7 @@ export interface AdminGroup extends Group {
   // 管理端的 name / description 始终是原字段，各语言译文另放在 i18n 里
   i18n?: GroupI18n
   force_openai_fast: boolean
+  force_openai_ultrafast: boolean
   free_openai_fast: boolean
   model_pricing: import('@/api/admin/channels').ChannelModelPricing[]
   // 分组利润控制（openai/anthropic/gemini/grok/antigravity 分组可启用；margin/buffer 为小数存储）。
@@ -756,6 +758,7 @@ export interface CompositeRouteDecision {
 export interface ApiKey {
   group_ids?: number[]
   funding_source?: 'balance' | 'universal_subscription'
+  forced_service_tier?: '' | 'priority' | 'ultrafast'
   id: number
   user_id: number
   key: string
@@ -790,6 +793,7 @@ export interface ApiKey {
 export interface CreateApiKeyRequest {
   group_ids?: number[]
   funding_source?: 'balance' | 'universal_subscription'
+  forced_service_tier?: '' | 'priority' | 'ultrafast'
   name: string
   group_id?: number | null
   custom_key?: string // Optional custom API Key
@@ -805,6 +809,7 @@ export interface CreateApiKeyRequest {
 export interface UpdateApiKeyRequest {
   group_ids?: number[]
   funding_source?: 'balance' | 'universal_subscription'
+  forced_service_tier?: '' | 'priority' | 'ultrafast'
   name?: string
   group_id?: number | null
   status?: 'active' | 'inactive'
@@ -832,6 +837,7 @@ export interface CreateGroupRequest {
   monthly_limit_usd?: number | null
   long_context_pricing_enabled?: boolean
   force_openai_fast?: boolean
+  force_openai_ultrafast?: boolean
   free_openai_fast?: boolean
   model_pricing?: import('@/api/admin/channels').ChannelModelPricing[]
   allow_image_generation?: boolean
@@ -902,6 +908,7 @@ export interface UpdateGroupRequest {
   monthly_limit_usd?: number | null
   long_context_pricing_enabled?: boolean
   force_openai_fast?: boolean
+  force_openai_ultrafast?: boolean
   free_openai_fast?: boolean
   model_pricing?: import('@/api/admin/channels').ChannelModelPricing[]
   allow_image_generation?: boolean
@@ -1864,6 +1871,7 @@ export interface UsageLog {
   request_id: string
   model: string
   service_tier?: string | null
+  service_tier_multiplier?: number | null
   reasoning_effort?: string | null
   inbound_endpoint?: string | null
   upstream_endpoint?: string | null
@@ -2205,6 +2213,7 @@ export interface ApiKeyUsageTrendPoint {
 // ==================== Admin User Management ====================
 
 export interface UpdateUserRequest {
+  is_downstream?: boolean
   email?: string
   password?: string
   username?: string

@@ -164,6 +164,7 @@ func ValidateSimpleModeGroupOperation(cfg *config.Config, operation AdminGroupOp
 
 // CreateUserInput represents input for creating a new user via admin operations.
 type CreateUserInput struct {
+	IsDownstream         bool
 	Email                string
 	Password             string
 	Username             string
@@ -179,6 +180,7 @@ type CreateUserInput struct {
 }
 
 type UpdateUserInput struct {
+	IsDownstream  *bool
 	Email         string
 	Password      string
 	Username      *string
@@ -296,6 +298,7 @@ type CreateGroupInput struct {
 	AllowMessagesDispatch       bool
 	AllowLive                   bool
 	ForceOpenAIFast             bool
+	ForceOpenAIUltrafast        bool
 	FreeOpenAIFast              bool
 	DefaultMappedModel          string
 	RequireOAuthOnly            bool
@@ -381,6 +384,7 @@ type UpdateGroupInput struct {
 	AllowMessagesDispatch       *bool
 	AllowLive                   *bool
 	ForceOpenAIFast             *bool
+	ForceOpenAIUltrafast        *bool
 	FreeOpenAIFast              *bool
 	DefaultMappedModel          *string
 	RequireOAuthOnly            *bool
@@ -588,6 +592,7 @@ type ProxyBatchDeleteSkipped struct {
 
 // ProxyTestResult represents the result of testing a proxy
 type ProxyTestResult struct {
+	Timezone    string `json:"timezone,omitempty"`
 	Success     bool   `json:"success"`
 	Message     string `json:"message"`
 	LatencyMs   int64  `json:"latency_ms,omitempty"`
@@ -626,6 +631,7 @@ type ProxyQualityCheckItem struct {
 
 // ProxyExitInfo represents proxy exit information from ip-api.com
 type ProxyExitInfo struct {
+	Timezone    string
 	IP          string
 	City        string
 	Region      string

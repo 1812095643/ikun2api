@@ -662,6 +662,7 @@ export interface SystemSettings {
   claude_code_client_version: string;
   claude_code_client_version_synced: string;
   claude_code_version_auto_sync_enabled: boolean;
+  openai_request_timezone_settings?: { auto_detect_proxy: boolean; default_timezone: string };
   openai_codex_ticket_enabled: boolean;
   openai_codex_ticket_allow_without_ticket: boolean;
   openai_codex_ticket_prompt_template: string;
@@ -1005,6 +1006,7 @@ export interface UpdateSettingsRequest {
   openai_codex_version_auto_sync_enabled?: boolean;
   claude_code_client_version?: string;
   claude_code_version_auto_sync_enabled?: boolean;
+  openai_request_timezone_settings?: { auto_detect_proxy: boolean; default_timezone: string };
   openai_codex_ticket_enabled?: boolean;
   openai_codex_ticket_allow_without_ticket?: boolean;
   openai_codex_ticket_prompt_template?: string;

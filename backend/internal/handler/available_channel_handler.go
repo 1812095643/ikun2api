@@ -153,7 +153,13 @@ func (h *AvailableChannelHandler) List(c *gin.Context) {
 		allowedGroupIDs[userGroups[i].ID] = struct{}{}
 	}
 
-	channels, err := h.channelService.ListAvailable(c.Request.Context())
+	pricingCtx, pricingErr := h.apiKeyService.UserPricingContext(c.Request.Context(), subject.UserID)
+	if pricingErr != nil {
+		response.ErrorFrom(c, pricingErr)
+		return
+	}
+	c.Header("Cache-Control", "private, no-store")
+	channels, err := h.channelService.ListAvailable(pricingCtx)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

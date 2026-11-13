@@ -642,6 +642,9 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 	if requestedModel != "" && !supportsOpenAIRequestModel(account, requestedModel, requireCompact) {
 		return 0, nil, "", nil
 	}
+	if openAIAccountServiceTierEligibilityReason(ctx, account, requestedModel) != "" {
+		return 0, nil, "", nil
+	}
 	if !account.SupportsOpenAIEndpointCapability(requiredCapability) {
 		return 0, nil, "", nil
 	}
@@ -679,6 +682,9 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 			return 0, nil, "", nil
 		}
 		if requestedModel != "" && !supportsOpenAIRequestModel(latest, requestedModel, requireCompact) {
+			return 0, nil, "", nil
+		}
+		if openAIAccountServiceTierEligibilityReason(ctx, latest, requestedModel) != "" {
 			return 0, nil, "", nil
 		}
 		if !latest.SupportsOpenAIEndpointCapability(requiredCapability) {

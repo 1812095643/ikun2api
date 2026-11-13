@@ -74,6 +74,7 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 		LastUsedAt:           u.LastUsedAt,
 		GroupRates:           u.GroupRates,
 		RestrictPublicGroups: u.RestrictPublicGroups,
+		IsDownstream:         u.IsDownstream,
 	}
 }
 
@@ -83,6 +84,7 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 	}
 	out := &APIKey{
 		FundingSource:      k.FundingSource,
+		ForcedServiceTier:  k.ForcedServiceTier,
 		ID:                 k.ID,
 		UserID:             k.UserID,
 		Key:                k.Key,
@@ -152,6 +154,7 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 		Group:                       groupFromServiceBase(g),
 		PreferSoonestWeeklyReset:    g.PreferSoonestWeeklyReset,
 		ForceOpenAIFast:             g.ForceOpenAIFast,
+		ForceOpenAIUltrafast:        g.ForceOpenAIUltrafast,
 		FreeOpenAIFast:              g.FreeOpenAIFast,
 		ProfitControlEnabled:        g.ProfitControlEnabled,
 		ProfitMinMargin:             g.ProfitMinMargin,
@@ -710,6 +713,7 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		RequestID:                 l.RequestID,
 		Model:                     requestedModel,
 		ServiceTier:               l.ServiceTier,
+		ServiceTierMultiplier:     l.ServiceTierMultiplier,
 		ReasoningEffort:           userFacingReasoningEffort(l),
 		InboundEndpoint:           l.InboundEndpoint,
 		AccountNameSnapshot:       service.MaskAccountNameSnapshot(l.AccountNameSnapshot),

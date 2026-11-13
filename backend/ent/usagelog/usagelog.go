@@ -22,6 +22,8 @@ const (
 	FieldAccountID = "account_id"
 	// FieldRequestID holds the string denoting the request_id field in the database.
 	FieldRequestID = "request_id"
+	// FieldServiceTierMultiplier holds the string denoting the service_tier_multiplier field in the database.
+	FieldServiceTierMultiplier = "service_tier_multiplier"
 	// FieldModel holds the string denoting the model field in the database.
 	FieldModel = "model"
 	// FieldRequestedModel holds the string denoting the requested_model field in the database.
@@ -168,6 +170,7 @@ var Columns = []string{
 	FieldAPIKeyID,
 	FieldAccountID,
 	FieldRequestID,
+	FieldServiceTierMultiplier,
 	FieldModel,
 	FieldRequestedModel,
 	FieldUpstreamModel,
@@ -328,6 +331,11 @@ func ByAccountID(opts ...sql.OrderTermOption) OrderOption {
 // ByRequestID orders the results by the request_id field.
 func ByRequestID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequestID, opts...).ToFunc()
+}
+
+// ByServiceTierMultiplier orders the results by the service_tier_multiplier field.
+func ByServiceTierMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldServiceTierMultiplier, opts...).ToFunc()
 }
 
 // ByModel orders the results by the model field.

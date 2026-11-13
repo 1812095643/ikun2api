@@ -99,6 +99,8 @@
           </div>
         </div>
 
+        <label v-if="enableDownstreamScope" class="mt-3 flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-300"><input type="checkbox" :checked="entry.apply_to_downstream !== false" data-test="pricing-downstream-scope" @change="emit('update', { ...entry, apply_to_downstream: ($event.target as HTMLInputElement).checked })" />{{ t('business.applyToDownstream') }}</label>
+
         <!-- Token mode -->
         <div v-if="entry.billing_mode === 'token'">
           <!-- Default prices (fallback when no interval matches) -->
@@ -326,10 +328,12 @@ const props = withDefaults(defineProps<{
   hideTokenIntervals?: boolean
   enableTimePricing?: boolean
   enableTierMultipliers?: boolean
+  enableDownstreamScope?: boolean
 }>(), {
   hideTokenIntervals: false,
   enableTimePricing: false,
   enableTierMultipliers: false,
+  enableDownstreamScope: false,
 })
 
 const emit = defineEmits<{

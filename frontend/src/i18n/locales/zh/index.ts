@@ -1,3 +1,5 @@
+import openaiServiceTiers from './openaiServiceTiers'
+import business from './business'
 import adminAccessKeys from './adminAccessKeys'
 import mcp from './mcp'
 import landing from './landing'
@@ -10,6 +12,8 @@ import admin from './admin'
 import misc from './misc'
 
 export default {
+  openaiServiceTiers,
+  business,
   adminAccessKeys,
   mcp,
   ...landing,

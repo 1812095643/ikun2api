@@ -272,7 +272,8 @@ type UpdateSettingsRequest struct {
 	OpenAICodexTicketPromptTemplate        *string `json:"openai_codex_ticket_prompt_template"`
 
 	// 自动降智检测运行器配置（nil = 不修改，非 nil = 整体校验后替换）。
-	CodexAutoDegradationCheck *service.CodexAutoDegradationCheckSettings `json:"codex_auto_degradation_check"`
+	OpenAIRequestTimezoneSettings *service.OpenAIRequestTimezoneSettings     `json:"openai_request_timezone_settings"`
+	CodexAutoDegradationCheck     *service.CodexAutoDegradationCheckSettings `json:"codex_auto_degradation_check"`
 
 	// codex_cli_only 加固（global-only）
 	MinCodexVersion                      string `json:"min_codex_version"`
@@ -1590,7 +1591,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AccountSchedulingThresholds: req.AccountSchedulingThresholds,
 
 		// 自动降智检测（nil = 本次请求未携带，buildSystemSettingsUpdates 跳过写入）
-		CodexAutoDegradationCheck: req.CodexAutoDegradationCheck,
+		CodexAutoDegradationCheck:     req.CodexAutoDegradationCheck,
+		OpenAIRequestTimezoneSettings: req.OpenAIRequestTimezoneSettings,
 
 		RegistrationEnabled:                 req.RegistrationEnabled,
 		EmailVerifyEnabled:                  req.EmailVerifyEnabled,
@@ -2478,6 +2480,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		OpenAICodexTicketHarvestProxyConfigured:                strings.TrimSpace(updatedSettings.OpenAICodexTicketHarvestProxyURL) != "",
 		OpenAICodexTicketPromptTemplate:                        service.EffectiveCodexProbeTemplate(updatedSettings.OpenAICodexTicketPromptTemplate),
 		OpenAICodexTicketPromptTemplateDefault:                 service.DefaultCodexProbeTemplate(),
+		OpenAIRequestTimezoneSettings:                          updatedSettings.OpenAIRequestTimezoneSettings,
 		CodexAutoDegradationCheck:                              updatedSettings.CodexAutoDegradationCheck,
 		MinCodexVersion:                                        updatedSettings.MinCodexVersion,
 		MaxCodexVersion:                                        updatedSettings.MaxCodexVersion,

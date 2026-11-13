@@ -36,7 +36,7 @@ func creditBalanceTx(ctx context.Context, tx BalanceCreditSQL, userID int64, amo
 	if err != nil || !value.IsPositive() || value.Exponent() < -8 || value.Exponent() > 12 || value.GreaterThan(decimal.NewFromInt(999999999999)) {
 		return 0, 0, fmt.Errorf("充值金额应为大于零、最多八位小数的余额金额")
 	}
-	if source != "manual" && source != "gift" && source != "lottery" {
+	if source != "manual" && source != "gift" && source != "lottery" && source != "on_account" {
 		return 0, 0, fmt.Errorf("充值来源无法识别")
 	}
 	filter := " AND deleted_at IS NULL"

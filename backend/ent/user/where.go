@@ -145,6 +145,11 @@ func LastActiveAt(v time.Time) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldLastActiveAt, v))
 }
 
+// IsDownstream applies equality check predicate on the "is_downstream" field. It's identical to IsDownstreamEQ.
+func IsDownstream(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldIsDownstream, v))
+}
+
 // RestrictPublicGroups applies equality check predicate on the "restrict_public_groups" field. It's identical to RestrictPublicGroupsEQ.
 func RestrictPublicGroups(v bool) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldRestrictPublicGroups, v))
@@ -1118,6 +1123,16 @@ func LastActiveAtIsNil() predicate.User {
 // LastActiveAtNotNil applies the NotNil predicate on the "last_active_at" field.
 func LastActiveAtNotNil() predicate.User {
 	return predicate.User(sql.FieldNotNull(FieldLastActiveAt))
+}
+
+// IsDownstreamEQ applies the EQ predicate on the "is_downstream" field.
+func IsDownstreamEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldIsDownstream, v))
+}
+
+// IsDownstreamNEQ applies the NEQ predicate on the "is_downstream" field.
+func IsDownstreamNEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldIsDownstream, v))
 }
 
 // RestrictPublicGroupsEQ applies the EQ predicate on the "restrict_public_groups" field.

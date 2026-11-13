@@ -7,6 +7,7 @@ import (
 
 // TokenCostRequest 通用网关 token 计费请求。
 type TokenCostRequest struct {
+	IsDownstream    bool
 	Ctx             context.Context
 	Model           string
 	Group           *Group
@@ -42,6 +43,7 @@ func (s *BillingService) CalculateTokenCostForRequest(req TokenCostRequest) (*Co
 
 func (s *BillingService) tokenCostInput(req TokenCostRequest, resolved *ResolvedPricing) CostInput {
 	input := CostInput{
+		IsDownstream:    req.IsDownstream,
 		Ctx:             req.Ctx,
 		Model:           req.Model,
 		Group:           req.Group,

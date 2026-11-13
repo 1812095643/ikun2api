@@ -94,6 +94,7 @@ var usageLogInsertArgTypes = [...]string{
 	"integer",     // account_switch_count
 	"integer",     // client_first_token_ms
 	"integer",     // upload_ms
+	"numeric",     // service_tier_multiplier
 	"timestamptz", // created_at
 }
 
@@ -304,6 +305,7 @@ func (r *usageLogRepository) createSingle(ctx context.Context, sqlq sqlExecutor,
 			account_switch_count,
 			client_first_token_ms,
 			upload_ms,
+			service_tier_multiplier,
 			created_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9,
@@ -311,7 +313,7 @@ func (r *usageLogRepository) createSingle(ctx context.Context, sqlq sqlExecutor,
 			$12, $13, $14, $15,
 			$16, $17, $18, $19,
 			$20, $21, $22, $23, $24, $25,
-			$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71
+			$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71, $72
 		)
 		ON CONFLICT (request_id, api_key_id) DO NOTHING
 		RETURNING id, created_at
@@ -773,6 +775,7 @@ func buildUsageLogBatchInsertQuery(keys []string, preparedByKey map[string]usage
 			account_switch_count,
 			client_first_token_ms,
 			upload_ms,
+			service_tier_multiplier,
 			created_at
 		) AS (VALUES `)
 
@@ -876,6 +879,7 @@ func buildUsageLogBatchInsertQuery(keys []string, preparedByKey map[string]usage
 				account_switch_count,
 				client_first_token_ms,
 				upload_ms,
+				service_tier_multiplier,
 				created_at
 			)
 			SELECT
@@ -949,6 +953,7 @@ func buildUsageLogBatchInsertQuery(keys []string, preparedByKey map[string]usage
 				account_switch_count,
 				client_first_token_ms,
 				upload_ms,
+				service_tier_multiplier,
 				created_at
 			FROM input
 			ON CONFLICT (request_id, api_key_id) DO NOTHING
@@ -1062,6 +1067,7 @@ func buildUsageLogBestEffortInsertQuery(preparedList []usageLogInsertPrepared) (
 			account_switch_count,
 			client_first_token_ms,
 			upload_ms,
+			service_tier_multiplier,
 			created_at
 		) AS (VALUES `)
 
@@ -1161,6 +1167,7 @@ func buildUsageLogBestEffortInsertQuery(preparedList []usageLogInsertPrepared) (
 			account_switch_count,
 			client_first_token_ms,
 			upload_ms,
+			service_tier_multiplier,
 			created_at
 		)
 		SELECT
@@ -1234,6 +1241,7 @@ func buildUsageLogBestEffortInsertQuery(preparedList []usageLogInsertPrepared) (
 			account_switch_count,
 			client_first_token_ms,
 			upload_ms,
+			service_tier_multiplier,
 			created_at
 		FROM input
 		ON CONFLICT (request_id, api_key_id) DO NOTHING
@@ -1315,6 +1323,7 @@ func execUsageLogInsertNoResult(ctx context.Context, sqlq sqlExecutor, prepared 
 			account_switch_count,
 			client_first_token_ms,
 			upload_ms,
+			service_tier_multiplier,
 			created_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9,
@@ -1322,7 +1331,7 @@ func execUsageLogInsertNoResult(ctx context.Context, sqlq sqlExecutor, prepared 
 			$12, $13, $14, $15,
 			$16, $17, $18, $19,
 			$20, $21, $22, $23, $24, $25,
-			$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71
+			$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71, $72
 		)
 		ON CONFLICT (request_id, api_key_id) DO NOTHING
 	`, prepared.args...)
@@ -1457,6 +1466,7 @@ func prepareUsageLogInsert(log *service.UsageLog) usageLogInsertPrepared {
 			nullInt(log.AccountSwitchCount), // account_switch_count
 			nullInt(log.ClientFirstTokenMs), // client_first_token_ms
 			nullInt(log.UploadMs),           // upload_ms
+			log.ServiceTierMultiplier,
 			createdAt,
 		},
 	}

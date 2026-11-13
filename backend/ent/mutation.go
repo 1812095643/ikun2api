@@ -118,6 +118,7 @@ type APIKeyMutation struct {
 	name                  *string
 	route_group_ids       *[]int64
 	appendroute_group_ids []int64
+	forced_service_tier   *string
 	funding_source        *string
 	status                *string
 	last_used_at          *time.Time
@@ -597,6 +598,42 @@ func (m *APIKeyMutation) ResetRouteGroupIds() {
 	m.route_group_ids = nil
 	m.appendroute_group_ids = nil
 	delete(m.clearedFields, apikey.FieldRouteGroupIds)
+}
+
+// SetForcedServiceTier sets the "forced_service_tier" field.
+func (m *APIKeyMutation) SetForcedServiceTier(s string) {
+	m.forced_service_tier = &s
+}
+
+// ForcedServiceTier returns the value of the "forced_service_tier" field in the mutation.
+func (m *APIKeyMutation) ForcedServiceTier() (r string, exists bool) {
+	v := m.forced_service_tier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldForcedServiceTier returns the old "forced_service_tier" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldForcedServiceTier(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldForcedServiceTier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldForcedServiceTier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldForcedServiceTier: %w", err)
+	}
+	return oldValue.ForcedServiceTier, nil
+}
+
+// ResetForcedServiceTier resets all changes to the "forced_service_tier" field.
+func (m *APIKeyMutation) ResetForcedServiceTier() {
+	m.forced_service_tier = nil
 }
 
 // SetFundingSource sets the "funding_source" field.
@@ -1636,7 +1673,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1660,6 +1697,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.route_group_ids != nil {
 		fields = append(fields, apikey.FieldRouteGroupIds)
+	}
+	if m.forced_service_tier != nil {
+		fields = append(fields, apikey.FieldForcedServiceTier)
 	}
 	if m.funding_source != nil {
 		fields = append(fields, apikey.FieldFundingSource)
@@ -1736,6 +1776,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupID()
 	case apikey.FieldRouteGroupIds:
 		return m.RouteGroupIds()
+	case apikey.FieldForcedServiceTier:
+		return m.ForcedServiceTier()
 	case apikey.FieldFundingSource:
 		return m.FundingSource()
 	case apikey.FieldStatus:
@@ -1795,6 +1837,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldGroupID(ctx)
 	case apikey.FieldRouteGroupIds:
 		return m.OldRouteGroupIds(ctx)
+	case apikey.FieldForcedServiceTier:
+		return m.OldForcedServiceTier(ctx)
 	case apikey.FieldFundingSource:
 		return m.OldFundingSource(ctx)
 	case apikey.FieldStatus:
@@ -1893,6 +1937,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRouteGroupIds(v)
+		return nil
+	case apikey.FieldForcedServiceTier:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetForcedServiceTier(v)
 		return nil
 	case apikey.FieldFundingSource:
 		v, ok := value.(string)
@@ -2247,6 +2298,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldRouteGroupIds:
 		m.ResetRouteGroupIds()
+		return nil
+	case apikey.FieldForcedServiceTier:
+		m.ResetForcedServiceTier()
 		return nil
 	case apikey.FieldFundingSource:
 		m.ResetFundingSource()
@@ -22309,6 +22363,7 @@ type GroupMutation struct {
 	addsort_order                           *int
 	allow_messages_dispatch                 *bool
 	allow_live                              *bool
+	force_openai_ultrafast                  *bool
 	force_openai_fast                       *bool
 	free_openai_fast                        *bool
 	require_oauth_only                      *bool
@@ -25362,6 +25417,42 @@ func (m *GroupMutation) ResetAllowLive() {
 	m.allow_live = nil
 }
 
+// SetForceOpenaiUltrafast sets the "force_openai_ultrafast" field.
+func (m *GroupMutation) SetForceOpenaiUltrafast(b bool) {
+	m.force_openai_ultrafast = &b
+}
+
+// ForceOpenaiUltrafast returns the value of the "force_openai_ultrafast" field in the mutation.
+func (m *GroupMutation) ForceOpenaiUltrafast() (r bool, exists bool) {
+	v := m.force_openai_ultrafast
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldForceOpenaiUltrafast returns the old "force_openai_ultrafast" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldForceOpenaiUltrafast(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldForceOpenaiUltrafast is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldForceOpenaiUltrafast requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldForceOpenaiUltrafast: %w", err)
+	}
+	return oldValue.ForceOpenaiUltrafast, nil
+}
+
+// ResetForceOpenaiUltrafast resets all changes to the "force_openai_ultrafast" field.
+func (m *GroupMutation) ResetForceOpenaiUltrafast() {
+	m.force_openai_ultrafast = nil
+}
+
 // SetForceOpenaiFast sets the "force_openai_fast" field.
 func (m *GroupMutation) SetForceOpenaiFast(b bool) {
 	m.force_openai_fast = &b
@@ -26335,7 +26426,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 72)
+	fields := make([]string, 0, 73)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26507,6 +26598,9 @@ func (m *GroupMutation) Fields() []string {
 	if m.allow_live != nil {
 		fields = append(fields, group.FieldAllowLive)
 	}
+	if m.force_openai_ultrafast != nil {
+		fields = append(fields, group.FieldForceOpenaiUltrafast)
+	}
 	if m.force_openai_fast != nil {
 		fields = append(fields, group.FieldForceOpenaiFast)
 	}
@@ -26674,6 +26768,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.AllowMessagesDispatch()
 	case group.FieldAllowLive:
 		return m.AllowLive()
+	case group.FieldForceOpenaiUltrafast:
+		return m.ForceOpenaiUltrafast()
 	case group.FieldForceOpenaiFast:
 		return m.ForceOpenaiFast()
 	case group.FieldFreeOpenaiFast:
@@ -26827,6 +26923,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldAllowMessagesDispatch(ctx)
 	case group.FieldAllowLive:
 		return m.OldAllowLive(ctx)
+	case group.FieldForceOpenaiUltrafast:
+		return m.OldForceOpenaiUltrafast(ctx)
 	case group.FieldForceOpenaiFast:
 		return m.OldForceOpenaiFast(ctx)
 	case group.FieldFreeOpenaiFast:
@@ -27264,6 +27362,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAllowLive(v)
+		return nil
+	case group.FieldForceOpenaiUltrafast:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetForceOpenaiUltrafast(v)
 		return nil
 	case group.FieldForceOpenaiFast:
 		v, ok := value.(bool)
@@ -28075,6 +28180,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldAllowLive:
 		m.ResetAllowLive()
+		return nil
+	case group.FieldForceOpenaiUltrafast:
+		m.ResetForceOpenaiUltrafast()
 		return nil
 	case group.FieldForceOpenaiFast:
 		m.ResetForceOpenaiFast()
@@ -45806,6 +45914,8 @@ type UsageLogMutation struct {
 	typ                          string
 	id                           *int64
 	request_id                   *string
+	service_tier_multiplier      *float64
+	addservice_tier_multiplier   *float64
 	model                        *string
 	requested_model              *string
 	upstream_model               *string
@@ -46128,6 +46238,76 @@ func (m *UsageLogMutation) OldRequestID(ctx context.Context) (v string, err erro
 // ResetRequestID resets all changes to the "request_id" field.
 func (m *UsageLogMutation) ResetRequestID() {
 	m.request_id = nil
+}
+
+// SetServiceTierMultiplier sets the "service_tier_multiplier" field.
+func (m *UsageLogMutation) SetServiceTierMultiplier(f float64) {
+	m.service_tier_multiplier = &f
+	m.addservice_tier_multiplier = nil
+}
+
+// ServiceTierMultiplier returns the value of the "service_tier_multiplier" field in the mutation.
+func (m *UsageLogMutation) ServiceTierMultiplier() (r float64, exists bool) {
+	v := m.service_tier_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldServiceTierMultiplier returns the old "service_tier_multiplier" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldServiceTierMultiplier(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldServiceTierMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldServiceTierMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldServiceTierMultiplier: %w", err)
+	}
+	return oldValue.ServiceTierMultiplier, nil
+}
+
+// AddServiceTierMultiplier adds f to the "service_tier_multiplier" field.
+func (m *UsageLogMutation) AddServiceTierMultiplier(f float64) {
+	if m.addservice_tier_multiplier != nil {
+		*m.addservice_tier_multiplier += f
+	} else {
+		m.addservice_tier_multiplier = &f
+	}
+}
+
+// AddedServiceTierMultiplier returns the value that was added to the "service_tier_multiplier" field in this mutation.
+func (m *UsageLogMutation) AddedServiceTierMultiplier() (r float64, exists bool) {
+	v := m.addservice_tier_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearServiceTierMultiplier clears the value of the "service_tier_multiplier" field.
+func (m *UsageLogMutation) ClearServiceTierMultiplier() {
+	m.service_tier_multiplier = nil
+	m.addservice_tier_multiplier = nil
+	m.clearedFields[usagelog.FieldServiceTierMultiplier] = struct{}{}
+}
+
+// ServiceTierMultiplierCleared returns if the "service_tier_multiplier" field was cleared in this mutation.
+func (m *UsageLogMutation) ServiceTierMultiplierCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldServiceTierMultiplier]
+	return ok
+}
+
+// ResetServiceTierMultiplier resets all changes to the "service_tier_multiplier" field.
+func (m *UsageLogMutation) ResetServiceTierMultiplier() {
+	m.service_tier_multiplier = nil
+	m.addservice_tier_multiplier = nil
+	delete(m.clearedFields, usagelog.FieldServiceTierMultiplier)
 }
 
 // SetModel sets the "model" field.
@@ -48670,7 +48850,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 49)
+	fields := make([]string, 0, 50)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -48682,6 +48862,9 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.request_id != nil {
 		fields = append(fields, usagelog.FieldRequestID)
+	}
+	if m.service_tier_multiplier != nil {
+		fields = append(fields, usagelog.FieldServiceTierMultiplier)
 	}
 	if m.model != nil {
 		fields = append(fields, usagelog.FieldModel)
@@ -48834,6 +49017,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.AccountID()
 	case usagelog.FieldRequestID:
 		return m.RequestID()
+	case usagelog.FieldServiceTierMultiplier:
+		return m.ServiceTierMultiplier()
 	case usagelog.FieldModel:
 		return m.Model()
 	case usagelog.FieldRequestedModel:
@@ -48941,6 +49126,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldAccountID(ctx)
 	case usagelog.FieldRequestID:
 		return m.OldRequestID(ctx)
+	case usagelog.FieldServiceTierMultiplier:
+		return m.OldServiceTierMultiplier(ctx)
 	case usagelog.FieldModel:
 		return m.OldModel(ctx)
 	case usagelog.FieldRequestedModel:
@@ -49067,6 +49254,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequestID(v)
+		return nil
+	case usagelog.FieldServiceTierMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetServiceTierMultiplier(v)
 		return nil
 	case usagelog.FieldModel:
 		v, ok := value.(string)
@@ -49391,6 +49585,9 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *UsageLogMutation) AddedFields() []string {
 	var fields []string
+	if m.addservice_tier_multiplier != nil {
+		fields = append(fields, usagelog.FieldServiceTierMultiplier)
+	}
 	if m.addchannel_id != nil {
 		fields = append(fields, usagelog.FieldChannelID)
 	}
@@ -49468,6 +49665,8 @@ func (m *UsageLogMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case usagelog.FieldServiceTierMultiplier:
+		return m.AddedServiceTierMultiplier()
 	case usagelog.FieldChannelID:
 		return m.AddedChannelID()
 	case usagelog.FieldInputTokens:
@@ -49523,6 +49722,13 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case usagelog.FieldServiceTierMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddServiceTierMultiplier(v)
+		return nil
 	case usagelog.FieldChannelID:
 		v, ok := value.(int64)
 		if !ok {
@@ -49692,6 +49898,9 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *UsageLogMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(usagelog.FieldServiceTierMultiplier) {
+		fields = append(fields, usagelog.FieldServiceTierMultiplier)
+	}
 	if m.FieldCleared(usagelog.FieldRequestedModel) {
 		fields = append(fields, usagelog.FieldRequestedModel)
 	}
@@ -49772,6 +49981,9 @@ func (m *UsageLogMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *UsageLogMutation) ClearField(name string) error {
 	switch name {
+	case usagelog.FieldServiceTierMultiplier:
+		m.ClearServiceTierMultiplier()
+		return nil
 	case usagelog.FieldRequestedModel:
 		m.ClearRequestedModel()
 		return nil
@@ -49857,6 +50069,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldRequestID:
 		m.ResetRequestID()
+		return nil
+	case usagelog.FieldServiceTierMultiplier:
+		m.ResetServiceTierMultiplier()
 		return nil
 	case usagelog.FieldModel:
 		m.ResetModel()
@@ -50170,6 +50385,7 @@ type UserMutation struct {
 	signup_source                 *string
 	last_login_at                 *time.Time
 	last_active_at                *time.Time
+	is_downstream                 *bool
 	restrict_public_groups        *bool
 	balance_notify_enabled        *bool
 	balance_notify_threshold_type *string
@@ -51094,6 +51310,42 @@ func (m *UserMutation) LastActiveAtCleared() bool {
 func (m *UserMutation) ResetLastActiveAt() {
 	m.last_active_at = nil
 	delete(m.clearedFields, user.FieldLastActiveAt)
+}
+
+// SetIsDownstream sets the "is_downstream" field.
+func (m *UserMutation) SetIsDownstream(b bool) {
+	m.is_downstream = &b
+}
+
+// IsDownstream returns the value of the "is_downstream" field in the mutation.
+func (m *UserMutation) IsDownstream() (r bool, exists bool) {
+	v := m.is_downstream
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsDownstream returns the old "is_downstream" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldIsDownstream(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsDownstream is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsDownstream requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsDownstream: %w", err)
+	}
+	return oldValue.IsDownstream, nil
+}
+
+// ResetIsDownstream resets all changes to the "is_downstream" field.
+func (m *UserMutation) ResetIsDownstream() {
+	m.is_downstream = nil
 }
 
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
@@ -52158,7 +52410,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -52212,6 +52464,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.last_active_at != nil {
 		fields = append(fields, user.FieldLastActiveAt)
+	}
+	if m.is_downstream != nil {
+		fields = append(fields, user.FieldIsDownstream)
 	}
 	if m.restrict_public_groups != nil {
 		fields = append(fields, user.FieldRestrictPublicGroups)
@@ -52278,6 +52533,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.LastLoginAt()
 	case user.FieldLastActiveAt:
 		return m.LastActiveAt()
+	case user.FieldIsDownstream:
+		return m.IsDownstream()
 	case user.FieldRestrictPublicGroups:
 		return m.RestrictPublicGroups()
 	case user.FieldBalanceNotifyEnabled:
@@ -52337,6 +52594,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldLastLoginAt(ctx)
 	case user.FieldLastActiveAt:
 		return m.OldLastActiveAt(ctx)
+	case user.FieldIsDownstream:
+		return m.OldIsDownstream(ctx)
 	case user.FieldRestrictPublicGroups:
 		return m.OldRestrictPublicGroups(ctx)
 	case user.FieldBalanceNotifyEnabled:
@@ -52485,6 +52744,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLastActiveAt(v)
+		return nil
+	case user.FieldIsDownstream:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsDownstream(v)
 		return nil
 	case user.FieldRestrictPublicGroups:
 		v, ok := value.(bool)
@@ -52751,6 +53017,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldLastActiveAt:
 		m.ResetLastActiveAt()
+		return nil
+	case user.FieldIsDownstream:
+		m.ResetIsDownstream()
 		return nil
 	case user.FieldRestrictPublicGroups:
 		m.ResetRestrictPublicGroups()

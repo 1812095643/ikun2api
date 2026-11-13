@@ -38,7 +38,7 @@ func (s *OpenAIGatewayService) forwardWithoutHostedWebSearch(ctx context.Context
 		return s.forwardOpenAIBPS(ctx, c, account, body)
 	}
 	beginUpstreamResponseModelObservation(c)
-	body = normalizeOpenAIRequestLocale(ctx, account, body, "http")
+	body = s.normalizeOpenAIRequestLocale(ctx, account, body, "http")
 	originalReasoningBody := body
 	ClearActualOpenAIUpstreamEndpoint(c)
 	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
@@ -740,39 +740,18 @@ func (s *OpenAIGatewayService) forwardWithoutHostedWebSearch(ctx context.Context
 		}
 	}
 
-	rawTier := requestView.ServiceTier
-	if openAIGroupForcesFast(ctx, account) {
-		rawTier = OpenAIFastTierPriority
-		if requestView.ServiceTier != OpenAIFastTierPriority {
-			markPatchSet("service_tier", OpenAIFastTierPriority)
+	tierBody, tierErr := s.applyOpenAIFastPolicyToBody(ctx, account, upstreamModel, body)
+	if tierErr != nil {
+		if blocked, ok := tierErr.(*OpenAIFastBlockedError); ok {
+			writeOpenAIFastPolicyBlockedResponse(c, blocked)
 		}
+		return nil, tierErr
 	}
-	if rawTier != "" {
-		if normTier := normalizedOpenAIServiceTierValue(rawTier); normTier != "" {
-			action, errMsg := s.evaluateOpenAIFastPolicy(ctx, account, upstreamModel, normTier)
-			switch action {
-			case BetaPolicyActionBlock:
-				msg := errMsg
-				if msg == "" {
-					msg = fmt.Sprintf("openai service_tier=%s is not allowed for model %s", normTier, upstreamModel)
-				}
-				blocked := &OpenAIFastBlockedError{Message: msg}
-				writeOpenAIFastPolicyBlockedResponse(c, blocked)
-				return nil, blocked
-			case BetaPolicyActionFilter:
-				markPatchDelete("service_tier")
-			case OpenAIFastPolicyActionForcePriority:
-				if rawTier != OpenAIFastTierPriority {
-					markPatchSet("service_tier", OpenAIFastTierPriority)
-				}
-			default:
-				if normTier != rawTier {
-					markPatchSet("service_tier", normTier)
-				}
-			}
-		}
-	} else if s.shouldForceOpenAIFastPriorityForMissingTier(ctx, account, upstreamModel) {
-		markPatchSet("service_tier", OpenAIFastTierPriority)
+	finalTier := gjson.GetBytes(tierBody, "service_tier")
+	if !finalTier.Exists() && requestView.ServiceTier != "" {
+		markPatchDelete("service_tier")
+	} else if finalTier.String() != requestView.ServiceTier {
+		markPatchSet("service_tier", finalTier.String())
 	}
 
 	if account.UsesOpenAICodexProtocol() {

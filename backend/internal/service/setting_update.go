@@ -521,6 +521,16 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyOpenAICodexTicketHarvestProxyURL] = strings.TrimSpace(settings.OpenAICodexTicketHarvestProxyURL)
 	// 自动降智检测：nil = 请求未携带该配置，跳过写入以保留既有值（与
 	// DefaultPlatformQuotas 的整体替换语义一致）；非 nil 时先整体校验再落库。
+	if settings.OpenAIRequestTimezoneSettings != nil {
+		if err := ValidateOpenAIRequestTimezoneSettings(settings.OpenAIRequestTimezoneSettings); err != nil {
+			return nil, err
+		}
+		blob, err := json.Marshal(settings.OpenAIRequestTimezoneSettings)
+		if err != nil {
+			return nil, err
+		}
+		updates[SettingKeyOpenAIRequestTimezoneSettings] = string(blob)
+	}
 	if settings.CodexAutoDegradationCheck != nil {
 		if err := ValidateCodexAutoDegradationCheckSettings(settings.CodexAutoDegradationCheck); err != nil {
 			return nil, err
@@ -856,6 +866,9 @@ func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
 	s.cyberSessionBlockRuntimeMu.Unlock()
 	if s.onUpdate != nil {
 		s.onUpdate() // Invalidate cache after settings update
+	}
+	if settings.OpenAIRequestTimezoneSettings != nil {
+		s.openAIRequestTimezoneCache.Store(&cachedOpenAIRequestTimezoneSettings{settings: *settings.OpenAIRequestTimezoneSettings, expires: time.Now().Add(time.Minute)})
 	}
 	s.notifyChannelMonitorRuntimeListeners()
 }

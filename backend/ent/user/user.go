@@ -51,6 +51,8 @@ const (
 	FieldLastLoginAt = "last_login_at"
 	// FieldLastActiveAt holds the string denoting the last_active_at field in the database.
 	FieldLastActiveAt = "last_active_at"
+	// FieldIsDownstream holds the string denoting the is_downstream field in the database.
+	FieldIsDownstream = "is_downstream"
 	// FieldRestrictPublicGroups holds the string denoting the restrict_public_groups field in the database.
 	FieldRestrictPublicGroups = "restrict_public_groups"
 	// FieldBalanceNotifyEnabled holds the string denoting the balance_notify_enabled field in the database.
@@ -214,6 +216,7 @@ var Columns = []string{
 	FieldSignupSource,
 	FieldLastLoginAt,
 	FieldLastActiveAt,
+	FieldIsDownstream,
 	FieldRestrictPublicGroups,
 	FieldBalanceNotifyEnabled,
 	FieldBalanceNotifyThresholdType,
@@ -283,6 +286,8 @@ var (
 	DefaultSignupSource string
 	// SignupSourceValidator is a validator for the "signup_source" field. It is called by the builders before save.
 	SignupSourceValidator func(string) error
+	// DefaultIsDownstream holds the default value on creation for the "is_downstream" field.
+	DefaultIsDownstream bool
 	// DefaultRestrictPublicGroups holds the default value on creation for the "restrict_public_groups" field.
 	DefaultRestrictPublicGroups bool
 	// DefaultBalanceNotifyEnabled holds the default value on creation for the "balance_notify_enabled" field.
@@ -393,6 +398,11 @@ func ByLastLoginAt(opts ...sql.OrderTermOption) OrderOption {
 // ByLastActiveAt orders the results by the last_active_at field.
 func ByLastActiveAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastActiveAt, opts...).ToFunc()
+}
+
+// ByIsDownstream orders the results by the is_downstream field.
+func ByIsDownstream(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsDownstream, opts...).ToFunc()
 }
 
 // ByRestrictPublicGroups orders the results by the restrict_public_groups field.

@@ -930,6 +930,13 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 	result.OpenAICodexTicketHarvestProxyURL = strings.TrimSpace(settings[SettingKeyOpenAICodexTicketHarvestProxyURL])
 	result.OpenAICodexTicketPromptTemplate = settings[SettingKeyOpenAICodexTicketPromptTemplate]
+	result.OpenAIRequestTimezoneSettings = DefaultOpenAIRequestTimezoneSettings()
+	if raw := settings[SettingKeyOpenAIRequestTimezoneSettings]; raw != "" {
+		parsed := *result.OpenAIRequestTimezoneSettings
+		if json.Unmarshal([]byte(raw), &parsed) == nil && ValidateOpenAIRequestTimezoneSettings(&parsed) == nil {
+			result.OpenAIRequestTimezoneSettings = &parsed
+		}
+	}
 	// 自动降智检测：key 缺失或损坏时回显默认值（默认关闭），
 	// 保证读取路径（GET 回显 / 保存合并）永远拿到可用配置。
 	result.CodexAutoDegradationCheck = DefaultCodexAutoDegradationCheckSettings()

@@ -172,8 +172,8 @@
         </template>
 
         <template #cell-cost="{ row }">
-          <div class="text-sm">
-            <div class="flex items-center gap-1.5">
+          <div class="inline-flex flex-col items-start gap-0.5 text-sm leading-tight" data-testid="usage-cost-cell">
+            <div class="flex items-center gap-1 leading-4">
               <span class="font-medium text-green-600 dark:text-green-400">${{ row.actual_cost?.toFixed(6) || '0.000000' }}</span>
               <span
                 v-if="row.long_context_billing_applied"
@@ -191,9 +191,10 @@
                 </div>
               </div>
             </div>
-            <div v-if="showAccountBilling && row.account_rate_multiplier != null" class="mt-0.5 text-[11px] text-orange-500 dark:text-orange-400">
+            <div v-if="showAccountBilling && row.account_rate_multiplier != null" class="whitespace-nowrap text-[11px] leading-3 text-orange-500 dark:text-orange-400">
               A ${{ accountBilled(row).toFixed(6) }}
             </div>
+            <UsageServiceTierBadge :row="row" />
           </div>
         </template>
 
@@ -501,6 +502,7 @@ import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'
 import UsageTokenCounts from '@/components/usage/UsageTokenCounts.vue'
 import UsageLatencyCell from '@/components/usage/UsageLatencyCell.vue'
+import UsageServiceTierBadge from '@/components/usage/UsageServiceTierBadge.vue'
 import {
   BILLING_MODE_TOKEN,
   getBillingModeLabel,

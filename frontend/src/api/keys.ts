@@ -67,9 +67,11 @@ export async function create(
   expiresInDays?: number,
   rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number },
   fundingSource?: 'balance' | 'universal_subscription',
-  groupIds?: number[]
+  groupIds?: number[],
+  forcedServiceTier?: '' | 'priority' | 'ultrafast'
 ): Promise<ApiKey> {
   const payload: CreateApiKeyRequest = { name }
+  if (forcedServiceTier !== undefined) payload.forced_service_tier = forcedServiceTier
   if (groupIds !== undefined) payload.group_ids = groupIds
   if (fundingSource) payload.funding_source = fundingSource
   if (groupId !== undefined) {

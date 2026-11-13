@@ -1173,7 +1173,7 @@ func (s *GatewayService) calculateRecordUsageCost(
 		if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil &&
 			resolved.Mode == BillingModePerRequest {
 			gid := apiKey.Group.ID
-			cost, err := s.billingService.CalculateCostUnified(CostInput{
+			cost, err := s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 				Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
 				UsageUnits: result.AudioUsage.DurationOrUnits, SizeTier: result.AudioUsage.Mode,
 				RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved,
@@ -1292,7 +1292,7 @@ func (s *GatewayService) resolveChannelPricing(ctx context.Context, billingModel
 		return nil
 	}
 	gid := apiKey.Group.ID
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group})
+	resolved := s.resolver.Resolve(ctx, PricingInput{IsDownstream: isDownstreamAPIKey(apiKey), Model: billingModel, GroupID: &gid, Group: apiKey.Group})
 	if resolved.Source == PricingSourceGroup || resolved.Source == PricingSourceChannel {
 		return resolved
 	}
@@ -1315,7 +1315,7 @@ func (s *GatewayService) calculateImageCost(
 	if resolved != nil && resolved.Source == PricingSourceGroup &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		gid := apiKey.Group.ID
-		cost, err := s.billingService.CalculateCostUnified(CostInput{
+		cost, err := s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
 			RequestCount: result.ImageCount, SizeTier: sizeTier,
 			RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved,
@@ -1340,7 +1340,7 @@ func (s *GatewayService) calculateImageCost(
 			// 按次/图片模式按请求张数结算。Tokens 不参与计价，但尺寸档未命中时
 			// calculatePerRequestCost 要用它匹配按上下文分档的单价，不能省略。
 			gid := apiKey.Group.ID
-			cost, err := s.billingService.CalculateCostUnified(CostInput{
+			cost, err := s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 				Ctx:             ctx,
 				Model:           billingModel,
 				GroupID:         &gid,
@@ -1361,7 +1361,7 @@ func (s *GatewayService) calculateImageCost(
 		case !forcePerImage:
 			// token 模式且开关未强制按张：保持原 token 计费。
 			gid := apiKey.Group.ID
-			cost, err := s.billingService.CalculateCostUnified(CostInput{
+			cost, err := s.billingService.CalculateCostUnified(CostInput{IsDownstream: isDownstreamAPIKey(apiKey),
 				Ctx:             ctx,
 				Model:           billingModel,
 				GroupID:         &gid,
@@ -1409,10 +1409,10 @@ func (s *GatewayService) calculateTokenCost(
 	var resolved *ResolvedPricing
 	if s.resolver != nil && apiKey.Group != nil {
 		gid := apiKey.Group.ID
-		resolved = s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group})
+		resolved = s.resolver.Resolve(ctx, PricingInput{IsDownstream: isDownstreamAPIKey(apiKey), Model: billingModel, GroupID: &gid, Group: apiKey.Group})
 	}
 
-	cost, err := s.billingService.CalculateTokenCostForRequest(TokenCostRequest{
+	cost, err := s.billingService.CalculateTokenCostForRequest(TokenCostRequest{IsDownstream: isDownstreamAPIKey(apiKey),
 		Ctx:             ctx,
 		Model:           billingModel,
 		Group:           apiKey.Group,

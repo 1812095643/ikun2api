@@ -58,6 +58,7 @@ type updateChannelRequest struct {
 }
 
 type channelModelPricingRequest struct {
+	ApplyToDownstream          *bool                      `json:"apply_to_downstream"`
 	Platform                   string                     `json:"platform" binding:"omitempty,max=50"`
 	Models                     []string                   `json:"models" binding:"required,min=1,max=100"`
 	BillingMode                string                     `json:"billing_mode" binding:"omitempty,oneof=token per_request image"`
@@ -133,6 +134,7 @@ type channelResponse struct {
 }
 
 type channelModelPricingResponse struct {
+	ApplyToDownstream          *bool                       `json:"apply_to_downstream"`
 	ID                         int64                       `json:"id"`
 	Platform                   string                      `json:"platform"`
 	Models                     []string                    `json:"models"`
@@ -265,6 +267,7 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 		intervals = append(intervals, intervalToResponse(iv))
 	}
 	return channelModelPricingResponse{
+		ApplyToDownstream:          p.ApplyToDownstream,
 		ID:                         p.ID,
 		Platform:                   platform,
 		Models:                     models,
@@ -367,6 +370,7 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 			flexMultiplier = r.FlexMultiplier
 		}
 		result = append(result, service.ChannelModelPricing{
+			ApplyToDownstream:          r.ApplyToDownstream,
 			Platform:                   platform,
 			Models:                     r.Models,
 			BillingMode:                billingMode,

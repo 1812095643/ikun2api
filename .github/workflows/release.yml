@@ -165,6 +165,13 @@ jobs:
           -run 'Test(MuseVideo|ForwardMuseVideo|IsGrokVideoStatusBillable|ExtractGrokVideoBilling|GrokMediaUsageFromResponseVideo|ForwardGrokMediaContent|GrokMediaSignedVideoContentURL|ForwardGrokVideoStatus|RewriteGrokMediaVideoContentURLs|GrokMediaVideoCompletionStillClaimsBillingOnce|GrokVideo|OpenAIGatewayServiceRecordUsage_(GrokVideo|GroupVideo|HydratesGroupVideo))'
           -count=1 -timeout=180s
 
+      - name: 记账、下游与 OpenAI 档位时区回归
+        run: |
+          cd backend
+          go test -tags unit ./internal/service ./internal/repository ./internal/handler ./internal/handler/admin ./internal/handler/dto ./internal/workspace ./internal/server/middleware -run 'Test(OpenAIAccountServiceTiers|OpenAIServiceTier|OpenAIAccountTier|OpenAIForced|OpenAIRequestTimezone|OpenAIRequestLocale|NormalizeOpenAIRequestLocale|RewriteOpenAIRequestEnvironment|ProxyProbe|AdminReceivable|Receivable|Downstream|UserGroupRateResolver|APIKeyAuthSnapshot|GroupRequestsDecodeForceOpenAI)' -count=1 -timeout=180s
+          cd ../frontend
+          pnpm exec vitest run src/utils/__tests__/openaiServiceTiers.spec.ts src/components/usage/UsageServiceTierBadge.spec.ts src/components/account/__tests__/OpenAIServiceTierSettings.spec.ts src/components/account/__tests__/OpenAIRequestTimezoneField.spec.ts src/components/account/__tests__/EditAccountModal.spec.ts src/views/user/__tests__/KeysView.spec.ts src/views/admin/__tests__/groupsOpenAIFast.spec.ts src/components/admin/business/__tests__/BusinessFlows.spec.ts
+
       # ---------------- 五个平台二进制 ----------------
 
       - name: 释放 runner 磁盘空间

@@ -38,6 +38,7 @@ func (UsageLog) Fields() []ent.Field {
 		field.String("request_id").
 			MaxLen(64).
 			NotEmpty(),
+		field.Float("service_tier_multiplier").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "decimal(12,4)"}),
 		field.String("model").
 			MaxLen(100).
 			NotEmpty(),

@@ -269,7 +269,7 @@ func (s *OpenAIGatewayService) buildCodexProbeRequest(ctx context.Context, accou
 		return nil, nil, ErrCodexProbeIdentity
 	}
 	template := ctx.Value(codexProbeTemplateContextKey{}).(*CodexProbeTemplate)
-	return template.render(model, challenge.Prompt, account.OpenAIRequestTimezone(), identity)
+	return template.render(model, challenge.Prompt, s.resolveOpenAIRequestTimezone(ctx, account), identity)
 }
 
 func (template *CodexProbeTemplate) render(model, prompt, timezone string, identity codexReplayIdentity) ([]byte, http.Header, error) {

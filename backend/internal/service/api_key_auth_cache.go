@@ -4,18 +4,19 @@ import "time"
 
 // APIKeyAuthSnapshot API Key 认证缓存快照（仅包含认证所需字段）
 type APIKeyAuthSnapshot struct {
-	FundingSource string                   `json:"funding_source"`
-	Version       int                      `json:"version"`
-	APIKeyID      int64                    `json:"api_key_id"`
-	UserID        int64                    `json:"user_id"`
-	RouteGroupIDs []int64                  `json:"route_group_ids,omitempty"`
-	GroupID       *int64                   `json:"group_id,omitempty"`
-	Name          string                   `json:"name"`
-	Status        string                   `json:"status"`
-	IPWhitelist   []string                 `json:"ip_whitelist,omitempty"`
-	IPBlacklist   []string                 `json:"ip_blacklist,omitempty"`
-	User          APIKeyAuthUserSnapshot   `json:"user"`
-	Group         *APIKeyAuthGroupSnapshot `json:"group,omitempty"`
+	FundingSource     string                   `json:"funding_source"`
+	ForcedServiceTier string                   `json:"forced_service_tier"`
+	Version           int                      `json:"version"`
+	APIKeyID          int64                    `json:"api_key_id"`
+	UserID            int64                    `json:"user_id"`
+	RouteGroupIDs     []int64                  `json:"route_group_ids,omitempty"`
+	GroupID           *int64                   `json:"group_id,omitempty"`
+	Name              string                   `json:"name"`
+	Status            string                   `json:"status"`
+	IPWhitelist       []string                 `json:"ip_whitelist,omitempty"`
+	IPBlacklist       []string                 `json:"ip_blacklist,omitempty"`
+	User              APIKeyAuthUserSnapshot   `json:"user"`
+	Group             *APIKeyAuthGroupSnapshot `json:"group,omitempty"`
 
 	// Quota fields for API Key independent quota feature
 	Quota     float64 `json:"quota"`      // Quota limit in USD (0 = unlimited)
@@ -32,6 +33,7 @@ type APIKeyAuthSnapshot struct {
 
 // APIKeyAuthUserSnapshot 用户快照
 type APIKeyAuthUserSnapshot struct {
+	IsDownstream  bool    `json:"is_downstream"`
 	ID            int64   `json:"id"`
 	Status        string  `json:"status"`
 	Role          string  `json:"role"`
@@ -112,6 +114,7 @@ type APIKeyAuthGroupSnapshot struct {
 	AllowMessagesDispatch       bool                              `json:"allow_messages_dispatch"`
 	AllowLive                   bool                              `json:"allow_live"`
 	ForceOpenAIFast             bool                              `json:"force_openai_fast"`
+	ForceOpenAIUltrafast        bool                              `json:"force_openai_ultrafast"`
 	FreeOpenAIFast              bool                              `json:"free_openai_fast"`
 	DefaultMappedModel          string                            `json:"default_mapped_model,omitempty"`
 	MessagesDispatchModelConfig OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config,omitempty"`

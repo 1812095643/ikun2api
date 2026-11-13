@@ -23,15 +23,15 @@ const selectStub = {
 const catalog = { default: 'Asia/Singapore', timezones: ['Asia/Singapore', 'Asia/Tokyo', 'Europe/London'] }
 
 describe('OpenAIRequestTimezoneField', () => {
-  it('uses the backend catalog and resets a retired timezone to Singapore', async () => {
+  it('keeps a saved timezone and offers inherited gateway settings', async () => {
     getOpenAIRequestTimezones.mockResolvedValue(catalog)
     const wrapper = mount(OpenAIRequestTimezoneField, {
       props: { modelValue: 'Europe/Oslo' },
       global: { stubs: { Select: selectStub } }
     })
     await flushPromises()
-    expect(wrapper.get('[data-test="timezone-select"]').text()).toBe('Europe/Oslo / 3')
-    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['Asia/Singapore'])
+    expect(wrapper.get('[data-test="timezone-select"]').text()).toBe('Europe/Oslo / 5')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     wrapper.unmount()
   })
 
@@ -42,8 +42,24 @@ describe('OpenAIRequestTimezoneField', () => {
       global: { stubs: { Select: selectStub } }
     })
     await flushPromises()
-    expect(wrapper.get('[data-test="timezone-select"]').text()).toBe('Asia/Tokyo / 3')
+    expect(wrapper.get('[data-test="timezone-select"]').text()).toBe('Asia/Tokyo / 4')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     wrapper.unmount()
   })
+})
+
+
+it('retains automatic mode and fallback options if the catalog is unavailable', async () => {
+  getOpenAIRequestTimezones.mockRejectedValue(new Error('offline'))
+  const wrapper = mount(OpenAIRequestTimezoneField, { props: { modelValue: '' }, global: { stubs: { Select: selectStub } } })
+  await flushPromises()
+  expect(wrapper.findComponent(selectStub).props('options')[0]).toEqual({ value: '', label: 'openaiServiceTiers.inheritTimezone' })
+  expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+})
+
+it('omits the inherited option for the system default timezone selector', async () => {
+  getOpenAIRequestTimezones.mockResolvedValue(catalog)
+  const wrapper = mount(OpenAIRequestTimezoneField, { props: { modelValue: 'Asia/Singapore', allowInherit: false }, global: { stubs: { Select: selectStub } } })
+  await flushPromises()
+  expect(wrapper.findComponent(selectStub).props('options').every((option: { value: string }) => option.value !== '')).toBe(true)
 })

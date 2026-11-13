@@ -879,3 +879,20 @@ describe('admin UsageTable deleted-user badge', () => {
     expect(wrapper.text()).toContain('active@test.com')
   })
 })
+
+
+describe('stacked usage cost', () => {
+  it.each([true, false])('keeps tier and account billing below the charge (admin=%s)', (showAccountBilling) => {
+    const row = { ...baseImageRow, request_id: 'tier-stacked', model: 'gpt-6.1-sol', billing_mode: 'token', image_count: 0, service_tier: 'ultrafast', service_tier_multiplier: 8, account_rate_multiplier: .5 }
+    const wrapper = mount(UsageTable, {
+      props: { data: [row], columns: [{ key: 'cost', label: 'Cost' }], showAccountBilling },
+      global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
+    })
+    const cost = wrapper.get('[data-testid="usage-cost-cell"]')
+    const marker = cost.get('[data-testid="service-tier-billing-marker"]')
+    expect(marker.text()).toBe('Ultrafast ×8')
+    expect(marker.element.parentElement).toBe(cost.element)
+    expect(cost.element.firstElementChild?.contains(marker.element)).toBe(false)
+    expect(cost.text().includes('A $')).toBe(showAccountBilling)
+  })
+})

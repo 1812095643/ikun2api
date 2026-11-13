@@ -117,6 +117,8 @@ type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[i
 
 // SettingService 系统设置服务
 type SettingService struct {
+	openAIRequestTimezoneCache         atomic.Pointer[cachedOpenAIRequestTimezoneSettings]
+	openAIRequestTimezoneSF            singleflight.Group
 	scopedAdminKeyRepo                 ScopedAdminKeyRepository
 	settingRepo                        SettingRepository
 	defaultSubGroupReader              DefaultSubscriptionGroupReader

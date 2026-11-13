@@ -96,7 +96,7 @@ type BillingCache interface {
 
 // ModelPricing 模型价格配置（per-token价格，与LiteLLM格式一致）
 type ModelPricing struct {
-	// UltrafastMultiplier is model-owned and independent of operator Fast pricing.
+	// UltrafastMultiplier applies to Standard prices; account overrides are request-local.
 	UltrafastMultiplier                float64
 	InputPricePerToken                 float64            // 每token输入价格 (USD)
 	InputPricePerTokenPriority         float64            // priority service tier 下每token输入价格 (USD)
@@ -202,6 +202,7 @@ type UsageTokens struct {
 
 // CostBreakdown 费用明细
 type CostBreakdown struct {
+	ServiceTierMultiplier     float64
 	InputCost                 float64 // 文本输入费用（不含图片输入，图片输入单独记入 ImageInputCost）
 	ImageInputCost            float64 // 图片输入 token 费用（如 gpt-image-2 图片编辑）
 	OutputCost                float64
@@ -1588,6 +1589,7 @@ func applyChannelTokenPriceOverrides(pricing *ModelPricing, channelPricing *Chan
 
 // CostInput 统一计费输入
 type CostInput struct {
+	IsDownstream              bool
 	Ctx                       context.Context
 	Model                     string
 	GroupID                   *int64 // 用于渠道定价查找
@@ -1597,7 +1599,8 @@ type CostInput struct {
 	UsageUnits                float64 // 音频等连续计量单位（分钟/小时/百万字符）
 	SizeTier                  string  // 按次/图片模式的层级标签（"1K","2K","4K","HD" 等）
 	RateMultiplier            float64
-	PricingAt                 time.Time             // 渠道分时定价使用的计费时刻
+	PricingAt                 time.Time // 渠道分时定价使用的计费时刻
+	ServiceTierMultiplier     *float64
 	ServiceTier               string                // "priority","flex","" 等
 	ReasoningEffort           string                // 最终转发的推理等级，按匹配定价中配置的等级倍率计费
 	Resolver                  *ModelPricingResolver // 定价解析器
@@ -1620,6 +1623,7 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 		if err != nil {
 			return nil, err
 		}
+		pricing = pricingWithServiceTierOverride(pricing, input.ServiceTier, input.ServiceTierMultiplier)
 		breakdown := s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongContextBilling && !input.DisableModelLongContextPricing)
 		applyCostBreakdownMultiplier(breakdown, reasoningEffortBillingMultiplier(input.ReasoningEffort, pricing.ReasoningEffortMultipliers))
 		return breakdown, nil
@@ -1629,9 +1633,10 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 	resolved := input.Resolved
 	if resolved == nil {
 		resolved = input.Resolver.Resolve(input.Ctx, PricingInput{
-			Model:   input.Model,
-			GroupID: input.GroupID,
-			Group:   input.Group,
+			IsDownstream: input.IsDownstream,
+			Model:        input.Model,
+			GroupID:      input.GroupID,
+			Group:        input.Group,
 		})
 	}
 
@@ -1708,6 +1713,7 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 	// 官方长上下文阶梯仅在无区间定价时应用（区间定价已包含上下文分层）。
 	applyLongCtx := len(resolved.Intervals) == 0 && contextTierPricingEnabled && !input.DisableModelLongContextPricing
 
+	pricing = pricingWithServiceTierOverride(pricing, input.ServiceTier, input.ServiceTierMultiplier)
 	breakdown := s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongCtx)
 	applyCostBreakdownMultiplier(breakdown, resolvedChannelTimeMultiplier(resolved, input.PricingAt))
 	applyCostBreakdownMultiplier(breakdown, reasoningEffortBillingMultiplier(input.ReasoningEffort, pricing.ReasoningEffortMultipliers))
@@ -1782,7 +1788,10 @@ func (s *BillingService) computeTokenBreakdown(
 		cacheCreationMultiplier = longCtxInputMultiplier
 	}
 
-	bd := &CostBreakdown{}
+	bd := &CostBreakdown{ServiceTierMultiplier: configuredServiceTierMultiplier(serviceTier, pricing)}
+	if usePriorityServiceTierPricing(serviceTier, pricing) && pricing.InputPricePerToken > 0 && pricing.InputPricePerTokenPriority > 0 {
+		bd.ServiceTierMultiplier = pricing.InputPricePerTokenPriority / pricing.InputPricePerToken
+	}
 	// 分离图片输入 token 与文本输入 token（多模态 embedding、图片编辑等图文不同价场景）。
 	// InputCost 仅计文本输入，图片输入费用单独记入 ImageInputCost，便于对账；总额不变。
 	// ImageInputTokens 为 0 时（绝大多数 chat/vision 流量）走原始单价路径，行为不变。
@@ -2038,8 +2047,8 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 		return pricing
 	}
 	cloned := *pricing
-	if isOpenAIGPT6AstraModel(normalized) {
-		cloned.UltrafastMultiplier = 6
+	if ratio := openAIModelUltrafastPricingRatio(normalized); ratio > 0 {
+		cloned.UltrafastMultiplier = ratio
 	}
 	if needsOpus55FastMultiplier {
 		multiplier := 2.0

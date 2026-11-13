@@ -22,6 +22,7 @@ export interface IntervalFormEntry {
 }
 
 export interface PricingFormEntry {
+  apply_to_downstream?: boolean
   models: string[]
   billing_mode: BillingMode
   input_price: number | string | null

@@ -449,6 +449,9 @@ func openAICompatibleAccountEligibilityFailureReasonBeforeProfit(ctx context.Con
 	if requestedModel != "" && !supportsOpenAIRequestModel(account, requestedModel, requireCompact) {
 		return "model_not_supported"
 	}
+	if reason := openAIAccountServiceTierEligibilityReason(ctx, account, requestedModel); reason != "" {
+		return reason
+	}
 	if !account.SupportsOpenAIEndpointCapability(requiredCapability) {
 		if account.IsGrok() && requiredCapability == OpenAIEndpointCapabilityGrokMediaGeneration {
 			_, reason := account.GrokMediaGenerationEligibility()
@@ -788,6 +791,11 @@ func openAIQuotaAutoPauseSettingsFromContext(ctx context.Context) OpsOpenAIAccou
 func (s *OpenAIGatewayService) withOpenAIQuotaAutoPauseContext(ctx context.Context) context.Context {
 	if s == nil || s.settingService == nil {
 		return ctx
+	}
+	if openAIFastPolicySettingsFromContext(ctx) == nil {
+		if settings, err := s.settingService.GetOpenAIFastPolicySettings(ctx); err == nil {
+			ctx = withOpenAIFastPolicyContext(ctx, settings)
+		}
 	}
 	return withOpenAIQuotaAutoPauseSettings(ctx, s.settingService.GetOpenAIQuotaAutoPauseSettings(ctx))
 }

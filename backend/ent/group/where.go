@@ -315,6 +315,11 @@ func AllowLive(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldAllowLive, v))
 }
 
+// ForceOpenaiUltrafast applies equality check predicate on the "force_openai_ultrafast" field. It's identical to ForceOpenaiUltrafastEQ.
+func ForceOpenaiUltrafast(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldForceOpenaiUltrafast, v))
+}
+
 // ForceOpenaiFast applies equality check predicate on the "force_openai_fast" field. It's identical to ForceOpenaiFastEQ.
 func ForceOpenaiFast(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldForceOpenaiFast, v))
@@ -2438,6 +2443,16 @@ func AllowLiveEQ(v bool) predicate.Group {
 // AllowLiveNEQ applies the NEQ predicate on the "allow_live" field.
 func AllowLiveNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldAllowLive, v))
+}
+
+// ForceOpenaiUltrafastEQ applies the EQ predicate on the "force_openai_ultrafast" field.
+func ForceOpenaiUltrafastEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldForceOpenaiUltrafast, v))
+}
+
+// ForceOpenaiUltrafastNEQ applies the NEQ predicate on the "force_openai_ultrafast" field.
+func ForceOpenaiUltrafastNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldForceOpenaiUltrafast, v))
 }
 
 // ForceOpenaiFastEQ applies the EQ predicate on the "force_openai_fast" field.

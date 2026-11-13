@@ -105,6 +105,20 @@ func (_c *APIKeyCreate) SetRouteGroupIds(v []int64) *APIKeyCreate {
 	return _c
 }
 
+// SetForcedServiceTier sets the "forced_service_tier" field.
+func (_c *APIKeyCreate) SetForcedServiceTier(v string) *APIKeyCreate {
+	_c.mutation.SetForcedServiceTier(v)
+	return _c
+}
+
+// SetNillableForcedServiceTier sets the "forced_service_tier" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableForcedServiceTier(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetForcedServiceTier(*v)
+	}
+	return _c
+}
+
 // SetFundingSource sets the "funding_source" field.
 func (_c *APIKeyCreate) SetFundingSource(v string) *APIKeyCreate {
 	_c.mutation.SetFundingSource(v)
@@ -403,6 +417,10 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.ForcedServiceTier(); !ok {
+		v := apikey.DefaultForcedServiceTier
+		_c.mutation.SetForcedServiceTier(v)
+	}
 	if _, ok := _c.mutation.FundingSource(); !ok {
 		v := apikey.DefaultFundingSource
 		_c.mutation.SetFundingSource(v)
@@ -471,6 +489,14 @@ func (_c *APIKeyCreate) check() error {
 	if v, ok := _c.mutation.Name(); ok {
 		if err := apikey.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.ForcedServiceTier(); !ok {
+		return &ValidationError{Name: "forced_service_tier", err: errors.New(`ent: missing required field "APIKey.forced_service_tier"`)}
+	}
+	if v, ok := _c.mutation.ForcedServiceTier(); ok {
+		if err := apikey.ForcedServiceTierValidator(v); err != nil {
+			return &ValidationError{Name: "forced_service_tier", err: fmt.Errorf(`ent: validator failed for field "APIKey.forced_service_tier": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.FundingSource(); !ok {
@@ -566,6 +592,10 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.RouteGroupIds(); ok {
 		_spec.SetField(apikey.FieldRouteGroupIds, field.TypeJSON, value)
 		_node.RouteGroupIds = value
+	}
+	if value, ok := _c.mutation.ForcedServiceTier(); ok {
+		_spec.SetField(apikey.FieldForcedServiceTier, field.TypeString, value)
+		_node.ForcedServiceTier = value
 	}
 	if value, ok := _c.mutation.FundingSource(); ok {
 		_spec.SetField(apikey.FieldFundingSource, field.TypeString, value)
@@ -836,6 +866,18 @@ func (u *APIKeyUpsert) UpdateRouteGroupIds() *APIKeyUpsert {
 // ClearRouteGroupIds clears the value of the "route_group_ids" field.
 func (u *APIKeyUpsert) ClearRouteGroupIds() *APIKeyUpsert {
 	u.SetNull(apikey.FieldRouteGroupIds)
+	return u
+}
+
+// SetForcedServiceTier sets the "forced_service_tier" field.
+func (u *APIKeyUpsert) SetForcedServiceTier(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldForcedServiceTier, v)
+	return u
+}
+
+// UpdateForcedServiceTier sets the "forced_service_tier" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateForcedServiceTier() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldForcedServiceTier)
 	return u
 }
 
@@ -1294,6 +1336,20 @@ func (u *APIKeyUpsertOne) UpdateRouteGroupIds() *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) ClearRouteGroupIds() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearRouteGroupIds()
+	})
+}
+
+// SetForcedServiceTier sets the "forced_service_tier" field.
+func (u *APIKeyUpsertOne) SetForcedServiceTier(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetForcedServiceTier(v)
+	})
+}
+
+// UpdateForcedServiceTier sets the "forced_service_tier" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateForcedServiceTier() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateForcedServiceTier()
 	})
 }
 
@@ -1967,6 +2023,20 @@ func (u *APIKeyUpsertBulk) UpdateRouteGroupIds() *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) ClearRouteGroupIds() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearRouteGroupIds()
+	})
+}
+
+// SetForcedServiceTier sets the "forced_service_tier" field.
+func (u *APIKeyUpsertBulk) SetForcedServiceTier(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetForcedServiceTier(v)
+	})
+}
+
+// UpdateForcedServiceTier sets the "forced_service_tier" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateForcedServiceTier() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateForcedServiceTier()
 	})
 }
 

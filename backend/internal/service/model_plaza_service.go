@@ -145,6 +145,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		}
 		ch.normalizeBillingModelSource()
 		supported := ch.SupportedModels()
+		filterSupportedDownstreamPricing(ctx, supported)
 		fillGlobalPricingFallback(s.pricingService, supported)
 
 		for _, gid := range ch.GroupIDs {

@@ -475,6 +475,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, title: 'User Request Audit', titleKey: 'admin.userRequestAudit.title', descriptionKey: 'admin.userRequestAudit.description' }
   },
   {
+    path: '/admin/receivables', name: 'AdminReceivables', component: () => import('@/views/admin/ReceivablesView.vue'), meta: { requiresAuth: true, requiresAdmin: true, title: '记账收款', titleKey: 'business.ledger' }
+  },
+  {
+    path: '/admin/downstreams', name: 'AdminDownstreams', component: () => import('@/views/admin/DownstreamsView.vue'), meta: { requiresAuth: true, requiresAdmin: true, title: '下游管理', titleKey: 'business.downstreams' }
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),

@@ -31,6 +31,8 @@ const (
 	FieldGroupID = "group_id"
 	// FieldRouteGroupIds holds the string denoting the route_group_ids field in the database.
 	FieldRouteGroupIds = "route_group_ids"
+	// FieldForcedServiceTier holds the string denoting the forced_service_tier field in the database.
+	FieldForcedServiceTier = "forced_service_tier"
 	// FieldFundingSource holds the string denoting the funding_source field in the database.
 	FieldFundingSource = "funding_source"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -107,6 +109,7 @@ var Columns = []string{
 	FieldName,
 	FieldGroupID,
 	FieldRouteGroupIds,
+	FieldForcedServiceTier,
 	FieldFundingSource,
 	FieldStatus,
 	FieldLastUsedAt,
@@ -154,6 +157,10 @@ var (
 	KeyValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// DefaultForcedServiceTier holds the default value on creation for the "forced_service_tier" field.
+	DefaultForcedServiceTier string
+	// ForcedServiceTierValidator is a validator for the "forced_service_tier" field. It is called by the builders before save.
+	ForcedServiceTierValidator func(string) error
 	// DefaultFundingSource holds the default value on creation for the "funding_source" field.
 	DefaultFundingSource string
 	// FundingSourceValidator is a validator for the "funding_source" field. It is called by the builders before save.
@@ -221,6 +228,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
+}
+
+// ByForcedServiceTier orders the results by the forced_service_tier field.
+func ByForcedServiceTier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldForcedServiceTier, opts...).ToFunc()
 }
 
 // ByFundingSource orders the results by the funding_source field.

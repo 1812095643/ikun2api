@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
+	"github.com/MACOS-DO/sub4api/internal/pkg/ctxkey"
 	"github.com/MACOS-DO/sub4api/internal/pkg/logger"
 	"github.com/MACOS-DO/sub4api/internal/pkg/timezone"
 	"github.com/google/uuid"
@@ -404,7 +405,8 @@ type inflightEstimateDeps struct {
 	// 即账号映射后的模型），因此这里取所有候选映射模型的最高估算。
 	// 仅在首选/渠道候选均无法定价（或 composite 分组）时才调用；实现只读调度器快照，
 	// 不在请求路径上直接查库，也不按模型名缓存（内存不随请求模型名增长）。
-	accountMappedModels func(ctx context.Context, apiKey *APIKey, model string) []string
+	accountMappedModels  func(ctx context.Context, apiKey *APIKey, model string) []string
+	serviceTierTokenCost func(context.Context, *APIKey, string, *ModelPricing, UsageTokens, float64) float64
 }
 
 // inflightSnapshotLister 调度器快照读取（与账号选择同源：Redis 快照，未命中时由快照服务自身回源并回填）。
@@ -556,6 +558,7 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 	if d.resolver != nil {
 		in := PricingInput{Model: model}
 		if apiKey != nil {
+			in.IsDownstream = isDownstreamAPIKey(apiKey)
 			in.GroupID = apiKey.GroupID
 			in.Group = apiKey.Group
 		}
@@ -573,6 +576,9 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 		}
 		if pricing == nil {
 			return 0
+		}
+		if d.serviceTierTokenCost != nil {
+			return d.serviceTierTokenCost(ctx, apiKey, model, pricing, UsageTokens{InputTokens: inputTokens, OutputTokens: outputTokens}, textRate)
 		}
 		return (float64(inputTokens)*pricing.InputPricePerToken + float64(outputTokens)*pricing.OutputPricePerToken) * textRate
 	}
@@ -751,6 +757,7 @@ func (s *GatewayService) EstimateInflightReservation(ctx context.Context, apiKey
 
 func (s *OpenAIGatewayService) inflightEstimateDeps() inflightEstimateDeps {
 	d := inflightEstimateDeps{cfg: s.cfg, billing: s.billingService, resolver: s.resolver}
+	d.serviceTierTokenCost = s.estimateOpenAIServiceTierTokenCost
 	if s.channelService != nil {
 		d.resolveMapping = s.channelService.ResolveChannelMapping
 	}
@@ -776,8 +783,20 @@ func (s *OpenAIGatewayService) inflightEstimateDeps() inflightEstimateDeps {
 
 // EstimateInflightReservation 同 GatewayService.EstimateInflightReservation（OpenAI 网关倍率口径）。
 func (s *OpenAIGatewayService) EstimateInflightReservation(ctx context.Context, apiKey *APIKey, req InflightEstimateRequest) (float64, bool) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if s == nil {
 		return 0, false
 	}
+	if apiKey != nil {
+		if _, exists := ctx.Value(openAIRequestServiceTierContextKey{}).(openAIRequestServiceTierContext); !exists {
+			ctx = WithOpenAIRequestServiceTier(ctx, apiKey, nil)
+		}
+		if apiKey.Group != nil && IsGroupContextValid(apiKey.Group) {
+			ctx = context.WithValue(ctx, ctxkey.Group, apiKey.Group)
+		}
+	}
+	ctx = s.withOpenAIInflightTierAccounts(ctx, apiKey)
 	return s.inflightEstimateDeps().estimate(ctx, apiKey, req)
 }

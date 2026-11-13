@@ -608,6 +608,11 @@
           </Select>
         </div>
 
+        <div v-if="keySupportsOpenAITier" class="space-y-1.5" data-testid="key-forced-service-tier">
+          <label class="input-label">{{ t('openaiServiceTiers.forcedTier') }}</label>
+          <OpenAIServiceTierSelect v-model="formData.forced_service_tier" />
+        </div>
+
         <!-- Custom Key Section (only for create) -->
         <div v-if="!showEditModal" class="space-y-3">
           <div class="flex items-center justify-between">
@@ -1204,6 +1209,8 @@ const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import OpenAIServiceTierSelect from '@/components/common/OpenAIServiceTierSelect.vue'
+import type { ForcedOpenAIServiceTier } from '@/utils/openaiServiceTiers'
 import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import DataTable from '@/components/common/DataTable.vue'
 	import Pagination from '@/components/common/Pagination.vue'
@@ -1445,6 +1452,7 @@ const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance 
 const formData = ref({
   name: '',
     funding_source: 'balance' as 'balance' | 'universal_subscription',
+    forced_service_tier: '' as ForcedOpenAIServiceTier,
   group_id: null as number | null,
   smart_routing: false,
   group_ids: [] as number[],
@@ -1555,6 +1563,10 @@ const groupOptions = computed(() =>
   }))
 )
 
+const keySupportsOpenAITier = computed(() => {
+  const ids = formData.value.smart_routing ? formData.value.group_ids : [formData.value.group_id]
+  return groups.value.some(group => ids.includes(group.id) && (group.platform === 'openai' || group.platform === 'composite'))
+})
 const createProvider = ref<KeyGroupProvider>('anthropic')
 const createProviderOptions = computed(() => KEY_GROUP_PROVIDERS.map((value) => ({
   value,
@@ -1737,6 +1749,7 @@ const editKey = (key: ApiKey) => {
   formData.value = {
     name: key.name,
     funding_source: key.funding_source || 'balance',
+    forced_service_tier: key.forced_service_tier || '' as ForcedOpenAIServiceTier,
     group_id: key.group_id,
     smart_routing: (key.group_ids?.length ?? 0) > 1,
     group_ids: [...(key.group_ids?.length ? key.group_ids : key.group_id ? [key.group_id] : [])],
@@ -1898,6 +1911,7 @@ const handleSubmit = async () => {
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         funding_source: formData.value.funding_source,
+        forced_service_tier: formData.value.forced_service_tier,
         name: formData.value.name,
         group_id: formData.value.group_id,
         group_ids: formData.value.smart_routing ? [...formData.value.group_ids] : [formData.value.group_id],
@@ -1926,7 +1940,8 @@ const handleSubmit = async () => {
         expiresInDays,
         rateLimitData,
         formData.value.funding_source,
-        formData.value.smart_routing ? [...formData.value.group_ids] : undefined
+        formData.value.smart_routing ? [...formData.value.group_ids] : undefined,
+        formData.value.forced_service_tier
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
@@ -1972,6 +1987,7 @@ const closeModals = () => {
   formData.value = {
     name: '',
     funding_source: 'balance' as 'balance' | 'universal_subscription',
+    forced_service_tier: '' as ForcedOpenAIServiceTier,
     group_id: null,
     smart_routing: false,
     group_ids: [],

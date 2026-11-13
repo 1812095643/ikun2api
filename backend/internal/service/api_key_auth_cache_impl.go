@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 29 // v29: smart routes, user RPM and privacy scheduling snapshots
+const apiKeyAuthSnapshotVersion = 31 // v31: per-key and group forced OpenAI service tiers
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -336,23 +336,25 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		return nil
 	}
 	snapshot := &APIKeyAuthSnapshot{
-		Version:       apiKeyAuthSnapshotVersion,
-		APIKeyID:      apiKey.ID,
-		UserID:        apiKey.UserID,
-		GroupID:       apiKey.GroupID,
-		RouteGroupIDs: append([]int64(nil), apiKey.RouteGroupIDs...),
-		FundingSource: apiKey.FundingSource,
-		Name:          apiKey.Name,
-		Status:        apiKey.Status,
-		IPWhitelist:   apiKey.IPWhitelist,
-		IPBlacklist:   apiKey.IPBlacklist,
-		Quota:         apiKey.Quota,
-		QuotaUsed:     apiKey.QuotaUsed,
-		ExpiresAt:     apiKey.ExpiresAt,
-		RateLimit5h:   apiKey.RateLimit5h,
-		RateLimit1d:   apiKey.RateLimit1d,
-		RateLimit7d:   apiKey.RateLimit7d,
+		Version:           apiKeyAuthSnapshotVersion,
+		APIKeyID:          apiKey.ID,
+		UserID:            apiKey.UserID,
+		GroupID:           apiKey.GroupID,
+		RouteGroupIDs:     append([]int64(nil), apiKey.RouteGroupIDs...),
+		FundingSource:     apiKey.FundingSource,
+		ForcedServiceTier: apiKey.ForcedServiceTier,
+		Name:              apiKey.Name,
+		Status:            apiKey.Status,
+		IPWhitelist:       apiKey.IPWhitelist,
+		IPBlacklist:       apiKey.IPBlacklist,
+		Quota:             apiKey.Quota,
+		QuotaUsed:         apiKey.QuotaUsed,
+		ExpiresAt:         apiKey.ExpiresAt,
+		RateLimit5h:       apiKey.RateLimit5h,
+		RateLimit1d:       apiKey.RateLimit1d,
+		RateLimit7d:       apiKey.RateLimit7d,
 		User: APIKeyAuthUserSnapshot{
+			IsDownstream:               apiKey.User.IsDownstream,
 			ID:                         apiKey.User.ID,
 			Status:                     apiKey.User.Status,
 			Role:                       apiKey.User.Role,
@@ -425,6 +427,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			AllowMessagesDispatch:           apiKey.Group.AllowMessagesDispatch,
 			AllowLive:                       apiKey.Group.AllowLive,
 			ForceOpenAIFast:                 apiKey.Group.ForceOpenAIFast,
+			ForceOpenAIUltrafast:            apiKey.Group.ForceOpenAIUltrafast,
 			FreeOpenAIFast:                  apiKey.Group.FreeOpenAIFast,
 			DefaultMappedModel:              apiKey.Group.DefaultMappedModel,
 			MessagesDispatchModelConfig:     apiKey.Group.MessagesDispatchModelConfig,
@@ -452,23 +455,25 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		return nil
 	}
 	apiKey := &APIKey{
-		ID:            snapshot.APIKeyID,
-		UserID:        snapshot.UserID,
-		GroupID:       snapshot.GroupID,
-		RouteGroupIDs: append([]int64(nil), snapshot.RouteGroupIDs...),
-		FundingSource: snapshot.FundingSource,
-		Key:           key,
-		Name:          snapshot.Name,
-		Status:        snapshot.Status,
-		IPWhitelist:   snapshot.IPWhitelist,
-		IPBlacklist:   snapshot.IPBlacklist,
-		Quota:         snapshot.Quota,
-		QuotaUsed:     snapshot.QuotaUsed,
-		ExpiresAt:     snapshot.ExpiresAt,
-		RateLimit5h:   snapshot.RateLimit5h,
-		RateLimit1d:   snapshot.RateLimit1d,
-		RateLimit7d:   snapshot.RateLimit7d,
+		ID:                snapshot.APIKeyID,
+		UserID:            snapshot.UserID,
+		GroupID:           snapshot.GroupID,
+		RouteGroupIDs:     append([]int64(nil), snapshot.RouteGroupIDs...),
+		FundingSource:     snapshot.FundingSource,
+		ForcedServiceTier: snapshot.ForcedServiceTier,
+		Key:               key,
+		Name:              snapshot.Name,
+		Status:            snapshot.Status,
+		IPWhitelist:       snapshot.IPWhitelist,
+		IPBlacklist:       snapshot.IPBlacklist,
+		Quota:             snapshot.Quota,
+		QuotaUsed:         snapshot.QuotaUsed,
+		ExpiresAt:         snapshot.ExpiresAt,
+		RateLimit5h:       snapshot.RateLimit5h,
+		RateLimit1d:       snapshot.RateLimit1d,
+		RateLimit7d:       snapshot.RateLimit7d,
 		User: &User{
+			IsDownstream:                snapshot.User.IsDownstream,
 			ID:                          snapshot.User.ID,
 			Status:                      snapshot.User.Status,
 			Role:                        snapshot.User.Role,
@@ -534,6 +539,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			AllowMessagesDispatch:           snapshot.Group.AllowMessagesDispatch,
 			AllowLive:                       snapshot.Group.AllowLive,
 			ForceOpenAIFast:                 snapshot.Group.ForceOpenAIFast,
+			ForceOpenAIUltrafast:            snapshot.Group.ForceOpenAIUltrafast,
 			FreeOpenAIFast:                  snapshot.Group.FreeOpenAIFast,
 			DefaultMappedModel:              snapshot.Group.DefaultMappedModel,
 			MessagesDispatchModelConfig:     snapshot.Group.MessagesDispatchModelConfig,

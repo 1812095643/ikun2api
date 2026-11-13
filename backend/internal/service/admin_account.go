@@ -502,6 +502,9 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err != nil {
 		return nil, err
 	}
+	if err := ValidateOpenAIAccountServiceTiersExtra(input.Platform, accountExtra); err != nil {
+		return nil, err
+	}
 	if err := ValidateOpenAIRequestTimezoneExtra(input.Platform, accountExtra); err != nil {
 		return nil, err
 	}
@@ -782,6 +785,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		if account.Platform == PlatformAntigravity && !wasOveragesEnabled && account.IsOveragesEnabled() {
 			delete(account.Extra, modelRateLimitsKey)
 			delete(account.Extra, "antigravity_credits_overages") // 清理旧版 overages 运行态
+		}
+		if err := ValidateOpenAIAccountServiceTiersExtra(account.Platform, account.Extra); err != nil {
+			return nil, err
 		}
 		if err := ValidateOpenAIRequestTimezoneExtra(account.Platform, account.Extra); err != nil {
 			return nil, err

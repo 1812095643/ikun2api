@@ -113,6 +113,21 @@ func accountCodexToolCapabilities(account *Account, modelID string) map[string]j
 		}
 		applyCodexToolCapabilities(capabilities, map[string]json.RawMessage{"service_tiers": encoded}, false)
 	}
+	if !account.SupportsOpenAIServiceTier(OpenAIFastTierPriority) || !account.SupportsOpenAIServiceTier(OpenAIFastTierUltrafast) {
+		var tiers []configuredCodexServiceTier
+		if len(capabilities["service_tiers"]) == 0 {
+			tiers = configuredCodexServiceTiersForModel(modelID)
+		} else {
+			_ = json.Unmarshal(capabilities["service_tiers"], &tiers)
+		}
+		filtered := make([]configuredCodexServiceTier, 0, len(tiers))
+		for _, tier := range tiers {
+			if account.SupportsOpenAIServiceTier(tier.ID) {
+				filtered = append(filtered, tier)
+			}
+		}
+		capabilities["service_tiers"], _ = json.Marshal(filtered)
+	}
 	return capabilities
 }
 
