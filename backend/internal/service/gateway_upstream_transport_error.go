@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	pkghttputil "github.com/MACOS-DO/sub4api/internal/pkg/httputil"
 	"github.com/MACOS-DO/sub4api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -15,6 +16,12 @@ import (
 // unscheduled after a durable transport failure (matches the OpenAI-side
 // openAITransportErrorTempUnschedDuration).
 const gatewayTransportErrorTempUnschedDuration = 10 * time.Minute
+
+// gatewayStreamHeaderTimeoutTempUnschedDuration benches an account whose
+// upstream accepted a streaming request but sent no headers within
+// gateway.stream_response_header_timeout (an overloaded relay queueing work),
+// so the next requests go elsewhere instead of each waiting out the timeout.
+const gatewayStreamHeaderTimeoutTempUnschedDuration = 1 * time.Minute
 
 // gatewayTransportFailoverBody is the Anthropic-format error body attached to
 // the failover error for a transport-level failure. Kept identical to the
@@ -65,6 +72,9 @@ func (s *GatewayService) handleUpstreamTransportError(ctx context.Context, c *gi
 
 	if classifyUpstreamTransportError(err).Persistent {
 		s.tempUnscheduleTransportError(ctx, account, safeErr)
+	} else if errors.Is(err, pkghttputil.ErrStreamResponseHeaderTimeout) && s != nil {
+		tempUnscheduleAccountFor(ctx, s.accountRepo, account, gatewayStreamHeaderTimeoutTempUnschedDuration,
+			"upstream stream response header timeout (auto temp-unschedule 1m): "+safeErr)
 	}
 
 	return &UpstreamFailoverError{
@@ -95,11 +105,15 @@ func (s *GatewayService) tempUnscheduleTransportError(ctx context.Context, accou
 // shared by every forward path whose scheduler reads the persisted
 // temp-unschedulable state (Anthropic/Bedrock and Gemini).
 func tempUnscheduleAccountForTransportError(ctx context.Context, repo AccountRepository, account *Account, safeErr string) {
+	tempUnscheduleAccountFor(ctx, repo, account, gatewayTransportErrorTempUnschedDuration,
+		"upstream transport error (proxy/network): "+safeErr)
+}
+
+func tempUnscheduleAccountFor(ctx context.Context, repo AccountRepository, account *Account, d time.Duration, reason string) {
 	if account == nil || repo == nil {
 		return
 	}
-	until := time.Now().Add(gatewayTransportErrorTempUnschedDuration)
-	reason := "upstream transport error (proxy/network): " + safeErr
+	until := time.Now().Add(d)
 
 	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), openAIAccountStateUpdateTimeout)
 	defer cancel()

@@ -5,12 +5,14 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	pkghttputil "github.com/MACOS-DO/sub4api/internal/pkg/httputil"
 	"github.com/gin-gonic/gin"
 )
 
@@ -201,5 +203,35 @@ func TestHandleUpstreamTransportError_UpstreamDeadlineStillFailsOver(t *testing.
 	}
 	if repo.calls != 0 {
 		t.Fatalf("SetTempUnschedulable called %d times for upstream deadline, want 0", repo.calls)
+	}
+}
+
+// TestHandleUpstreamTransportError_StreamHeaderTimeoutBenchesOneMinute pins that
+// a stream header timeout (relay accepted the request but sent nothing) fails
+// over and benches the account for one minute, not the ten-minute
+// transport-fault cooldown.
+func TestHandleUpstreamTransportError_StreamHeaderTimeoutBenchesOneMinute(t *testing.T) {
+	repo := &transportTempUnschedRepoStub{}
+	s := &GatewayService{accountRepo: repo}
+	c := newTransportErrorTestGin(t)
+	account := &Account{ID: 24, Name: "relay", Platform: PlatformAnthropic}
+
+	before := time.Now()
+	err := s.handleUpstreamTransportError(context.Background(), c, account,
+		fmt.Errorf("%w after 1m30s", pkghttputil.ErrStreamResponseHeaderTimeout), OpsUpstreamErrorEvent{})
+
+	var failoverErr *UpstreamFailoverError
+	if !errors.As(err, &failoverErr) {
+		t.Fatalf("expected *UpstreamFailoverError, got %T: %v", err, err)
+	}
+	if repo.calls != 1 || repo.lastID != account.ID {
+		t.Fatalf("SetTempUnschedulable calls=%d id=%d, want 1 call for account %d", repo.calls, repo.lastID, account.ID)
+	}
+	wantUntil := before.Add(gatewayStreamHeaderTimeoutTempUnschedDuration)
+	if repo.lastUntil.Before(wantUntil.Add(-5*time.Second)) || repo.lastUntil.After(wantUntil.Add(5*time.Second)) {
+		t.Fatalf("until = %v, want ~%v", repo.lastUntil, wantUntil)
+	}
+	if !strings.HasPrefix(repo.lastReason, "upstream stream response header timeout") {
+		t.Fatalf("reason = %q", repo.lastReason)
 	}
 }
