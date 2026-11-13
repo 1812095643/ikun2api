@@ -34,7 +34,7 @@ WITH usage_base AS (
     g.platform AS platform,
     ul.group_id AS group_id,
     ul.duration_ms AS duration_ms,
-    ul.first_token_ms AS first_token_ms,
+    COALESCE(ul.client_first_token_ms, ul.first_token_ms) AS first_token_ms, -- 用户实际首字，旧记录回退到上游首字
     (ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens) AS tokens
   FROM usage_logs ul
   JOIN groups g ON g.id = ul.group_id

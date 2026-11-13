@@ -106,6 +106,11 @@ func TestUsageLogRepositoryCreateSyncRequestTypeAndLegacyFields(t *testing.T) {
 			log.NativeCompactionV2,
 			log.CacheCreation30mTokens,
 			log.CacheCreation12hTokens,
+			sqlmock.AnyArg(), // gateway_wait_ms
+			sqlmock.AnyArg(), // pre_forward_ms
+			sqlmock.AnyArg(), // account_switch_count
+			sqlmock.AnyArg(), // client_first_token_ms
+			sqlmock.AnyArg(), // upload_ms
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(99), createdAt))
@@ -205,6 +210,11 @@ func TestUsageLogRepositoryCreate_PersistsServiceTier(t *testing.T) {
 			log.NativeCompactionV2,
 			log.CacheCreation30mTokens,
 			log.CacheCreation12hTokens,
+			sqlmock.AnyArg(), // gateway_wait_ms
+			sqlmock.AnyArg(), // pre_forward_ms
+			sqlmock.AnyArg(), // account_switch_count
+			sqlmock.AnyArg(), // client_first_token_ms
+			sqlmock.AnyArg(), // upload_ms
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(100), createdAt))
@@ -286,8 +296,8 @@ func TestPrepareUsageLogInsert_PersistsNativeCompactionV2WithoutChangingRequestT
 	prepared := prepareUsageLogInsert(log)
 
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
-	require.Equal(t, "boolean", usageLogInsertArgTypes[len(usageLogInsertArgTypes)-4])
-	require.Equal(t, true, prepared.args[len(prepared.args)-4])
+	require.Equal(t, "boolean", usageLogInsertArgTypes[len(usageLogInsertArgTypes)-9])
+	require.Equal(t, true, prepared.args[len(prepared.args)-9])
 	require.Equal(t, int16(service.RequestTypeStream), prepared.args[30])
 	require.Equal(t, service.RequestTypeStream, log.RequestType)
 	require.True(t, log.Stream)
@@ -969,9 +979,14 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},
 			sql.NullString{}, // upstream_request_id
 			sql.NullString{},
-			false, // native_compaction_v2
-			0,     // cache_creation_30m_tokens
-			0,     // cache_creation_12h_tokens
+			false,           // native_compaction_v2
+			0,               // cache_creation_30m_tokens
+			0,               // cache_creation_12h_tokens
+			sql.NullInt64{}, // gateway_wait_ms
+			sql.NullInt64{}, // pre_forward_ms
+			sql.NullInt64{}, // account_switch_count
+			sql.NullInt64{}, // client_first_token_ms
+			sql.NullInt64{}, // upload_ms
 			now,
 		}})
 		require.NoError(t, err)
@@ -1049,13 +1064,18 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // billing_tier
 			sql.NullString{},  // billing_mode
 			sql.NullFloat64{}, // account_stats_cost
-			sql.NullString{}, // account_name_snapshot
-			sql.NullString{}, // account_platform_snapshot
+			sql.NullString{},  // account_name_snapshot
+			sql.NullString{},  // account_platform_snapshot
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			false,             // native_compaction_v2
 			0,                 // cache_creation_30m_tokens
 			0,                 // cache_creation_12h_tokens
+			sql.NullInt64{},   // gateway_wait_ms
+			sql.NullInt64{},   // pre_forward_ms
+			sql.NullInt64{},   // account_switch_count
+			sql.NullInt64{},   // client_first_token_ms
+			sql.NullInt64{},   // upload_ms
 			now,
 		}})
 		require.NoError(t, err)
@@ -1116,13 +1136,18 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // billing_tier
 			sql.NullString{},  // billing_mode
 			sql.NullFloat64{}, // account_stats_cost
-			sql.NullString{}, // account_name_snapshot
-			sql.NullString{}, // account_platform_snapshot
+			sql.NullString{},  // account_name_snapshot
+			sql.NullString{},  // account_platform_snapshot
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			true,              // native_compaction_v2
 			0,                 // cache_creation_30m_tokens
 			0,                 // cache_creation_12h_tokens
+			sql.NullInt64{},   // gateway_wait_ms
+			sql.NullInt64{},   // pre_forward_ms
+			sql.NullInt64{},   // account_switch_count
+			sql.NullInt64{},   // client_first_token_ms
+			sql.NullInt64{},   // upload_ms
 			now,
 		}})
 		require.NoError(t, err)
@@ -1184,13 +1209,18 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // billing_tier
 			sql.NullString{},  // billing_mode
 			sql.NullFloat64{}, // account_stats_cost
-			sql.NullString{}, // account_name_snapshot
-			sql.NullString{}, // account_platform_snapshot
+			sql.NullString{},  // account_name_snapshot
+			sql.NullString{},  // account_platform_snapshot
 			sql.NullString{},  // upstream_request_id
 			sql.NullString{},  // session_id
 			false,             // native_compaction_v2
 			0,                 // cache_creation_30m_tokens
 			0,                 // cache_creation_12h_tokens
+			sql.NullInt64{},   // gateway_wait_ms
+			sql.NullInt64{},   // pre_forward_ms
+			sql.NullInt64{},   // account_switch_count
+			sql.NullInt64{},   // client_first_token_ms
+			sql.NullInt64{},   // upload_ms
 			now,
 		}})
 		require.NoError(t, err)

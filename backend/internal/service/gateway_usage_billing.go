@@ -43,19 +43,53 @@ type RecordUsageInput struct {
 	APIKey             *APIKey
 	User               *User
 	Account            *Account
-	Subscription       *UserSubscription  // 可选：订阅信息
-	PricingAt          time.Time          // token 售价固定时刻；零值保持既有的记录时刻语义
-	InboundEndpoint    string             // 入站端点（客户端请求路径）
-	UpstreamEndpoint   string             // 上游端点（标准化后的上游路径）
-	UserAgent          string             // 请求的 User-Agent
-	IPAddress          string             // 请求的客户端 IP 地址
-	SessionID          string             // 客户端显式会话标识（session_id / X-Session-Id 等请求头），仅用于用量行会话关联
-	RequestPayloadHash string             // 请求体语义哈希，用于降低 request_id 误复用时的静默误去重风险
-	ForceCacheBilling  bool               // 强制缓存计费：将 input_tokens 转为 cache_read 计费（用于粘性会话切换）
-	APIKeyService      APIKeyQuotaUpdater // 可选：用于更新API Key配额
-	QuotaPlatform      string             // user×platform 配额计量平台：handler 在请求 ctx 内经 QuotaPlatform() 算定后传入（后扣运行在 worker 池 background ctx 上，取不到 ForcePlatform）
+	Subscription       *UserSubscription     // 可选：订阅信息
+	PricingAt          time.Time             // token 售价固定时刻；零值保持既有的记录时刻语义
+	InboundEndpoint    string                // 入站端点（客户端请求路径）
+	UpstreamEndpoint   string                // 上游端点（标准化后的上游路径）
+	UserAgent          string                // 请求的 User-Agent
+	IPAddress          string                // 请求的客户端 IP 地址
+	SessionID          string                // 客户端显式会话标识（session_id / X-Session-Id 等请求头），仅用于用量行会话关联
+	RequestPayloadHash string                // 请求体语义哈希，用于降低 request_id 误复用时的静默误去重风险
+	ForceCacheBilling  bool                  // 强制缓存计费：将 input_tokens 转为 cache_read 计费（用于粘性会话切换）
+	APIKeyService      APIKeyQuotaUpdater    // 可选：用于更新API Key配额
+	QuotaPlatform      string                // user×platform 配额计量平台：handler 在请求 ctx 内经 QuotaPlatform() 算定后传入（后扣运行在 worker 池 background ctx 上，取不到 ForcePlatform）
+	Timing             *GatewayRequestTiming // 可选：网关侧耗时拆分（排队、转发前耗时、换号次数）
 
 	ChannelUsageFields // 渠道映射信息（由 handler 在 Forward 前解析）
+}
+
+// GatewayRequestTiming 是 handler 测得的网关侧耗时。ForwardResult 的 Duration/FirstTokenMs
+// 只覆盖最后一次转发，用户实际首字还要加上 PreForward。
+type GatewayRequestTiming struct {
+	Upload      time.Duration // 读完客户端请求体的时长（客户端上传，含在 PreForward 内）
+	SlotWait    time.Duration // 等用户/账号并发槽位的总时长
+	PreForward  time.Duration // 从请求到达到最后一次转发开始
+	SwitchCount int           // 最后一次转发前的换号次数
+}
+
+func durationMsPtr(d time.Duration) *int {
+	if d < 0 {
+		d = 0
+	}
+	ms := int(d.Milliseconds())
+	return &ms
+}
+
+// applyGatewayTiming 把网关侧耗时写入用量行，并推出用户实际首字时间。
+func applyGatewayTiming(log *UsageLog, timing *GatewayRequestTiming) {
+	if log == nil || timing == nil {
+		return
+	}
+	log.UploadMs = durationMsPtr(timing.Upload)
+	log.GatewayWaitMs = durationMsPtr(timing.SlotWait)
+	log.PreForwardMs = durationMsPtr(timing.PreForward)
+	switchCount := timing.SwitchCount
+	log.AccountSwitchCount = &switchCount
+	if log.FirstTokenMs != nil {
+		client := *log.PreForwardMs + *log.FirstTokenMs
+		log.ClientFirstTokenMs = &client
+	}
 }
 
 // APIKeyQuotaUpdater defines the interface for updating API Key quota and rate limit usage
@@ -706,6 +740,7 @@ func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInpu
 		ForceCacheBilling:  input.ForceCacheBilling,
 		APIKeyService:      input.APIKeyService,
 		QuotaPlatform:      input.QuotaPlatform,
+		Timing:             input.Timing,
 		ChannelUsageFields: input.ChannelUsageFields,
 	})
 }
@@ -727,6 +762,7 @@ type recordUsageCoreInput struct {
 	ForceCacheBilling  bool
 	APIKeyService      APIKeyQuotaUpdater
 	QuotaPlatform      string
+	Timing             *GatewayRequestTiming
 	ChannelUsageFields
 }
 
@@ -1471,6 +1507,9 @@ func (s *GatewayService) buildRecordUsageLog(
 		GroupID:                  apiKey.GroupID,
 		SubscriptionID:           optionalSubscriptionID(subscription),
 		CreatedAt:                time.Now(),
+	}
+	if IsClaudeOAuthSchedulingAccount(input.Account) {
+		applyGatewayTiming(usageLog, input.Timing)
 	}
 	if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier
