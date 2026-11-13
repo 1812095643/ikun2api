@@ -655,7 +655,7 @@ func detachStreamUpstreamContext(ctx context.Context, stream bool) (context.Cont
 	if !stream {
 		return ctx, func() {}
 	}
-	return pkghttputil.DetachUpstreamContext(ctx), func() {}
+	return pkghttputil.MarkStreamRequest(pkghttputil.DetachUpstreamContext(ctx)), func() {}
 }
 
 func detachUpstreamContext(ctx context.Context, drainTimeout ...time.Duration) (context.Context, context.CancelFunc) {

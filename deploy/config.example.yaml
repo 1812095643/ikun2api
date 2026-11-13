@@ -236,6 +236,9 @@ gateway:
   # Timeout for waiting upstream response headers (seconds)
   # 等待上游响应头超时时间（秒）
   response_header_timeout: 600
+  # Streaming requests: response header timeout before failing over to the next account (seconds, 0=disabled; not OpenAI/Codex)
+  # 流式请求等待上游响应头超时时间，超时切换下一个账号（秒，0=禁用；不作用于 OpenAI/Codex）
+  stream_response_header_timeout: 90
   # OpenAI/Codex upstream response header timeout (seconds, 0=disabled)
   # OpenAI/Codex 等待上游响应头超时时间（秒，0=禁用本地响应头超时）
   openai_response_header_timeout: 0

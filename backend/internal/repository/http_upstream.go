@@ -221,7 +221,7 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	// 执行请求
 	client := s.httpClientForUpstreamRequest(entry.client, req)
 	client = httpClientWithGrokAccessDeniedFallback(client)
-	resp, err := doUpstreamRequest(client, req, s.upstreamDrainTimeout())
+	resp, err := doUpstreamRequestWithHeaderTimeout(client, req, s.upstreamDrainTimeout(), s.streamResponseHeaderTimeout(profile))
 	if err != nil {
 		s.recordOpenAIHTTP2Failure(profile, entry.protocolMode, entry.proxyKey, err)
 		// 请求失败，立即减少计数
@@ -282,7 +282,7 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 
 	client := s.httpClientForUpstreamRequest(entry.client, req)
 	client = httpClientWithGrokAccessDeniedFallback(client)
-	resp, err := doUpstreamRequest(client, req, s.upstreamDrainTimeout())
+	resp, err := doUpstreamRequestWithHeaderTimeout(client, req, s.upstreamDrainTimeout(), s.streamResponseHeaderTimeout(upstreamProfile))
 	if err != nil {
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
@@ -305,6 +305,15 @@ func (s *httpUpstreamService) upstreamDrainTimeout() time.Duration {
 	return pkghttputil.DefaultUpstreamDrainTimeout
 }
 
+// streamResponseHeaderTimeout is the header budget for client-streaming
+// requests. OpenAI/Codex keeps its own policy (openai_response_header_timeout).
+func (s *httpUpstreamService) streamResponseHeaderTimeout(profile service.HTTPUpstreamProfile) time.Duration {
+	if s.cfg == nil || profile == service.HTTPUpstreamProfileOpenAI || s.cfg.Gateway.StreamResponseHeaderTimeout <= 0 {
+		return 0
+	}
+	return time.Duration(s.cfg.Gateway.StreamResponseHeaderTimeout) * time.Second
+}
+
 // doUpstreamRequest owns cancellation for one attempt, without cancelling the
 // caller's context (which may be detached for billing or reused for retries).
 func doUpstreamRequest(client *http.Client, req *http.Request, drainTimeouts ...time.Duration) (*http.Response, error) {
@@ -312,6 +321,14 @@ func doUpstreamRequest(client *http.Client, req *http.Request, drainTimeouts ...
 	if len(drainTimeouts) > 0 {
 		drainTimeout = drainTimeouts[0]
 	}
+	return doUpstreamRequestWithHeaderTimeout(client, req, drainTimeout, 0)
+}
+
+// doUpstreamRequestWithHeaderTimeout additionally aborts a streaming request
+// (see pkghttputil.MarkStreamRequest) whose response headers have not arrived
+// within streamHeaderTimeout, returning ErrStreamResponseHeaderTimeout so the
+// caller fails over instead of holding the client until it gives up.
+func doUpstreamRequestWithHeaderTimeout(client *http.Client, req *http.Request, drainTimeout, streamHeaderTimeout time.Duration) (*http.Response, error) {
 	ctx, cancel := pkghttputil.NewUpstreamAttemptContext(req.Context(), drainTimeout)
 	wireRequest := req.WithContext(ctx)
 	if err := compressCodexResponsesRequest(wireRequest); err != nil {
@@ -321,7 +338,18 @@ func doUpstreamRequest(client *http.Client, req *http.Request, drainTimeouts ...
 		}
 		return nil, err
 	}
+	var headerTimer *time.Timer
+	if streamHeaderTimeout > 0 && pkghttputil.IsStreamRequest(req.Context()) {
+		headerTimer = time.AfterFunc(streamHeaderTimeout, cancel)
+	}
 	resp, err := servertiming.Do(client, wireRequest)
+	if headerTimer != nil && !headerTimer.Stop() {
+		cancel()
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		return nil, fmt.Errorf("%w after %s", pkghttputil.ErrStreamResponseHeaderTimeout, streamHeaderTimeout)
+	}
 	if err != nil {
 		cancel()
 		return resp, err
