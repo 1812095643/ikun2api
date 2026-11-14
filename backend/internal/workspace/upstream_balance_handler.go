@@ -11,12 +11,22 @@ import (
 
 func (h *Handler) listUpstreamBalances(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
+	key, err := upstreamBalanceDisplayKey(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	display := defaultUpstreamBalanceDisplay()
+	if err = h.getRuntime(c.Request.Context(), key, &display); err != nil {
+		fail(c, err)
+		return
+	}
 	_, records, err := h.prepareUpstreamBalances(c.Request.Context())
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	response.Success(c, gin.H{"items": records, "total": len(records)})
+	response.Success(c, gin.H{"items": records, "total": len(records), "display": display})
 }
 func findUpstreamBalanceRecord(records []upstreamBalanceRecord, id string) (upstreamBalanceRecord, error) {
 	for _, r := range records {
@@ -105,7 +115,7 @@ func (h *Handler) saveUpstreamBalance(c *gin.Context) {
 	response.Success(c, gin.H{"saved": true})
 	h.wakeUpstreamBalances()
 }
-func (h *Handler) queueUpstreamBalances(ctx context.Context, id string) (int, error) {
+func (h *Handler) queueUpstreamBalances(ctx context.Context, id string, selection ...string) (int, error) {
 	_, records, err := h.prepareUpstreamBalances(ctx)
 	if err != nil {
 		return 0, err
@@ -115,9 +125,16 @@ func (h *Handler) queueUpstreamBalances(ctx context.Context, id string) (int, er
 			return 0, err
 		}
 	}
+	selected := map[string]bool{}
+	for _, selectedID := range selection {
+		if _, err = findUpstreamBalanceRecord(records, selectedID); err != nil {
+			return 0, err
+		}
+		selected[selectedID] = true
+	}
 	count := 0
 	for _, r := range records {
-		if id != "" && r.ID != id {
+		if (id != "" && r.ID != id) || (len(selected) > 0 && !selected[r.ID]) {
 			continue
 		}
 		result, e := h.db.ExecContext(ctx, `UPDATE workspace_upstream_balances SET refresh_requested=TRUE,requested_at=NOW() WHERE id=$1 AND refresh_requested=FALSE
@@ -133,7 +150,28 @@ func (h *Handler) queueUpstreamBalances(ctx context.Context, id string) (int, er
 }
 func (h *Handler) refreshUpstreamBalances(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	count, err := h.queueUpstreamBalances(c.Request.Context(), c.Param("id"))
+	var req struct {
+		IDs *[]string `json:"ids"`
+	}
+	if c.Request.ContentLength != 0 {
+		if err := body(c, &req, 400<<10); err != nil {
+			fail(c, err)
+			return
+		}
+	}
+	var selected []string
+	if req.IDs != nil {
+		selected = *req.IDs
+		if len(selected) == 0 {
+			response.Accepted(c, gin.H{"queued": 0})
+			return
+		}
+	}
+	if len(selected) > 5000 {
+		fail(c, badRequest("单次最多查询 5000 个上游。"))
+		return
+	}
+	count, err := h.queueUpstreamBalances(c.Request.Context(), c.Param("id"), selected...)
 	if err != nil {
 		fail(c, err)
 		return

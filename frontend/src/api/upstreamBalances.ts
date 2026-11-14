@@ -56,16 +56,34 @@ export interface UpstreamBalanceDraft {
   wallet_token?: string
   clear_wallet_token?: boolean
 }
+export type BalanceSort = 'manual' | 'name' | 'balance_asc' | 'balance_desc' | 'recent'
+export type BalanceColumn = 'comparison' | 'monitor' | 'models' | 'last_checked_at'
+export interface UpstreamBalanceDisplay {
+  order: string[]
+  hidden: string[]
+  hidden_columns: BalanceColumn[]
+  compact: boolean
+  sort_by: BalanceSort
+}
+export const balanceColumns: { key: BalanceColumn; label: string }[] = [
+  { key: 'comparison', label: 'Key 校验' }, { key: 'monitor', label: '余额监控' },
+  { key: 'models', label: '模型变更' }, { key: 'last_checked_at', label: '最近查询' }
+]
+export const defaultBalanceDisplay = (): UpstreamBalanceDisplay => ({ order: [], hidden: [], hidden_columns: [], compact: true, sort_by: 'manual' })
+
 const base = '/admin/workspace/upstream-balances'
 export const upstreamBalancesAPI = {
   async list(signal?: AbortSignal) {
-    return (await apiClient.get<{ items: UpstreamBalance[]; total: number }>(base, { signal })).data
+    return (await apiClient.get<{ items: UpstreamBalance[]; total: number; display?: UpstreamBalanceDisplay }>(base, { signal })).data
   },
   async save(id: string, draft: UpstreamBalanceDraft) {
     await apiClient.put(`${base}/${id}`, draft)
   },
-  async refresh(id?: string) {
-    return (await apiClient.post<{ queued: number }>(id ? `${base}/${id}/refresh` : `${base}/refresh`, {})).data
+  async refresh(id?: string, ids?: string[]) {
+    return (await apiClient.post<{ queued: number }>(id ? `${base}/${id}/refresh` : `${base}/refresh`, ids ? { ids } : {})).data
+  },
+  async saveDisplay(display: UpstreamBalanceDisplay) {
+    return (await apiClient.put<UpstreamBalanceDisplay>(`${base}/display`, display)).data
   }
 }
 export const balanceKindLabel = (kind: string) => ({ auto: '自动识别', sub2api: 'Sub2API', newapi: 'New API' }[kind] || '待识别')

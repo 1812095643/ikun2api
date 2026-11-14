@@ -77,4 +77,20 @@ describe('upstream balance management', () => {
     expect(formatUpstreamBalance(null, 'USD', true)).toBe('不限额')
     expect(formatUpstreamBalance(Number.NaN, 'USD')).toBe('—')
   })
+  it('shows a hidden row with a restore action and respects hidden columns', async () => {
+    const wrapper = mount(UpstreamBalanceTable, { props: { items: [fixture()], loading: false, refreshing: null, hiddenIds: ['supplier'], hiddenColumns: ['monitor'] }, global: { stubs: { RouterLink: true } } })
+    expect(wrapper.findAll('th').map(v => v.text())).not.toContain('余额监控')
+    expect(wrapper.text()).toContain('已隐藏')
+    await wrapper.get('button[title="恢复显示"]').trigger('click')
+    expect(wrapper.emitted('visibility')?.[0]).toEqual(['supplier', false])
+  })
+  it('supports keyboard reorder and page selection independently from refresh', async () => {
+    const wrapper = mount(UpstreamBalanceTable, { props: { items: [fixture()], loading: false, refreshing: null }, global: { stubs: { RouterLink: true } } })
+    await wrapper.get('.upstream-drag-handle').trigger('keydown', { key: 'ArrowDown' })
+    expect(wrapper.emitted('move')?.[0]).toEqual(['supplier', 1])
+    await wrapper.get('input[aria-label="全选本页上游"]').setValue(true)
+    expect(wrapper.emitted('select')?.[0]).toEqual([['supplier']])
+    expect(wrapper.emitted('refresh')).toBeUndefined()
+  })
+
 })
