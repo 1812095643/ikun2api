@@ -17,7 +17,8 @@ type blindboxSpec struct {
 	DrawTime string `json:"draw_time"`
 }
 type blindboxSettings struct {
-	Enabled bool `json:"enabled"`
+	Enabled        bool   `json:"enabled"`
+	UsagePerChance string `json:"usage_per_chance"`
 	blindboxSpec
 }
 type blindboxRound struct {
@@ -83,15 +84,31 @@ func blindboxDeadline(day string, s blindboxSpec) (time.Time, error) {
 	return time.ParseInLocation("2006-01-02 15:04", day+" "+s.DrawTime, lotteryLocation)
 }
 
-func blindboxAllowance(spend string) (int, error) {
+func normalizeBlindboxUsageStep(raw string) (string, error) {
+	if !checkinMoneyPattern.MatchString(raw) {
+		return "", badRequest("每份解锁消费须大于 0，最多八位小数。")
+	}
+	v, err := decimal.NewFromString(raw)
+	if err != nil || !v.IsPositive() || v.GreaterThan(decimal.NewFromInt(1000000)) {
+		return "", badRequest("每份解锁消费须大于 0，且不超过 1,000,000。")
+	}
+	return v.String(), nil
+}
+
+func blindboxAllowance(spend, rawStep string) (int, error) {
 	v, err := decimal.NewFromString(spend)
 	if err != nil || v.IsNegative() {
 		return 0, fmt.Errorf("今日用量金额无法核对")
 	}
+	normalized, err := normalizeBlindboxUsageStep(rawStep)
+	if err != nil {
+		return 0, err
+	}
+	step, _ := decimal.NewFromString(normalized)
 	if v.IsZero() {
 		return 0, nil
 	}
-	whole, remainder := v.QuoRem(decimal.NewFromInt(100), 0)
+	whole, remainder := v.QuoRem(step, 0)
 	limit := whole
 	if remainder.IsPositive() {
 		limit = limit.Add(decimal.NewFromInt(1))
@@ -148,9 +165,12 @@ func loadBlindboxSettings(ctx context.Context, db lotteryDB, lock bool) (blindbo
 	if lock {
 		suffix = " FOR SHARE"
 	}
-	err := db.QueryRowContext(ctx, `SELECT enabled,price::text,minimum::text,maximum::text,draw_time FROM workspace_blindbox_settings WHERE id=1`+suffix).Scan(&s.Enabled, &s.Price, &s.Minimum, &s.Maximum, &s.DrawTime)
+	err := db.QueryRowContext(ctx, `SELECT enabled,price::text,minimum::text,maximum::text,draw_time,usage_per_chance::text FROM workspace_blindbox_settings WHERE id=1`+suffix).Scan(&s.Enabled, &s.Price, &s.Minimum, &s.Maximum, &s.DrawTime, &s.UsagePerChance)
 	if err == nil {
 		err = normalizeBlindboxSpec(&s.blindboxSpec)
+	}
+	if err == nil {
+		s.UsagePerChance, err = normalizeBlindboxUsageStep(s.UsagePerChance)
 	}
 	return s, err
 }

@@ -62,11 +62,11 @@ onBeforeUnmount(() => clearInterval(timer));
     <p v-else class="py-6 text-center text-xs text-gray-400">等待首份参与后生成奖池</p>
     <p class="blindbox-probability-note">概率随份数变化，以截止时公示为准；每份同概率随机分配。</p>
     <details class="blindbox-rules"><summary>参与规则</summary><ol>
-      <li>当天完成签到且有已入账、金额大于 0 的模型消费。消费大于 0 至 100 可购 1 份，超过 100 至 200 可购 2 份，依此类推；盲盒支出不计入模型消费。</li>
+      <li>当天完成签到且有已入账的模型消费。每 {{ status.eligibility.usage_per_chance }} 额度消费可购 1 份，不足一份按一份计算；盲盒支出不计入模型消费。</li>
       <li>每份 {{ checkinMoney(status.round.spec.price) }}，开奖前截止，以服务器时间为准；本场最多 10,000 份。</li>
       <li>购买余额全部组成奖池并返还。每份 {{ checkinMoney(status.round.spec.minimum) }} 至 {{ checkinMoney(status.round.spec.maximum) }}，目标 30% 保本，其余亏损或盈利，实际比例见公示；单份参与原额返还。</li>
       <li>开奖后自动到账，开盒仅展示结果。奖励不计入充值资格或邀请返利；同一笔购买重试不会重复扣款。</li>
-      <li>首份购买后锁定本场规则；参与榜公示份数，中奖榜仅展示整场净赚用户，不公开邮箱。</li>
+      <li>首份购买后锁定本场售价、奖励及开奖时间；参与榜公示份数，中奖榜仅展示整场净赚用户，不公开邮箱。</li>
     </ol></details>
   </section>
 </template>

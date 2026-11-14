@@ -10,6 +10,7 @@ const form = reactive<BlindboxSettings>({
   minimum: "1",
   maximum: "10",
   draw_time: "21:00",
+  usage_per_chance: "100",
 });
 const loading = shallowRef(true);
 const saving = shallowRef(false);
@@ -88,7 +89,7 @@ onMounted(load);
             aria-labelledby="blindbox-enabled-label"
           />
         </div>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <div class="space-y-2">
             <label for="blindbox-price" class="input-label">每份售价（$）</label
             ><input
@@ -103,6 +104,25 @@ onMounted(load);
               required
               @input="
                 form.price = ($event.target as HTMLInputElement).value;
+                message = '';
+              "
+            />
+          </div>
+          <div class="space-y-2">
+            <label for="blindbox-usage-per-chance" class="input-label"
+              >每份解锁消费（额度）</label
+            ><input
+              id="blindbox-usage-per-chance"
+              :value="form.usage_per_chance"
+              type="number"
+              class="input"
+              inputmode="decimal"
+              min="0.00000001"
+              max="1000000"
+              step="0.00000001"
+              required
+              @input="
+                form.usage_per_chance = ($event.target as HTMLInputElement).value;
                 message = '';
               "
             />
@@ -156,7 +176,7 @@ onMounted(load);
           </div>
         </div>
         <p class="max-w-2xl text-xs leading-6 text-gray-500 dark:text-gray-400">
-          首份购买后本场规则锁定，修改从下一场生效；关闭仅停止新购，已购场次照常结算。
+          解锁门槛立即生效，已购份数保留；售价、奖励及开奖时间从下一场生效。关闭仅停止新购。
         </p>
         <div
           class="flex justify-end border-t border-gray-100 pt-4 dark:border-dark-700"

@@ -96,7 +96,7 @@ func (h *Handler) getBlindbox(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	allowance, err := blindboxAllowance(usage)
+	allowance, err := blindboxAllowance(usage, s.UsagePerChance)
 	if err != nil {
 		fail(c, err)
 		return
@@ -187,7 +187,7 @@ func (h *Handler) getBlindbox(c *gin.Context) {
 	case r.Count >= blindboxCapacity:
 		reason = "本场份数已满"
 	}
-	response.Success(c, gin.H{"enabled": s.Enabled, "server_time": now, "round": r, "plan": plan, "participants": participants, "ranking": ranking, "winners": winners, "winners_date": profitDate, "quote": blindboxQuote(key, day, r.Spec), "eligibility": gin.H{"checked_in": checked, "usage_amount": usage, "limit": allowance, "bought": bought, "remaining": max(0, allowance-bought), "can_buy": reason == "", "reason": reason}})
+	response.Success(c, gin.H{"enabled": s.Enabled, "server_time": now, "round": r, "plan": plan, "participants": participants, "ranking": ranking, "winners": winners, "winners_date": profitDate, "quote": blindboxQuote(key, day, r.Spec), "eligibility": gin.H{"checked_in": checked, "usage_amount": usage, "usage_per_chance": s.UsagePerChance, "limit": allowance, "bought": bought, "remaining": max(0, allowance-bought), "can_buy": reason == "", "reason": reason}})
 }
 
 func (h *Handler) listBlindboxEntries(c *gin.Context) {

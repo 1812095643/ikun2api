@@ -28,15 +28,30 @@ func (h *Handler) saveBlindboxSettings(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	var s blindboxSettings
-	if err = decodeCheckinBody(c, &s); err == nil {
-		err = normalizeBlindboxSpec(&s.blindboxSpec)
+	var payload struct {
+		Enabled        bool    `json:"enabled"`
+		UsagePerChance *string `json:"usage_per_chance"`
+		blindboxSpec
+	}
+	if err = decodeCheckinBody(c, &payload); err != nil {
+		fail(c, err)
+		return
+	}
+	s := blindboxSettings{Enabled: payload.Enabled, blindboxSpec: payload.blindboxSpec}
+	err = normalizeBlindboxSpec(&s.blindboxSpec)
+	if err == nil && payload.UsagePerChance != nil {
+		s.UsagePerChance, err = normalizeBlindboxUsageStep(*payload.UsagePerChance)
+		payload.UsagePerChance = &s.UsagePerChance
 	}
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	if _, err = h.db.ExecContext(c.Request.Context(), `UPDATE workspace_blindbox_settings SET enabled=$1,price=$2::numeric,minimum=$3::numeric,maximum=$4::numeric,draw_time=$5,updated_by=$6,updated_at=NOW() WHERE id=1`, s.Enabled, s.Price, s.Minimum, s.Maximum, s.DrawTime, a.ID); err != nil {
+	// Older clients omit the threshold; preserve it atomically in the UPDATE.
+	if err = h.db.QueryRowContext(c.Request.Context(), `UPDATE workspace_blindbox_settings SET enabled=$1,price=$2::numeric,minimum=$3::numeric,maximum=$4::numeric,draw_time=$5,updated_by=$6,usage_per_chance=COALESCE($7::numeric,usage_per_chance),updated_at=NOW() WHERE id=1 RETURNING usage_per_chance::text`, s.Enabled, s.Price, s.Minimum, s.Maximum, s.DrawTime, a.ID, payload.UsagePerChance).Scan(&s.UsagePerChance); err == nil {
+		s.UsagePerChance, err = normalizeBlindboxUsageStep(s.UsagePerChance)
+	}
+	if err != nil {
 		fail(c, err)
 		return
 	}

@@ -116,7 +116,7 @@ func (h *Handler) purchaseBlindbox(ctx context.Context, userID int64, requestKey
 	if err = tx.QueryRowContext(ctx, blindboxUsageSQL, userID, start, start.AddDate(0, 0, 1)).Scan(&usage); err != nil {
 		return blindboxEntry{}, false, err
 	}
-	limit, err := blindboxAllowance(usage)
+	limit, err := blindboxAllowance(usage, s.UsagePerChance)
 	if err != nil {
 		return blindboxEntry{}, false, err
 	}

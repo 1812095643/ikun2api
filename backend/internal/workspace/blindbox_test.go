@@ -87,7 +87,7 @@ func TestBlindboxQuotaUsesExactHundredBoundaries(t *testing.T) {
 		amount string
 		want   int
 	}{{"0", 0}, {"0.0000000001", 1}, {"99.99", 1}, {"100", 1}, {"100.0000000001", 2}, {"200", 2}, {"200.01", 3}} {
-		got, err := blindboxAllowance(item.amount)
+		got, err := blindboxAllowance(item.amount, "100")
 		if err != nil || got != item.want {
 			t.Fatalf("%s: %d %v", item.amount, got, err)
 		}

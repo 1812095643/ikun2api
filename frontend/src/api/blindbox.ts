@@ -8,6 +8,7 @@ export interface BlindboxSpec {
 }
 export interface BlindboxSettings extends BlindboxSpec {
   enabled: boolean;
+  usage_per_chance: string;
 }
 export interface BlindboxRound {
   id: number;
@@ -55,6 +56,7 @@ export interface BlindboxStatus {
   eligibility: {
     checked_in: boolean;
     usage_amount: string;
+    usage_per_chance: string;
     limit: number;
     bought: number;
     remaining: number;
