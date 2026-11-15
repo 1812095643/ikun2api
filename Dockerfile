@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7
 # =============================================================================
 # IKUN2api Multi-Stage Dockerfile
+# Build context must be the repository root, including frontend/ and docs/legal/.
+# Example: docker build -f Dockerfile -t ikun2api:local .
 # =============================================================================
 # Stage 1: Build frontend
 # Stage 2: Build Go backend with embedded frontend
@@ -41,7 +43,10 @@ RUN --mount=type=cache,id=ikun2api-pnpm-store,target=/root/.local/share/pnpm/sto
 # Copy only that subtree to keep the build dependency minimal.
 COPY frontend/ ./
 COPY docs/legal/ /app/docs/legal/
-RUN pnpm run build
+RUN pnpm run build && \
+    test -s /app/backend/internal/web/dist/index.html && \
+    test -s /app/backend/internal/web/dist/image-studio/index.html && \
+    test -d /app/backend/internal/web/dist/assets
 
 # -----------------------------------------------------------------------------
 # Stage 2: Backend Builder
@@ -88,7 +93,7 @@ COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
 RUN --mount=type=cache,id=ikun2api-gomod,target=/go/pkg/mod \
     --mount=type=cache,id=ikun2api-gobuild,target=/root/.cache/go-build \
     VERSION_VALUE="${VERSION}" && \
-    if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(./scripts/resolve-version.sh)"; fi && \
+    if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(sh ./scripts/resolve-version.sh)"; fi && \
     DATE_VALUE="${DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build \
     -tags embed \

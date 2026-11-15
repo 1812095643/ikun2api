@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Build one release target from the verified source checkout."""
 import argparse,datetime,json,os,pathlib,re,shutil,subprocess,tarfile,tempfile,zipfile
+from verify_frontend import verify_tree
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 def build(target,version,commit,output):
  if not re.fullmatch(r'\d+\.\d+\.\d+',version):raise ValueError('stable semantic version required')
  if target not in ('linux_amd64','linux_arm64','darwin_amd64','darwin_arm64','windows_amd64'):raise ValueError('unsupported target')
+ verify_tree(ROOT/'backend/internal/web/dist')
  system,arch=target.split('_');output.mkdir(exist_ok=True,parents=True)
  with tempfile.TemporaryDirectory(prefix='ikun-release-') as temp:
   stage=pathlib.Path(temp);binary=stage/('ikun2api.exe' if system=='windows' else 'ikun2api')
