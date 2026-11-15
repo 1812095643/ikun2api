@@ -78,6 +78,10 @@ func (s *adminServiceImpl) loadUserGroupRatesOneByOne(ctx context.Context, users
 	}
 }
 
+func (s *adminServiceImpl) GetUserIdentity(ctx context.Context, id int64) (*User, error) {
+	return s.userRepo.GetByID(ctx, id)
+}
+
 func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error) {
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {

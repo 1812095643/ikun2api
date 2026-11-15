@@ -125,7 +125,9 @@ func (s *UserRepoSuite) TestGetLatestUsedAtByUserIDs_UsesUsageLogs() {
 	s.mustInsertUsageLog(userWithUsage.ID, older)
 	s.mustInsertUsageLog(userWithUsage.ID, newer)
 
-	got, err := s.repo.GetLatestUsedAtByUserIDs(s.ctx, []int64{userWithUsage.ID, userWithoutUsage.ID})
+	// Repeated inputs must still return one timestamp per user, and missing
+	// histories must stay absent instead of becoming a zero timestamp.
+	got, err := s.repo.GetLatestUsedAtByUserIDs(s.ctx, []int64{userWithUsage.ID, userWithoutUsage.ID, userWithUsage.ID})
 	s.Require().NoError(err)
 	s.Require().Contains(got, userWithUsage.ID)
 	s.Require().NotContains(got, userWithoutUsage.ID)

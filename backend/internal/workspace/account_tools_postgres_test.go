@@ -27,7 +27,7 @@ type toolsFixtureAdmin struct {
 	accounts []service.Account
 }
 
-func (a *toolsFixtureAdmin) GetUser(context.Context, int64) (*service.User, error) {
+func (a *toolsFixtureAdmin) GetUserIdentity(context.Context, int64) (*service.User, error) {
 	return &service.User{ID: 1, Email: "admin@example.test", Username: "fixture"}, nil
 }
 func (a *toolsFixtureAdmin) GetAccount(_ context.Context, id int64) (*service.Account, error) {

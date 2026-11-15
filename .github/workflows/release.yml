@@ -75,6 +75,11 @@ jobs:
           go test ./internal/workspace -run 'TestBlindbox|TestUpstream|TestModel' -count=1 -timeout=180s
           cd ../frontend
           pnpm exec vitest run src/components/checkin/BlindboxAdminSettings.spec.ts src/components/checkin/BlindboxPool.spec.ts src/components/admin/upstream-balances/__tests__/UpstreamBalances.spec.ts src/components/admin/upstream-balances/__tests__/UpstreamModels.spec.ts src/composables/__tests__/useUpstreamBalanceDisplay.spec.ts src/composables/__tests__/useUpstreamBalances.spec.ts src/utils/__tests__/upstreamBalanceList.spec.ts
+      - name: 工作台身份读取与用户最近使用时间回归
+        working-directory: backend
+        run: |
+          go test -tags unit ./internal/workspace ./internal/service -run 'TestWorkspaceIdentity|TestAdminService_(GetUser|ListUsers)' -count=1 -timeout=180s
+          go test -tags integration ./internal/repository -run '^TestUserRepoSuite$/^Test(GetLatestUsedAtByUserIDs|ListWithFilters_SortByLastUsedAt)' -count=1 -timeout=240s
       - name: Persistent update and backup retention regression
         working-directory: backend
         run: go test -tags unit ./internal/service ./internal/handler/admin -run 'Test(UpdateService|UpdateRelease|UpdateDownload|UpdateVersion|UpdateBackup|UpdateMaintenance|UpdateExtract|UpdateJournal|UpdatePrepare|UpgradeBackups|PersistentRuntime|SystemHandler|SystemUpdate)' -count=1 -timeout=180s

@@ -100,7 +100,7 @@ func (h *Handler) identity(c *gin.Context) (actor, error) {
 	if !ok || subject.UserID <= 0 {
 		return actor{}, &requestError{401, "请先登录。"}
 	}
-	u, err := h.admin.GetUser(c.Request.Context(), subject.UserID)
+	u, err := h.admin.GetUserIdentity(c.Request.Context(), subject.UserID)
 	if err != nil {
 		return actor{}, err
 	}

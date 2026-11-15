@@ -21,7 +21,7 @@ import (
 
 type blindboxSettingsAdmin struct{ service.AdminService }
 
-func (*blindboxSettingsAdmin) GetUser(context.Context, int64) (*service.User, error) {
+func (*blindboxSettingsAdmin) GetUserIdentity(context.Context, int64) (*service.User, error) {
 	return &service.User{ID: 8}, nil
 }
 

@@ -741,11 +741,18 @@ func (r *userRepository) GetLatestUsedAtByUserIDs(ctx context.Context, userIDs [
 		return nil, fmt.Errorf("sql executor is not configured")
 	}
 
+	// Probe the existing (user_id, created_at) index once per user. GROUP BY
+	// with MAX may scan the entire history, including on identity lookups.
 	const query = `
-		SELECT user_id, MAX(created_at) AS last_used_at
-		FROM usage_logs
-		WHERE user_id = ANY($1)
-		GROUP BY user_id
+		SELECT requested.user_id, latest.created_at AS last_used_at
+		FROM (SELECT DISTINCT unnest($1::bigint[]) AS user_id) requested
+		CROSS JOIN LATERAL (
+			SELECT created_at
+			FROM usage_logs
+			WHERE user_id = requested.user_id
+			ORDER BY created_at DESC
+			LIMIT 1
+		) latest
 	`
 
 	rows, err := r.sql.QueryContext(ctx, query, pq.Array(userIDs))
