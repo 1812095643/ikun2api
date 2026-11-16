@@ -90,7 +90,7 @@ func lockReceivableUser(ctx context.Context, q BalanceCreditSQL, id int64, inclu
 }
 func outstandingReceivable(ctx context.Context, q BalanceCreditSQL, id int64) (decimal.Decimal, error) {
 	var raw string
-	e := receivableOne(ctx, q, `SELECT COALESCE(SUM(CASE WHEN kind='credit' THEN amount ELSE -amount END),0)::text FROM admin_receivable_entries WHERE user_id=$1`, []any{id}, func(r *sql.Rows) error { return r.Scan(&raw) })
+	e := receivableOne(ctx, q, `SELECT COALESCE(SUM(CASE WHEN kind IN ('credit','manual_credit') THEN amount ELSE -amount END),0)::text FROM admin_receivable_entries WHERE user_id=$1`, []any{id}, func(r *sql.Rows) error { return r.Scan(&raw) })
 	if e != nil {
 		return decimal.Zero, e
 	}
@@ -167,23 +167,31 @@ func (s *adminServiceImpl) CreditUserOnAccount(ctx context.Context, userID int64
 	return s.userRepo.GetByID(cacheCtx, userID)
 }
 
-// RecordReceivablePaymentTx only settles debt; it never credits spendable balance.
-// The caller owns the transaction and rolls it back on every error.
+// RecordReceivablePaymentTx 只结清欠款，不增加可用余额；调用方负责提交或回滚事务。
 func RecordReceivablePaymentTx(ctx context.Context, q BalanceCreditSQL, userID int64, amount, notes, method string, actorID int64, key string, occurredAt *time.Time) (*ReceivableEntry, error) {
+	return recordReceivableEntryTx(ctx, q, userID, "payment", amount, notes, method, actorID, key, occurredAt)
+}
+
+// RecordManualReceivableTx 补记已经发生的欠款，不重复充值，也不伪造充值记录。
+func RecordManualReceivableTx(ctx context.Context, q BalanceCreditSQL, userID int64, amount, notes string, actorID int64, key string, occurredAt *time.Time) (*ReceivableEntry, error) {
+	return recordReceivableEntryTx(ctx, q, userID, "manual_credit", amount, notes, "", actorID, key, occurredAt)
+}
+
+func recordReceivableEntryTx(ctx context.Context, q BalanceCreditSQL, userID int64, kind, amount, notes, method string, actorID int64, key string, occurredAt *time.Time) (*ReceivableEntry, error) {
 	value, e := validateReceivableInput(amount, notes, method, actorID, key)
 	if e != nil {
 		return nil, e
 	}
 	if occurredAt != nil && (occurredAt.Before(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) || occurredAt.After(time.Now().Add(5*time.Minute))) {
-		return nil, infraerrors.BadRequest("INVALID_PAYMENT_DATE", "收款时间无效")
+		return nil, infraerrors.BadRequest("INVALID_RECEIVABLE_DATE", "请选择有效的记账或收款时间")
 	}
 	if _, e = q.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,91))`, key); e != nil {
 		return nil, e
 	}
-	if e = lockReceivableUser(ctx, q, userID, true); e != nil {
+	if e = lockReceivableUser(ctx, q, userID, kind == "payment"); e != nil {
 		return nil, e
 	}
-	existing, e := existingReceivable(ctx, q, userID, actorID, "payment", value, notes, method, key, occurredAt)
+	existing, e := existingReceivable(ctx, q, userID, actorID, kind, value, notes, method, key, occurredAt)
 	if e != nil || existing != nil {
 		return existing, e
 	}
@@ -191,10 +199,14 @@ func RecordReceivablePaymentTx(ctx context.Context, q BalanceCreditSQL, userID i
 	if e != nil {
 		return nil, e
 	}
-	if value.GreaterThan(outstanding) {
+	if kind == "payment" && value.GreaterThan(outstanding) {
 		return nil, infraerrors.BadRequest("PAYMENT_EXCEEDS_DEBT", "收款金额不能超过当前欠款")
 	}
-	v := &ReceivableEntry{UserID: userID, Kind: "payment", Amount: value.String(), OutstandingAfter: outstanding.Sub(value).String(), ActorID: actorID, Notes: notes, PaymentMethod: method, OperationKey: key}
-	e = receivableOne(ctx, q, `INSERT INTO admin_receivable_entries(user_id,kind,amount,outstanding_after,actor_id,operation_key,notes,payment_method,occurred_at) VALUES($1,'payment',$2::numeric,$3::numeric,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW())) RETURNING id,occurred_at,created_at`, []any{userID, v.Amount, v.OutstandingAfter, actorID, key, notes, method, occurredAt}, func(r *sql.Rows) error { return r.Scan(&v.ID, &v.OccurredAt, &v.CreatedAt) })
+	after := outstanding.Add(value)
+	if kind == "payment" {
+		after = outstanding.Sub(value)
+	}
+	v := &ReceivableEntry{UserID: userID, Kind: kind, Amount: value.String(), OutstandingAfter: after.String(), ActorID: actorID, Notes: notes, PaymentMethod: method, OperationKey: key}
+	e = receivableOne(ctx, q, `INSERT INTO admin_receivable_entries(user_id,kind,amount,outstanding_after,actor_id,operation_key,notes,payment_method,occurred_at) VALUES($1,$2,$3::numeric,$4::numeric,$5,$6,$7,$8,COALESCE($9::timestamptz,NOW())) RETURNING id,occurred_at,created_at`, []any{userID, kind, v.Amount, v.OutstandingAfter, actorID, key, notes, method, occurredAt}, func(r *sql.Rows) error { return r.Scan(&v.ID, &v.OccurredAt, &v.CreatedAt) })
 	return v, e
 }

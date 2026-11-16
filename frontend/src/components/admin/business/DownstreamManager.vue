@@ -265,6 +265,7 @@ function debt(row: DownstreamUser) {
     :mode="mode"
     :user-ids="targetIDs"
     :initial-group="initialGroup"
+    :users="data?.items || []"
     @close="mode = null"
     @saved="reload"
   />

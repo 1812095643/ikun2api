@@ -1,10 +1,15 @@
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import ReloginAuthorizationForm from './ReloginAuthorizationForm.vue'
 import ReloginImportForm from './ReloginImportForm.vue'
 import ReloginSettingsForm from './ReloginSettingsForm.vue'
+import GroupSelector from '@/components/common/GroupSelector.vue'
 import type { ReloginSettings } from '@/api/relogin'
+vi.mock('vue-i18n', async original => ({
+  ...(await original<typeof import('vue-i18n')>()),
+  useI18n: () => ({ t: (key: string) => key })
+}))
 
 describe('账号授权入口', () => {
   it('默认粘贴资料，切换手动填写不丢失已输入内容', async () => {
@@ -51,6 +56,28 @@ describe('失效重登设置标签', () => {
     quota_enabled: false, quota_interval: 300, quota_threshold: 20, recipients: ['owner@example.test']
   }
   const options = { groups: [{ id: 2, name: 'GPT' }], proxies: [{ id: 3, name: '默认代理' }] }
+  it('复用账号分组选择组件，并保留倍率、账号数和平台筛选', async () => {
+    const groupOptions = [{ id: 2, name: 'GPT', platform: 'openai' as const, rate_multiplier: 0.7, account_count: 5 }]
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options: { ...options, groups: groupOptions }, busy: false }, global: { plugins: [createPinia()] } })
+    const selector = wrapper.getComponent(GroupSelector)
+    expect(selector.props('platform')).toBe('openai')
+    expect(selector.props('groups')[0]).toEqual(groupOptions[0])
+    selector.vm.$emit('update:modelValue', [])
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.emitted('save')?.[0][0] as ReloginSettings).template.group_ids).toEqual([])
+    wrapper.unmount()
+  })
+  it('保存时移除选项中已经不存在的旧分组，保留其他默认值', async () => {
+    const wrapper = mount(ReloginSettingsForm, { props: {
+      settings: { ...settings, template: { ...settings.template, group_ids: [2, 82] } }, options, busy: false
+    }, global: { plugins: [createPinia()] } })
+    await wrapper.get('form').trigger('submit')
+    const saved = wrapper.emitted('save')?.[0][0] as ReloginSettings
+    expect(saved.template.group_ids).toEqual([2])
+    expect(saved.template.extra).toEqual(settings.template.extra)
+    expect(saved.template.load_factor).toBe(10000)
+    wrapper.unmount()
+  })
   it('每次只显示一类，切换保留改动并一次保存全部设置', async () => {
     const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
     expect(wrapper.get('[aria-selected="true"]').text()).toBe('自动重登')

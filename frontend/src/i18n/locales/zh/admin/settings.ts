@@ -837,6 +837,8 @@ export default {
           'CNY 支付通道下，套餐每 1 USD 价格收取多少 CNY（如 7.15）。0 或留空 = 不换算，订阅按 price 数值直接收款。启用后所有套餐 price 必须按 USD 定价',
         subscriptionUsdToCnyRateDisabled: '未启用（按 price 直付）',
         rechargeFeeRate: '充值手续费率',
+        defaultFeeRate: '默认手续费率',
+        methodFeeHint: '单独费率留空沿用默认，0 表示免手续费',
         rechargeFeeRateHint: '用户充值时额外收取的手续费百分比，0 表示不收取手续费',
         rechargeFeePreview: '预览：充值 100 元，手续费 {fee} 元',
         rechargeBonus: {

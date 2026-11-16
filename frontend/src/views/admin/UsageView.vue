@@ -133,6 +133,7 @@
             :default-sort-order="'desc'"
             @sort="handleSort"
             @userClick="handleUserClick"
+            @user-action="handleUserAction"
             @ipGeoBatchFailed="handleIpGeoBatchFailed"
           />
           <Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" />
@@ -145,6 +146,7 @@
             :visible-column-keys="errVisibleColumnKeys"
             user-clickable
             @userClick="handleUserClick"
+            @user-action="handleUserAction"
             @openErrorDetail="openError"
             @sort="onErrSort"
             @update:page="onErrPage"
@@ -181,6 +183,7 @@
     :hide-actions="true"
     @close="showBalanceHistoryModal = false; balanceHistoryUser = null"
   />
+  <TicketNotificationDialog v-if="notificationUserId" :initial-user-id="notificationUserId" @close="notificationUserId = null" @sent="notificationUserId = null; appStore.showSuccess('通知已发送')" />
 </template>
 
 <script setup lang="ts">
@@ -198,6 +201,7 @@ import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageEx
 import UserTokenRanking from '@/components/admin/usage/UserTokenRanking.vue'
 import UsageCleanupDialog from '@/components/admin/usage/UsageCleanupDialog.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
+import TicketNotificationDialog from '@/components/workspace/tickets/TicketNotificationDialog.vue'
 import OpsErrorLogTable from '@/views/admin/ops/components/OpsErrorLogTable.vue'
 import OpsErrorDetailModal from '@/views/admin/ops/components/OpsErrorDetailModal.vue'
 import { listErrorLogs } from '@/api/admin/ops'
@@ -209,6 +213,11 @@ import type { AdminUsageLog, TrendDataPoint, ModelStat, GroupStat, EndpointStat,
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const notificationUserId = ref<number | null>(null)
+function handleUserAction(action: 'usage' | 'notify', userId: number, email: string) {
+  if (action === 'usage') handleRankingSelectUser(userId, email)
+  else notificationUserId.value = userId
+}
 type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
 type ModelDistributionSource = 'requested' | 'upstream' | 'mapping'

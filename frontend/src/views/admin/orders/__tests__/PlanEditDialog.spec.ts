@@ -139,6 +139,18 @@ function mountDialog({
 }
 
 describe('PlanEditDialog', () => {
+  it('独立费率存在时分别预览支付宝和微信实付金额', async () => {
+    const wrapper = mountDialog({ paymentConfig: {
+      subscription_usd_to_cny_rate: 1, recharge_fee_rate: 3, recharge_fee_rates: { alipay: 0.6, wxpay: 0 }
+    } })
+    await wrapper.find('input[type="number"]').setValue('100')
+    expect(wrapper.text()).toContain('payment.methods.alipay')
+    expect(wrapper.text()).toContain('¥100.60')
+    expect(wrapper.text()).toContain('payment.methods.wxpay')
+    expect(wrapper.text()).toContain('¥100.00')
+    expect(wrapper.text()).not.toContain('¥103.00')
+    wrapper.unmount()
+  })
   it('shows CNY channel charge using the configured subscription rate and fee', async () => {
     const wrapper = mountDialog({
       paymentConfig: {

@@ -2,6 +2,7 @@
 import { computed, reactive, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatPaymentAmount } from '@/components/payment/currency'
+import { resolvePaymentFeeRate } from '@/utils/paymentFees'
 import { useAppStore } from '@/stores/app'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import { adminPaymentAPI, type AdminPaymentConfig } from '@/api/admin/payment'
@@ -19,7 +20,13 @@ const subscriptionCnyPreview = computed(() => {
  const amount = Math.round(price * rate * 100) / 100; const feeRate = Number(props.paymentConfig?.recharge_fee_rate) || 0
  const fee = feeRate > 0 ? Math.ceil(amount * feeRate) / 100 : 0
  const total = Math.round((amount + fee) * 100) / 100
- return { amount: formatPaymentAmount(amount, 'CNY'), feeRate, total: formatPaymentAmount(total, 'CNY') }
+ const methods = ['alipay', 'wxpay'].some(method => props.paymentConfig?.recharge_fee_rates?.[method] != null)
+   ? ['alipay', 'wxpay'].map(method => {
+     const methodFee = resolvePaymentFeeRate(feeRate, props.paymentConfig?.recharge_fee_rates, method)
+     const methodTotal = Math.round((amount + (methodFee > 0 ? Math.ceil(amount * methodFee) / 100 : 0)) * 100) / 100
+     return { method, rate: methodFee, total: formatPaymentAmount(methodTotal, 'CNY') }
+   }) : []
+ return { amount: formatPaymentAmount(amount, 'CNY'), feeRate, total: formatPaymentAmount(total, 'CNY'), methods }
 })
 const limits = [{ key: 'daily_limit_usd', label: '每日上限' }, { key: 'weekly_limit_usd', label: '每周上限' }, { key: 'monthly_limit_usd', label: '每月上限' }] as const
 watch(() => props.show, show => {
@@ -54,7 +61,7 @@ async function save() {
     <div><label for="plan-sort" class="input-label">排序</label><input id="plan-sort" v-model.number="form.sort_order" type="number" class="input" /></div>
     <label class="flex items-center gap-2 text-sm"><input v-model="form.for_sale" type="checkbox" class="checkbox" />上架销售</label>
    </fieldset>
-   <div v-if="subscriptionCnyPreview" class="rounded-xl bg-gray-50 p-3 text-xs leading-6 text-gray-600 dark:bg-dark-700 dark:text-gray-300"><p>{{ t('payment.admin.subscriptionCnyPayPreview', { amount: subscriptionCnyPreview.amount }) }}</p><p v-if="subscriptionCnyPreview.feeRate > 0">{{ t('payment.admin.subscriptionCnyPayPreviewWithFee', { feeRate: subscriptionCnyPreview.feeRate, total: subscriptionCnyPreview.total }) }}</p></div>
+   <div v-if="subscriptionCnyPreview" class="rounded-xl bg-gray-50 p-3 text-xs leading-6 text-gray-600 dark:bg-dark-700 dark:text-gray-300"><p>{{ t('payment.admin.subscriptionCnyPayPreview', { amount: subscriptionCnyPreview.amount }) }}</p><template v-if="subscriptionCnyPreview.methods.length"><p v-for="method in subscriptionCnyPreview.methods" :key="method.method">{{ t(`payment.methods.${method.method}`) }} · {{ method.rate }}% · {{ method.total }}</p></template><p v-else-if="subscriptionCnyPreview.feeRate > 0">{{ t('payment.admin.subscriptionCnyPayPreviewWithFee', { feeRate: subscriptionCnyPreview.feeRate, total: subscriptionCnyPreview.total }) }}</p></div>
    <p class="text-xs leading-5 text-gray-500 dark:text-gray-400">每日额度按站点时区零点重置；周按 7 天、月按 30 天滚动。周期刷新不补回套餐总额度。不同分组按各自实际倍率扣费，专属分组仍需授权。</p>
    <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
   </form>

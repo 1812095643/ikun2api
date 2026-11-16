@@ -66,14 +66,11 @@
 
         <template #cell-user="{ row }">
           <div v-if="row.user_id" class="text-sm">
-            <button
+            <UsageUserMenu
               v-if="userClickable && row.user_email"
-              class="font-medium text-primary-600 underline decoration-dashed underline-offset-2 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-              :title="t('admin.usage.clickToViewBalance')"
-              @click.stop="emit('userClick', row.user_id, row.user_email)"
-            >
-              {{ row.user_email }}
-            </button>
+              :email="row.user_email"
+              @select="action => action === 'balance' ? emit('userClick', row.user_id, row.user_email) : emit('userAction', action, row.user_id, row.user_email)"
+            />
             <span v-else class="font-medium text-gray-900 dark:text-white">{{ row.user_email || '-' }}</span>
             <span class="ml-1 text-gray-500 dark:text-gray-400">#{{ row.user_id }}</span>
           </div>
@@ -182,6 +179,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DataTable from '@/components/common/DataTable.vue'
+import UsageUserMenu from '@/components/admin/usage/UsageUserMenu.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import IpGeoCell from '@/components/common/IpGeoCell.vue'
@@ -308,6 +306,7 @@ interface Emits {
   (e: 'ipGeoBatchFailed'): void
   (e: 'sort', sortBy: string, sortOrder: 'asc' | 'desc'): void
   (e: 'userClick', userId: number, email?: string): void
+  (e: 'userAction', action: 'usage' | 'notify', userId: number, email: string): void
 }
 
 const props = defineProps<Props>()

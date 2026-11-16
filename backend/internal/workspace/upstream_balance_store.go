@@ -173,6 +173,9 @@ func (h *Handler) loadUpstreamBalanceRecords(ctx context.Context, groups []upstr
 		if err = json.Unmarshal(s, &r.Snapshot); err != nil {
 			return nil, err
 		}
+		if len(r.Snapshot.Readings) > 0 {
+			r.Snapshot = summarizeUpstreamBalances(r.Snapshot.Readings, r.Config.PreferredAccountID)
+		}
 		if err = json.Unmarshal(a, &r.storedAlert); err != nil {
 			return nil, err
 		}

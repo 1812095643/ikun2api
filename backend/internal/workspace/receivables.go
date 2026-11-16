@@ -26,6 +26,7 @@ func (h *Handler) registerBusinessAdmin(r *gin.RouterGroup) {
 	ledger.GET("", h.listReceivables)
 	ledger.GET("/:id", h.receivableHistory)
 	ledger.POST("/:id/payments", h.recordReceivablePayment)
+	ledger.POST("/:id/credits", h.recordManualReceivable)
 	downstream := r.Group("/downstreams", requireFinanceAdmin)
 	downstream.GET("", h.listDownstreams)
 	downstream.POST("/apply", h.applyDownstreamChanges)
@@ -47,10 +48,10 @@ type receivableAccount struct {
 }
 
 const receivableAccountsSQL = `WITH debt AS (
- SELECT user_id,SUM(CASE WHEN kind='credit' THEN amount ELSE 0 END) credited,
+ SELECT user_id,SUM(CASE WHEN kind IN ('credit','manual_credit') THEN amount ELSE 0 END) credited,
  SUM(CASE WHEN kind='payment' THEN amount ELSE 0 END) received,
- SUM(CASE WHEN kind='credit' THEN amount ELSE -amount END) outstanding,
- MAX(created_at) FILTER (WHERE kind='credit') last_credit,MAX(occurred_at) FILTER(WHERE kind='payment') last_payment
+ SUM(CASE WHEN kind IN ('credit','manual_credit') THEN amount ELSE -amount END) outstanding,
+ MAX(occurred_at) FILTER (WHERE kind IN ('credit','manual_credit')) last_credit,MAX(occurred_at) FILTER(WHERE kind='payment') last_payment
  FROM admin_receivable_entries GROUP BY user_id
 ), filtered AS (SELECT u.id user_id,u.email,u.username,u.deleted_at IS NOT NULL deleted,u.is_downstream,u.balance,d.credited,d.received,d.outstanding,d.last_credit,d.last_payment
  FROM debt d JOIN users u ON u.id=d.user_id
@@ -112,7 +113,7 @@ func (h *Handler) receivableHistory(c *gin.Context) {
 		return
 	}
 	var total int
-	err = h.db.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(amount) FILTER(WHERE kind='credit'),0)::text,COALESCE(SUM(amount) FILTER(WHERE kind='payment'),0)::text,COALESCE(SUM(CASE WHEN kind='credit' THEN amount ELSE -amount END),0)::text FROM admin_receivable_entries WHERE user_id=$1`, id).Scan(&total, &account.Credited, &account.Received, &account.Outstanding)
+	err = h.db.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(amount) FILTER(WHERE kind IN ('credit','manual_credit')),0)::text,COALESCE(SUM(amount) FILTER(WHERE kind='payment'),0)::text,COALESCE(SUM(CASE WHEN kind IN ('credit','manual_credit') THEN amount ELSE -amount END),0)::text FROM admin_receivable_entries WHERE user_id=$1`, id).Scan(&total, &account.Credited, &account.Received, &account.Outstanding)
 	if err != nil {
 		fail(c, err)
 		return
@@ -139,6 +140,12 @@ func (h *Handler) receivableHistory(c *gin.Context) {
 	response.Success(c, gin.H{"account": account, "items": items, "total": total, "page": page, "page_size": size})
 }
 func (h *Handler) recordReceivablePayment(c *gin.Context) {
+	h.recordReceivable(c, false)
+}
+func (h *Handler) recordManualReceivable(c *gin.Context) {
+	h.recordReceivable(c, true)
+}
+func (h *Handler) recordReceivable(c *gin.Context, manual bool) {
 	id, err := positiveID(c)
 	if err != nil {
 		fail(c, err)
@@ -166,7 +173,12 @@ func (h *Handler) recordReceivablePayment(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback()
-	entry, err := service.RecordReceivablePaymentTx(c.Request.Context(), tx, id, req.Amount, req.Notes, req.Method, actor.ID, req.Key, req.OccurredAt)
+	var entry *service.ReceivableEntry
+	if manual {
+		entry, err = service.RecordManualReceivableTx(c.Request.Context(), tx, id, req.Amount, req.Notes, actor.ID, req.Key, req.OccurredAt)
+	} else {
+		entry, err = service.RecordReceivablePaymentTx(c.Request.Context(), tx, id, req.Amount, req.Notes, req.Method, actor.ID, req.Key, req.OccurredAt)
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			fail(c, err)

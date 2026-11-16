@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { nextTick, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { useAppStore } from '@/stores/app'
+import GroupSelector from '@/components/common/GroupSelector.vue'
+import type { Group } from '@/types'
 import type { ReloginOptions, ReloginSettings } from '@/api/relogin'
 const props = defineProps<{ settings: ReloginSettings; options: ReloginOptions; busy: boolean; error?: string }>()
 const emit = defineEmits<{ save: [settings: ReloginSettings] }>()
@@ -15,6 +17,7 @@ const tabs = [
   { value: 'account', label: '账号默认值' },
   { value: 'quota', label: '额度通知' }
 ]
+const groups = computed(() => props.options.groups.map(group => ({ ...group, platform: group.platform || 'openai' })) as (Group & { account_count?: number })[])
 async function revealInvalid(event: Event) {
   const input = event.target as HTMLInputElement
   const tab = input.closest<HTMLElement>('[data-settings-tab]')?.dataset.settingsTab
@@ -38,7 +41,9 @@ function save() {
   }
   emit('save', {
     ...draft,
-    template: { ...draft.template, model_mapping: mapping, extra: {
+    template: { ...draft.template,
+      group_ids: draft.template.group_ids.filter(id => props.options.groups.some(group => group.id === id)),
+      model_mapping: mapping, extra: {
       ...draft.template.extra,
       openai_oauth_responses_websockets_v2_enabled: draft.template.extra.openai_oauth_responses_websockets_v2_mode !== 'off'
     } },
@@ -130,27 +135,7 @@ function save() {
         <label class="setting-check"><input v-model="draft.template.extra.openai_long_context_billing_enabled" type="checkbox" />长上下文计费</label>
       </div>
       <label class="ws-field mt-5">模型映射<textarea v-model="modelMapping" class="ws-input font-mono" rows="5" spellcheck="false" aria-label="模型映射" placeholder='{"来源模型": "上游模型"}' /></label>
-      <div class="ws-field mt-5">
-        <span>分组</span>
-        <div class="settings-groups">
-          <label
-            v-for="group in options.groups"
-            :key="group.id"
-            class="setting-check"
-            ><input
-              v-model="draft.template.group_ids"
-              type="checkbox"
-              :value="group.id"
-            />{{ group.name }}</label
-          >
-          <p
-            v-if="!options.groups.length"
-            class="ws-muted"
-          >
-            暂无可选的 OpenAI 分组，请先到分组管理中创建。
-          </p>
-        </div>
-      </div>
+      <GroupSelector v-model="draft.template.group_ids" class="mt-5" :groups="groups" platform="openai" />
     </section>
     <section id="relogin-settings-panel-quota" v-show="activeTab === 'quota'" data-settings-tab="quota"
       class="relogin-settings-panel" role="tabpanel" aria-labelledby="relogin-settings-tab-quota">
@@ -207,18 +192,5 @@ function save() {
 .setting-check input {
   margin-top: 5px;
   accent-color: var(--ws-primary, #2563eb);
-}
-.settings-groups {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 13px;
-  background: var(--ws-soft, #f5f7f8);
-  border-radius: 9px;
-}
-@media (max-width: 600px) {
-  .settings-groups {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

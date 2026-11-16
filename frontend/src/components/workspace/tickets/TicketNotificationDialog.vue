@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import { onMounted } from 'vue'
 import Select from '@/components/common/Select.vue'
 import TicketComposer from './TicketComposer.vue'
 import { useTicketNotification } from '@/composables/workspace/useTicketNotification'
 import type { TicketDraft } from '@/api/workspace'
 
 const emit = defineEmits<{ close: []; sent: [id: number] }>()
+const props = defineProps<{ initialUserId?: number }>()
 const { recipient, options, searching, busy, error, searchError, subject, uncertain, search, select, submit } = useTicketNotification()
+onMounted(async () => {
+  if (!props.initialUserId) return
+  await search(String(props.initialUserId))
+  select(props.initialUserId)
+})
 
 async function send(message: TicketDraft) {
   const id = await submit(message)

@@ -94,7 +94,7 @@ watch(page, reload)
                 <span
                   class="badge"
                   :class="
-                    entry.kind === 'credit' ? 'badge-warning' : 'badge-success'
+                    entry.kind === 'payment' ? 'badge-success' : 'badge-warning'
                   "
                   >{{ t(`business.${entry.kind}`) }}</span
                 >

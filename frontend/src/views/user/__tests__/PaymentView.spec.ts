@@ -4,6 +4,7 @@ import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
 import AmountInput from '@/components/payment/AmountInput.vue'
+import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import en from '@/i18n/locales/en'
 import zh from '@/i18n/locales/zh'
@@ -375,6 +376,30 @@ describe('PaymentView subscription plan grid', () => {
 })
 
 describe('PaymentView recharge rate preview', () => {
+  it('切换支付方式同步手续费标签与应付金额，不把默认费率重复叠加', async () => {
+    routeState.path = '/purchase'
+    routeState.query = {}
+    const method = checkoutInfoFixture().data.methods.wxpay
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
+      recharge_fee_rate: 3,
+      recharge_fee_rates: { alipay: 0.6, wxpay: 1.2 },
+      methods: { alipay: { ...method, fee_rate: 0.6 }, wxpay: { ...method, fee_rate: 1.2 } }
+    }))
+    const wrapper = shallowMount(PaymentView, { global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true, Transition: false } } })
+    await flushPromises()
+    wrapper.getComponent(AmountInput).vm.$emit('update:modelValue', 100)
+    const selector = wrapper.getComponent(PaymentMethodSelector)
+    selector.vm.$emit('select', 'alipay')
+    await flushPromises()
+    expect((wrapper.vm as any).feeRate).toBe(0.6)
+    expect((wrapper.vm as any).totalAmount).toBe(100.6)
+    selector.vm.$emit('select', 'wxpay')
+    await flushPromises()
+    expect((wrapper.vm as any).feeRate).toBe(1.2)
+    expect((wrapper.vm as any).totalAmount).toBe(101.2)
+    expect(selector.props('methods').map(method => method.fee_rate)).toEqual([0.6, 1.2])
+    wrapper.unmount()
+  })
   it('uses the selected payment method currency in both locale templates', async () => {
     translate.mockClear()
     routeState.path = '/purchase'
@@ -412,6 +437,14 @@ describe('PaymentView recharge rate preview', () => {
 })
 
 describe('PaymentView subscription confirmation amounts', () => {
+  it.each([0, 1])('订阅订单使用微信单独费率 %s，先换算再加手续费', async rate => {
+    const wrapper = await mountSubscriptionConfirm({ checkout: {
+      subscription_usd_to_cny_rate: 7.15, recharge_fee_rate: 2.5, recharge_fee_rates: { wxpay: rate }
+    }, method: { currency: 'CNY' }, plan: { price: 9.99 } })
+    expect((wrapper.vm as any).feeRate).toBe(rate)
+    expect((wrapper.vm as any).subTotalAmount).toBe(rate ? 72.15 : 71.43)
+    wrapper.unmount()
+  })
   it('shows converted CNY pay amount using the subscription rate, not the balance multiplier', async () => {
     const wrapper = await mountSubscriptionConfirm({
       checkout: {

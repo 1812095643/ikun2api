@@ -2,10 +2,10 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
-import Select from '@/components/common/Select.vue'
+import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import BusinessError from './BusinessError.vue'
 import { adminAPI } from '@/api/admin'
-import { businessAPI, type DownstreamApply } from '@/api/admin/business'
+import { businessAPI, type DownstreamApply, type DownstreamUser } from '@/api/admin/business'
 import {
   businessMoney,
   positiveDecimal,
@@ -20,15 +20,15 @@ const props = defineProps<{
   mode: DownstreamAction | null
   userIds: number[]
   initialGroup?: number | null
+  users?: DownstreamUser[]
 }>()
 const emit = defineEmits<{ close: []; saved: [] }>()
 const { t } = useI18n()
 const app = useAppStore()
-const form = reactive({
-  group: null as number | null,
-  rate: '',
-  restore: false
-})
+const rates = reactive<Record<number, string>>({})
+const originalRates = ref<Record<number, string>>({})
+const mixedGroups = ref<number[]>([])
+const changedGroups = ref<number[]>([])
 const selected = ref<number[]>([])
 const search = ref('')
 const key = ref(newBusinessOperationKey())
@@ -36,19 +36,15 @@ const submitting = ref(false)
 const groups = ref<Group[]>([])
 const groupError = ref('')
 const groupsLoading = ref(false)
-const currentRates = ref<Record<number, number>>({})
 let groupSequence = 0
 const { data, loading, error, load, clear } =
   useBusinessRequest<PaginatedResponse<AdminUser>>()
 const ids = computed(() =>
   props.mode === 'add' ? selected.value : props.userIds
 )
-const groupOptions = computed(() =>
-  groups.value.map((group) => ({
-    value: group.id,
-    label: `${group.name} · ${group.rate_multiplier}×`
-  }))
-)
+const changedRates = computed(() => Object.fromEntries(changedGroups.value
+  .filter(id => rates[id] !== originalRates.value[id] || mixedGroups.value.includes(id))
+  .map(id => [id, rates[id].trim() === '' ? null : Number(rates[id])])) as Record<number, number | null>)
 const title = computed(() =>
   t(
     `business.${props.mode === 'add' ? 'addDownstream' : props.mode === 'price' ? 'pricing' : 'removeDownstream'}`
@@ -58,12 +54,15 @@ const valid = computed(
   () =>
     ids.value.length > 0 &&
     (props.mode !== 'price' ||
-      (form.group &&
-        !groupsLoading.value &&
-        !groupError.value &&
-        (form.restore ||
-          (positiveDecimal(form.rate, 4) && Number(form.rate) <= 100000))))
+      (!groupsLoading.value && !groupError.value && Object.keys(changedRates.value).length > 0 &&
+        Object.values(changedRates.value).every(rate => rate === null ||
+          (positiveDecimal(String(rate), 4) && rate <= 100000))))
 )
+function updateRate(id: number, value: string) {
+  rates[id] = value
+  if (!changedGroups.value.includes(id)) changedGroups.value.push(id)
+  key.value = newBusinessOperationKey()
+}
 function reloadUsers() {
   void load((signal) =>
     adminAPI.users.list(
@@ -92,12 +91,16 @@ async function reloadGroups() {
     ])
     if (sequence !== groupSequence || props.mode !== 'price') return
     groups.value = allGroups
-    currentRates.value = user?.group_rates || {}
-    if (form.group)
-      form.rate =
-        currentRates.value[form.group] != null
-          ? String(currentRates.value[form.group])
-          : ''
+    const users = props.users?.filter(item => props.userIds.includes(item.id)) || []
+    if (!user && users.length !== props.userIds.length) throw new Error(t('business.loadingFailed'))
+    for (const group of allGroups) {
+      const values = user ? [user.group_rates?.[group.id] ?? null] : users.map(item =>
+        item.group_rates.find(rate => rate.group_id === group.id)?.rate ?? null)
+      const mixed = values.some(value => value !== values[0])
+      if (mixed) mixedGroups.value.push(group.id)
+      rates[group.id] = !mixed && values[0] != null ? String(values[0]) : ''
+    }
+    originalRates.value = { ...rates }
   } catch (e) {
     if (sequence === groupSequence)
       groupError.value = extractApiErrorMessage(e, t('business.loadingFailed'))
@@ -111,30 +114,20 @@ watch(
     clear()
     groupSequence++
     groups.value = []
-    currentRates.value = {}
+    Object.keys(rates).forEach(id => delete rates[Number(id)])
+    originalRates.value = {}
+    mixedGroups.value = []
+    changedGroups.value = []
     selected.value = []
     search.value = ''
-    Object.assign(form, {
-      group: props.initialGroup || null,
-      rate: '',
-      restore: false
-    })
     key.value = newBusinessOperationKey()
     if (mode === 'add') reloadUsers()
     if (mode === 'price') void reloadGroups()
-  }
+  },
+  { immediate: true }
 )
 watch(
-  () => form.group,
-  (group) => {
-    form.rate =
-      group && currentRates.value[group] != null
-        ? String(currentRates.value[group])
-        : ''
-  }
-)
-watch(
-  () => [form.group, form.rate, form.restore, ...ids.value],
+  () => [...ids.value],
   () => {
     key.value = newBusinessOperationKey()
   }
@@ -160,10 +153,7 @@ async function submit() {
     operation_key: key.value
   }
   if (props.mode === 'add') request.is_downstream = true
-  if (props.mode === 'price' && form.group)
-    request.group_rates = {
-      [form.group]: form.restore ? null : Number(form.rate)
-    }
+  if (props.mode === 'price') request.group_rates = changedRates.value
   if (props.mode === 'remove') request.is_downstream = false
   submitting.value = true
   try {
@@ -182,7 +172,7 @@ async function submit() {
   <BaseDialog
     :show="!!mode"
     :title="title"
-    width="normal"
+    :width="mode === 'price' ? 'wide' : 'normal'"
     :close-on-escape="!submitting"
     :show-close-button="!submitting"
     @close="!submitting && $emit('close')"
@@ -232,36 +222,29 @@ async function submit() {
           :message="groupError"
           @retry="reloadGroups"
         />
-        <div>
-          <label class="input-label">{{ t('business.group') }}</label
-          ><Select
-            v-model="form.group"
-            :aria-label="t('business.group')"
-            :options="groupOptions"
-            :disabled="groupsLoading"
-            :placeholder="t('business.chooseGroup')"
-          />
+        <div v-else-if="groupsLoading" class="py-8 text-center text-sm text-gray-400">{{ t('common.loading') }}</div>
+        <div v-else class="space-y-2">
+          <div v-for="group in groups" :key="group.id" class="flex flex-wrap items-center gap-3 rounded-xl border p-3 sm:flex-nowrap"
+            :class="group.is_exclusive ? 'border-primary-200 bg-primary-50/30 dark:border-primary-800/50 dark:bg-primary-900/10' : 'border-gray-200 dark:border-dark-600'">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <PlatformIcon :platform="group.platform" size="sm" />
+                <span class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{{ group.name }}</span>
+              </div>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('business.publicRate') }} <span class="font-medium tabular-nums text-gray-700 dark:text-gray-300">{{ group.rate_multiplier }}×</span></p>
+            </div>
+            <div class="flex items-center gap-2">
+              <label :for="`downstream-rate-${group.id}`" class="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{{ t('business.customRate') }}</label>
+              <input :id="`downstream-rate-${group.id}`" :value="rates[group.id]" class="input hide-spinner w-28 py-2 text-sm tabular-nums" type="text" inputmode="decimal"
+                :aria-label="`${group.name} ${t('business.customRate')}`"
+                :placeholder="mixedGroups.includes(group.id) && !changedGroups.includes(group.id) ? t('business.mixedRate') : String(group.rate_multiplier)"
+                @input="updateRate(group.id, ($event.target as HTMLInputElement).value)" />
+              <button type="button" class="rounded-md px-2 py-1 text-xs text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                :disabled="!rates[group.id] && !mixedGroups.includes(group.id)" @click="updateRate(group.id, '')">{{ t('common.reset') }}</button>
+            </div>
+          </div>
         </div>
-        <div>
-          <label for="downstream-rate" class="input-label">{{
-            t('business.customRate')
-          }}</label
-          ><input
-            id="downstream-rate"
-            v-model="form.rate"
-            type="text"
-            inputmode="decimal"
-            class="input"
-            :disabled="form.restore || groupsLoading"
-            :placeholder="t('business.keepGroupRate')"
-          />
-        </div>
-        <label class="flex cursor-pointer items-center gap-2 text-sm"
-          ><input v-model="form.restore" type="checkbox" />{{
-            t('business.clearRate')
-          }}</label
-        ></template
-      >
+      </template>
       <p v-if="mode === 'remove'" class="text-sm text-gray-500">
         {{ t('business.removeHint') }}
       </p>

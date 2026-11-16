@@ -119,10 +119,12 @@ func summarizeUpstreamBalances(readings []upstreamBalanceReading, preferred int6
 	s := upstreamBalanceSnapshot{Readings: readings, Total: len(readings), Comparison: "unverified"}
 	var first *upstreamBalanceReading
 	var selected *upstreamBalanceReading
+	var minimum *upstreamBalanceReading
+	comparable := true
 	same := true
 	for i := range readings {
 		r := &readings[i]
-		if r.Error != "" {
+		if r.Error != "" || (!r.Unlimited && (r.Balance == nil || !finiteBalance(*r.Balance))) {
 			continue
 		}
 		s.Successful++
@@ -130,6 +132,13 @@ func summarizeUpstreamBalances(readings []upstreamBalanceReading, preferred int6
 			first = r
 		} else if !sameUpstreamBalance(*first, *r) {
 			same = false
+		}
+		if r.Unit != first.Unit || r.Scope != first.Scope {
+			comparable = false
+		}
+		if minimum == nil || (minimum.Unlimited && !r.Unlimited) ||
+			(!r.Unlimited && !minimum.Unlimited && *r.Balance < *minimum.Balance) {
+			minimum = r
 		}
 		for _, id := range r.AccountIDs {
 			if id == preferred {
@@ -149,15 +158,18 @@ func summarizeUpstreamBalances(readings []upstreamBalanceReading, preferred int6
 	default:
 		s.Comparison = "consistent"
 	}
-	// Never sum balances for multiple keys. An ambiguous/partially failed group
-	// cannot drive a wallet alarm until an administrator chooses its source.
-	if preferred == 0 && same && s.Successful == len(readings) {
-		selected = first
+	// 同口径读数取最小值，既不累加钱包，也不因查询时间差隐藏有效余额。
+	if preferred == 0 && comparable {
+		selected = minimum
 	}
 	if selected != nil {
 		s.Balance, s.Unit, s.Scope, s.Unlimited = selected.Balance, selected.Unit, selected.Scope, selected.Unlimited
 	} else if s.Successful > 0 {
-		s.Error = "读数不一致或部分 Key 查询失败，请指定监控 Key。"
+		if preferred != 0 {
+			s.Error = "指定的监控 Key 暂无有效读数，请查询后重试或改为自动。"
+		} else {
+			s.Error = "余额单位或口径不同，请指定监控 Key。"
+		}
 	}
 	return s
 }

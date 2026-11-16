@@ -318,6 +318,7 @@ import { platformAccentBarClass, platformBadgeLightClass, platformBadgeClass, pl
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { resolvePaymentFeeRate } from '@/utils/paymentFees'
 import { DEFAULT_PAYMENT_CURRENCY, formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
 import { planValiditySuffix as validitySuffixOf } from '@/components/payment/validity'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
@@ -682,13 +683,16 @@ const methodOptions = computed<PaymentMethodOption[]>(() =>
     return {
       type,
       display_name: ml?.display_name,
-      fee_rate: ml?.fee_rate ?? 0,
+      fee_rate: feeRateFor(type),
       available: ml?.available !== false && amountFitsMethod(payBaseAmount.value, type),
     }
   })
 )
 
-const feeRate = computed(() => checkout.value?.recharge_fee_rate ?? 0)
+function feeRateFor(method: string): number {
+  return resolvePaymentFeeRate(checkout.value?.recharge_fee_rate ?? 0, checkout.value?.recharge_fee_rates, method)
+}
+const feeRate = computed(() => feeRateFor(selectedMethod.value))
 const feeAmount = computed(() =>
   feeRate.value > 0 && payBaseAmount.value > 0
     ? Math.ceil(((payBaseAmount.value * feeRate.value) / 100) * 100) / 100
@@ -737,10 +741,11 @@ const subTotalAmount = computed(() => {
   return roundPaymentAmount(subPaymentAmount.value + subFeeAmount.value, selectedCurrency.value)
 })
 
-function subscriptionTotalAmountForCurrency(value: number, currency: string): number {
+function subscriptionTotalAmountForCurrency(value: number, currency: string, method: string): number {
   const paymentAmount = subscriptionPaymentAmountForCurrency(value, currency)
-  if (feeRate.value <= 0 || paymentAmount <= 0) return paymentAmount
-  const fee = ceilPaymentAmount((paymentAmount * feeRate.value) / 100, currency)
+  const rate = feeRateFor(method)
+  if (rate <= 0 || paymentAmount <= 0) return paymentAmount
+  const fee = ceilPaymentAmount((paymentAmount * rate) / 100, currency)
   return roundPaymentAmount(paymentAmount + fee, currency)
 }
 
@@ -753,8 +758,8 @@ const subMethodOptions = computed<PaymentMethodOption[]>(() => {
     return {
       type,
       display_name: ml?.display_name,
-      fee_rate: ml?.fee_rate ?? 0,
-      available: ml?.available !== false && amountFitsMethod(subscriptionTotalAmountForCurrency(price, currency), type),
+      fee_rate: feeRateFor(type),
+      available: ml?.available !== false && amountFitsMethod(subscriptionTotalAmountForCurrency(price, currency, type), type),
     }
   })
 })

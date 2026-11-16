@@ -77,6 +77,7 @@ export interface CheckoutInfoResponse {
   /** Subscription CNY conversion rate (1 USD = X CNY); 0 = disabled, plan price is charged as-is */
   subscription_usd_to_cny_rate: number
   recharge_fee_rate: number
+  recharge_fee_rates?: Record<string, number>
   /** 充值赠送阶梯（按 min_amount 升序）；缺失/空数组 = 不赠送 */
   recharge_bonus_tiers?: RechargeBonusTier[]
   /** 阶梯模式：bonus 赠金 / discount 折扣；缺失按 bonus */

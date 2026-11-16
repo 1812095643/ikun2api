@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"math"
@@ -12,6 +13,7 @@ import (
 	"github.com/MACOS-DO/sub4api/internal/pkg/response"
 	"github.com/MACOS-DO/sub4api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 )
 
 type accountTemplate struct {
@@ -57,7 +59,63 @@ func (h *Handler) loadReloginSettings(ctx context.Context) (reloginConfig, error
 			return s, err
 		}
 	}
-	return s, normalizeReloginTemplate(&s.Template)
+	if err := normalizeReloginTemplate(&s.Template); err != nil {
+		return s, err
+	}
+	if err := h.pruneDeletedReloginGroups(ctx, &s); err != nil {
+		return s, err
+	}
+	return s, nil
+}
+
+// 仅读到明确已删除的引用才修复保存值；数据库异常不当成分组删除。
+func (h *Handler) pruneDeletedReloginGroups(ctx context.Context, s *reloginConfig) error {
+	if len(s.Template.GroupIDs) == 0 {
+		return nil
+	}
+	rows, err := h.db.QueryContext(ctx, `SELECT id FROM groups WHERE id=ANY($1) AND deleted_at IS NULL`, pq.Array(s.Template.GroupIDs))
+	if err != nil {
+		return err
+	}
+	existing := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[id] = true
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	cleaned := []int64{}
+	for _, id := range s.Template.GroupIDs {
+		if existing[id] {
+			cleaned = append(cleaned, id)
+		}
+	}
+	if len(cleaned) == len(s.Template.GroupIDs) {
+		return nil
+	}
+	before, err := json.Marshal(s.Template.GroupIDs)
+	if err != nil {
+		return err
+	}
+	after, err := json.Marshal(cleaned)
+	if err != nil {
+		return err
+	}
+	// 只改分组字段，并比较原分组值，避免覆盖管理员并发保存的其他设置。
+	if _, err = h.db.ExecContext(ctx, `UPDATE workspace_runtime
+	 SET value=jsonb_set(value,'{template,group_ids}',$1::jsonb),updated_at=NOW()
+	 WHERE key='relogin_settings' AND value#>'{template,group_ids}'=$2::jsonb`, string(after), string(before)); err != nil {
+		return err
+	}
+	s.Template.GroupIDs = cleaned
+	return nil
 }
 func (h *Handler) reloginSettings(c *gin.Context) {
 	s, err := h.loadReloginSettings(c.Request.Context())
@@ -86,6 +144,10 @@ func (h *Handler) saveReloginSettings(c *gin.Context) {
 		fail(c, err)
 		return
 	}
+	storedGroups := make(map[int64]bool, len(s.Template.GroupIDs))
+	for _, id := range s.Template.GroupIDs {
+		storedGroups[id] = true
+	}
 	if err := body(c, &s, 64<<10); err != nil {
 		fail(c, err)
 		return
@@ -110,7 +172,11 @@ func (h *Handler) saveReloginSettings(c *gin.Context) {
 	if s.Template.ProxyID != nil {
 		p, err := h.admin.GetProxy(ctx, *s.Template.ProxyID)
 		if err != nil {
-			fail(c, err)
+			if errors.Is(err, service.ErrProxyNotFound) {
+				fail(c, badRequest("默认代理已删除，请重新选择代理。"))
+			} else {
+				fail(c, err)
+			}
 			return
 		}
 		if !p.IsActive() || p.IsExpired(time.Now()) {
@@ -118,17 +184,31 @@ func (h *Handler) saveReloginSettings(c *gin.Context) {
 			return
 		}
 	}
+	groups := []int64{}
+	seenGroups := map[int64]bool{}
 	for _, id := range s.Template.GroupIDs {
 		g, err := h.admin.GetGroup(ctx, id)
 		if err != nil {
+			// 设置打开后分组也可能被删除；保存前再次核对并剔除失效引用。
+			if errors.Is(err, service.ErrGroupNotFound) {
+				continue
+			}
 			fail(c, err)
 			return
 		}
-		if g.Status != "active" || g.Platform != "openai" {
-			fail(c, badRequest("请选择当前有效的 OpenAI 分组。"))
+		if g.Status != "active" || (g.Platform != "openai" && (g.Platform != "composite" || h.cfg != nil && h.cfg.RunMode == "simple")) {
+			if storedGroups[id] {
+				continue
+			}
+			fail(c, badRequest(fmt.Sprintf("分组「%s」当前不可用于 OpenAI 账号。", g.Name)))
 			return
 		}
+		if !seenGroups[id] {
+			groups = append(groups, id)
+			seenGroups[id] = true
+		}
 	}
+	s.Template.GroupIDs = groups
 	if err := h.setRuntime(ctx, "relogin_settings", s); err != nil {
 		fail(c, err)
 		return
@@ -137,7 +217,7 @@ func (h *Handler) saveReloginSettings(c *gin.Context) {
 }
 func (h *Handler) reloginOptions(c *gin.Context) {
 	ctx := c.Request.Context()
-	groups, err := h.admin.GetAllGroupsByPlatform(ctx, "openai")
+	groups, err := h.admin.GetAllGroups(ctx)
 	if err != nil {
 		fail(c, err)
 		return
@@ -150,8 +230,10 @@ func (h *Handler) reloginOptions(c *gin.Context) {
 	g := []gin.H{}
 	p := []gin.H{}
 	for _, item := range groups {
-		if item.Status == "active" {
-			g = append(g, gin.H{"id": item.ID, "name": item.Name})
+		if item.Status == "active" && (item.Platform == "openai" || (item.Platform == "composite" && (h.cfg == nil || h.cfg.RunMode != "simple"))) {
+			g = append(g, gin.H{"id": item.ID, "name": item.Name, "platform": item.Platform,
+				"description": item.Description, "rate_multiplier": item.RateMultiplier,
+				"subscription_type": item.SubscriptionType, "account_count": item.AccountCount, "status": item.Status})
 		}
 	}
 	for _, item := range proxies {

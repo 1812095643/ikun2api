@@ -26,7 +26,12 @@ func (h *Handler) listUpstreamBalances(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	response.Success(c, gin.H{"items": records, "total": len(records), "display": display})
+	monitoring := defaultUpstreamBalanceMonitoring()
+	if err = h.getRuntime(c.Request.Context(), "upstream_balance_monitoring", &monitoring); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, gin.H{"items": records, "total": len(records), "display": display, "monitoring": monitoring})
 }
 func findUpstreamBalanceRecord(records []upstreamBalanceRecord, id string) (upstreamBalanceRecord, error) {
 	for _, r := range records {

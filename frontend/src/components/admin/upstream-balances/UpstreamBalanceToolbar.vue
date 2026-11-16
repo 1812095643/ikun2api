@@ -13,7 +13,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:search': [value: string]; 'update:filter': [value: string]; 'update:visibility': [value: string]
   sort: [value: BalanceSort]; toggleColumn: [key: BalanceColumn]; compact: []; resetDisplay: []
-  reload: []; refresh: []; models: []; querySelected: []; hideSelected: []; showSelected: []; clearSelection: []
+  reload: []; refresh: []; models: []; monitoring: []; querySelected: []; hideSelected: []; showSelected: []; clearSelection: []
 }>()
 const tabs = computed(() => [ { key: 'visible', label: '显示中', count: props.total - props.hiddenCount }, { key: 'hidden', label: '已隐藏', count: props.hiddenCount }, { key: 'all', label: '全部', count: props.total } ])
 const filters = computed(() => [ { value: 'all', label: '全部状态' }, { value: 'low', label: `余额偏低 · ${props.counts.low}` }, { value: 'error', label: `查询异常 · ${props.counts.error}` }, { value: 'models', label: `模型有变更 · ${props.counts.models}` }, { value: 'monitored', label: `已启用监控 · ${props.counts.monitored}` } ])
@@ -37,6 +37,7 @@ const sorts = [{ value: 'manual', label: '手动排序' }, { value: 'name', labe
       <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
         <button type="button" class="btn btn-secondary px-2.5" title="刷新列表" aria-label="刷新列表" :disabled="loading" @click="emit('reload')"><Icon name="refresh" size="sm" :class="{ 'animate-spin': loading }" /></button>
         <UpstreamBalanceDisplayMenu :display="display" :disabled="!ready" @toggle="emit('toggleColumn', $event)" @compact="emit('compact')" @reset="emit('resetDisplay')" />
+        <button type="button" class="btn btn-secondary gap-1.5" :disabled="loading || !total" @click="emit('monitoring')"><Icon name="bell" size="sm" />余额告警</button>
         <button type="button" class="btn btn-secondary" :disabled="loading || modelBusy || !total" @click="emit('models')">{{ modelBusy ? '提交中…' : '检测模型' }}</button>
         <button type="button" class="btn btn-primary gap-1.5" :disabled="loading || querying || !resultCount" @click="emit('refresh')"><Icon name="sync" size="sm" />{{ querying ? '提交中…' : '查询余额' }}</button>
       </div>

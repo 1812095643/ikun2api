@@ -193,8 +193,8 @@ func TestUpstreamBalanceComparisonNeverSumsOrHidesFailures(t *testing.T) {
 	}
 	b.Balance = &g
 	s = summarizeUpstreamBalances([]upstreamBalanceReading{a, b}, 0)
-	if s.Comparison != "different" || s.Balance != nil {
-		t.Fatal("conflicting wallets silently selected")
+	if s.Comparison != "different" || s.Balance == nil || *s.Balance != 5 || s.Error != "" {
+		t.Fatal("最低有效余额未展示")
 	}
 	s = summarizeUpstreamBalances([]upstreamBalanceReading{a, b}, 2)
 	if s.Balance == nil || *s.Balance != 6 {
@@ -202,8 +202,8 @@ func TestUpstreamBalanceComparisonNeverSumsOrHidesFailures(t *testing.T) {
 	}
 	b.Error = "unavailable"
 	s = summarizeUpstreamBalances([]upstreamBalanceReading{a, b}, 0)
-	if s.Comparison != "partial" || s.Balance != nil {
-		t.Fatal("failed key hidden")
+	if s.Comparison != "partial" || s.Balance == nil || *s.Balance != 5 || s.Error != "" {
+		t.Fatal("部分查询异常不应隐藏其他有效读数")
 	}
 	b.Error = ""
 	b.Balance = &f

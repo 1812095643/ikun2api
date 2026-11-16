@@ -9,6 +9,7 @@ import BusinessError from './BusinessError.vue'
 import ReceivableTable from './ReceivableTable.vue'
 import ReceivablePaymentDialog from './ReceivablePaymentDialog.vue'
 import ReceivableHistoryDialog from './ReceivableHistoryDialog.vue'
+import ReceivableCreditDialog from './ReceivableCreditDialog.vue'
 import {
   businessAPI,
   type ReceivableAccount,
@@ -19,6 +20,7 @@ import { useBusinessRequest } from '@/composables/useBusinessRequest'
 const { t } = useI18n()
 const filter = reactive({ search: '', state: 'open', page: 1, page_size: 20 })
 const search = ref('')
+const adding = ref(false)
 const paymentUser = ref<ReceivableAccount | null>(null)
 const historyUser = ref<ReceivableAccount | null>(null)
 const { data, loading, error, load } = useBusinessRequest<ReceivablePage>()
@@ -56,8 +58,9 @@ onBeforeUnmount(() => clearTimeout(timer))
 </script>
 <template>
   <TablePageLayout>
-    <template #actions
-      ><div class="flex flex-wrap gap-x-10 gap-y-4 py-1">
+    <template #filters>
+      <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 rounded-xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-200/70 dark:bg-dark-800 dark:ring-dark-700">
+      <dl class="flex flex-wrap items-center gap-y-3 divide-x divide-gray-200 dark:divide-dark-600">
         <div
           v-for="key in [
             'outstanding',
@@ -66,12 +69,13 @@ onBeforeUnmount(() => clearTimeout(timer))
             'debtors'
           ] as const"
           :key="key"
+          class="px-5 first:pl-0 last:pr-0"
         >
-          <div class="text-xs font-medium text-gray-500">
+          <dt class="text-[11px] font-medium text-gray-500 dark:text-gray-400">
             {{ t(`business.${key}`) }}
-          </div>
-          <div
-            class="mt-1 text-xl font-semibold tabular-nums"
+          </dt>
+          <dd
+            class="mt-0.5 text-lg font-semibold leading-6 tracking-tight tabular-nums"
             :class="
               key === 'outstanding'
                 ? 'text-amber-700 dark:text-amber-300'
@@ -79,19 +83,17 @@ onBeforeUnmount(() => clearTimeout(timer))
             "
           >
             {{
-              !data || loading
+              !data || loading || error
                 ? '—'
                 : key === 'debtors'
                   ? data.summary[key]
                   : businessMoney(data.summary[key])
             }}
-          </div>
+          </dd>
         </div>
-      </div></template
-    >
-    <template #filters
-      ><div class="flex flex-wrap items-center gap-3">
-        <div class="relative w-full sm:w-72">
+      </dl>
+      <div class="flex w-full flex-wrap items-center gap-2 xl:ml-auto xl:w-auto">
+        <div class="relative min-w-40 flex-1 sm:w-56 sm:flex-none">
           <Icon
             name="search"
             size="sm"
@@ -103,7 +105,7 @@ onBeforeUnmount(() => clearTimeout(timer))
             class="input pl-9"
           />
         </div>
-        <div class="w-36">
+        <div class="w-32">
           <Select
             v-model="filter.state"
             :options="states"
@@ -111,15 +113,21 @@ onBeforeUnmount(() => clearTimeout(timer))
             :aria-label="t('common.status')"
           />
         </div>
+        <button class="btn btn-primary gap-1.5" @click="adding = true">
+          <Icon name="plus" size="sm" />{{ t('business.addCredit') }}
+        </button>
         <button
-          class="btn btn-secondary sm:ml-auto"
+          class="btn btn-secondary px-2.5"
+          :title="t('business.refresh')"
+          :aria-label="t('business.refresh')"
           :disabled="loading"
           @click="reload"
         >
-          <Icon name="refresh" size="sm" />{{ t('business.refresh') }}
+          <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading }" />
         </button>
-      </div></template
-    >
+      </div>
+      </div>
+    </template>
     <template #table
       ><BusinessError
         v-if="error"
@@ -142,6 +150,7 @@ onBeforeUnmount(() => clearTimeout(timer))
         @update:page-size="updatePageSize"
     /></template>
   </TablePageLayout>
+  <ReceivableCreditDialog v-if="adding" @close="adding = false" @saved="reload" />
   <ReceivablePaymentDialog
     :user="paymentUser"
     @close="paymentUser = null"

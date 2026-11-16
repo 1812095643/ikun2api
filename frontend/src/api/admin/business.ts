@@ -21,7 +21,7 @@ export interface ReceivableAccount {
 export interface ReceivableEntry {
   id: number
   user_id: number
-  kind: 'credit' | 'payment'
+  kind: 'credit' | 'manual_credit' | 'payment'
   amount: string
   outstanding_after: string
   actor_id: number
@@ -113,6 +113,14 @@ export const businessAPI = {
         request
       )
     ).data
+  },
+  async credit(id: number, request: {
+    amount: string
+    notes: string
+    occurred_at?: string
+    operation_key: string
+  }) {
+    return (await apiClient.post<ReceivableEntry>(`${base}/receivables/${id}/credits`, request)).data
   },
   async downstreams(params: Record<string, unknown>, signal?: AbortSignal) {
     return (

@@ -46,6 +46,10 @@ func downstreamFixture(t *testing.T) *sql.DB {
 	require.NoError(t, e)
 	_, e = db.Exec(string(migration))
 	require.NoError(t, e)
+	manualMigration, e := os.ReadFile("../../migrations/275_manual_receivable_entries.sql")
+	require.NoError(t, e)
+	_, e = db.Exec(string(manualMigration))
+	require.NoError(t, e)
 	return db
 }
 func TestDownstreamPostgresGroupPricingAndAtomicBatch(t *testing.T) {
@@ -141,11 +145,18 @@ func TestDownstreamPostgresQueriesScopeStatisticsAndReceivables(t *testing.T) {
 	require.Equal(t, int64(1), payload.Data.Items[0].Requests)
 	require.Equal(t, "1.25", payload.Data.Items[0].Cost)
 	require.Equal(t, int64(150), payload.Data.Items[0].Tokens)
+	_, e = db.Exec(`INSERT INTO admin_receivable_entries(user_id,kind,amount,outstanding_after,actor_id,operation_key) VALUES(8,'manual_credit',3.125,13.125,1,'22222222-2222-4222-8222-222222222222')`)
+	require.NoError(t, e)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/admin/workspace/downstreams", nil))
+	require.Equal(t, 200, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"outstanding":"13.12500000"`)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest("GET", "/admin/workspace/receivables", nil))
 	require.Equal(t, 200, w.Code, w.Body.String())
 	require.Contains(t, w.Body.String(), "reseller@example.invalid")
 	require.NotContains(t, w.Body.String(), "regular@example.invalid")
+	require.Contains(t, w.Body.String(), `"credited":"13.12500000"`)
 	// Existing debts remain visible after the user is deleted.
 	_, e = db.Exec(`UPDATE users SET deleted_at=NOW() WHERE id=8`)
 	require.NoError(t, e)
@@ -167,6 +178,9 @@ func TestBusinessAdminRejectsRestrictedAdminKeys(t *testing.T) {
 		r.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		require.Equal(t, 403, w.Code)
 	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("POST", "/admin/workspace/receivables/8/credits", strings.NewReader(`{"amount":"10"}`)))
+	require.Equal(t, 403, w.Code)
 }
 func TestDownstreamValidationRejectsSilentPriceRounding(t *testing.T) {
 	require.False(t, validDownstreamRate(0.12345))

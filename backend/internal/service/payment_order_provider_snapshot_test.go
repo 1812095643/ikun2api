@@ -11,6 +11,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCreateOrderInTxKeepsMethodFeeSnapshotAfterConfigChange(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	user, err := client.User.Create().SetEmail("fees@example.test").SetPasswordHash("test-only").Save(ctx)
+	require.NoError(t, err)
+	cfg := &PaymentConfig{RechargeFeeRate: 3, RechargeFeeRates: map[string]float64{"alipay": 0.6, "wxpay": 0}, MaxPendingOrders: 10, OrderTimeoutMin: 30}
+	svc := &PaymentService{entClient: client}
+	for _, method := range []string{"alipay", "wxpay"} {
+		rate := cfg.RechargeFeeRateFor(method)
+		_, pay, err := calculateCreateOrderPayAmountForOrderType(100, rate, "CNY", payment.OrderTypeBalance, 0)
+		require.NoError(t, err)
+		order, err := svc.createOrderInTx(ctx, CreateOrderRequest{UserID: user.ID, PaymentType: method, OrderType: payment.OrderTypeBalance}, &User{ID: user.ID, Email: user.Email}, nil, cfg, 100, 100, rate, pay, 0, nil)
+		require.NoError(t, err)
+		cfg.RechargeFeeRates[method] = 99
+		stored, err := client.PaymentOrder.Get(ctx, order.ID)
+		require.NoError(t, err)
+		require.Equal(t, rate, stored.FeeRate)
+		require.Equal(t, pay, stored.PayAmount)
+		require.Equal(t, float64(100), stored.Amount)
+	}
+}
+
 func TestBuildPaymentOrderProviderSnapshot_ExcludesSensitiveConfig(t *testing.T) {
 	t.Parallel()
 

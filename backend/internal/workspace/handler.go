@@ -198,6 +198,7 @@ func (h *Handler) Register(v1 *gin.RouterGroup, jwt, admin, audit, backendGuard,
 	manage.GET("/navigation", h.navigation)
 	manage.GET("/upstream-balances", h.listUpstreamBalances)
 	manage.PUT("/upstream-balances/display", h.saveUpstreamBalanceDisplay)
+	manage.PUT("/upstream-balances/monitoring", h.saveUpstreamBalanceMonitoring)
 	manage.PUT("/upstream-balances/:id", h.saveUpstreamBalance)
 	manage.POST("/upstream-balances/refresh", h.refreshUpstreamBalances)
 	manage.POST("/upstream-balances/:id/refresh", h.refreshUpstreamBalances)

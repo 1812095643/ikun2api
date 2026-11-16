@@ -8,14 +8,16 @@ import UpstreamBalanceTable from './UpstreamBalanceTable.vue'
 import UpstreamModelDialog from './UpstreamModelDialog.vue'
 import UpstreamBalanceEditor from './UpstreamBalanceEditor.vue'
 import UpstreamBalanceDetails from './UpstreamBalanceDetails.vue'
+import UpstreamBalanceMonitoringDialog from './UpstreamBalanceMonitoringDialog.vue'
 import { upstreamModelsAPI } from '@/api/upstreamModels'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
 import { useUpstreamBalances } from '@/composables/useUpstreamBalances'
 import { defaultBalanceDisplay, type BalanceColumn, type UpstreamBalance, type UpstreamBalanceDraft } from '@/api/upstreamBalances'
 
-const { items, loading, error, search, filter, visibility, page, pageSize, selectedIDs, refreshing, saving, filtered, visible, busy, hiddenCount, counts, display, displaySaving, displayReady, displayError, updateDisplay, load, refresh, save, setHidden, reorder, move, setDragging, resetFilters } = useUpstreamBalances()
+const { items, monitoring, loading, error, search, filter, visibility, page, pageSize, selectedIDs, refreshing, saving, filtered, visible, busy, hiddenCount, counts, display, displaySaving, displayReady, displayError, updateDisplay, load, refresh, save, setHidden, reorder, move, setDragging, resetFilters } = useUpstreamBalances()
 const editing = shallowRef<UpstreamBalance | null>(null)
+const showMonitoring = shallowRef(false)
 const detailID = shallowRef('')
 const modelID = shallowRef('')
 const modelItem = computed(() => items.value.find(item => item.id === modelID.value) || null)
@@ -40,7 +42,7 @@ async function handleSave(id: string, draft: UpstreamBalanceDraft) { if (await s
 <template>
   <TablePageLayout class="upstream-page">
     <template #filters>
-      <UpstreamBalanceToolbar v-model:search="search" v-model:filter="filter" v-model:visibility="visibility" :display="display" :total="items.length" :hidden-count="hiddenCount" :selected-count="selectedIDs.length" :result-count="filtered.length" :counts="counts" :loading="loading" :querying="!!refreshing" :model-busy="modelBusy" :display-saving="displaySaving" :ready="displayReady" @sort="updateDisplay({ sort_by: $event })" @toggle-column="toggleColumn" @compact="updateDisplay({ compact: !display.compact })" @reset-display="updateDisplay(defaultBalanceDisplay())" @reload="load()" @refresh="refresh(undefined, filtered.map(item => item.id))" @models="refreshModels" @query-selected="refresh(undefined, selectedIDs)" @hide-selected="setHidden(selectedIDs, true)" @show-selected="setHidden(selectedIDs, false)" @clear-selection="selectedIDs = []" />
+      <UpstreamBalanceToolbar v-model:search="search" v-model:filter="filter" v-model:visibility="visibility" :display="display" :total="items.length" :hidden-count="hiddenCount" :selected-count="selectedIDs.length" :result-count="filtered.length" :counts="counts" :loading="loading" :querying="!!refreshing" :model-busy="modelBusy" :display-saving="displaySaving" :ready="displayReady" @sort="updateDisplay({ sort_by: $event })" @toggle-column="toggleColumn" @compact="updateDisplay({ compact: !display.compact })" @reset-display="updateDisplay(defaultBalanceDisplay())" @reload="load()" @refresh="refresh(undefined, filtered.map(item => item.id))" @models="refreshModels" @monitoring="showMonitoring = true" @query-selected="refresh(undefined, selectedIDs)" @hide-selected="setHidden(selectedIDs, true)" @show-selected="setHidden(selectedIDs, false)" @clear-selection="selectedIDs = []" />
       <div v-if="error || displayError" role="alert" class="mt-3 flex items-center justify-between gap-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"><span>{{ error || displayError }}</span><button v-if="error" type="button" class="shrink-0 underline" @click="load()">重试</button></div>
     </template>
     <template #table>
@@ -50,6 +52,7 @@ async function handleSave(id: string, draft: UpstreamBalanceDraft) { if (await s
     <template #pagination><Pagination v-model:page="page" v-model:page-size="pageSize" :total="filtered.length" :show-page-size-selector="true" /></template>
   </TablePageLayout>
   <UpstreamModelDialog :item="modelItem" @close="modelID = ''" @changed="load(false)" />
+  <UpstreamBalanceMonitoringDialog v-if="showMonitoring" :initial="monitoring" :selected-ids="[...selectedIDs]" :total="items.length" @close="showMonitoring = false" @saved="load(false)" />
   <UpstreamBalanceEditor :item="editing" :saving="saving" @close="!saving && (editing = null)" @save="handleSave" />
   <UpstreamBalanceDetails :item="details" @close="detailID = ''" />
 </template>

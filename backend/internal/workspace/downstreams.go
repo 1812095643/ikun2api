@@ -272,7 +272,7 @@ func (h *Handler) listDownstreams(c *gin.Context) {
 	}
 	rows, err := h.db.QueryContext(ctx, `WITH selected AS (SELECT u.id,u.email,u.username,u.status,u.balance`+filter+` ORDER BY u.id DESC LIMIT $2 OFFSET $3)
  SELECT s.id,s.email,s.username,s.status,s.balance::text,
- COALESCE((SELECT SUM(CASE WHEN kind='credit' THEN amount ELSE -amount END) FROM admin_receivable_entries WHERE user_id=s.id),0)::text,
+ COALESCE((SELECT SUM(CASE WHEN kind IN ('credit','manual_credit') THEN amount ELSE -amount END) FROM admin_receivable_entries WHERE user_id=s.id),0)::text,
  x.requests,x.tokens,x.cost::text,x.last_used,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('group_id',r.group_id,'group_name',g.name,'rate',r.rate_multiplier) ORDER BY g.name,r.group_id)
  FROM user_group_rate_multipliers r JOIN groups g ON g.id=r.group_id WHERE r.user_id=s.id AND r.rate_multiplier IS NOT NULL AND g.deleted_at IS NULL),'[]'::jsonb)

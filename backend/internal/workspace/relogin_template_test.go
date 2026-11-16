@@ -79,6 +79,7 @@ func TestReloginTemplateRecoversArchivedSettingsWithoutOverwritingCurrentChoices
 	current := []byte(`{"template":{"proxy_id":9,"concurrency":37,"group_ids":[2]}}`)
 	mock.ExpectQuery("SELECT value FROM workspace_runtime WHERE key").WithArgs("relogin_settings").WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow(current))
 	mock.ExpectQuery("SELECT value FROM workspace_runtime WHERE key").WithArgs("migration43_legacy_relogin_archive").WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow(envelope))
+	mock.ExpectQuery("SELECT id FROM groups").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2))
 	cfg, err := h.loadReloginSettings(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, int64(9), *cfg.Template.ProxyID)

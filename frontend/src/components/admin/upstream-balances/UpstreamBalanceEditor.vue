@@ -12,7 +12,7 @@ const token = shallowRef('')
 const recipients = shallowRef('')
 const showWallet = shallowRef(false)
 const validation = shallowRef('')
-const keyOptions = computed(() => [{ value: 0, label: '自动（仅使用一致的读数）' }, ...(props.item?.accounts.map(a => ({ value: a.id, label: `#${a.id} ${a.name}` })) || [])])
+const keyOptions = computed(() => [{ value: 0, label: '自动（取最低有效余额）' }, ...(props.item?.accounts.map(a => ({ value: a.id, label: `#${a.id} ${a.name}` })) || [])])
 const kinds = [{ value: 'auto', label: '自动识别' }, { value: 'sub2api', label: 'Sub2API' }, { value: 'newapi', label: 'New API' }]
 const modes = [{ value: 'auto', label: '自动兼容' }, { value: 'modern', label: '新版（Bearer）' }, { value: 'legacy', label: '旧版（原始令牌）' }]
 watch(() => props.item, item => {

@@ -699,6 +699,7 @@ export interface SystemSettings {
   payment_balance_recharge_multiplier: number;
   payment_subscription_usd_to_cny_rate: number;
   payment_recharge_fee_rate: number;
+  payment_recharge_fee_rates?: Record<string, number>;
   payment_recharge_bonus_tiers?: RechargeBonusTier[];
   payment_recharge_bonus_mode?: string;
   payment_recharge_bonus_notice?: string;
@@ -1039,6 +1040,7 @@ export interface UpdateSettingsRequest {
   payment_balance_recharge_multiplier?: number;
   payment_subscription_usd_to_cny_rate?: number;
   payment_recharge_fee_rate?: number;
+  payment_recharge_fee_rates?: Record<string, number>;
   payment_recharge_bonus_tiers?: RechargeBonusTier[];
   payment_recharge_bonus_mode?: string;
   payment_recharge_bonus_notice?: string;

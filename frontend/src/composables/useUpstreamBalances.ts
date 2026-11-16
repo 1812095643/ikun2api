@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
-import { upstreamBalancesAPI, type UpstreamBalance, type UpstreamBalanceDraft } from '@/api/upstreamBalances'
+import { upstreamBalancesAPI, type UpstreamBalance, type UpstreamBalanceDraft, type BalanceMonitoring } from '@/api/upstreamBalances'
 import { useAppStore } from '@/stores/app'
 import { useUpstreamBalanceDisplay } from './useUpstreamBalanceDisplay'
 import { mergeUpstreamOrder, orderUpstreamBalances, upstreamHasError } from '@/utils/upstreamBalanceList'
@@ -9,6 +9,7 @@ export function useUpstreamBalances() {
   const presentation = useUpstreamBalanceDisplay()
   const { display, initializeDisplay } = presentation
   const items = shallowRef<UpstreamBalance[]>([])
+  const monitoring = shallowRef<BalanceMonitoring>({ monitor_enabled: true, interval_minutes: 30, threshold: 10, recipients: [] })
   const loading = shallowRef(true)
   const error = shallowRef('')
   const search = shallowRef('')
@@ -67,6 +68,7 @@ export function useUpstreamBalances() {
       if (stopped || controller.signal.aborted) return
       initializeDisplay(data.display)
       items.value = data.items
+      if (data.monitoring) monitoring.value = data.monitoring
       const ids = new Set(data.items.map(row => row.id))
       selectedIDs.value = selectedIDs.value.filter(id => ids.has(id))
       error.value = ''
@@ -101,5 +103,5 @@ export function useUpstreamBalances() {
   }
   onMounted(() => { void load() })
   onUnmounted(() => { stopped = true; clearTimeout(timer); active?.abort() })
-  return { ...presentation, items, loading, error, search, filter, visibility, page, pageSize, selectedIDs, refreshing, saving, filtered, visible, busy, hiddenCount, counts, load, refresh, save, setHidden, reorder, move, setDragging, resetFilters }
+  return { ...presentation, items, monitoring, loading, error, search, filter, visibility, page, pageSize, selectedIDs, refreshing, saving, filtered, visible, busy, hiddenCount, counts, load, refresh, save, setHidden, reorder, move, setDragging, resetFilters }
 }

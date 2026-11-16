@@ -29,14 +29,11 @@
       >
         <template #cell-user="{ row }">
           <div class="text-sm">
-            <button
+            <UsageUserMenu
               v-if="row.user?.email"
-              class="font-medium text-primary-600 underline decoration-dashed underline-offset-2 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-              @click="$emit('userClick', row.user_id, row.user?.email)"
-              :title="t('admin.usage.clickToViewBalance')"
-            >
-              {{ row.user.email }}
-            </button>
+              :email="row.user.email"
+              @select="action => action === 'balance' ? $emit('userClick', row.user_id, row.user.email) : $emit('userAction', action, row.user_id, row.user.email)"
+            />
             <span v-else class="font-medium text-gray-900 dark:text-white">-</span>
             <span v-if="row.user?.deleted_at" class="ml-1 inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-rose-100 text-rose-600 ring-1 ring-inset ring-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:ring-rose-500/30">
               {{ t('admin.usage.userDeletedBadge') }}
@@ -503,6 +500,7 @@ import { resolveUsageRequestType } from '@/utils/usageRequestType'
 import UsageTokenCounts from '@/components/usage/UsageTokenCounts.vue'
 import UsageLatencyCell from '@/components/usage/UsageLatencyCell.vue'
 import UsageServiceTierBadge from '@/components/usage/UsageServiceTierBadge.vue'
+import UsageUserMenu from './UsageUserMenu.vue'
 import {
   BILLING_MODE_TOKEN,
   getBillingModeLabel,
@@ -565,6 +563,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 const emit = defineEmits<{
   userClick: [userID: number, email?: string]
+  userAction: [action: 'usage' | 'notify', userID: number, email: string]
   sort: [key: string, order: 'asc' | 'desc']
   ipGeoBatchFailed: []
 }>()

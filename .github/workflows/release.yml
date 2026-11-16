@@ -187,6 +187,23 @@ jobs:
           cd ../frontend
           pnpm exec vitest run src/utils/__tests__/openaiServiceTiers.spec.ts src/components/usage/UsageServiceTierBadge.spec.ts src/components/account/__tests__/OpenAIServiceTierSettings.spec.ts src/components/account/__tests__/OpenAIRequestTimezoneField.spec.ts src/components/account/__tests__/EditAccountModal.spec.ts src/views/user/__tests__/KeysView.spec.ts src/views/admin/__tests__/groupsOpenAIFast.spec.ts src/components/admin/business/__tests__/BusinessFlows.spec.ts
 
+      - name: 记账补录、重登分组与支付手续费回归
+        run: |
+          set -euo pipefail
+          docker run -d --name ikun-release-business -e POSTGRES_USER=ikun_test -e POSTGRES_PASSWORD=fixture-only -e POSTGRES_DB=ikun_business_fixture -p 127.0.0.1:19984:5432 postgres:17-alpine
+          trap 'docker rm -f ikun-release-business >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 40); do
+            if docker exec ikun-release-business pg_isready -U ikun_test -d ikun_business_fixture; then break; fi
+            sleep 1
+          done
+          docker exec ikun-release-business pg_isready -U ikun_test -d ikun_business_fixture
+          export IKUN_BUSINESS_TEST_DSN='host=127.0.0.1 port=19984 user=ikun_test password=fixture-only dbname=ikun_business_fixture sslmode=disable'
+          export IKUN_TOOLS_TEST_DSN="$IKUN_BUSINESS_TEST_DSN"
+          cd backend
+          go test -tags unit ./internal/service ./internal/workspace ./internal/handler/admin -run 'Test(AdminReceivables|ManualReceivables|ValidateReceivable|OnAccount|BusinessAdmin|Downstream|Relogin|UpstreamBalance|PaymentFee|PaymentMethodLimitsExpose|CreateOrderInTxKeepsMethod|GetAvailableMethodLimits|UpdatePaymentConfig|ParsePaymentConfig|GetPaymentConfig|CalculateCreateOrder)' -count=1 -timeout=180s
+          cd ../frontend
+          pnpm exec vitest run src/views/user/__tests__/PaymentView.spec.ts src/views/admin/orders/__tests__/PlanEditDialog.spec.ts src/components/admin/settings/__tests__/PaymentFeeSettings.spec.ts src/utils/__tests__/paymentFees.spec.ts src/components/admin/usage/__tests__/UsageUserMenu.spec.ts src/components/workspace/relogin/ReloginForms.spec.ts src/components/common/__tests__/GroupSelector.spec.ts src/composables/workspace/useTicketNotification.spec.ts
+
       # ---------------- 五个平台二进制 ----------------
 
       - name: 释放 runner 磁盘空间

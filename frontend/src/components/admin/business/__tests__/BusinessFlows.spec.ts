@@ -2,10 +2,14 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import ReceivablePaymentDialog from '../ReceivablePaymentDialog.vue'
 import DownstreamActionDialog from '../DownstreamActionDialog.vue'
+import ReceivableCreditDialog from '../ReceivableCreditDialog.vue'
+import Select from '@/components/common/Select.vue'
 import type { ReceivableAccount } from '@/api/admin/business'
 const mocks = vi.hoisted(() => ({
   history: vi.fn(),
   payment: vi.fn(),
+  credit: vi.fn(),
+  list: vi.fn(),
   apply: vi.fn(),
   getAllIncludingInactive: vi.fn(),
   getById: vi.fn(),
@@ -20,7 +24,7 @@ vi.mock('@/api/admin/business', async (original) => ({
 vi.mock('@/api/admin', () => ({
   adminAPI: {
     groups: { getAllIncludingInactive: mocks.getAllIncludingInactive },
-    users: { getById: mocks.getById }
+    users: { getById: mocks.getById, list: mocks.list }
   }
 }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => mocks }))
@@ -54,8 +58,25 @@ beforeEach(() => {
   ])
   mocks.getById.mockResolvedValue({ id: 8, group_rates: { 10: 0.5, 11: 0.6 } })
   mocks.apply.mockResolvedValue({ affected: 1 })
+  mocks.list.mockResolvedValue({ items: [{ id: 8, email: user.email }], total: 1 })
 })
 describe('receivable collection', () => {
+  it('补录仅调用记账接口，超时重试使用同一操作编号', async () => {
+    mocks.credit.mockRejectedValue({ message: 'timeout' })
+    const w = mount(ReceivableCreditDialog, { global })
+    await flushPromises()
+    w.getComponent(Select).vm.$emit('update:modelValue', 8)
+    await w.get('#receivable-credit-amount').setValue('7.12345678')
+    await w.get('form').trigger('submit')
+    await flushPromises()
+    await w.get('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.credit).toHaveBeenCalledTimes(2)
+    expect(mocks.credit.mock.calls[0][1].amount).toBe('7.12345678')
+    expect(mocks.credit.mock.calls[1][1].operation_key).toBe(mocks.credit.mock.calls[0][1].operation_key)
+    expect(mocks.payment).not.toHaveBeenCalled()
+    expect(w.emitted('saved')).toBeUndefined()
+  })
   it('preserves exact decimal text and the operation id when retrying a timeout', async () => {
     mocks.payment.mockRejectedValue({ message: 'timeout' })
     const w = mount(ReceivablePaymentDialog, { props: { user }, global })
@@ -87,6 +108,24 @@ describe('receivable collection', () => {
   })
 })
 describe('existing per-group multiplier shortcut', () => {
+  it('批量调价显示公开价格与混合专属价格，仅保存修改过的分组', async () => {
+    mocks.getAllIncludingInactive.mockResolvedValue([
+      { id: 10, name: 'Claude', platform: 'anthropic', rate_multiplier: 1 },
+      { id: 11, name: 'GPT', platform: 'openai', rate_multiplier: 0.8 }
+    ])
+    const users = [
+      { id: 8, group_rates: [{ group_id: 10, rate: 0.5 }] },
+      { id: 9, group_rates: [{ group_id: 10, rate: 0.6 }] }
+    ] as import('@/api/admin/business').DownstreamUser[]
+    const w = mount(DownstreamActionDialog, { props: { mode: 'price', userIds: [8, 9], users }, global })
+    await flushPromises()
+    expect(w.get('#downstream-rate-10').attributes('placeholder')).toBe('business.mixedRate')
+    expect(w.text()).toContain('business.publicRate')
+    await w.get('#downstream-rate-11').setValue('0.4')
+    await w.findAll('button').find(button => button.text() === 'common.confirm')!.trigger('click')
+    await flushPromises()
+    expect(mocks.apply).toHaveBeenCalledWith({ user_ids: [8, 9], group_rates: { 11: 0.4 }, operation_key: expect.any(String) })
+  })
   it('edits the chosen group without introducing a grade or global multiplier', async () => {
     const w = mount(DownstreamActionDialog, {
       props: { mode: null, userIds: [8], initialGroup: 10 },
@@ -94,10 +133,10 @@ describe('existing per-group multiplier shortcut', () => {
     })
     await w.setProps({ mode: 'price' })
     await flushPromises()
-    expect((w.get('#downstream-rate').element as HTMLInputElement).value).toBe(
+    expect((w.get('#downstream-rate-10').element as HTMLInputElement).value).toBe(
       '0.5'
     )
-    await w.get('#downstream-rate').setValue('0.3333')
+    await w.get('#downstream-rate-10').setValue('0.3333')
     const confirm = w
       .findAll('button')
       .find((button) => button.text() === 'common.confirm')!
@@ -116,7 +155,7 @@ describe('existing per-group multiplier shortcut', () => {
     })
     await w.setProps({ mode: 'price' })
     await flushPromises()
-    await w.get('#downstream-rate').setValue('0.12345')
+    await w.get('#downstream-rate-10').setValue('0.12345')
     const confirm = w
       .findAll('button')
       .find((button) => button.text() === 'common.confirm')!

@@ -1756,6 +1756,23 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(weightedModeText).toContain("计费倍率");
   });
 
+  it('分别保存支付宝和微信手续费，并允许恢复默认', async () => {
+    getSettings.mockResolvedValueOnce({ ...baseSettingsResponse, payment_enabled: true,
+      payment_recharge_fee_rate: 0.6, payment_recharge_fee_rates: { alipay: 1.2, wxpay: 0 } });
+    const wrapper = mountView();
+    await flushPromises();
+    await openPaymentTab(wrapper);
+    expect((wrapper.get('#payment-fee-alipay').element as HTMLInputElement).value).toBe('1.2');
+    expect((wrapper.get('#payment-fee-wxpay').element as HTMLInputElement).value).toBe('0');
+    await wrapper.get('#payment-fee-alipay').setValue('');
+    await wrapper.find('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      payment_recharge_fee_rate: 0.6, payment_recharge_fee_rates: { wxpay: 0 }
+    }));
+    wrapper.unmount();
+  });
+
   it("passes translated upload and remove labels to the payment help image uploader", async () => {
     const wrapper = mountView();
 

@@ -49,6 +49,12 @@ func adminLedgerFixture(t *testing.T) (*sql.DB, *dbent.Client) {
 	require.NoError(t, e)
 	_, e = db.Exec(string(migration))
 	require.NoError(t, e)
+	manualMigration, e := os.ReadFile("../../migrations/275_manual_receivable_entries.sql")
+	require.NoError(t, e)
+	for range 2 {
+		_, e = db.Exec(string(manualMigration))
+		require.NoError(t, e)
+	}
 	client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
 	return db, client
 }
@@ -175,6 +181,59 @@ func TestAdminReceivablesPostgresConcurrentReceiptsCannotOverCollect(t *testing.
 	require.NoError(t, db.QueryRow(`SELECT SUM(CASE WHEN kind='credit' THEN amount ELSE -amount END)::text FROM admin_receivable_entries WHERE user_id=8`).Scan(&debt))
 	require.Equal(t, "3.00000000", debt)
 }
+func TestManualReceivablesPostgresDebtOnlyIdempotentAndCollectable(t *testing.T) {
+	db, _ := adminLedgerFixture(t)
+	ctx := context.Background()
+	_, err := db.Exec(`UPDATE users SET balance=42 WHERE id=8`)
+	require.NoError(t, err)
+	key := uuid.NewString()
+	at := time.Now().Add(-48 * time.Hour).Truncate(time.Microsecond)
+	var wg sync.WaitGroup
+	errs := make(chan error, 6)
+	for range 6 {
+		wg.Go(func() {
+			tx, err := db.Begin()
+			if err != nil {
+				errs <- err
+				return
+			}
+			defer tx.Rollback()
+			_, err = RecordManualReceivableTx(ctx, tx, 8, "12.12345678", "补记之前的充值", 1, key, &at)
+			if err == nil {
+				err = tx.Commit()
+			}
+			errs <- err
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	var balance, debt string
+	var entries, credits int
+	require.NoError(t, db.QueryRow(`SELECT balance::text FROM users WHERE id=8`).Scan(&balance))
+	require.Equal(t, "42.00000000", balance)
+	require.NoError(t, db.QueryRow(`SELECT COUNT(*),SUM(CASE WHEN kind IN ('credit','manual_credit') THEN amount ELSE -amount END)::text FROM admin_receivable_entries WHERE user_id=8`).Scan(&entries, &debt))
+	require.Equal(t, 1, entries)
+	require.Equal(t, "12.12345678", debt)
+	require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM redeem_codes`).Scan(&credits))
+	require.Zero(t, credits)
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	_, err = RecordManualReceivableTx(ctx, tx, 8, "20", "补记之前的充值", 1, key, &at)
+	require.Error(t, err)
+	require.NoError(t, tx.Rollback())
+	tx, err = db.Begin()
+	require.NoError(t, err)
+	entry, err := RecordReceivablePaymentTx(ctx, tx, 8, "12.12345678", "结清补记", "转账", 1, uuid.NewString(), nil)
+	require.NoError(t, err)
+	require.Equal(t, "0", entry.OutstandingAfter)
+	require.NoError(t, tx.Commit())
+	require.NoError(t, db.QueryRow(`SELECT balance::text FROM users WHERE id=8`).Scan(&balance))
+	require.Equal(t, "42.00000000", balance)
+}
+
 func TestValidateReceivableAmount(t *testing.T) {
 	for _, raw := range []string{"0", "-1", "NaN", "Inf", "0.000000001", "1000000000000", strings.Repeat("1", 65)} {
 		t.Run(fmt.Sprintf("reject_%s", raw), func(t *testing.T) { _, e := ValidateReceivableAmount(raw); require.Error(t, e) })

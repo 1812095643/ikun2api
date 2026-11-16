@@ -57,6 +57,7 @@ export interface UpstreamBalanceDraft {
   clear_wallet_token?: boolean
 }
 export type BalanceSort = 'manual' | 'name' | 'balance_asc' | 'balance_desc' | 'recent'
+export type BalanceMonitoring = Pick<BalanceMonitorConfig, 'monitor_enabled' | 'interval_minutes' | 'threshold' | 'recipients'>
 export type BalanceColumn = 'comparison' | 'monitor' | 'models' | 'last_checked_at'
 export interface UpstreamBalanceDisplay {
   order: string[]
@@ -74,7 +75,7 @@ export const defaultBalanceDisplay = (): UpstreamBalanceDisplay => ({ order: [],
 const base = '/admin/workspace/upstream-balances'
 export const upstreamBalancesAPI = {
   async list(signal?: AbortSignal) {
-    return (await apiClient.get<{ items: UpstreamBalance[]; total: number; display?: UpstreamBalanceDisplay }>(base, { signal })).data
+    return (await apiClient.get<{ items: UpstreamBalance[]; total: number; display?: UpstreamBalanceDisplay; monitoring?: BalanceMonitoring }>(base, { signal })).data
   },
   async save(id: string, draft: UpstreamBalanceDraft) {
     await apiClient.put(`${base}/${id}`, draft)
@@ -84,6 +85,11 @@ export const upstreamBalancesAPI = {
   },
   async saveDisplay(display: UpstreamBalanceDisplay) {
     return (await apiClient.put<UpstreamBalanceDisplay>(`${base}/display`, display)).data
+  },
+  async saveMonitoring(config: BalanceMonitoring, ids?: string[]) {
+    return (await apiClient.put<{ saved: boolean; affected: number }>(`${base}/monitoring`, {
+      ...config, all: !ids, ...(ids ? { ids } : {})
+    })).data
   }
 }
 export const balanceKindLabel = (kind: string) => ({ auto: '自动识别', sub2api: 'Sub2API', newapi: 'New API' }[kind] || '待识别')
