@@ -199,10 +199,28 @@ jobs:
           docker exec ikun-release-business pg_isready -U ikun_test -d ikun_business_fixture
           export IKUN_BUSINESS_TEST_DSN='host=127.0.0.1 port=19984 user=ikun_test password=fixture-only dbname=ikun_business_fixture sslmode=disable'
           export IKUN_TOOLS_TEST_DSN="$IKUN_BUSINESS_TEST_DSN"
+          export IKUN_UNIVERSAL_TEST_DSN="$IKUN_BUSINESS_TEST_DSN"
           cd backend
           go test -tags unit ./internal/service ./internal/workspace ./internal/handler/admin -run 'Test(AdminReceivables|ManualReceivables|ValidateReceivable|OnAccount|BusinessAdmin|Downstream|Relogin|UpstreamBalance|PaymentFee|PaymentMethodLimitsExpose|CreateOrderInTxKeepsMethod|GetAvailableMethodLimits|UpdatePaymentConfig|ParsePaymentConfig|GetPaymentConfig|CalculateCreateOrder)' -count=1 -timeout=180s
+          go test -tags unit ./internal/repository -run 'Test(UsageBillingBatchPostgres|OpenAIServiceTierPostgresPersistence|SchedulerMetadata|SchedulerSnapshotKeepsOpenAIServiceTiers)' -count=1 -timeout=180s
           cd ../frontend
           pnpm exec vitest run src/views/user/__tests__/PaymentView.spec.ts src/views/admin/orders/__tests__/PlanEditDialog.spec.ts src/components/admin/settings/__tests__/PaymentFeeSettings.spec.ts src/utils/__tests__/paymentFees.spec.ts src/components/admin/usage/__tests__/UsageUserMenu.spec.ts src/components/workspace/relogin/ReloginForms.spec.ts src/components/common/__tests__/GroupSelector.spec.ts src/composables/workspace/useTicketNotification.spec.ts
+
+      - name: 上游 0.2.22 与本地档位兼容回归
+        working-directory: backend
+        run: >-
+          go test -tags unit,embed ./internal/service ./internal/repository ./internal/server ./internal/web ./internal/payment/provider ./internal/pkg/apicompat ./internal/pkg/gemini ./internal/pkg/antigravity
+          -run 'Test(UsageBillingLane|SchedulerCache|SchedulerMetadata|SchedulerSnapshotKeepsOpenAIServiceTiers|OpenAIForced|OpenAIUltrafast|OpenAIGatewayService_OAuthAdditionalTools|OpenAIHTTPCapacityShed|APIContracts|FrontendServer|Vertex|Bedrock)'
+          -count=1 -timeout=240s
+
+      - name: 扣费合批与汇总并发写入回归
+        working-directory: backend
+        env:
+          SUB2API_TEST_POSTGRES_IMAGE: postgres:17-alpine
+        run: >-
+          go test -tags integration ./internal/repository
+          -run 'TestUsageBillingRepositoryApplyBatch|TestUsageBillingLaneCombiner_ConcurrentRequestsOfOneUser|TestAccountRepositoryBatchUpdateLastUsed|TestGroupUsageRollup|TestGetByKeyForAuthCarriesGroupForceOpenAI|TestSchedulerSnapshotConfiguredMembership'
+          -count=1 -timeout=240s
 
       # ---------------- 五个平台二进制 ----------------
 

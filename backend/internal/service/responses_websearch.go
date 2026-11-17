@@ -1146,7 +1146,11 @@ func responsesWebSearchAccountStatsCost[T any](ctx context.Context, channels *Ch
 		if count < 1 {
 			count = 1
 		}
-		cost := resolveAccountStatsCost(ctx, channels, billing, accountID, groupID, upstreamModel, tokens, count, roundCost, tier, pricingAt, longContext, effort)
+		upstreamPriceMultiplier := 1.0
+		if result, ok := any(round).(*ForwardResult); ok {
+			upstreamPriceMultiplier = result.upstreamPriceFactor()
+		}
+		cost := resolveAccountStatsCost(ctx, channels, billing, accountID, groupID, upstreamModel, tokens, count, roundCost, tier, pricingAt, longContext, upstreamPriceMultiplier, effort)
 		if cost == nil {
 			return nil
 		}

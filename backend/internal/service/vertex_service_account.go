@@ -84,6 +84,8 @@ func (a *Account) VertexProjectID() string {
 	return ""
 }
 
+// VertexLocation 返回模型请求使用的区域：vertex_model_locations 显式指定优先；否则取账号区域，
+// Gemini 账号区域为多区域（us/eu）时按 vertexModelLocations 判断模型是否支持，不支持的走 global。
 func (a *Account) VertexLocation(model string) string {
 	if a == nil {
 		return vertexDefaultLocation
@@ -95,6 +97,15 @@ func (a *Account) VertexLocation(model string) string {
 			}
 		}
 	}
+	location := a.vertexAccountLocation()
+	if a.Platform != PlatformGemini {
+		return location
+	}
+	return resolveVertexModelLocation(location, model)
+}
+
+// vertexAccountLocation 返回账号配置的区域，未配置时为 vertexDefaultLocation。
+func (a *Account) vertexAccountLocation() string {
 	if v := strings.TrimSpace(a.GetCredential("location")); v != "" {
 		return v
 	}
@@ -347,10 +358,7 @@ func buildVertexGeminiURL(projectID, location, model, action string, stream bool
 	if err := validateVertexGeminiAction(action); err != nil {
 		return "", err
 	}
-	host := fmt.Sprintf("%s-aiplatform.googleapis.com", location)
-	if location == "global" {
-		host = vertexGlobalHost
-	}
+	host := vertexAPIHost(location)
 	u := fmt.Sprintf(
 		"https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:%s",
 		host,
@@ -385,10 +393,7 @@ func buildVertexAnthropicURL(projectID, location, model string, stream bool) (st
 	if stream {
 		action = "streamRawPredict"
 	}
-	host := fmt.Sprintf("%s-aiplatform.googleapis.com", location)
-	if location == "global" {
-		host = "aiplatform.googleapis.com"
-	}
+	host := vertexAPIHost(location)
 	escapedModel := strings.ReplaceAll(url.PathEscape(model), "%40", "@")
 	return fmt.Sprintf(
 		"https://%s/v1/projects/%s/locations/%s/publishers/anthropic/models/%s:%s",
@@ -476,11 +481,16 @@ func normalizeVertexAnthropicModelID(model string) string {
 
 // buildVertexGeminiAccountURL 按账号构造 Vertex Gemini 请求地址：未配置 project_id 的 API Key 账号
 // 走 Express mode 全局端点，其余账号走项目级端点。
-func buildVertexGeminiAccountURL(account *Account, model, action string, stream bool) (string, error) {
+func buildVertexGeminiAccountURL(account *Account, model, action string, stream bool, cachedContentLocations ...string) (string, error) {
 	if account.IsVertexAPIKey() && account.VertexProjectID() == "" {
 		return buildVertexGeminiExpressURL(model, action, stream)
 	}
-	return buildVertexGeminiURL(account.VertexProjectID(), account.VertexLocation(model), model, action, stream)
+	cachedContentLocation := ""
+	if len(cachedContentLocations) > 0 {
+		cachedContentLocation = cachedContentLocations[0]
+	}
+	location := vertexGeminiRequestLocation(account, model, cachedContentLocation)
+	return buildVertexGeminiURL(account.VertexProjectID(), location, model, action, stream)
 }
 
 // buildVertexGeminiExpressURL 构造不带项目与区域的全局端点地址，仅 API Key 认证可用。

@@ -153,11 +153,16 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	// Check cache first
 	cached := s.cache.Get()
 	if cached != nil {
-		// Check If-None-Match for 304 response
-		if match := c.GetHeader("If-None-Match"); !privateSharePage && match == cached.ETag {
-			c.Status(http.StatusNotModified)
-			c.Abort()
-			return
+		// A matching ETag is only enough for 304 when the response has no
+		// per-request nonce. Otherwise the browser would reuse HTML carrying a
+		// stale nonce that no longer matches the CSP header of this request.
+		if nonce == "" && !privateSharePage {
+			if match := c.GetHeader("If-None-Match"); match == cached.ETag {
+				applyHTMLNoCacheHeaders(c.Writer.Header())
+				c.Status(http.StatusNotModified)
+				c.Abort()
+				return
+			}
 		}
 
 		// Replace nonce placeholder with actual nonce before serving
@@ -165,8 +170,8 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 
 		if !privateSharePage {
 			c.Header("ETag", cached.ETag)
-			c.Header("Cache-Control", "no-cache") // Must revalidate
 		}
+		applyHTMLNoCacheHeaders(c.Writer.Header())
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 		c.Abort()
 		return
@@ -179,6 +184,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	settings, err := s.settings.GetPublicSettingsForInjection(ctx)
 	if err != nil {
 		// Fallback: serve without injection
+		applyHTMLNoCacheHeaders(c.Writer.Header())
 		c.Data(http.StatusOK, "text/html; charset=utf-8", s.baseHTML)
 		c.Abort()
 		return
@@ -187,6 +193,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	settingsJSON, err := json.Marshal(settings)
 	if err != nil {
 		// Fallback: serve without injection
+		applyHTMLNoCacheHeaders(c.Writer.Header())
 		c.Data(http.StatusOK, "text/html; charset=utf-8", s.baseHTML)
 		c.Abort()
 		return
@@ -202,9 +209,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	if cached != nil && !privateSharePage {
 		c.Header("ETag", cached.ETag)
 	}
-	if !privateSharePage {
-		c.Header("Cache-Control", "no-cache")
-	}
+	applyHTMLNoCacheHeaders(c.Writer.Header())
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	c.Abort()
 }

@@ -93,7 +93,7 @@ func (s *AccountUsageService) RefreshClaudeForWarmup(ctx context.Context, a *Acc
 	if s.cache != nil {
 		s.cache.apiCache.Store(a.ID, &apiUsageCache{response: raw, timestamp: q.CheckedAt})
 	}
-	s.syncActiveToPassive(ctx, a.ID, s.buildUsageInfo(raw, &q.CheckedAt))
+	s.syncActiveToPassive(ctx, a, s.buildUsageInfo(raw, &q.CheckedAt))
 	return q, nil
 }
 

@@ -208,21 +208,31 @@ func WithOpenAIRequestServiceTier(ctx context.Context, key *APIKey, body []byte)
 	return context.WithValue(ctx, openAIRequestServiceTierContextKey{}, preference)
 }
 
-func openAIForcedServiceTier(ctx context.Context, account *Account) string {
+func openAIForcedServiceTier(ctx context.Context, account *Account, models ...string) string {
 	if ctx == nil || account == nil || account.Platform != PlatformOpenAI {
 		return ""
 	}
 	group, _ := ctx.Value(ctxkey.Group).(*Group)
 	if IsGroupContextValid(group) && groupSupportsOpenAIFast(group.Platform) {
-		if group.ForceOpenAIUltrafast {
-			return OpenAIFastTierUltrafast
-		}
-		if group.ForceOpenAIFast {
-			return OpenAIFastTierPriority
+		if len(models) > 0 {
+			if forced := openAIGroupForcedServiceTier(ctx, account, models[0]); forced != "" {
+				return forced
+			}
+		} else {
+			// 预估阶段尚未选定模型，仍需加载可能启用的档位价格。
+			if group.ForceOpenAIUltrafast {
+				return OpenAIFastTierUltrafast
+			}
+			if group.ForceOpenAIFast {
+				return OpenAIFastTierPriority
+			}
 		}
 	}
 	preference, _ := ctx.Value(openAIRequestServiceTierContextKey{}).(openAIRequestServiceTierContext)
 	if validateForcedOpenAIServiceTier(preference.keyForced) == nil {
+		if preference.keyForced == OpenAIFastTierUltrafast && len(models) > 0 && !openAIModelSupportsUltrafast(models[0]) {
+			return ""
+		}
 		return preference.keyForced
 	}
 	return ""
@@ -230,7 +240,7 @@ func openAIForcedServiceTier(ctx context.Context, account *Account) string {
 
 func (s *OpenAIGatewayService) resolveEffectiveOpenAIServiceTier(ctx context.Context, account *Account, model, rawTier string) (string, error) {
 	tier := normalizedOpenAIServiceTierValue(rawTier)
-	if forced := openAIForcedServiceTier(ctx, account); forced != "" {
+	if forced := openAIForcedServiceTier(ctx, account, model); forced != "" {
 		tier = forced
 	} else if rawTier != "" && tier == "" {
 		return rawTier, nil // ingress validation owns unknown/non-string fields; preserve existing pass-through semantics
@@ -265,7 +275,8 @@ func openAIAccountServiceTierEligibilityReason(ctx context.Context, account *Acc
 	}
 	preference, _ := ctx.Value(openAIRequestServiceTierContextKey{}).(openAIRequestServiceTierContext)
 	tier := preference.requested
-	if forced := openAIForcedServiceTier(ctx, account); forced != "" {
+	mappedModel := account.GetMappedModel(model)
+	if forced := openAIForcedServiceTier(ctx, account, mappedModel); forced != "" {
 		tier = forced
 	}
 	settings := openAIFastPolicySettingsFromContext(ctx)
@@ -273,7 +284,6 @@ func openAIAccountServiceTierEligibilityReason(ctx context.Context, account *Acc
 	if matcher == "" {
 		matcher = OpenAIFastTierMissing
 	}
-	mappedModel := account.GetMappedModel(model)
 	action, _ := evaluateOpenAIFastPolicyWithSettings(settings, openAIFastPolicyUserID(ctx), account, mappedModel, matcher)
 	switch action {
 	case BetaPolicyActionFilter, BetaPolicyActionBlock:

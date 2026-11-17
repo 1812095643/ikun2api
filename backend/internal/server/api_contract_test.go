@@ -255,6 +255,7 @@ func TestAPIContracts(t *testing.T) {
 					"created_at": "2025-01-02T03:04:05Z",
 					"updated_at": "2025-01-02T03:04:05Z",
 					"funding_source": "balance",
+					"forced_service_tier": "",
 					"group_ids": null
 				}
 			}
@@ -310,6 +311,7 @@ func TestAPIContracts(t *testing.T) {
 							"created_at": "2025-01-02T03:04:05Z",
 							"updated_at": "2025-01-02T03:04:05Z",
 							"funding_source": "",
+							"forced_service_tier": "",
 							"group_ids": null
 						}
 					],
@@ -628,6 +630,11 @@ func TestAPIContracts(t *testing.T) {
 							"stream": true,
 							"duration_ms": 100,
 							"first_token_ms": 50,
+							"client_first_token_ms": null,
+							"gateway_wait_ms": null,
+							"pre_forward_ms": null,
+							"upload_ms": null,
+							"account_switch_count": null,
 							"image_count": 0,
 							"image_size": null,
 							"image_input_size": null,
@@ -949,6 +956,7 @@ func TestAPIContracts(t *testing.T) {
 					"openai_low_upstream_rate_priority_enabled": true,
 					"openai_oauth_scheduling_rate_multiplier": 0.05,
 					"openai_ttft_mode": "semantic",
+					"openai_request_timezone_settings": {"auto_detect_proxy": true, "default_timezone": "Asia/Singapore"},
 					"openai_advanced_scheduler_enabled": true,
 					"openai_advanced_scheduler_sticky_weighted_enabled": false,
 					"openai_advanced_scheduler_subscription_priority_enabled": false,
@@ -998,6 +1006,7 @@ func TestAPIContracts(t *testing.T) {
 					"payment_balance_recharge_multiplier": 0,
 					"payment_subscription_usd_to_cny_rate": 0,
 					"payment_recharge_fee_rate": 0,
+					"payment_recharge_fee_rates": null,
 					"payment_recharge_bonus_tiers": [],
 					"payment_recharge_bonus_mode": "bonus",
 					"payment_recharge_bonus_notice": "",
@@ -1291,6 +1300,7 @@ func TestAPIContracts(t *testing.T) {
 					"openai_low_upstream_rate_priority_enabled": false,
 					"openai_oauth_scheduling_rate_multiplier": 1,
 					"openai_ttft_mode": "semantic",
+					"openai_request_timezone_settings": {"auto_detect_proxy": true, "default_timezone": "Asia/Singapore"},
 					"openai_advanced_scheduler_enabled": false,
 					"openai_advanced_scheduler_sticky_weighted_enabled": false,
 					"openai_advanced_scheduler_subscription_priority_enabled": false,
@@ -1337,6 +1347,7 @@ func TestAPIContracts(t *testing.T) {
 					"payment_balance_recharge_multiplier": 0,
 					"payment_subscription_usd_to_cny_rate": 0,
 					"payment_recharge_fee_rate": 0,
+					"payment_recharge_fee_rates": null,
 					"payment_recharge_bonus_tiers": [],
 					"payment_recharge_bonus_mode": "bonus",
 					"payment_recharge_bonus_notice": "",
@@ -2089,6 +2100,10 @@ func (s *stubAccountRepo) ClearAntigravityQuotaScopes(ctx context.Context, id in
 }
 
 func (s *stubAccountRepo) ClearModelRateLimits(ctx context.Context, id int64) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubAccountRepo) ClearModelRateLimit(ctx context.Context, id int64, scope string) error {
 	return errors.New("not implemented")
 }
 

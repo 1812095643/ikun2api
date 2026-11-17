@@ -59,6 +59,8 @@ func TestSchedulerCacheCodexTicketProjectionAndLegacyRebuild(t *testing.T) {
 		raw, err := json.Marshal(legacy)
 		require.NoError(t, err)
 		require.NoError(t, cache.rdb.Set(ctx, schedulerAccountMetaKey("991"), raw, 0).Err())
+		// 模拟升级后首次读到旧投影，避开新版本允许短时复用的进程内快照。
+		cache.dropSnapshotEntry(bucket.String())
 		_, hit, err = cache.GetSnapshot(ctx, bucket)
 		require.NoError(t, err)
 		require.False(t, hit, "old metadata must cause DB fallback and republish")

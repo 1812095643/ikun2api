@@ -120,6 +120,34 @@ func TestOpenAIServiceTierAccountEligibilityMatchesPolicy(t *testing.T) {
 	require.Empty(t, openAIForcedServiceTier(ctx, a))
 }
 
+func TestOpenAIForcedUltrafastUnsupportedModelsKeepRequestedTier(t *testing.T) {
+	svc := newOpenAIGatewayServiceWithSettings(t, DefaultOpenAIFastPolicySettings())
+	for _, kind := range []string{AccountTypeOAuth, AccountTypeAPIKey} {
+		for _, source := range []string{"group", "key"} {
+			t.Run(kind+"/"+source, func(t *testing.T) {
+				account := tierTestAccount(kind, map[string]any{"ultrafast_enabled": false})
+				group := &Group{ID: 1, Hydrated: true, Platform: PlatformOpenAI, Status: StatusActive, ForceOpenAIUltrafast: source == "group"}
+				key := &APIKey{}
+				if source == "key" {
+					key.ForcedServiceTier = OpenAIFastTierUltrafast
+				}
+				body := []byte(`{"model":"gpt-5.6-sol","input":"hello","service_tier":"default"}`)
+				ctx := context.WithValue(context.Background(), ctxkey.Group, group)
+				ctx = WithOpenAIRequestServiceTier(ctx, key, body)
+				out, err := svc.applyOpenAIFastPolicyToBody(ctx, account, "gpt-5.6-sol", body)
+				require.NoError(t, err)
+				require.Equal(t, "default", gjson.GetBytes(out, "service_tier").String())
+				require.Empty(t, openAIAccountServiceTierEligibilityReason(ctx, account, "gpt-5.6-sol"))
+				frame := append([]byte(`{"type":"response.create",`), body[1:]...)
+				out, blocked, err := svc.applyOpenAIFastPolicyToWSResponseCreate(ctx, account, "gpt-5.6-sol", frame)
+				require.NoError(t, err)
+				require.Nil(t, blocked)
+				require.Equal(t, "default", gjson.GetBytes(out, "service_tier").String())
+			})
+		}
+	}
+}
+
 func TestOpenAIAccountTierPricingAllTokenBucketsAndOverrides(t *testing.T) {
 	billing := NewBillingService(&config.Config{}, nil)
 	a := tierTestAccount(AccountTypeAPIKey, map[string]any{
