@@ -193,10 +193,11 @@ jobs:
           docker run -d --name ikun-release-business -e POSTGRES_USER=ikun_test -e POSTGRES_PASSWORD=fixture-only -e POSTGRES_DB=ikun_business_fixture -p 127.0.0.1:19984:5432 postgres:17-alpine
           trap 'docker rm -f ikun-release-business >/dev/null 2>&1 || true' EXIT
           for attempt in $(seq 1 40); do
-            if docker exec ikun-release-business pg_isready -U ikun_test -d ikun_business_fixture; then break; fi
+            if docker exec ikun-release-business pg_isready -h 127.0.0.1 -U ikun_test -d ikun_business_fixture; then break; fi
             sleep 1
           done
-          docker exec ikun-release-business pg_isready -U ikun_test -d ikun_business_fixture
+          docker exec ikun-release-business pg_isready -h 127.0.0.1 -U ikun_test -d ikun_business_fixture
+          docker exec -e PGPASSWORD=fixture-only ikun-release-business psql -h 127.0.0.1 -U ikun_test -d ikun_business_fixture -v ON_ERROR_STOP=1 -tAc 'SELECT 1'
           export IKUN_BUSINESS_TEST_DSN='host=127.0.0.1 port=19984 user=ikun_test password=fixture-only dbname=ikun_business_fixture sslmode=disable'
           export IKUN_TOOLS_TEST_DSN="$IKUN_BUSINESS_TEST_DSN"
           export IKUN_UNIVERSAL_TEST_DSN="$IKUN_BUSINESS_TEST_DSN"
