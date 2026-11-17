@@ -132,6 +132,20 @@ func stripClaudePrivacyEnvironmentText(text string) (string, bool) {
 			changed = true
 			continue
 		}
+		// 2.1.326 的失效提醒再次带出旧目录；保留停用与文件搬迁指引。
+		const expiredScratchpadPrefix = "The scratchpad directory announced earlier ("
+		const expiredScratchpadSuffix = ") is out of use: put no new files there. Files that you wrote there may still be at that path. To go on working with one, first copy it under the primary working directory: a tool that attaches or publishes a file may refuse the old path."
+		if strings.HasPrefix(field, expiredScratchpadPrefix) && strings.HasSuffix(field, expiredScratchpadSuffix) {
+			field = "The scratchpad directory announced earlier" + strings.TrimPrefix(expiredScratchpadSuffix, ")")
+			out.WriteString(line[:len(line)-len(strings.TrimLeft(line, " \t"))] + "- " + field)
+			if strings.HasSuffix(line, "\r\n") {
+				out.WriteString("\r\n")
+			} else if strings.HasSuffix(line, "\n") {
+				out.WriteString("\n")
+			}
+			changed = true
+			continue
+		}
 		out.WriteString(line)
 	}
 	if !changed {
