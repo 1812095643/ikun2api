@@ -151,6 +151,7 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 		return nil
 	}
 	out := &AdminGroup{
+		BridgeRequired:              g.BridgeRequired,
 		Group:                       groupFromServiceBase(g),
 		PreferSoonestWeeklyReset:    g.PreferSoonestWeeklyReset,
 		ForceOpenAIFast:             g.ForceOpenAIFast,

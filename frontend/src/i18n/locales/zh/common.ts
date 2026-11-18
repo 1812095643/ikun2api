@@ -159,7 +159,8 @@ export default {
       loginRejectedWarning: '未同意最新条款前，无法输入账号密码或使用快捷登录。',
       loginRequiredWarning: '请先阅读并同意最新条款后再登录。',
       registerRejectedWarning: '未同意最新条款前，无法注册或使用快捷登录。',
-      registerRequiredWarning: '请先阅读并同意最新条款后再注册。'
+      registerRequiredWarning: '请先阅读并同意最新条款后再注册。',
+      registerCheckboxHint: '请先阅读并勾选同意条款'
     }
   },
 

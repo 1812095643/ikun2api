@@ -27,9 +27,15 @@
       </div>
 
       <!-- Registration Form -->
-      <form v-else @submit.prevent="handleRegister" class="space-y-5">
+      <form
+        v-else
+        class="space-y-5"
+        :class="{ 'agreement-blocked': checkboxAgreementBlocked }"
+        @click.capture="handleBlockedRegistrationClick"
+        @submit.prevent="handleRegister"
+      >
         <!-- Email Input -->
-        <div>
+        <div data-agreement-gate>
           <label for="email" class="input-label">
             {{ t('auth.emailLabel') }}
           </label>
@@ -53,7 +59,7 @@
         </div>
 
         <!-- Password Input -->
-        <div>
+        <div data-agreement-gate>
           <label for="password" class="input-label">
             {{ t('auth.passwordLabel') }}
           </label>
@@ -88,7 +94,7 @@
         </div>
 
         <!-- Confirm Password Input -->
-        <div>
+        <div data-agreement-gate>
           <label for="confirmPassword" class="input-label">
             {{ t('auth.confirmPassword') }}
           </label>
@@ -120,7 +126,7 @@
         </div>
 
         <!-- Invitation Code Input (Required when enabled) -->
-        <div v-if="invitationCodeEnabled">
+        <div v-if="invitationCodeEnabled" data-agreement-gate>
           <label for="invitation_code" class="input-label">
             {{ t('auth.invitationCodeLabel') }}
           </label>
@@ -167,7 +173,7 @@
         </div>
 
         <!-- Affiliate Invitation Code Input (Optional) -->
-        <div v-else-if="affiliateEnabled" data-testid="affiliate-invitation-field">
+        <div v-else-if="affiliateEnabled" data-testid="affiliate-invitation-field" data-agreement-gate>
           <label for="affiliate_code" class="input-label">
             {{ t('auth.invitationCodeLabel') }}
             <span class="ml-1 text-xs font-normal text-gray-400 dark:text-dark-500">({{ t('common.optional') }})</span>
@@ -188,7 +194,7 @@
         </div>
 
         <!-- Promo Code Input (Optional) -->
-        <div v-if="promoCodeEnabled">
+        <div v-if="promoCodeEnabled" data-agreement-gate>
           <label for="promo_code" class="input-label">
             {{ t('auth.promoCodeLabel') }}
             <span class="ml-1 text-xs font-normal text-gray-400 dark:text-dark-500">({{ t('common.optional') }})</span>
@@ -261,12 +267,14 @@
           :mode="loginAgreementMode"
           :updated-at="loginAgreementUpdatedAt"
           :visible="showAgreementModal"
+          :checkbox-hint="checkboxAgreementBlocked ? agreementHintCount : 0"
           @accept="acceptLoginAgreement"
           @reject="rejectLoginAgreement"
           @open="showAgreementModal = true"
         />
 
         <!-- Submit Button -->
+        <div data-agreement-gate>
         <button
           type="submit"
           :disabled="registrationActionDisabled || (turnstileEnabled && !turnstileToken)"
@@ -301,6 +309,7 @@
                 : t('auth.createAccount')
           }}
         </button>
+        </div>
 
       </form>
 
@@ -538,6 +547,15 @@ const showOAuthLogin = computed(
 const agreementGateActive = computed(
   () => loginAgreementEnabled.value && !agreementAccepted.value
 )
+const checkboxAgreementBlocked = computed(
+  () => settingsLoaded.value && agreementGateActive.value && loginAgreementMode.value === 'checkbox'
+)
+const agreementHintCount = ref(0)
+
+function handleBlockedRegistrationClick(event: MouseEvent): void {
+  if (!checkboxAgreementBlocked.value || !(event.target instanceof Element)) return
+  if (event.target.closest('[data-agreement-gate]')) agreementHintCount.value++
+}
 
 const registrationActionDisabled = computed(
   () => isLoading.value || !settingsLoaded.value || agreementGateActive.value
@@ -678,6 +696,7 @@ function acceptLoginAgreement(): void {
     )
   }
   agreementAccepted.value = true
+  agreementHintCount.value = 0
   showAgreementModal.value = false
 }
 
@@ -934,8 +953,10 @@ function validateForm(): boolean {
   let isValid = true
 
   if (agreementGateActive.value) {
-    appStore.showWarning(t('legal.loginAgreementPrompt.registerRequiredWarning'))
-    if (loginAgreementMode.value !== 'checkbox') {
+    if (checkboxAgreementBlocked.value) {
+      agreementHintCount.value++
+    } else if (loginAgreementMode.value !== 'checkbox') {
+      appStore.showWarning(t('legal.loginAgreementPrompt.registerRequiredWarning'))
       showAgreementModal.value = true
     }
     return false
@@ -1119,6 +1140,16 @@ function buildRegistrationErrorMessage(error: unknown, fallback: string): string
   return buildAuthErrorMessage(error, { fallback })
 }
 </script>
+
+<style scoped>
+.agreement-blocked [data-agreement-gate] {
+  cursor: not-allowed;
+}
+
+.agreement-blocked [data-agreement-gate] :is(input, button):disabled {
+  pointer-events: none;
+}
+</style>
 
 <style scoped>
 .fade-enter-active,

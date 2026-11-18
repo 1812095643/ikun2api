@@ -1232,6 +1232,7 @@ export default {
         }
       },
       claudeCode: {
+        bridgeRequired: '仅允许 IKUN Bridge',
         title: 'Claude 客户端限制',
         tooltip:
           '启用后仅允许 Claude Code；可额外放行 Claude Desktop。其他客户端将被拒绝，或使用下方配置的降级分组。',

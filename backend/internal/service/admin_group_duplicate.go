@@ -136,6 +136,7 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		AudioRealtimePricePerMin:        cloneGroupValuePointer(source.AudioRealtimePricePerMin),
 		AudioTTSPricePerMillionChars:    cloneGroupValuePointer(source.AudioTTSPricePerMillionChars),
 		AudioSTTPricePerHour:            cloneGroupValuePointer(source.AudioSTTPricePerHour),
+		BridgeRequired:                  source.Platform == PlatformAnthropic && source.BridgeRequired,
 		ClaudeCodeOnly:                  source.ClaudeCodeOnly,
 		AllowClaudeDesktop:              source.Platform == PlatformAnthropic && source.ClaudeCodeOnly && source.AllowClaudeDesktop,
 		PreferSoonestWeeklyReset:        source.Platform == PlatformAnthropic && source.PreferSoonestWeeklyReset,

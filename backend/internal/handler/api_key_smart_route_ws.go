@@ -116,6 +116,10 @@ func selectSmartWSRoute(ctx context.Context, key *service.APIKey, model string, 
 		if !smartWSRouteAllowed(candidate, requestmodel.FromBodyCandidates("", "application/json", body)) {
 			continue
 		}
+		if service.BridgeGroupDenied(ctx, candidate.Group) != "" {
+			lastErr = service.ErrBridgeRequired
+			continue
+		}
 		routeCtx := context.WithValue(ctx, ctxkey.Group, candidate.Group)
 		routeCtx, forwardModel, err := prepare(routeCtx, candidate)
 		if err != nil {

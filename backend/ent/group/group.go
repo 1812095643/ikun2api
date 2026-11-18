@@ -106,6 +106,8 @@ const (
 	FieldLongContextPricingEnabled = "long_context_pricing_enabled"
 	// FieldModelPricing holds the string denoting the model_pricing field in the database.
 	FieldModelPricing = "model_pricing"
+	// FieldBridgeRequired holds the string denoting the bridge_required field in the database.
+	FieldBridgeRequired = "bridge_required"
 	// FieldClaudeCodeOnly holds the string denoting the claude_code_only field in the database.
 	FieldClaudeCodeOnly = "claude_code_only"
 	// FieldPreferSoonestWeeklyReset holds the string denoting the prefer_soonest_weekly_reset field in the database.
@@ -282,6 +284,7 @@ var Columns = []string{
 	FieldAudioSttPricePerHour,
 	FieldLongContextPricingEnabled,
 	FieldModelPricing,
+	FieldBridgeRequired,
 	FieldClaudeCodeOnly,
 	FieldPreferSoonestWeeklyReset,
 	FieldAllowClaudeDesktop,
@@ -409,6 +412,8 @@ var (
 	AudioSttPricePerHourValidator func(float64) error
 	// DefaultLongContextPricingEnabled holds the default value on creation for the "long_context_pricing_enabled" field.
 	DefaultLongContextPricingEnabled bool
+	// DefaultBridgeRequired holds the default value on creation for the "bridge_required" field.
+	DefaultBridgeRequired bool
 	// DefaultClaudeCodeOnly holds the default value on creation for the "claude_code_only" field.
 	DefaultClaudeCodeOnly bool
 	// DefaultPreferSoonestWeeklyReset holds the default value on creation for the "prefer_soonest_weekly_reset" field.
@@ -683,6 +688,11 @@ func ByAudioSttPricePerHour(opts ...sql.OrderTermOption) OrderOption {
 // ByLongContextPricingEnabled orders the results by the long_context_pricing_enabled field.
 func ByLongContextPricingEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLongContextPricingEnabled, opts...).ToFunc()
+}
+
+// ByBridgeRequired orders the results by the bridge_required field.
+func ByBridgeRequired(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBridgeRequired, opts...).ToFunc()
 }
 
 // ByClaudeCodeOnly orders the results by the claude_code_only field.

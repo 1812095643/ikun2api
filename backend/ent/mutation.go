@@ -22347,6 +22347,7 @@ type GroupMutation struct {
 	long_context_pricing_enabled            *bool
 	model_pricing                           *jsontext.Value
 	appendmodel_pricing                     jsontext.Value
+	bridge_required                         *bool
 	claude_code_only                        *bool
 	prefer_soonest_weekly_reset             *bool
 	allow_claude_desktop                    *bool
@@ -24869,6 +24870,42 @@ func (m *GroupMutation) ResetModelPricing() {
 	delete(m.clearedFields, group.FieldModelPricing)
 }
 
+// SetBridgeRequired sets the "bridge_required" field.
+func (m *GroupMutation) SetBridgeRequired(b bool) {
+	m.bridge_required = &b
+}
+
+// BridgeRequired returns the value of the "bridge_required" field in the mutation.
+func (m *GroupMutation) BridgeRequired() (r bool, exists bool) {
+	v := m.bridge_required
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBridgeRequired returns the old "bridge_required" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldBridgeRequired(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBridgeRequired is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBridgeRequired requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBridgeRequired: %w", err)
+	}
+	return oldValue.BridgeRequired, nil
+}
+
+// ResetBridgeRequired resets all changes to the "bridge_required" field.
+func (m *GroupMutation) ResetBridgeRequired() {
+	m.bridge_required = nil
+}
+
 // SetClaudeCodeOnly sets the "claude_code_only" field.
 func (m *GroupMutation) SetClaudeCodeOnly(b bool) {
 	m.claude_code_only = &b
@@ -26426,7 +26463,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 73)
+	fields := make([]string, 0, 74)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26561,6 +26598,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.model_pricing != nil {
 		fields = append(fields, group.FieldModelPricing)
+	}
+	if m.bridge_required != nil {
+		fields = append(fields, group.FieldBridgeRequired)
 	}
 	if m.claude_code_only != nil {
 		fields = append(fields, group.FieldClaudeCodeOnly)
@@ -26744,6 +26784,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.LongContextPricingEnabled()
 	case group.FieldModelPricing:
 		return m.ModelPricing()
+	case group.FieldBridgeRequired:
+		return m.BridgeRequired()
 	case group.FieldClaudeCodeOnly:
 		return m.ClaudeCodeOnly()
 	case group.FieldPreferSoonestWeeklyReset:
@@ -26899,6 +26941,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldLongContextPricingEnabled(ctx)
 	case group.FieldModelPricing:
 		return m.OldModelPricing(ctx)
+	case group.FieldBridgeRequired:
+		return m.OldBridgeRequired(ctx)
 	case group.FieldClaudeCodeOnly:
 		return m.OldClaudeCodeOnly(ctx)
 	case group.FieldPreferSoonestWeeklyReset:
@@ -27278,6 +27322,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetModelPricing(v)
+		return nil
+	case group.FieldBridgeRequired:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBridgeRequired(v)
 		return nil
 	case group.FieldClaudeCodeOnly:
 		v, ok := value.(bool)
@@ -28144,6 +28195,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldModelPricing:
 		m.ResetModelPricing()
+		return nil
+	case group.FieldBridgeRequired:
+		m.ResetBridgeRequired()
 		return nil
 	case group.FieldClaudeCodeOnly:
 		m.ResetClaudeCodeOnly()

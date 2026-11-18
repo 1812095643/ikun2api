@@ -1017,6 +1017,9 @@ func (s *GatewayService) resolveGatewayGroup(ctx context.Context, groupID *int64
 		if err != nil {
 			return nil, nil, err
 		}
+		if BridgeGroupDenied(ctx, group) != "" {
+			return nil, nil, ErrBridgeRequired
+		}
 
 		if group.AllowsClaudeClient(ctx) {
 			return group, &currentID, nil

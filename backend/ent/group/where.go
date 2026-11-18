@@ -265,6 +265,11 @@ func LongContextPricingEnabled(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldLongContextPricingEnabled, v))
 }
 
+// BridgeRequired applies equality check predicate on the "bridge_required" field. It's identical to BridgeRequiredEQ.
+func BridgeRequired(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldBridgeRequired, v))
+}
+
 // ClaudeCodeOnly applies equality check predicate on the "claude_code_only" field. It's identical to ClaudeCodeOnlyEQ.
 func ClaudeCodeOnly(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldClaudeCodeOnly, v))
@@ -2223,6 +2228,16 @@ func ModelPricingIsNil() predicate.Group {
 // ModelPricingNotNil applies the NotNil predicate on the "model_pricing" field.
 func ModelPricingNotNil() predicate.Group {
 	return predicate.Group(sql.FieldNotNull(FieldModelPricing))
+}
+
+// BridgeRequiredEQ applies the EQ predicate on the "bridge_required" field.
+func BridgeRequiredEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldBridgeRequired, v))
+}
+
+// BridgeRequiredNEQ applies the NEQ predicate on the "bridge_required" field.
+func BridgeRequiredNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldBridgeRequired, v))
 }
 
 // ClaudeCodeOnlyEQ applies the EQ predicate on the "claude_code_only" field.

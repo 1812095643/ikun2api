@@ -226,6 +226,7 @@ type CreateGroupRequest struct {
 	AudioRealtimePricePerMin        *float64                      `json:"audio_realtime_price_per_min"`
 	AudioTtsPricePerMillionChars    *float64                      `json:"audio_tts_price_per_million_chars"`
 	AudioSttPricePerHour            *float64                      `json:"audio_stt_price_per_hour"`
+	BridgeRequired                  bool                          `json:"bridge_required"`
 	ClaudeCodeOnly                  bool                          `json:"claude_code_only"`
 	AllowClaudeDesktop              bool                          `json:"allow_claude_desktop"`
 	PreferSoonestWeeklyReset        *bool                         `json:"prefer_soonest_weekly_reset"`
@@ -306,6 +307,7 @@ type UpdateGroupRequest struct {
 	AudioRealtimePricePerMin        *float64                      `json:"audio_realtime_price_per_min"`
 	AudioTtsPricePerMillionChars    *float64                      `json:"audio_tts_price_per_million_chars"`
 	AudioSttPricePerHour            *float64                      `json:"audio_stt_price_per_hour"`
+	BridgeRequired                  *bool                         `json:"bridge_required"`
 	ClaudeCodeOnly                  *bool                         `json:"claude_code_only"`
 	AllowClaudeDesktop              *bool                         `json:"allow_claude_desktop"`
 	PreferSoonestWeeklyReset        *bool                         `json:"prefer_soonest_weekly_reset"`
@@ -715,6 +717,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		AudioRealtimePricePerMin:        req.AudioRealtimePricePerMin,
 		AudioTTSPricePerMillionChars:    req.AudioTtsPricePerMillionChars,
 		AudioSTTPricePerHour:            req.AudioSttPricePerHour,
+		BridgeRequired:                  req.BridgeRequired,
 		ClaudeCodeOnly:                  req.ClaudeCodeOnly,
 		AllowClaudeDesktop:              req.AllowClaudeDesktop,
 		PreferSoonestWeeklyReset:        req.PreferSoonestWeeklyReset,
@@ -866,6 +869,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		AudioRealtimePricePerMin:        req.AudioRealtimePricePerMin,
 		AudioTTSPricePerMillionChars:    req.AudioTtsPricePerMillionChars,
 		AudioSTTPricePerHour:            req.AudioSttPricePerHour,
+		BridgeRequired:                  req.BridgeRequired,
 		ClaudeCodeOnly:                  req.ClaudeCodeOnly,
 		AllowClaudeDesktop:              req.AllowClaudeDesktop,
 		PreferSoonestWeeklyReset:        req.PreferSoonestWeeklyReset,

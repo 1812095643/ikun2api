@@ -1439,6 +1439,7 @@
             </span>
           </div>
           <ClaudeDesktopAccessOption v-model="createForm.allow_claude_desktop" :restricted="createForm.claude_code_only" />
+          <IkunBridgeAccessOption v-model="createForm.bridge_required" class="mt-3" />
           <!-- 降级分组选择（仅当启用 claude_code_only 时显示） -->
           <div v-if="createForm.claude_code_only" class="mt-3">
             <label class="input-label">{{
@@ -3097,6 +3098,7 @@
             </span>
           </div>
           <ClaudeDesktopAccessOption v-model="editForm.allow_claude_desktop" :restricted="editForm.claude_code_only" />
+          <IkunBridgeAccessOption v-model="editForm.bridge_required" class="mt-3" />
           <!-- 降级分组选择（仅当启用 claude_code_only 时显示） -->
           <div v-if="editForm.claude_code_only" class="mt-3">
             <label class="input-label">{{
@@ -4331,6 +4333,7 @@ import DataTable from "@/components/common/DataTable.vue";
 import Pagination from "@/components/common/Pagination.vue";
 import Toggle from "@/components/common/Toggle.vue";
 import ClaudeDesktopAccessOption from "@/components/group/ClaudeDesktopAccessOption.vue";
+import IkunBridgeAccessOption from "@/components/group/IkunBridgeAccessOption.vue";
 import ClaudeWeeklyResetPriorityOption from "@/components/group/ClaudeWeeklyResetPriorityOption.vue";
 import BaseDialog from "@/components/common/BaseDialog.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
@@ -5033,6 +5036,7 @@ const createForm = reactive({
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
+  bridge_required: false,
   claude_code_only: false,
   allow_claude_desktop: false,
   prefer_soonest_weekly_reset: true,
@@ -5403,6 +5407,7 @@ const editForm = reactive({
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
+  bridge_required: false,
   claude_code_only: false,
   allow_claude_desktop: false,
   prefer_soonest_weekly_reset: true,
@@ -5877,6 +5882,7 @@ const closeCreateModal = () => {
   createForm.profit_min_margin_percent = 0;
   createForm.profit_safety_buffer_percent = 0;
   createForm.claude_code_only = false;
+  createForm.bridge_required = false;
   createForm.allow_claude_desktop = false;
   createForm.prefer_soonest_weekly_reset = true;
   createForm.fallback_group_id = null;
@@ -5986,6 +5992,7 @@ const handleCreateGroup = async () => {
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createGroupForm,
+      bridge_required: createForm.platform === 'anthropic' && createForm.bridge_required,
       allow_claude_desktop: createForm.platform === 'anthropic' && createForm.claude_code_only && createForm.allow_claude_desktop,
       prefer_soonest_weekly_reset: createForm.platform === 'anthropic' && createForm.prefer_soonest_weekly_reset,
       force_openai_fast: normalizeGroupOpenAIFast(
@@ -6182,6 +6189,7 @@ const handleEdit = async (group: AdminGroup) => {
     group.profit_safety_buffer ?? 0,
   );
   editForm.claude_code_only = group.claude_code_only || false;
+  editForm.bridge_required = group.bridge_required ?? false;
   editForm.allow_claude_desktop = group.allow_claude_desktop || false;
   editForm.prefer_soonest_weekly_reset = group.prefer_soonest_weekly_reset ?? true;
   editForm.fallback_group_id = group.fallback_group_id;
@@ -6337,6 +6345,7 @@ const handleUpdateGroup = async () => {
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
       ...editForm,
+      bridge_required: editForm.platform === 'anthropic' && editForm.bridge_required,
       allow_claude_desktop: editForm.platform === 'anthropic' && editForm.claude_code_only && editForm.allow_claude_desktop,
       prefer_soonest_weekly_reset: editForm.platform === 'anthropic' && editForm.prefer_soonest_weekly_reset,
       force_openai_fast: normalizeGroupOpenAIFast(

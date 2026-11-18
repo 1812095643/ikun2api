@@ -887,6 +887,20 @@ func (_u *GroupUpdate) ClearModelPricing() *GroupUpdate {
 	return _u
 }
 
+// SetBridgeRequired sets the "bridge_required" field.
+func (_u *GroupUpdate) SetBridgeRequired(v bool) *GroupUpdate {
+	_u.mutation.SetBridgeRequired(v)
+	return _u
+}
+
+// SetNillableBridgeRequired sets the "bridge_required" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableBridgeRequired(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetBridgeRequired(*v)
+	}
+	return _u
+}
+
 // SetClaudeCodeOnly sets the "claude_code_only" field.
 func (_u *GroupUpdate) SetClaudeCodeOnly(v bool) *GroupUpdate {
 	_u.mutation.SetClaudeCodeOnly(v)
@@ -1934,6 +1948,9 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ModelPricingCleared() {
 		_spec.ClearField(group.FieldModelPricing, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.BridgeRequired(); ok {
+		_spec.SetField(group.FieldBridgeRequired, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)
@@ -3220,6 +3237,20 @@ func (_u *GroupUpdateOne) ClearModelPricing() *GroupUpdateOne {
 	return _u
 }
 
+// SetBridgeRequired sets the "bridge_required" field.
+func (_u *GroupUpdateOne) SetBridgeRequired(v bool) *GroupUpdateOne {
+	_u.mutation.SetBridgeRequired(v)
+	return _u
+}
+
+// SetNillableBridgeRequired sets the "bridge_required" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableBridgeRequired(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetBridgeRequired(*v)
+	}
+	return _u
+}
+
 // SetClaudeCodeOnly sets the "claude_code_only" field.
 func (_u *GroupUpdateOne) SetClaudeCodeOnly(v bool) *GroupUpdateOne {
 	_u.mutation.SetClaudeCodeOnly(v)
@@ -4297,6 +4328,9 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if _u.mutation.ModelPricingCleared() {
 		_spec.ClearField(group.FieldModelPricing, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.BridgeRequired(); ok {
+		_spec.SetField(group.FieldBridgeRequired, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)

@@ -284,6 +284,7 @@ type CreateGroupInput struct {
 	AudioRealtimePricePerMin     *float64
 	AudioTTSPricePerMillionChars *float64
 	AudioSTTPricePerHour         *float64
+	BridgeRequired               bool
 	ClaudeCodeOnly               bool   // 仅允许 Claude Code 客户端
 	PreferSoonestWeeklyReset     *bool  // Claude 分组默认开启；nil 表示使用默认值
 	AllowClaudeDesktop           bool   // Claude Code 限制开启时额外允许 Desktop
@@ -370,6 +371,7 @@ type UpdateGroupInput struct {
 	AudioRealtimePricePerMin     *float64
 	AudioTTSPricePerMillionChars *float64
 	AudioSTTPricePerHour         *float64
+	BridgeRequired               *bool
 	ClaudeCodeOnly               *bool // 仅允许 Claude Code 客户端
 	PreferSoonestWeeklyReset     *bool
 	AllowClaudeDesktop           *bool  // Claude Code 限制开启时额外允许 Desktop

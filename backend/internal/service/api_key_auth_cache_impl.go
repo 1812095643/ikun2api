@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 31 // v31: per-key and group forced OpenAI service tiers
+const apiKeyAuthSnapshotVersion = 32 // v32: group Bridge admission policy
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -415,6 +415,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			AudioSTTPricePerHour:            apiKey.Group.AudioSTTPricePerHour,
 			LongContextPricingEnabled:       apiKey.Group.LongContextPricingEnabled,
 			ModelPricing:                    apiKey.Group.ModelPricing,
+			BridgeRequired:                  apiKey.Group.BridgeRequired,
 			ClaudeCodeOnly:                  apiKey.Group.ClaudeCodeOnly,
 			AllowClaudeDesktop:              apiKey.Group.AllowClaudeDesktop,
 			PreferSoonestWeeklyReset:        apiKey.Group.PreferSoonestWeeklyReset,
@@ -527,6 +528,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			AudioSTTPricePerHour:            snapshot.Group.AudioSTTPricePerHour,
 			LongContextPricingEnabled:       snapshot.Group.LongContextPricingEnabled,
 			ModelPricing:                    snapshot.Group.ModelPricing,
+			BridgeRequired:                  snapshot.Group.BridgeRequired,
 			ClaudeCodeOnly:                  snapshot.Group.ClaudeCodeOnly,
 			AllowClaudeDesktop:              snapshot.Group.AllowClaudeDesktop,
 			PreferSoonestWeeklyReset:        snapshot.Group.PreferSoonestWeeklyReset,

@@ -623,6 +623,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		AudioRealtimePricePerMin:        audioRealtimePricePerMin,
 		AudioTTSPricePerMillionChars:    audioTTSPricePerMillionChars,
 		AudioSTTPricePerHour:            audioSTTPricePerHour,
+		BridgeRequired:                  platform == PlatformAnthropic && input.BridgeRequired,
 		ClaudeCodeOnly:                  input.ClaudeCodeOnly,
 		AllowClaudeDesktop:              platform == PlatformAnthropic && input.ClaudeCodeOnly && input.AllowClaudeDesktop,
 		PreferSoonestWeeklyReset:        platform == PlatformAnthropic && (input.PreferSoonestWeeklyReset == nil || *input.PreferSoonestWeeklyReset),
@@ -972,6 +973,10 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 
 	// Claude Code 客户端限制
+	if input.BridgeRequired != nil {
+		group.BridgeRequired = *input.BridgeRequired
+	}
+	group.BridgeRequired = group.Platform == PlatformAnthropic && group.BridgeRequired
 	if input.ClaudeCodeOnly != nil {
 		group.ClaudeCodeOnly = *input.ClaudeCodeOnly
 	}

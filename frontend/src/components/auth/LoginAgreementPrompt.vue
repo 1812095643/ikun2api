@@ -1,13 +1,25 @@
 <template>
   <div
     v-if="mode === 'checkbox' && documents.length > 0"
-    class="px-0.5"
+    class="relative px-0.5"
   >
+    <div aria-live="polite">
+      <div
+        v-if="checkboxHint && !accepted"
+        :id="hintId"
+        :key="checkboxHint"
+        class="agreement-hint pointer-events-none absolute bottom-full left-0 z-10 mb-2 max-w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 shadow-sm dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+      >
+        {{ t('legal.loginAgreementPrompt.registerCheckboxHint') }}
+      </div>
+    </div>
     <div class="flex items-start gap-2">
       <input
         id="login-agreement-consent"
+        ref="checkbox"
         type="checkbox"
         :checked="accepted"
+        :aria-describedby="checkboxHint && !accepted ? hintId : undefined"
         class="mt-[2px] h-4 w-4 flex-shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-900"
         @change="handleCheckboxChange"
       />
@@ -143,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { LoginAgreementDocument } from '@/types'
@@ -156,8 +168,10 @@ const props = withDefaults(defineProps<{
   mode: 'modal' | 'checkbox' | string
   updatedAt?: string
   visible: boolean
+  checkboxHint?: number
 }>(), {
-  updatedAt: ''
+  updatedAt: '',
+  checkboxHint: 0
 })
 
 const emit = defineEmits<{
@@ -171,6 +185,14 @@ const documents = computed(() => props.documents.filter((doc) => doc.title.trim(
 const updatedAt = computed(() => props.updatedAt || '')
 const accepted = computed(() => props.accepted)
 const mode = computed(() => props.mode === 'checkbox' ? 'checkbox' : 'modal')
+const hintId = useId()
+const checkbox = useTemplateRef<HTMLInputElement>('checkbox')
+
+watch(() => props.checkboxHint, (hint) => {
+  if (!hint || props.accepted || !checkbox.value) return
+  checkbox.value.focus({ preventScroll: true })
+  checkbox.value.scrollIntoView?.({ block: 'nearest' })
+}, { flush: 'post' })
 
 function documentRoute(doc: LoginAgreementDocument) {
   return {
@@ -216,6 +238,33 @@ function documentIcon(index: number, title: string): 'document' | 'shield' | 'gl
 </script>
 
 <style scoped>
+.agreement-hint {
+  animation: agreement-nudge 280ms ease-out;
+}
+
+.agreement-hint::after {
+  position: absolute;
+  inset: auto auto -4px 6px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+  border-color: inherit;
+  background: inherit;
+  transform: rotate(45deg);
+  content: '';
+}
+
+@keyframes agreement-nudge {
+  24% { transform: translateX(4px); }
+  48% { transform: translateX(-3px); }
+  72% { transform: translateX(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agreement-hint { animation: none; }
+}
+
 .agreement-fade-enter-active,
 .agreement-fade-leave-active {
   transition: opacity 0.18s ease;

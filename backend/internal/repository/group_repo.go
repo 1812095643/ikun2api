@@ -130,6 +130,7 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetLongContextPricingEnabled(groupIn.LongContextPricingEnabled).
 		SetModelPricing(modelPricing).
 		SetDefaultValidityDays(groupIn.DefaultValidityDays).
+		SetBridgeRequired(groupIn.BridgeRequired).
 		SetClaudeCodeOnly(groupIn.ClaudeCodeOnly).
 		SetAllowClaudeDesktop(groupIn.AllowClaudeDesktop).
 		SetPreferSoonestWeeklyReset(groupIn.PreferSoonestWeeklyReset).
@@ -320,6 +321,7 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetLongContextPricingEnabled(groupIn.LongContextPricingEnabled).
 		SetModelPricing(modelPricing).
 		SetDefaultValidityDays(groupIn.DefaultValidityDays).
+		SetBridgeRequired(groupIn.BridgeRequired).
 		SetClaudeCodeOnly(groupIn.ClaudeCodeOnly).
 		SetAllowClaudeDesktop(groupIn.AllowClaudeDesktop).
 		SetPreferSoonestWeeklyReset(groupIn.PreferSoonestWeeklyReset).

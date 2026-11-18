@@ -209,6 +209,9 @@ func (Group) Fields() []ent.Field {
 			Comment("分组逐模型定价；优先级高于渠道和内置定价"),
 
 		// Claude Code 客户端限制 (added by migration 029)
+		field.Bool("bridge_required").
+			Default(false).
+			Comment("Require a valid IKUN Bridge session for model requests"),
 		field.Bool("claude_code_only").
 			Default(false).
 			Comment("是否仅允许 Claude Code 客户端"),

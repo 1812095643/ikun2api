@@ -1235,6 +1235,7 @@ export default {
         }
       },
       claudeCode: {
+        bridgeRequired: 'Require IKUN Bridge',
         title: 'Claude Client Restriction',
         tooltip: 'Restrict access to Claude Code, with an optional exception for Claude Desktop. Other clients are rejected or use the configured fallback group.',
         enabled: 'Claude Code Only',

@@ -80,6 +80,7 @@ type Group struct {
 	ModelPricing              []ChannelModelPricing
 
 	// Claude Code 客户端限制
+	BridgeRequired           bool
 	ClaudeCodeOnly           bool
 	AllowClaudeDesktop       bool
 	PreferSoonestWeeklyReset bool

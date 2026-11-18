@@ -66,6 +66,10 @@ func (p *PanelRateLimiter) Heavy() gin.HandlerFunc {
 	return p.userScoped("heavy", func(s service.PanelRateLimitSettings) int { return s.HeavyRPM })
 }
 
+func (p *PanelRateLimiter) BridgeSession() gin.HandlerFunc {
+	return p.userScoped("bridge-session", func(s service.PanelRateLimitSettings) int { return s.UserRPM })
+}
+
 func (p *PanelRateLimiter) userScoped(scope string, limitOf func(service.PanelRateLimitSettings) int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if p == nil || p.limiter == nil || p.settingService == nil {

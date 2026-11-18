@@ -711,6 +711,11 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			)
 			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, subject.UserID)
 			if err != nil {
+				if errors.Is(err, service.ErrBridgeRequired) {
+					service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
+					h.handleStreamingAwareErrorWithCode(c, http.StatusForbidden, "permission_error", service.BridgeRequiredCode, service.BridgeRequiredMessage, streamStarted)
+					return
+				}
 				if failoverClientGone(c) {
 					reqLog.Info("gateway.account_select_aborted_client_disconnected", zap.Error(err))
 					return
@@ -1069,6 +1074,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 								zap.String("fallback_subscription_type", fallbackGroup.SubscriptionType),
 							)
 							_ = h.antigravityGatewayService.WriteMappedClaudeError(c, account, promptTooLongErr.StatusCode, promptTooLongErr.RequestID, promptTooLongErr.Body)
+							return
+						}
+						if service.BridgeGroupDenied(c.Request.Context(), fallbackGroup) != "" {
+							h.handleStreamingAwareErrorWithCode(c, http.StatusForbidden, "permission_error", service.BridgeRequiredCode, service.BridgeRequiredMessage, streamStarted)
 							return
 						}
 						fallbackAPIKey := cloneAPIKeyWithGroup(apiKey, fallbackGroup)
@@ -2350,6 +2359,11 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	// 选择支持该模型的账号
 	account, err := h.gatewayService.SelectAccountForModel(c.Request.Context(), apiKey.GroupID, sessionHash, parsedReq.Model)
 	if err != nil {
+		if errors.Is(err, service.ErrBridgeRequired) {
+			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
+			h.handleStreamingAwareErrorWithCode(c, http.StatusForbidden, "permission_error", service.BridgeRequiredCode, service.BridgeRequiredMessage, false)
+			return
+		}
 		reqLog.Warn("gateway.count_tokens_select_account_failed", zap.Error(err))
 		cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, parsedReq.Model, parsedReq.Model, service.PlatformAnthropic)
 		if !cls.ModelNotFound {

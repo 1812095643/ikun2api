@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
 	"github.com/MACOS-DO/sub4api/internal/pkg/httputil"
@@ -44,6 +45,7 @@ func lookupAPIKeyForRequest(c *gin.Context, keys SmartRouteKeyService, credentia
 type smartRouteAttempt struct {
 	groupID            int64
 	retryable, skipped bool
+	bridgeDenied       bool
 	selection          *service.APIKeyRouteSelection
 }
 
@@ -59,11 +61,22 @@ type SmartRouteMatcher func(*gin.Context, *service.APIKey) (bool, error)
 // group after its account attempts fail; an arbitrary upstream error cannot.
 // Successful output and established WebSocket/SSE are never replayed.
 func APIKeySmartRouting(engine http.Handler, keys SmartRouteKeyService, configs ...*config.Config) gin.HandlerFunc {
+	var passes *service.BridgePassSigner
+	if len(configs) > 0 && configs[0] != nil {
+		passes = service.NewBridgePassSigner(configs[0].JWT.Secret)
+	}
 	return func(c *gin.Context) {
 		if attempt, ok := c.Request.Context().Value(smartRouteAttemptKey{}).(*smartRouteAttempt); ok {
 			c.Next()
 			attempt.retryable = smartRouteCanContinue(c, attempt)
 			return
+		}
+		var bridgeTicket string
+		if values := c.Request.Header.Values(service.BridgePassHeader); len(values) != 0 {
+			if len(values) == 1 {
+				bridgeTicket = values[0]
+			}
+			c.Request.Header.Del(service.BridgePassHeader)
 		}
 		if keys == nil || engine == nil || apiKeyHeadersTooLarge(c) {
 			c.Next()
@@ -84,6 +97,9 @@ func APIKeySmartRouting(engine http.Handler, keys SmartRouteKeyService, configs 
 		}
 		key, err := keys.GetByKey(c.Request.Context(), credential)
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), smartRouteLookupKey{}, &smartRouteLookup{credential: credential, key: key, err: err}))
+		if err == nil && key != nil && bridgeTicket != "" {
+			c.Request = c.Request.WithContext(service.WithBridgePassState(c.Request.Context(), passes.Verify(bridgeTicket, key.ID, credential, time.Now())))
+		}
 		if err != nil || key == nil || len(key.CandidateGroupIDs()) < 2 {
 			c.Next()
 			return
@@ -118,7 +134,7 @@ func APIKeySmartRouting(engine http.Handler, keys SmartRouteKeyService, configs 
 			c.Request = c.Request.WithContext(service.WithAPIKeyRouteRPMReceipts(c.Request.Context()))
 		}
 		discovery := c.Request.Method == http.MethodGet && strings.HasSuffix(strings.TrimRight(c.Request.URL.Path, "/"), "/models")
-		var best, last *smartRouteWriter
+		var best, last, bridgeDenied *smartRouteWriter
 		var catalogs []*smartRouteWriter
 		for _, groupID := range key.CandidateGroupIDs() {
 			if c.Request.Context().Err() != nil {
@@ -145,6 +161,9 @@ func APIKeySmartRouting(engine http.Handler, keys SmartRouteKeyService, configs 
 				return
 			}
 			last = writer
+			if attempt.bridgeDenied {
+				bridgeDenied = writer
+			}
 			if discovery && writer.status >= 200 && writer.status < 300 {
 				catalogs = append(catalogs, writer)
 				continue
@@ -162,6 +181,8 @@ func APIKeySmartRouting(engine http.Handler, keys SmartRouteKeyService, configs 
 			mergeSmartRouteCatalogs(catalogs).commit()
 		} else if best != nil {
 			best.commit()
+		} else if bridgeDenied != nil {
+			bridgeDenied.commit()
 		} else if last != nil {
 			last.commit()
 		}

@@ -628,6 +628,20 @@ func (_c *GroupCreate) SetModelPricing(v jsontext.Value) *GroupCreate {
 	return _c
 }
 
+// SetBridgeRequired sets the "bridge_required" field.
+func (_c *GroupCreate) SetBridgeRequired(v bool) *GroupCreate {
+	_c.mutation.SetBridgeRequired(v)
+	return _c
+}
+
+// SetNillableBridgeRequired sets the "bridge_required" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableBridgeRequired(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetBridgeRequired(*v)
+	}
+	return _c
+}
+
 // SetClaudeCodeOnly sets the "claude_code_only" field.
 func (_c *GroupCreate) SetClaudeCodeOnly(v bool) *GroupCreate {
 	_c.mutation.SetClaudeCodeOnly(v)
@@ -1221,6 +1235,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultLongContextPricingEnabled
 		_c.mutation.SetLongContextPricingEnabled(v)
 	}
+	if _, ok := _c.mutation.BridgeRequired(); !ok {
+		v := group.DefaultBridgeRequired
+		_c.mutation.SetBridgeRequired(v)
+	}
 	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
 		v := group.DefaultClaudeCodeOnly
 		_c.mutation.SetClaudeCodeOnly(v)
@@ -1452,6 +1470,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.LongContextPricingEnabled(); !ok {
 		return &ValidationError{Name: "long_context_pricing_enabled", err: errors.New(`ent: missing required field "Group.long_context_pricing_enabled"`)}
+	}
+	if _, ok := _c.mutation.BridgeRequired(); !ok {
+		return &ValidationError{Name: "bridge_required", err: errors.New(`ent: missing required field "Group.bridge_required"`)}
 	}
 	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
 		return &ValidationError{Name: "claude_code_only", err: errors.New(`ent: missing required field "Group.claude_code_only"`)}
@@ -1749,6 +1770,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ModelPricing(); ok {
 		_spec.SetField(group.FieldModelPricing, field.TypeJSON, value)
 		_node.ModelPricing = value
+	}
+	if value, ok := _c.mutation.BridgeRequired(); ok {
+		_spec.SetField(group.FieldBridgeRequired, field.TypeBool, value)
+		_node.BridgeRequired = value
 	}
 	if value, ok := _c.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)
@@ -2783,6 +2808,18 @@ func (u *GroupUpsert) UpdateModelPricing() *GroupUpsert {
 // ClearModelPricing clears the value of the "model_pricing" field.
 func (u *GroupUpsert) ClearModelPricing() *GroupUpsert {
 	u.SetNull(group.FieldModelPricing)
+	return u
+}
+
+// SetBridgeRequired sets the "bridge_required" field.
+func (u *GroupUpsert) SetBridgeRequired(v bool) *GroupUpsert {
+	u.Set(group.FieldBridgeRequired, v)
+	return u
+}
+
+// UpdateBridgeRequired sets the "bridge_required" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateBridgeRequired() *GroupUpsert {
+	u.SetExcluded(group.FieldBridgeRequired)
 	return u
 }
 
@@ -4117,6 +4154,20 @@ func (u *GroupUpsertOne) UpdateModelPricing() *GroupUpsertOne {
 func (u *GroupUpsertOne) ClearModelPricing() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearModelPricing()
+	})
+}
+
+// SetBridgeRequired sets the "bridge_required" field.
+func (u *GroupUpsertOne) SetBridgeRequired(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetBridgeRequired(v)
+	})
+}
+
+// UpdateBridgeRequired sets the "bridge_required" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateBridgeRequired() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateBridgeRequired()
 	})
 }
 
@@ -5682,6 +5733,20 @@ func (u *GroupUpsertBulk) UpdateModelPricing() *GroupUpsertBulk {
 func (u *GroupUpsertBulk) ClearModelPricing() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearModelPricing()
+	})
+}
+
+// SetBridgeRequired sets the "bridge_required" field.
+func (u *GroupUpsertBulk) SetBridgeRequired(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetBridgeRequired(v)
+	})
+}
+
+// UpdateBridgeRequired sets the "bridge_required" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateBridgeRequired() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateBridgeRequired()
 	})
 }
 

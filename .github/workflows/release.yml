@@ -69,6 +69,12 @@ jobs:
         run: |
           python3 scripts/release/test_frontend.py
           python3 scripts/release/verify_frontend.py
+      - name: Bridge 分组准入与注册页回归
+        run: |
+          cd backend
+          go test -tags unit ./internal/service ./internal/server/middleware ./internal/server/routes -run 'Test(Bridge|SmartRouting|GatewayRoutesGroupModelAllowlist)' -count=1 -timeout=180s
+          cd ../frontend
+          pnpm exec vitest run src/views/auth/__tests__/RegisterView.spec.ts
       - name: 盲盒与上游余额管理回归
         run: |
           cd backend
