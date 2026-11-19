@@ -883,6 +883,22 @@ func (s *SettingService) GetRectifierSettings(ctx context.Context) (*RectifierSe
 	if err := json.Unmarshal([]byte(value), &settings); err != nil {
 		return DefaultRectifierSettings(), nil
 	}
+	// Older persisted settings did not contain the native thinking-signature
+	// switch. Keep that repair enabled when the key is absent while preserving an
+	// explicit false value written by an administrator.
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(value), &fields); err == nil {
+		defaults := DefaultRectifierSettings()
+		if _, ok := fields["enabled"]; !ok {
+			settings.Enabled = defaults.Enabled
+		}
+		if _, ok := fields["thinking_signature_enabled"]; !ok {
+			settings.ThinkingSignatureEnabled = defaults.ThinkingSignatureEnabled
+		}
+		if _, ok := fields["thinking_budget_enabled"]; !ok {
+			settings.ThinkingBudgetEnabled = defaults.ThinkingBudgetEnabled
+		}
+	}
 
 	return &settings, nil
 }

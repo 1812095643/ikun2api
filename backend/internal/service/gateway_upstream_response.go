@@ -112,13 +112,21 @@ func (s *GatewayService) shouldRectifySignatureError(ctx context.Context, accoun
 	}
 	if account.Type == AccountTypeAPIKey {
 		// API Key 账号：独立开关，一次读取配置
-		settings, err := s.settingService.GetRectifierSettings(ctx)
-		if err != nil || !settings.Enabled || !settings.APIKeySignatureEnabled {
+		if s.settingService == nil {
 			return false
 		}
-		// 先检查内置模式（同 OAuth），再检查自定义关键词
-		if s.isThinkingBlockSignatureError(respBody) {
-			return true
+		settings, err := s.settingService.GetRectifierSettings(ctx)
+		if err != nil || settings == nil || !settings.Enabled {
+			return false
+		}
+		// 明确的 thinking signature 400 使用官方式历史清理；它不改变当前
+		// thinking 模式，也不依赖通用 API Key 降级开关。
+		if isClaudeInvalidThinkingSignature(respBody) {
+			return settings.ThinkingSignatureEnabled
+		}
+		// 其他自定义签名关键词继续使用原来的 API Key 专属降级开关。
+		if !settings.APIKeySignatureEnabled {
+			return false
 		}
 		return matchSignaturePatterns(respBody, settings.APIKeySignaturePatterns)
 	}

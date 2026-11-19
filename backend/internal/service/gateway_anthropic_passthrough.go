@@ -92,8 +92,34 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 		}
 	}
 
+	// Keep the same bounded, session-scoped recovery state as the normal Claude
+	// forward path. API Key passthrough remains byte-for-byte untouched on
+	// successful requests; this state is consulted only after an explicit 400
+	// invalid-thinking-signature response.
+	metadataSession := ""
+	if identity := ParseMetadataUserID(gjson.GetBytes(input.Body, "metadata.user_id").String()); identity != nil {
+		metadataSession = identity.SessionID
+	}
+	thinkingScope, canRememberThinking := claudeThinkingRecoveryScope(c, account, input.RequestModel, metadataSession)
+	thinkingRecoveryEnabled := s.settingService != nil && s.settingService.IsSignatureRectifierEnabled(ctx)
+	if supportsClaudeThinkingHistoryRecovery(account, input.RequestModel) && canRememberThinking && thinkingRecoveryEnabled {
+		known := s.claudeThinkingRecovery.known(thinkingScope, time.Now())
+		if len(known) > 0 {
+			if clean, _, changed := stripClaudeThinkingHistory(input.Body, known); changed {
+				input.Body = clean
+				if input.Parsed != nil {
+					if err := input.Parsed.ReplaceBody(input.Body); err != nil {
+						return nil, err
+					}
+				}
+				logger.LegacyPrintf("service.gateway", "Account %d: reused accepted thinking history recovery in passthrough", account.ID)
+			}
+		}
+	}
+
 	var resp *http.Response
 	retryStart := time.Now()
+	retriedThinkingSignature := false
 	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
 		upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, input.RequestStream)
 		upstreamReq, wireBody, err := s.buildUpstreamRequestAnthropicAPIKeyPassthrough(upstreamCtx, c, account, input.Body, token)
@@ -118,6 +144,56 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				UpstreamURL: safeUpstreamURL(upstreamReq.URL.String()),
 				Passthrough: true,
 			})
+		}
+
+		// A precise Anthropic thinking-signature 400 is safe to repair once on the
+		// same API Key account. Other 400 responses stay untouched and continue
+		// through the existing passthrough handling below.
+		if resp.StatusCode == http.StatusBadRequest && !retriedThinkingSignature {
+			respBody, readErr := s.readUpstreamErrorBody(resp)
+			if readErr == nil {
+				originalHeader := resp.Header.Clone()
+				shouldRepair := s.shouldRectifySignatureError(ctx, account, respBody, input.RequestModel)
+				if !shouldRepair {
+					resp.Body = io.NopCloser(bytes.NewReader(respBody))
+				} else {
+					_ = resp.Body.Close()
+					if ctx.Err() != nil {
+						resp.Body = io.NopCloser(bytes.NewReader(respBody))
+						break
+					}
+					if clean, recovered, changed := stripClaudeThinkingHistory(input.Body, nil); changed {
+						retriedThinkingSignature = true
+						retryCtx, releaseRetryCtx := detachStreamUpstreamContext(ctx, input.RequestStream)
+						retryReq, retryWireBody, buildErr := s.buildUpstreamRequestAnthropicAPIKeyPassthrough(retryCtx, c, account, clean, token)
+						releaseRetryCtx()
+						if buildErr == nil {
+							retryResp, retryErr := s.httpUpstream.DoWithTLS(retryReq, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+							if retryErr == nil && retryResp != nil && retryResp.StatusCode < 400 {
+								input.Body = retryWireBody
+								if input.Parsed != nil {
+									if err := input.Parsed.ReplaceBody(input.Body); err != nil {
+										_ = retryResp.Body.Close()
+										return nil, err
+									}
+								}
+								if canRememberThinking {
+									s.claudeThinkingRecovery.remember(thinkingScope, recovered, time.Now())
+								}
+								logger.LegacyPrintf("service.gateway", "Account %d: passthrough thinking block retry succeeded (historical thinking removed)", account.ID)
+								resp = retryResp
+								break
+							}
+							if retryResp != nil && retryResp.Body != nil {
+								_ = retryResp.Body.Close()
+							}
+						}
+					}
+					// Repair failed or no thinking block was removable: preserve the
+					// original upstream 400 body for the caller.
+					resp = &http.Response{StatusCode: http.StatusBadRequest, Header: originalHeader, Body: io.NopCloser(bytes.NewReader(respBody))}
+				}
+			}
 		}
 
 		// 透传分支禁止 400 请求体降级重试（该重试会改写请求体）

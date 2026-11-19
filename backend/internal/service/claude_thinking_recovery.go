@@ -96,7 +96,9 @@ func (c *claudeThinkingRecoveryCache) remember(scope [32]byte, blocks [][32]byte
 }
 
 func supportsClaudeThinkingHistoryRecovery(account *Account, model string) bool {
-	return account != nil && account.IsAnthropicOAuthOrSetupToken() && ShouldApplyRetryFilters(model)
+	return account != nil && account.Platform == PlatformAnthropic &&
+		(account.IsAnthropicOAuthOrSetupToken() || account.Type == AccountTypeAPIKey) &&
+		ShouldApplyRetryFilters(model)
 }
 
 func claudeThinkingRecoveryScope(c *gin.Context, account *Account, model, metadataSession string) ([32]byte, bool) {

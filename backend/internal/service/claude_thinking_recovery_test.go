@@ -150,6 +150,38 @@ func TestForwardClaudeThinkingRecoveryDoesNotRememberFailedRepair(t *testing.T) 
 	require.Zero(t, svc.claudeThinkingRecovery.order.Len())
 }
 
+func TestForwardClaudeThinkingRecoverySupportsAnthropicAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := &thinkingRecoveryUpstream{}
+	cfg := &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}}
+	settings := &signatureBudgetSettings{}
+	svc := &GatewayService{
+		cfg:                  cfg,
+		responseHeaderFilter: compileResponseHeaderFilter(cfg),
+		httpUpstream:         upstream,
+		rateLimitService:     &RateLimitService{},
+		deferredService:      &DeferredService{},
+		settingService:       NewSettingService(settings, cfg),
+	}
+	account := newAnthropicOAuthAccountForPartialUsageTest()
+	account.Type = AccountTypeAPIKey
+	account.Credentials = map[string]any{
+		"api_key":  "anthropic-api-key",
+		"base_url": "https://api.anthropic.com",
+	}
+	account.Extra = nil
+
+	c, _ := newThinkingRecoveryContext([]byte(thinkingRecoveryFixture), "api-key-session", 17)
+	parsed, err := ParseGatewayRequest(NewRequestBodyRef([]byte(thinkingRecoveryFixture)), PlatformAnthropic)
+	require.NoError(t, err)
+	result, err := svc.Forward(context.Background(), c, account, parsed)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, upstream.bodies, 2)
+	require.NotContains(t, string(upstream.bodies[1]), "rejected-signature")
+	require.Equal(t, "adaptive", gjson.GetBytes(upstream.bodies[1], "thinking.type").String())
+}
+
 func TestClaudeThinkingRecoveryCacheBoundaries(t *testing.T) {
 	var cache claudeThinkingRecoveryCache
 	now := time.Unix(1000, 0)
@@ -265,6 +297,6 @@ func TestClaudeThinkingRecoveryProtocolScope(t *testing.T) {
 	require.False(t, supportsClaudeThinkingHistoryRecovery(account, "deepseek-v4"))
 	require.False(t, supportsClaudeThinkingHistoryRecovery(account, "unknown-model"))
 	account.Type = AccountTypeAPIKey
-	require.False(t, supportsClaudeThinkingHistoryRecovery(account, "claude-opus-5-5"))
+	require.True(t, supportsClaudeThinkingHistoryRecovery(account, "claude-opus-5-5"))
 	require.False(t, supportsClaudeThinkingHistoryRecovery(nil, "claude-opus-5-5"))
 }
