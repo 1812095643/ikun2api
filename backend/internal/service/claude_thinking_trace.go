@@ -81,7 +81,10 @@ func (s *GatewayService) beginClaudeThinkingTrace(c *gin.Context, account *Accou
 	}
 	// A failover can reuse gin.Context. Never reuse the previous account's trace.
 	c.Set(claudeThinkingTraceContextKey, (*claudeThinkingTrace)(nil))
-	if !supportsClaudeThinkingHistoryRecovery(account, model) {
+	// Source tracing remains limited to native OAuth/setup-token accounts. API
+	// Key accounts use the same recovery cache, but do not inherit the older
+	// diagnostic trace contract.
+	if account == nil || !account.IsAnthropicOAuthOrSetupToken() || !ShouldApplyRetryFilters(model) {
 		return nil
 	}
 	scope, valid := claudeThinkingRecoveryScope(c, account, model, originalSession)
