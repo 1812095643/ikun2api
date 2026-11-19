@@ -1279,7 +1279,7 @@ export default {
         force: '强制使用 Fast（priority）',
         hint: '开启后，此分组的 OpenAI 请求会强制写入 service_tier=priority；全局 Fast/Flex 策略仍可过滤或拦截。保存后新请求立即生效，已建立的 WebSocket 会话需重连。',
         forceUltrafast: '强制使用 Ultra Fast（ultrafast）',
-      ultrafastHint: '支持此档位的模型和账号使用 Ultra Fast。可在账号或渠道中设置倍率。',
+        ultrafastHint: '仅在账号支持时为 GPT-6 Astra、GPT-6.1 Sol 和 GPT-6.2 Sol／Astra 强制设置 service_tier=ultrafast。',
         free: '免费 Fast',
         freeHint: '该分组的 Fast 请求仍使用 priority 档位，但客户实际费用按同一请求的 Standard 价格计算。'
       },
