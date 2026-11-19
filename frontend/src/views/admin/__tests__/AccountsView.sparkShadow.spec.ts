@@ -349,6 +349,21 @@ describe('admin AccountsView — 账号行展示', () => {
     wrapper.unmount()
   })
 
+  it('renders the Claude OAuth subscription badge and preserves the automatic fallback', async () => {
+    const claudeAccounts = [
+      { id: 190, name: 'Manual', type: 'oauth', extra: { claude_subscription_label: 'max_20x' } },
+      { id: 191, name: 'Automatic', type: 'oauth', extra: {} },
+      { id: 192, name: 'API key', type: 'apikey', extra: { claude_subscription_label: 'ultra' } }
+    ].map(account => ({ ...account, platform: 'anthropic', credentials: { plan_type: 'pro' } }))
+    listAccounts.mockResolvedValue({ items: claudeAccounts, total: 3, page: 1, page_size: 20, pages: 1 })
+
+    const wrapper = mountViewWithRow()
+    await flushPromises()
+    expect(wrapper.findAllComponents(PlatformTypeBadge).map(badge => badge.props('planType')))
+      .toEqual(['Max 20x', 'pro', 'pro'])
+    wrapper.unmount()
+  })
+
   it('prefers persisted Grok JWT tier over lagging billing/quota snapshots', async () => {
     const grokAccounts = [
       {

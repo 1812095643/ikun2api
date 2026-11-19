@@ -1555,7 +1555,7 @@ func normalizeOpenAIOAuthResponsesCompatibilityInput(body []byte) ([]byte, bool,
 }
 
 func normalizeGPT6ResponsesSampling(body []byte, model string) ([]byte, bool, error) {
-	if !openai.IsGPT6SolFamilyModelSpelling(model) || (openai.IsGPT6SolOrLunaModelSpelling(model) && gjson.GetBytes(body, "reasoning.effort").String() == "none") {
+	if (!openai.IsGPT6SolFamilyModelSpelling(model) && openai.GPT62ModelID(model) == "") || (openai.IsGPT6SolOrLunaModelSpelling(model) && gjson.GetBytes(body, "reasoning.effort").String() == "none") {
 		return body, false, nil
 	}
 	out := body
@@ -2262,7 +2262,19 @@ func openAIFastPolicySettingsFromContext(ctx context.Context) *OpenAIFastPolicyS
 
 // openAIModelSupportsUltrafast 与本地档位价格共用模型识别，保留管理员倍率覆盖。
 func openAIModelSupportsUltrafast(model string) bool {
-	return openAIModelUltrafastPricingRatio(model) > 0
+	return openai.GPT62ModelID(model) != "" || openAIModelUltrafastPricingRatio(model) > 0
+}
+
+func openAIAccountAllowsForcedUltrafast(account *Account, model string) bool {
+	if !openAIModelSupportsUltrafast(model) {
+		return false
+	}
+	base := openai.GPT62ModelID(model)
+	if base == "" || !account.IsOpenAIOAuthLike() || gpt62PlanIncludesUltrafast(account, base) {
+		return true
+	}
+	metadata, found := account.GetUpstreamModelMetadata(base)
+	return found && gjson.GetBytes(metadata.CodexToolCapabilities["service_tiers"], `#(id=="ultrafast")`).Exists()
 }
 
 // openAIGroupForcedServiceTier returns the service_tier that the trusted request
@@ -2284,14 +2296,13 @@ func openAIGroupForcedServiceTier(ctx context.Context, account *Account, model s
 	if !IsGroupContextValid(group) || !groupSupportsOpenAIFast(group.Platform) {
 		return ""
 	}
-	switch {
-	case group.ForceOpenAIUltrafast && openAIModelSupportsUltrafast(model):
+	if group.ForceOpenAIUltrafast && openAIAccountAllowsForcedUltrafast(account, model) {
 		return OpenAIFastTierUltrafast
-	case group.ForceOpenAIFast:
-		return OpenAIFastTierPriority
-	default:
-		return ""
 	}
+	if group.ForceOpenAIFast {
+		return OpenAIFastTierPriority
+	}
+	return ""
 }
 
 // applyOpenAIFastPolicyToBody applies the OpenAI fast policy to a raw request
@@ -2772,7 +2783,7 @@ func validateGPT61CompatRequest(body []byte, model string, mappedModels ...strin
 }
 
 func validateGPT61RawEffort(body []byte, model string, mappedModels ...string) error {
-	if !openai.IsGPT61SolModelSpelling(model) && !openai.IsGPT61TerraModelSpelling(model) {
+	if !openai.IsGPT61SolModelSpelling(model) && !openai.IsGPT61TerraModelSpelling(model) && openai.GPT62ModelID(model) == "" {
 		return nil
 	}
 	for _, path := range []string{"reasoning.effort", "reasoning_effort", "output_config.effort"} {

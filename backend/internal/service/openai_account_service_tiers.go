@@ -177,7 +177,7 @@ func pricingWithServiceTierOverride(pricing *ModelPricing, tier string, multipli
 	case OpenAIFastTierPriority:
 		cloned.FastMultiplier = multiplier
 	case OpenAIFastTierUltrafast:
-		cloned.UltrafastMultiplier = *multiplier
+		cloned.UltrafastMultiplierOverride = multiplier
 	default:
 		return pricing
 	}
@@ -230,7 +230,7 @@ func openAIForcedServiceTier(ctx context.Context, account *Account, models ...st
 	}
 	preference, _ := ctx.Value(openAIRequestServiceTierContextKey{}).(openAIRequestServiceTierContext)
 	if validateForcedOpenAIServiceTier(preference.keyForced) == nil {
-		if preference.keyForced == OpenAIFastTierUltrafast && len(models) > 0 && !openAIModelSupportsUltrafast(models[0]) {
+		if preference.keyForced == OpenAIFastTierUltrafast && len(models) > 0 && !openAIAccountAllowsForcedUltrafast(account, models[0]) {
 			return ""
 		}
 		return preference.keyForced

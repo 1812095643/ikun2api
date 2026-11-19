@@ -151,7 +151,7 @@
             </div>
           </div>
 
-          <div v-if="enableTierMultipliers" class="mt-3 grid max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+          <div v-if="enableTierMultipliers" class="mt-3 grid max-w-3xl grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.fastMultiplier') }}</label>
               <input :value="entry.fast_multiplier" @input="emitField('fast_multiplier', ($event.target as HTMLInputElement).value)"
@@ -160,6 +160,11 @@
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.flexMultiplier') }}</label>
               <input :value="entry.flex_multiplier" @input="emitField('flex_multiplier', ($event.target as HTMLInputElement).value)"
+                type="number" step="any" min="0.000001" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.multiplierPlaceholder')" />
+            </div>
+            <div v-if="props.platform === 'openai'">
+              <label class="text-xs text-gray-400">{{ t('admin.channels.form.ultrafastMultiplier') }}</label>
+              <input :value="entry.ultrafast_multiplier" @input="emitField('ultrafast_multiplier', ($event.target as HTMLInputElement).value)"
                 type="number" step="any" min="0.000001" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.multiplierPlaceholder')" />
             </div>
           </div>
@@ -423,9 +428,8 @@ async function onModelsUpdate(newModels: string[]) {
   const oldModels = props.entry.models
   emit('update', { ...props.entry, models: newModels })
 
-  // 只在新增模型且当前无价格时自动填充
-  const addedModels = newModels.filter(m => !oldModels.includes(m))
-  if (addedModels.length === 0) return
+  // 只为空条目首次加入的单个模型填充默认价，避免给多个模型套用同一个价格。
+  if (oldModels.length !== 0 || newModels.length !== 1) return
 
   // 检查是否所有价格字段都为空
   const e = props.entry
@@ -435,7 +439,7 @@ async function onModelsUpdate(newModels: string[]) {
 
   // 查询第一个新增模型的默认价格
   try {
-    const result = await channelsAPI.getModelDefaultPricing(addedModels[0])
+    const result = await channelsAPI.getModelDefaultPricing(newModels[0])
     if (result.found) {
       emit('update', {
         ...props.entry,

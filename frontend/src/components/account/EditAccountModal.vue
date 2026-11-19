@@ -2952,6 +2952,21 @@
         <p class="input-hint">{{ t('admin.accounts.autoResetCredit.thresholdHint') }}</p>
       </div>
 
+      <div
+        v-if="account?.platform === 'anthropic' && account?.type === 'oauth'"
+        class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
+      >
+        <span class="input-label mb-0">{{ t('admin.accounts.anthropic.subscriptionLabel') }}</span>
+        <div class="w-44 flex-shrink-0">
+          <Select
+            v-model="editClaudeSubscriptionLabel"
+            :options="claudeSubscriptionLabelOptions"
+            :aria-label="t('admin.accounts.anthropic.subscriptionLabel')"
+            data-testid="claude-subscription-label"
+          />
+        </div>
+      </div>
+
       <!-- 配额控制 (Anthropic OAuth/SetupToken: 亲和 + 窗口费用 + 会话 + RPM 等) -->
       <div
         v-if="account?.platform === 'anthropic' && (account?.type === 'oauth' || account?.type === 'setup-token')"
@@ -3500,6 +3515,7 @@ import type {
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
+import { claudeSubscriptionLabels, readClaudeSubscriptionLabel, type ClaudeSubscriptionLabel } from '@/utils/planType'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import UpstreamRequestIdHeaderField from '@/components/account/UpstreamRequestIdHeaderField.vue'
 import OpenAIRequestTimezoneField from '@/components/account/OpenAIRequestTimezoneField.vue'
@@ -4286,6 +4302,7 @@ const selfHostedUpstreamToggles = [
 // OpenAI 订阅档位（Plus / Pro 20x / Pro 5x / Business Standard / Business Premium / Free）手动覆盖值,
 // 存于 credentials.plan_type;'' 表示清空/自动识别
 const editPlanType = ref<string>('')
+const editClaudeSubscriptionLabel = ref<ClaudeSubscriptionLabel | ''>('')
 const openAICompactMode = ref<OpenAICompactMode>('auto')
 const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 // Images 非流式响应缺 b64_json 时由网关下载 url 回填（仅 OpenAI API Key）。
@@ -4431,6 +4448,10 @@ const openAICompactModeOptions = computed(() => [
 const planTypeOptions = computed(() =>
   buildPlanTypeOptions(editPlanType.value, t('admin.accounts.openai.planTypeClear'))
 )
+const claudeSubscriptionLabelOptions = computed(() => [
+  { value: '', label: t('admin.accounts.anthropic.subscriptionLabelAuto') },
+  ...Object.entries(claudeSubscriptionLabels).map(([value, label]) => ({ value, label }))
+])
 const openAIResponsesModeOptions = computed(() => [
   { value: 'auto', label: t('admin.accounts.openai.responsesModeAuto') },
   { value: 'force_responses', label: t('admin.accounts.openai.responsesModeForceResponses') },
@@ -4802,6 +4823,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   responsesNonstreamKeepalive.value =
     newAccount.platform === 'openai' && newAccount.type === 'apikey' && extra?.responses_nonstream_keepalive === true
   editPlanType.value = ''
+  editClaudeSubscriptionLabel.value = newAccount.platform === 'anthropic' && newAccount.type === 'oauth'
+    ? readClaudeSubscriptionLabel(extra)
+    : ''
   openAICompactMode.value = 'auto'
   openAIResponsesMode.value = 'auto'
   openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
@@ -5762,7 +5786,18 @@ const submitUpdateAccount = async (accountID: number, updatePayload: Record<stri
   submitting.value = true
   try {
     if (props.account?.platform === 'anthropic' && (props.account?.type === 'oauth' || props.account?.type === 'setup-token')) {
-      updatePayload.extra = { ...((updatePayload.extra as Record<string, unknown>) || props.account.extra || {}), model_allowlist: { ...claudeModelAllowlist.value, models: [...claudeModelAllowlist.value.models] } }
+      const extra: Record<string, unknown> = {
+        ...((updatePayload.extra as Record<string, unknown>) || props.account.extra || {}),
+        model_allowlist: { ...claudeModelAllowlist.value, models: [...claudeModelAllowlist.value.models] }
+      }
+      if (props.account.type === 'oauth') {
+        if (editClaudeSubscriptionLabel.value) {
+          extra.claude_subscription_label = editClaudeSubscriptionLabel.value
+        } else {
+          delete extra.claude_subscription_label
+        }
+      }
+      updatePayload.extra = extra
     }
     let updatedAccount = await adminAPI.accounts.update(accountID, withAntigravityConfirmFlag(updatePayload))
     updatedAccount = await persistGrokMediaEligibility(accountID, updatedAccount)

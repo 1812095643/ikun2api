@@ -331,6 +331,28 @@ describe('EditAccountModal', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it.each(['ultra', ''])('updates the Claude OAuth subscription badge (%s) without replacing other settings', async (label) => {
+    const account = buildAccount()
+    account.platform = 'anthropic'
+    account.type = 'oauth'
+    account.credentials = { plan_type: 'pro' }
+    account.extra = { claude_subscription_label: 'max_5x', intercept_warmup: true }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const select = wrapper.get<HTMLSelectElement>('[data-testid="claude-subscription-label"]')
+    expect(select.element.value).toBe('max_5x')
+    await select.setValue(label)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const payload = updateAccountMock.mock.calls[0][1]
+    expect(payload.extra.intercept_warmup).toBe(true)
+    expect(payload.extra.claude_subscription_label).toBe(label || undefined)
+    expect(payload.credentials?.plan_type ?? 'pro').toBe('pro')
+    wrapper.unmount()
+  })
+
   it.each(['apikey', 'oauth'])('can opt a passthrough %s account into model filtering without changing groups', async (type) => {
     const account = buildAccount()
     account.type = type

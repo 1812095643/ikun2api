@@ -951,6 +951,8 @@ export default {
         noResponseBody: 'No response body from server'
       },
       anthropic: {
+        subscriptionLabel: 'Subscription badge',
+        subscriptionLabelAuto: 'Automatic',
         apiKeyPassthrough: 'Auto passthrough (auth only)',
         apiKeyPassthroughDesc:
           'Only applies to Anthropic API Key accounts. When enabled, messages/count_tokens are forwarded in passthrough mode with auth replacement only, while billing/concurrency/audit and safety filtering are preserved. Disable to roll back immediately.',

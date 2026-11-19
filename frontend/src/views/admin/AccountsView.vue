@@ -554,6 +554,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
+import { claudeSubscriptionLabels, readClaudeSubscriptionLabel } from '@/utils/planType'
 import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
@@ -1740,6 +1741,10 @@ function grok45ResponsesPlanIsHeavy(snapshot: Record<string, any> | undefined): 
 // from grok-4.5 Responses (or a carried 4.5 hint).
 function getAccountPlanType(row: any): string | undefined {
   if (!row) return undefined
+  if (row.platform === 'anthropic' && row.type === 'oauth') {
+    const label = readClaudeSubscriptionLabel(row.extra)
+    if (label) return claudeSubscriptionLabels[label]
+  }
   if (row.platform === 'grok') {
     const extra = (row.extra || {}) as Record<string, any>
     const billing = extra.grok_billing_snapshot as Record<string, any> | undefined

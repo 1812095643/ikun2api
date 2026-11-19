@@ -1,4 +1,4 @@
-/** OpenAI subscription SKU identity and Codex display names. Other providers use their own labels. */
+/** Normalize a provider plan label for comparison. */
 export function normalizePlanType(value?: string | null): string {
   return (value || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
 }
@@ -40,4 +40,24 @@ export function openAIPlanTypeLabel(value?: string | null, display: 'status' | '
     case 'unknown': return display === 'status' ? 'Unknown' : 'Account'
     default: return ''
   }
+}
+
+export const claudeSubscriptionLabels = {
+  free: 'Free',
+  pro: 'Pro',
+  max: 'Max',
+  max_5x: 'Max 5x',
+  max_20x: 'Max 20x',
+  ultra: 'Ultra',
+  team: 'Team',
+  enterprise: 'Enterprise'
+} as const
+
+export type ClaudeSubscriptionLabel = keyof typeof claudeSubscriptionLabels
+
+export function readClaudeSubscriptionLabel(extra?: Record<string, unknown> | null): ClaudeSubscriptionLabel | '' {
+  const value = extra?.claude_subscription_label
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(claudeSubscriptionLabels, value)
+    ? value as ClaudeSubscriptionLabel
+    : ''
 }
