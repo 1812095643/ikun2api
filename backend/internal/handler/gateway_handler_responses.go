@@ -311,8 +311,10 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		writerSizeBeforeForward := c.Writer.Size()
 		forwardStart := time.Now()
 		forwardBody := body
+		forwardCtx := requestCtx
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
+			forwardCtx = service.WithGatewaySchedulingModel(forwardCtx, reqModel)
 		}
 		var result *service.ForwardResult
 		setActualUpstreamEndpoint(c, "")
@@ -329,7 +331,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				return h.antigravityGatewayService.ForwardAsResponses(requestCtx, c, account, next, parsedReq)
 			})
 		} else {
-			result, err = h.gatewayService.ForwardAsResponses(requestCtx, c, account, forwardBody, parsedReq)
+			result, err = h.gatewayService.ForwardAsResponses(forwardCtx, c, account, forwardBody, parsedReq)
 		}
 
 		if accountReleaseFunc != nil {

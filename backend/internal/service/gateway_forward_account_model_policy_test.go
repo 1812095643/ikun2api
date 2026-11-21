@@ -21,8 +21,17 @@ func TestClaudeForwardChecksAccountModelPolicy(t *testing.T) {
 	const permitted = "claude-sonnet-4-6"
 	const forbidden = "claude-opus-4-6"
 	for _, endpoint := range []string{"messages", "chat/completions", "responses"} {
-		for _, requested := range []string{alias, forbidden} {
-			t.Run(endpoint+"/"+requested, func(t *testing.T) {
+		for _, scenario := range []struct {
+			name, forwarded, selected string
+			allow                     bool
+		}{
+			{name: "direct-alias", forwarded: alias, allow: true},
+			{name: "forbidden-model", forwarded: forbidden},
+			{name: "channel-and-account-agree", forwarded: permitted, selected: alias, allow: true},
+			{name: "channel-target-differs", forwarded: forbidden, selected: alias},
+			{name: "unlisted-direct-target", forwarded: permitted},
+		} {
+			t.Run(endpoint+"/"+scenario.name, func(t *testing.T) {
 				account := &Account{ID: 58, Platform: PlatformAnthropic, Type: AccountTypeAPIKey,
 					Credentials: map[string]any{"api_key": "fixture", "base_url": "https://synthetic.invalid",
 						"model_mapping": map[string]any{alias: permitted, forbidden: forbidden}},
@@ -34,10 +43,13 @@ func TestClaudeForwardChecksAccountModelPolicy(t *testing.T) {
 				if endpoint == "responses" {
 					text = `{"model":"MODEL","input":"test","max_output_tokens":8,"stream":true}`
 				}
-				body := []byte(strings.ReplaceAll(text, "MODEL", requested))
+				body := []byte(strings.ReplaceAll(text, "MODEL", scenario.forwarded))
 				rec := httptest.NewRecorder()
 				c, _ := gin.CreateTestContext(rec)
 				ctx := context.Background()
+				if scenario.selected != "" {
+					ctx = WithGatewaySchedulingModel(ctx, scenario.selected)
+				}
 				c.Request = httptest.NewRequest(http.MethodPost, "/v1/"+endpoint, strings.NewReader(string(body)))
 				var err error
 				switch endpoint {
@@ -51,7 +63,7 @@ func TestClaudeForwardChecksAccountModelPolicy(t *testing.T) {
 					_, err = svc.ForwardAsResponses(ctx, c, account, body, nil)
 				}
 				require.Error(t, err)
-				if requested == forbidden {
+				if !scenario.allow {
 					require.Equal(t, http.StatusForbidden, rec.Code)
 					require.Nil(t, transport.lastReq)
 				} else {

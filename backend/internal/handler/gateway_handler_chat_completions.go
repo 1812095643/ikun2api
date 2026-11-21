@@ -317,8 +317,10 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		writerSizeBeforeForward := c.Writer.Size()
 		forwardStart := time.Now()
 		forwardBody := body
+		forwardCtx := c.Request.Context()
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
+			forwardCtx = service.WithGatewaySchedulingModel(forwardCtx, reqModel)
 		}
 		var result *service.ForwardResult
 		setActualUpstreamEndpoint(c, "")
@@ -342,7 +344,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			setActualUpstreamEndpoint(c, EndpointAntigravityGenerateContent)
 			result, err = h.antigravityGatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, parsedReq)
 		} else {
-			result, err = h.gatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, parsedReq)
+			result, err = h.gatewayService.ForwardAsChatCompletions(forwardCtx, c, account, forwardBody, parsedReq)
 		}
 
 		if accountReleaseFunc != nil {

@@ -22,7 +22,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 		s.countTokensError(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
 		return fmt.Errorf("parse request: empty request")
 	}
-	if account != nil && !s.isModelSupportedForAnthropicForward(account, parsed.Model) {
+	if account != nil && !s.isModelSupportedForAnthropicForward(ctx, account, parsed.Model) {
 		s.countTokensError(c, http.StatusForbidden, "permission_error", "模型不在此账号白名单中")
 		return fmt.Errorf("account model allowlist rejected count_tokens")
 	}
