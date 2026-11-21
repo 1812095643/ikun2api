@@ -356,7 +356,7 @@ describe('EditAccountModal', () => {
   it.each(['apikey', 'oauth'])('can opt a passthrough %s account into model filtering without changing groups', async (type) => {
     const account = buildAccount()
     account.type = type
-    account.extra = { openai_passthrough: true }
+    account.extra = { openai_passthrough: true, openai_passthrough_model_filter: false }
     account.group_ids = [17]
     updateAccountMock.mockReset().mockResolvedValue(account)
     checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
@@ -372,6 +372,20 @@ describe('EditAccountModal', () => {
     expect(payload.extra.openai_passthrough_model_filter).toBe(true)
     expect(payload.credentials.model_mapping).toEqual({ 'gpt-5.2-2025-12-11': 'gpt-5.2-2025-12-11' })
     expect(payload.group_ids).toEqual([17])
+    wrapper.unmount()
+  })
+
+  it('honors a saved whitelist without a passthrough filter flag', async () => {
+    const account = buildAccount()
+    account.extra = { openai_passthrough: true }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const filter = wrapper.get<HTMLInputElement>('[data-testid="edit-openai-passthrough-model-filter"]')
+    expect(filter.element.checked).toBe(true)
+    await filter.setValue(false)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.openai_passthrough_model_filter).toBe(false)
     wrapper.unmount()
   })
 

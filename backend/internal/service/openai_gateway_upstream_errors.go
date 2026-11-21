@@ -196,8 +196,8 @@ func isOpenAIRequestScopedCapacityShed(upstreamMsg string, upstreamBody []byte) 
 }
 
 const (
-	openAIRequestScopedRetryMaxDelay      = 8 * time.Second
-	openAIRequestScopedModelCooldownMax   = 24 * time.Hour
+	openAIRequestScopedRetryMaxDelay    = 8 * time.Second
+	openAIRequestScopedModelCooldownMax = 24 * time.Hour
 )
 
 func openAIRequestScopedRetryDelay(responseHeaders http.Header, responseBody []byte) time.Duration {
@@ -317,7 +317,7 @@ func isOpenAIContextWindowError(upstreamMsg string, upstreamBody []byte) bool {
 
 func (s *OpenAIGatewayService) shouldFailoverUpstreamError(statusCode int) bool {
 	switch statusCode {
-	case 401, 402, 403, 405, 429, 529:
+	case 401, 402, 403, 405, http.StatusRequestTimeout, 429, 529:
 		return true
 	default:
 		return statusCode >= 500

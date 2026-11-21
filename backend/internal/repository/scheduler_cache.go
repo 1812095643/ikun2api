@@ -506,6 +506,13 @@ func (c *schedulerCache) loadSnapshotEntry(ctx context.Context, bucket service.S
 				return nil, nil
 			}
 		}
+		if account.Platform == service.PlatformAnthropic {
+			if _, exists := account.Extra[service.AccountModelAllowlistExtraKey]; !exists {
+				// 旧投影无法区分未设置与遗漏的白名单，回源重建后再使用。
+				c.dropSnapshotEntry(bucketKey)
+				return nil, nil
+			}
+		}
 		if account.IsOpenAIOAuthLike() && !account.IsShadow() {
 			if _, ok := account.Extra[service.CodexTicketReadyModelsExtraKey]; !ok {
 				c.dropSnapshotEntry(bucketKey)
@@ -1368,6 +1375,10 @@ func newSchedulerAccountMetaRevision() string {
 }
 
 func marshalSchedulerCacheAccount(account service.Account) ([]byte, []byte, error) {
+	// Hydration needs account configuration and group membership, not expanded
+	// group objects (also repeated in AccountGroups). Keep the caller's graph intact.
+	account.Groups = nil
+	account.AccountGroups = filterSchedulerAccountGroups(account.AccountGroups)
 	fullPayload, err := json.Marshal(account)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal account: %w", err)
@@ -1413,6 +1424,14 @@ func (c *schedulerCache) mgetChunked(ctx context.Context, keys []string) ([]any,
 
 func buildSchedulerMetadataAccount(account service.Account) service.Account {
 	extra := filterSchedulerExtra(account.Extra)
+	if account.Platform == service.PlatformAnthropic {
+		if extra == nil {
+			extra = make(map[string]any)
+		}
+		if _, exists := extra[service.AccountModelAllowlistExtraKey]; !exists {
+			extra[service.AccountModelAllowlistExtraKey] = service.GroupModelAllowlist{}
+		}
+	}
 	if account.Platform == service.PlatformOpenAI {
 		if extra == nil {
 			extra = make(map[string]any)
@@ -1565,6 +1584,7 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 	}
 	keys := []string{
 		service.ProxyFailureGuardExtraKey,
+		service.AccountModelAllowlistExtraKey,
 		service.OpenAIBPSCredentialStateExtraKey,
 		// Anthropic shared-window and Fable-only threshold checks run on this
 		// projection. UpdateExtra refreshes both payloads without a bucket rebuild.

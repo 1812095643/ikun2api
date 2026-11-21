@@ -118,13 +118,21 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 	}
 }
 
+// 转发前检查渠道改写后、账号映射前的模型名，允许管理员显式配置的账号别名。
+func (s *GatewayService) isModelSupportedForAnthropicForward(account *Account, model string) bool {
+	if account.Platform == PlatformAnthropic && strings.TrimSpace(model) != "" {
+		return s.isModelSupportedByAccount(account, model)
+	}
+	return account.AllowsConfiguredModel(model)
+}
+
 // Forward 转发请求到Claude API
 func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, parsed *ParsedRequest) (result *ForwardResult, err error) {
 	startTime := time.Now()
 	if parsed == nil {
 		return nil, fmt.Errorf("parse request: empty request")
 	}
-	if account != nil && !account.AllowsConfiguredModel(parsed.Model) {
+	if account != nil && !s.isModelSupportedForAnthropicForward(account, parsed.Model) {
 		c.JSON(http.StatusForbidden, gin.H{"type": "error", "error": gin.H{"type": "permission_error", "message": "该账号的模型白名单不允许此模型"}})
 		return nil, fmt.Errorf("account model allowlist rejected request")
 	}

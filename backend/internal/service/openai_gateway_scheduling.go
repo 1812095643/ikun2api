@@ -1684,6 +1684,14 @@ func (s *OpenAIGatewayService) openAIAccountMatchesSchedulingGroup(account *Acco
 	return openAIStickyAccountMatchesGroup(account, groupID)
 }
 
+// RefreshWebSocketAccountModelPolicy 读取当前账户快照，用于已建立连接的逐轮校验。
+func (s *OpenAIGatewayService) RefreshWebSocketAccountModelPolicy(ctx context.Context, accountID int64) (*Account, error) {
+	if s.schedulerSnapshot != nil {
+		return s.schedulerSnapshot.GetAccount(ctx, accountID)
+	}
+	return s.accountRepo.GetByID(ctx, accountID)
+}
+
 func (s *OpenAIGatewayService) getSchedulableAccount(ctx context.Context, accountID int64) (*Account, error) {
 	var (
 		account *Account

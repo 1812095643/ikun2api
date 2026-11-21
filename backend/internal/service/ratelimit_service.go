@@ -346,6 +346,11 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 	// 池模式默认不标记本地账号状态；但管理员显式配置的临时不可调度规则优先。
 	// 401 只在非凭据级且命中显式模型级规则时由规则处理，其余保留池模式现有的认证处理。
 	if account.IsPoolMode() && !customErrorCodesEnabled {
+		// 上游明确不支持该模型时，只冷却这个账号和模型的组合，其余模型仍参与调度。
+		if len(requestedModel) > 0 && (account.IsOpenAI() || account.Platform == PlatformAnthropic) &&
+			s.HandleUpstreamModelNotFound(ctx, account, requestedModel[0], statusCode, responseBody) {
+			return true
+		}
 		if tempUnschedRulesApply(account, statusCode, responseBody, tempUnschedulableModel(ctx, nil)) &&
 			s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
 			return true

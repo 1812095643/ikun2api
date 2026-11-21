@@ -1946,6 +1946,7 @@ type openAIResponsesWSUsageLogCase struct {
 	channelMapping            map[string]string
 	billingModelSource        string
 	accountModelMapping       map[string]any
+	nextAccountModelMapping   map[string]any
 	afterFirstUpstreamRequest func(channelSvc *service.ChannelService) error
 	// group 覆盖 apiKey.Group（分组级模型白名单测试用）；nil 保持原有无分组行为。
 	group *service.Group
@@ -1959,6 +1960,8 @@ type openAIResponsesWSUsageLogCase struct {
 	firstFrameCloseExpected bool
 	// secondTurnCloseExpected：第二个 turn 被拒（连接被 1008 关闭）。
 	secondTurnCloseExpected bool
+	// midFrameCloseExpected：midPayload 被拒（连接被 1008 关闭），帧不到达上游。
+	midFrameCloseExpected bool
 }
 
 type openAIResponsesWSUsageLogResult struct {
@@ -1972,6 +1975,7 @@ type openAIResponsesWSUsageLogResult struct {
 type openAIWSUsageHandlerAccountRepoStub struct {
 	service.AccountRepository
 	account service.Account
+	updated atomic.Pointer[service.Account]
 }
 
 func (s *openAIWSUsageHandlerAccountRepoStub) ListSchedulableByPlatform(ctx context.Context, platform string) ([]service.Account, error) {
@@ -1988,6 +1992,10 @@ func (s *openAIWSUsageHandlerAccountRepoStub) ListSchedulableByGroupIDAndPlatfor
 func (s *openAIWSUsageHandlerAccountRepoStub) GetByID(ctx context.Context, id int64) (*service.Account, error) {
 	if s.account.ID != id {
 		return nil, nil
+	}
+	if updated := s.updated.Load(); updated != nil {
+		account := *updated
+		return &account, nil
 	}
 	account := s.account
 	return &account, nil
@@ -2976,6 +2984,7 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 	upstreamPayloadCh := make(chan []byte, turnCount)
 	upstreamErrCh := make(chan error, 1)
 	var channelSvc *service.ChannelService
+	var accountRepo *openAIWSUsageHandlerAccountRepoStub
 	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if tc.accountPlatform == service.PlatformGrok {
 			payload, err := io.ReadAll(r.Body)
@@ -3012,6 +3021,15 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 				return
 			}
 			upstreamPayloadCh <- payload
+			if turn == 1 && tc.nextAccountModelMapping != nil {
+				updated := accountRepo.account
+				updated.Credentials = make(map[string]any, len(accountRepo.account.Credentials))
+				for key, value := range accountRepo.account.Credentials {
+					updated.Credentials[key] = value
+				}
+				updated.Credentials["model_mapping"] = tc.nextAccountModelMapping
+				accountRepo.updated.Store(&updated)
+			}
 			if turn == 1 && tc.afterFirstUpstreamRequest != nil {
 				if callbackErr := tc.afterFirstUpstreamRequest(channelSvc); callbackErr != nil {
 					upstreamErrCh <- callbackErr
@@ -3076,7 +3094,7 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 	cfg.Gateway.OpenAIWS.ReadTimeoutSeconds = 3
 	cfg.Gateway.OpenAIWS.WriteTimeoutSeconds = 3
 
-	accountRepo := &openAIWSUsageHandlerAccountRepoStub{account: account}
+	accountRepo = &openAIWSUsageHandlerAccountRepoStub{account: account}
 	usageRepo := &openAIWSUsageHandlerUsageLogRepoStub{created: make(chan *service.UsageLog, turnCount)}
 
 	if len(tc.channelMapping) > 0 {
@@ -3236,6 +3254,19 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		err = clientConn.Write(writeCtx, coderws.MessageText, []byte(tc.midPayload))
 		cancelWrite()
 		require.NoError(t, err)
+		if tc.midFrameCloseExpected {
+			readCtx, cancelRead := context.WithTimeout(context.Background(), 3*time.Second)
+			_, _, readErr := clientConn.Read(readCtx)
+			cancelRead()
+			require.Error(t, readErr, "mid frame should have been rejected with a close")
+			var closeErr coderws.CloseError
+			require.ErrorAs(t, readErr, &closeErr)
+			require.Equal(t, coderws.StatusPolicyViolation, closeErr.Code)
+			require.Contains(t, closeErr.Reason, tc.closeReason)
+			require.Len(t, upstreamPayloadCh, 1, "rejected mid frame must not reach upstream")
+			_ = clientConn.CloseNow()
+			return openAIResponsesWSUsageLogResult{}
+		}
 		readCompleted()
 	}
 	if strings.TrimSpace(tc.secondPayload) != "" && (turnCount >= 2) {
@@ -3406,6 +3437,22 @@ func TestOpenAIResponsesWebSocketSimpleModeRechecksKeyWindows(t *testing.T) {
 				firstPayload:  `{"type":"response.create","model":"gpt-5.1"}`,
 				secondPayload: `{"type":"response.create","model":"gpt-5.1"}`,
 				ingressMode:   mode, simpleModeRejectAtRead: 3, secondTurnCloseExpected: true, closeReason: "billing check failed",
+			})
+		})
+	}
+}
+
+func TestOpenAIWebSocketRefreshesAccountModelAllowlistBetweenTurns(t *testing.T) {
+	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
+		t.Run(mode, func(t *testing.T) {
+			runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+				firstPayload:            `{"type":"response.create","model":"gpt-6-luna","stream":false}`,
+				secondPayload:           `{"type":"response.create","model":"gpt-6-luna","stream":false}`,
+				ingressMode:             mode,
+				accountModelMapping:     map[string]any{"gpt-6-luna": "gpt-6-luna", "gpt-6.1-sol": "gpt-6.1-sol"},
+				nextAccountModelMapping: map[string]any{"gpt-6.1-sol": "gpt-6.1-sol"},
+				secondTurnCloseExpected: true,
+				closeReason:             "model switch requires reconnect",
 			})
 		})
 	}

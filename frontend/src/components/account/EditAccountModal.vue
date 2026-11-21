@@ -4843,7 +4843,11 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   if (newAccount.platform === 'openai' && (newAccount.type === 'oauth' || newAccount.type === 'setup-token' || newAccount.type === 'apikey')) {
     openaiPassthroughEnabled.value = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
     openAIRequestTimezone.value = typeof extra?.openai_request_timezone === 'string' ? extra.openai_request_timezone : ''
-    openaiPassthroughModelFilterEnabled.value = extra?.openai_passthrough_model_filter === true
+    const passthroughModelFilter = extra?.openai_passthrough_model_filter
+    const previousModelMapping = Object.entries(newAccount.credentials?.model_mapping ?? {})
+    openaiPassthroughModelFilterEnabled.value = typeof passthroughModelFilter === 'boolean'
+      ? passthroughModelFilter
+      : previousModelMapping.length > 0 && previousModelMapping.every(([source, target]) => source === target)
     openaiFlattenNamespacesEnabled.value =
       newAccount.type === 'oauth' && extra?.openai_responses_flatten_namespaces === true
     openAIServiceTierDraft.value = readOpenAIServiceTierDraft(extra as Record<string, unknown>)
@@ -6409,8 +6413,8 @@ const handleSubmit = async () => {
         delete newExtra.openai_passthrough
         delete newExtra.openai_oauth_passthrough
       }
-      if (openaiPassthroughEnabled.value && openaiPassthroughModelFilterEnabled.value) {
-        newExtra.openai_passthrough_model_filter = true
+      if (openaiPassthroughEnabled.value) {
+        newExtra.openai_passthrough_model_filter = openaiPassthroughModelFilterEnabled.value
       } else {
         delete newExtra.openai_passthrough_model_filter
       }

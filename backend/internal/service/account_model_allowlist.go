@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
-	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
 	"sort"
 	"strings"
+
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
+	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
 )
 
 const AccountModelAllowlistExtraKey = "model_allowlist"
@@ -45,23 +46,32 @@ func NormalizeAccountModelAllowlistExtra(extra map[string]any) (map[string]any, 
 	return out, nil
 }
 
-// AllowsConfiguredModel restricts selection only; it never rewrites a provider request.
+func (a *Account) configuredModelAllowlist() (GroupModelAllowlist, bool) {
+	raw, exists := a.Extra[AccountModelAllowlistExtraKey]
+	if !exists {
+		return GroupModelAllowlist{}, true
+	}
+	if cfg, ok := raw.(GroupModelAllowlist); ok {
+		return cfg, true
+	}
+	var cfg GroupModelAllowlist
+	data, err := json.Marshal(raw)
+	if err != nil || json.Unmarshal(data, &cfg) != nil {
+		return GroupModelAllowlist{}, false
+	}
+	return cfg, true
+}
+
+// AllowsConfiguredModel 检查独立白名单，不改写上游模型。
 func (a *Account) AllowsConfiguredModel(model string) bool {
 	if a == nil {
 		return false
 	}
-	raw, ok := a.Extra[AccountModelAllowlistExtraKey]
-	if !ok {
-		return true
-	}
-	data, err := json.Marshal(raw)
-	if err != nil {
-		return false
-	}
-	var cfg GroupModelAllowlist
-	if json.Unmarshal(data, &cfg) != nil {
-		return false
-	}
+	cfg, valid := a.configuredModelAllowlist()
+	return valid && cfg.allowsConfiguredAccountModel(model)
+}
+
+func (cfg GroupModelAllowlist) allowsConfiguredAccountModel(model string) bool {
 	if !cfg.Enabled {
 		return true
 	}

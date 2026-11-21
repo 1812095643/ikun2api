@@ -391,11 +391,10 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ModelMappingEdgeCases(t *test
 			endpoint:      "messages",
 		},
 		{
-			name:          "Forward: 模型不在映射表中时不改写",
-			model:         "claude-sonnet-4-20250514",
-			modelMapping:  map[string]any{"claude-3-haiku-20240307": "claude-3-opus-20240229"},
-			expectedModel: "claude-sonnet-4-20250514",
-			endpoint:      "messages",
+			name:         "Forward: 拒绝模型映射之外的模型",
+			model:        "claude-sonnet-4-20250514",
+			modelMapping: map[string]any{"claude-3-haiku-20240307": "claude-3-opus-20240229"},
+			endpoint:     "messages",
 		},
 		{
 			name:          "Forward: 精确匹配映射应改写模型",
@@ -419,11 +418,10 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ModelMappingEdgeCases(t *test
 			endpoint:      "count_tokens",
 		},
 		{
-			name:          "CountTokens: 模型不在映射表中时不改写",
-			model:         "claude-sonnet-4-20250514",
-			modelMapping:  map[string]any{"claude-3-haiku-20240307": "claude-3-opus-20240229"},
-			expectedModel: "claude-sonnet-4-20250514",
-			endpoint:      "count_tokens",
+			name:         "CountTokens: 拒绝模型映射之外的模型",
+			model:        "claude-sonnet-4-20250514",
+			modelMapping: map[string]any{"claude-3-haiku-20240307": "claude-3-opus-20240229"},
+			endpoint:     "count_tokens",
 		},
 		{
 			name:          "CountTokens: 精确匹配映射应改写模型",
@@ -491,6 +489,12 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ModelMappingEdgeCases(t *test
 				}
 
 				result, err := svc.Forward(context.Background(), c, account, parsed)
+				if tt.expectedModel == "" {
+					require.Error(t, err)
+					require.Equal(t, http.StatusForbidden, rec.Code)
+					require.Empty(t, upstream.lastBody)
+					return
+				}
 				require.NoError(t, err)
 				require.NotNil(t, result)
 				require.Equal(t, tt.expectedModel, gjson.GetBytes(upstream.lastBody, "model").String(),
@@ -513,6 +517,12 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ModelMappingEdgeCases(t *test
 				}
 
 				err := svc.ForwardCountTokens(context.Background(), c, account, parsed)
+				if tt.expectedModel == "" {
+					require.Error(t, err)
+					require.Equal(t, http.StatusForbidden, rec.Code)
+					require.Empty(t, upstream.lastBody)
+					return
+				}
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedModel, gjson.GetBytes(upstream.lastBody, "model").String(),
 					"CountTokens 上游请求体中的模型应为: %s", tt.expectedModel)

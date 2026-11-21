@@ -548,3 +548,22 @@ func TestRateLimitService_HandleUpstreamError_ModelNotFoundImageModelStillCoolsD
 	require.Len(t, repo.modelRateLimitCalls, 1, "守卫只作用于 codex plan-gated 分支")
 	require.Equal(t, upstreamModelNotFoundReason, repo.modelRateLimitCalls[0].reason)
 }
+
+func TestRateLimitService_PoolModeModelNotFoundKeepsOtherModelsAvailable(t *testing.T) {
+	for _, tc := range []struct{ platform, model string }{
+		{PlatformOpenAI, "gpt-6.1-sol"},
+		{PlatformAnthropic, "claude-opus-4-6"},
+	} {
+		t.Run(tc.platform, func(t *testing.T) {
+			repo := &modelNotFoundAccountRepoStub{}
+			svc := &RateLimitService{accountRepo: repo}
+			account := &Account{ID: 17, Platform: tc.platform, Type: AccountTypeAPIKey, Credentials: map[string]any{"pool_mode": true}}
+			require.True(t, account.IsPoolMode())
+			require.True(t, svc.HandleUpstreamError(context.Background(), account, http.StatusNotFound, nil,
+				[]byte(`{"error":{"type":"model_not_found","message":"model not found"}}`), tc.model))
+			require.Len(t, repo.modelRateLimitCalls, 1)
+			require.Equal(t, tc.model, repo.modelRateLimitCalls[0].scope)
+			require.Zero(t, repo.tempCalls)
+		})
+	}
+}

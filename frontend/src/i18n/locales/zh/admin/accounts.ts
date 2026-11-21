@@ -406,6 +406,8 @@ export default {
       testConnection: '测试连接',
       reAuthorize: '重新授权',
       refreshToken: '刷新令牌',
+      refreshTokenHint: '系统已在后台自动刷新令牌，频繁手动刷新可能与自动刷新相互冲突，导致令牌失效、账号被暂停',
+      refreshTokenFrequentWarning: '距离上次手动刷新不足一分钟：频繁刷新可能与后台自动刷新冲突，导致令牌失效。如无必要请稍候再试。',
       noAccountsYet: '暂无账号',
       createFirstAccount: '添加 AI 平台账号以开始使用 API 网关。',
       tokenRefreshed: 'Token 刷新成功',
@@ -889,7 +891,7 @@ export default {
           '开启后，该 OpenAI 账号将自动透传请求与响应，仅替换认证并保留计费/并发/审计及必要安全过滤；如遇兼容性问题可随时关闭回滚。',
         passthroughModelFilter: '透传时按账号模型筛选',
         passthroughModelFilterDesc:
-          '使用账号模型白名单与映射的来源模型名筛选候选账号，映射目标不会改写透传请求的模型名。列表为空时允许所有模型。默认关闭。',
+          '使用账号模型白名单与映射的来源模型名筛选候选账号，映射目标不会改写透传请求的模型名。列表为空时允许所有模型。已有白名单默认启用筛选。',
         flattenNamespaces: '摊平 Codex namespace 工具（兼容）',
         flattenNamespacesDesc:
           '默认关闭：/responses 上的 namespace 工具声明原样转发，这正是 ChatGPT Codex 后端期望的形态。仅当该 OAuth 账号指向不认识 namespace 的兼容上游时才开启——摊平会把工具改名为 namespace__tool，使按 functions.<命名空间>.<工具> 寻址的模型（如 gpt-5.6 多智能体）无法调用。压缩（compact）请求不受该开关影响，始终摊平。',

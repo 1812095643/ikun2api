@@ -41,6 +41,10 @@ func (s *GatewayService) ForwardAsChatCompletions(
 		return nil, fmt.Errorf("parse chat completions request: %w", err)
 	}
 	originalModel := ccReq.Model
+	if !s.isModelSupportedForAnthropicForward(account, originalModel) {
+		writeChatCompletionsError(c, http.StatusForbidden, "permission_error", "该账号的模型白名单不允许此模型")
+		return nil, fmt.Errorf("account model allowlist rejected request")
+	}
 	clientStream := ccReq.Stream
 
 	// 2. Convert CC → Responses → Anthropic (chained conversion)

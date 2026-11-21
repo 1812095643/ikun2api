@@ -138,3 +138,24 @@ func TestSchedulerMetadataAccountDropsInvalidUpstreamBillingProbe(t *testing.T) 
 		require.NotContains(t, metadata.Extra, service.UpstreamBillingProbeExtraKey)
 	}
 }
+
+func TestSchedulerMetadataPreservesClaudeAccountModelAllowlist(t *testing.T) {
+	account := service.Account{
+		ID: 35, Platform: service.PlatformAnthropic, Type: service.AccountTypeOAuth,
+		Credentials: map[string]any{"model_mapping": map[string]any{"claude-opus-4-6": "claude-opus-4-6"}},
+		Extra: map[string]any{service.AccountModelAllowlistExtraKey: service.GroupModelAllowlist{
+			Enabled: true, Models: []string{"claude-sonnet-4-6"},
+		}},
+	}
+	encoded, err := json.Marshal(buildSchedulerMetadataAccount(account))
+	require.NoError(t, err)
+	metadata, err := decodeCachedAccountPayload(string(encoded))
+	require.NoError(t, err)
+	require.True(t, metadata.IsModelSupported("claude-sonnet-4-6"))
+	require.False(t, metadata.IsModelSupported("claude-opus-4-6"))
+
+	account.Extra = nil
+	unrestricted := buildSchedulerMetadataAccount(account)
+	require.Contains(t, unrestricted.Extra, service.AccountModelAllowlistExtraKey)
+	require.True(t, unrestricted.AllowsConfiguredModel("claude-opus-4-6"))
+}

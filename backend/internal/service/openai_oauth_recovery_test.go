@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -33,6 +34,17 @@ func (r *openAIRecoveryRepo) UpdateCredentials(_ context.Context, id int64, cred
 	r.account = snapshotOAuthRefreshAccount(r.account)
 	r.account.Credentials = shallowCopyMap(credentials)
 	return nil
+}
+
+func (r *openAIRecoveryRepo) UpdateOpenAIOAuthCredentialsIfUnchanged(_ context.Context, id int64, expected map[string]any, proxyID *int64, replacement map[string]any) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.account.ID != id || !reflect.DeepEqual(r.account.Credentials, expected) || !reflect.DeepEqual(r.account.ProxyID, proxyID) {
+		return false, nil
+	}
+	r.account = snapshotOAuthRefreshAccount(r.account)
+	r.account.Credentials = shallowCopyMap(replacement)
+	return true, nil
 }
 
 func (r *openAIRecoveryRepo) SetError(context.Context, int64, string) error {

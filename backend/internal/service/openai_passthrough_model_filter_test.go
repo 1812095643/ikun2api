@@ -164,3 +164,18 @@ func TestOpenAIPassthroughModelFilterGroupCatalog(t *testing.T) {
 	require.ElementsMatch(t, []string{"qwen3.8-max", "gpt-6.1-sol"}, models,
 		"a restricted passthrough account must not contribute the unrestricted default catalog")
 }
+
+func TestOpenAIPassthroughHonorsExistingAccountModelAllowlist(t *testing.T) {
+	for _, accountType := range []string{AccountTypeAPIKey, AccountTypeOAuth} {
+		t.Run(accountType, func(t *testing.T) {
+			account := &Account{
+				Platform: PlatformOpenAI, Type: accountType,
+				Extra:       map[string]any{"openai_passthrough": true},
+				Credentials: map[string]any{"model_mapping": map[string]any{"gpt-6.1-sol": "gpt-6.1-sol"}},
+			}
+			require.True(t, account.IsModelSupported("gpt-6.1-sol"))
+			require.False(t, account.IsModelSupported("gpt-6-luna"))
+			require.False(t, (&GatewayService{}).isModelSupportedByAccount(account, "gpt-6-luna"))
+		})
+	}
+}
