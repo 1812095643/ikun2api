@@ -11,6 +11,9 @@ describe('审计动作翻译', () => {
     expect(auditActionLabel('usage.dashboard.api_keys_usage.create', i18n.global.t)).toBe('查看 API Key 用量')
     expect(auditActionLabel('admin.users.update', i18n.global.t)).toBe('更新用户')
     expect(auditActionLabel('auth.login.2fa', i18n.global.t)).toBe('两步验证登录')
+    expect(auditActionLabel('admin.accounts.credentials.read', i18n.global.t)).toBe('查看账号凭据')
+    expect(auditActionLabel('payment.orders.create', i18n.global.t)).toBe('创建支付订单')
+    expect(auditActionLabel('admin.workspace.downstreams.apply.create', i18n.global.t)).toBe('更新下游设置')
   })
   it('切换语言后重新翻译，未知动作不裸露技术键', () => {
     i18n.global.locale.value = 'en'

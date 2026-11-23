@@ -7,6 +7,7 @@ export default {
     loadFailed: 'Failed to load audit logs',
     otherAction: 'Other operation',
     actionPattern: '{action} {resource}',
+    resourceOperation: '{resource} operation',
     actionNames: {
       navigationRead: 'Mark navigation message as read', apiKeyUsage: 'View API key usage',
       login: 'Sign in', login2fa: 'Sign in with two-factor authentication', register: 'Register', tokenRefresh: 'Refresh session', sessionMismatch: 'Session binding mismatch',
@@ -18,6 +19,8 @@ export default {
       batch_delete: 'Bulk delete', delete_preview: 'Preview deletion of', filter_delete: 'Delete filtered'
     },
     resources: {
+      paymentOrders: 'payment order', paymentPlans: 'subscription plan', paymentProviders: 'payment provider',
+      accountCredentials: 'account credentials', userApiKeys: 'user API keys', groupApiKeys: 'group API keys', backupStorage: 'backup storage settings', adminApiKey: 'admin API key',
       users: 'user', accounts: 'account', groups: 'group', apiKeys: 'API key', proxies: 'proxy',
       subscriptions: 'subscription', redeemCodes: 'redeem code', backups: 'backup', settings: 'system settings',
       payment: 'payment configuration', channels: 'channel', auditLogs: 'audit logs', monitoring: 'monitoring configuration',

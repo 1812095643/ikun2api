@@ -7,6 +7,7 @@ export default {
     loadFailed: '加载操作日志失败',
     otherAction: '其他操作',
     actionPattern: '{action}{resource}',
+    resourceOperation: '{resource}操作',
     actionNames: {
       navigationRead: '标记导航消息已读', apiKeyUsage: '查看 API Key 用量',
       login: '登录', login2fa: '两步验证登录', register: '注册', tokenRefresh: '刷新登录凭据', sessionMismatch: '登录会话校验不匹配',
@@ -18,6 +19,8 @@ export default {
       batch_delete: '批量删除', delete_preview: '预览待删除的', filter_delete: '按条件删除'
     },
     resources: {
+      paymentOrders: '支付订单', paymentPlans: '订阅套餐', paymentProviders: '支付服务商',
+      accountCredentials: '账号凭据', userApiKeys: '用户 API Key', groupApiKeys: '分组 API Key', backupStorage: '备份存储配置', adminApiKey: '管理员 API Key',
       users: '用户', accounts: '账号', groups: '分组', apiKeys: 'API Key', proxies: '代理',
       subscriptions: '订阅', redeemCodes: '兑换码', backups: '备份', settings: '系统设置',
       payment: '支付配置', channels: '渠道', auditLogs: '操作日志', monitoring: '监控配置',
