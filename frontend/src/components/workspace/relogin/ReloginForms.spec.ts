@@ -5,6 +5,11 @@ import ReloginAuthorizationForm from './ReloginAuthorizationForm.vue'
 import ReloginImportForm from './ReloginImportForm.vue'
 import ReloginSettingsForm from './ReloginSettingsForm.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
+import ProxySelector from '@/components/common/ProxySelector.vue'
+import Select from '@/components/common/Select.vue'
+import Toggle from '@/components/common/Toggle.vue'
+import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
+import ReloginModelSettings from './ReloginModelSettings.vue'
 import type { ReloginSettings } from '@/api/relogin'
 vi.mock('vue-i18n', async original => ({
   ...(await original<typeof import('vue-i18n')>()),
@@ -55,7 +60,20 @@ describe('失效重登设置标签', () => {
       extra: { codex_fingerprint_mode: 'full', openai_long_context_billing_enabled: true, openai_oauth_responses_websockets_v2_mode: 'ctx_pool', openai_oauth_responses_websockets_v2_enabled: true }, model_mapping: {} },
     quota_enabled: false, quota_interval: 300, quota_threshold: 20, recipients: ['owner@example.test']
   }
-  const options = { groups: [{ id: 2, name: 'GPT' }], proxies: [{ id: 3, name: '默认代理' }] }
+  const options = { groups: [{ id: 2, name: 'GPT' }], proxies: [] }
+  it('代理、档位、开关与数字输入沿用账号编辑组件', async () => {
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
+    expect(wrapper.getComponent(ProxySelector).props('proxies')).toEqual([])
+    expect(wrapper.findAllComponents(Select)).toHaveLength(2)
+    expect(wrapper.findAllComponents(Toggle)).toHaveLength(4)
+    expect(wrapper.findAll('#relogin-settings-panel-account input[type="number"].input')).toHaveLength(4)
+    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.get('fieldset').attributes('inert')).toBeUndefined()
+    await wrapper.setProps({ busy: true })
+    expect(wrapper.get('fieldset').attributes('inert')).toBeDefined()
+    expect(wrapper.getComponent(ProxySelector).props('disabled')).toBe(true)
+    wrapper.unmount()
+  })
   it('复用账号分组选择组件，并保留倍率、账号数和平台筛选', async () => {
     const groupOptions = [{ id: 2, name: 'GPT', platform: 'openai' as const, rate_multiplier: 0.7, account_count: 5 }]
     const wrapper = mount(ReloginSettingsForm, { props: { settings, options: { ...options, groups: groupOptions }, busy: false }, global: { plugins: [createPinia()] } })
@@ -95,9 +113,9 @@ describe('失效重登设置标签', () => {
   })
   it('保存收敛档位、模型映射及 WS 关闭选择，输入不回写原设置', async () => {
     const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
-    await wrapper.get('[aria-label="收敛档位"]').setValue('device')
-    await wrapper.get('[aria-label="WebSocket"]').setValue('off')
-    await wrapper.get('[aria-label="模型映射"]').setValue('{"alias":"target"}')
+    wrapper.findAllComponents(Select)[0].vm.$emit('update:modelValue', 'device')
+    wrapper.findAllComponents(Select)[1].vm.$emit('update:modelValue', 'off')
+    wrapper.getComponent(ReloginModelSettings).vm.$emit('update:modelMappings', [{ from: 'alias', to: 'target' }])
     await wrapper.get('form').trigger('submit')
     const saved = wrapper.emitted('save')?.[0][0] as ReloginSettings
     expect(saved.template.extra.codex_fingerprint_mode).toBe('device')
@@ -106,12 +124,72 @@ describe('失效重登设置标签', () => {
     expect(settings.template.extra.codex_fingerprint_mode).toBe('full')
     wrapper.unmount()
   })
-  it('模型映射格式错误时保持输入并阻止提交', async () => {
+  it('模型映射缺少目标时保留输入并阻止提交', async () => {
     const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
-    await wrapper.get('[aria-label="模型映射"]').setValue('{"alias":null}')
+    wrapper.getComponent(ReloginModelSettings).vm.$emit('update:modelMappings', [{ from: 'alias', to: '' }])
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('save')).toBeUndefined()
-    expect(wrapper.get('[role="alert"]').text()).toContain('模型映射')
+    expect(wrapper.get('[role="alert"]').text()).toContain('来源模型和上游模型')
+    wrapper.unmount()
+  })
+  it('旧白名单、自定义模型和别名映射完整回填，切换与保存不丢失', async () => {
+    const existing = { 'gpt-6': 'gpt-6', 'private-model': 'private-model', alias: 'gpt-6' }
+    const wrapper = mount(ReloginSettingsForm, { props: {
+      settings: { ...settings, template: { ...settings.template, model_mapping: existing } }, options, busy: false
+    }, global: { plugins: [createPinia()] } })
+    const models = wrapper.getComponent(ReloginModelSettings)
+    expect(models.getComponent(ModelWhitelistSelector).props('modelValue')).toEqual(['gpt-6', 'private-model'])
+    await models.findAll('[aria-pressed]')[1].trigger('click')
+    expect(models.get<HTMLInputElement>('[aria-label="来源模型 1"]').element.value).toBe('alias')
+    await models.get('[aria-label="上游模型 1"]').setValue('gpt-6.1-sol')
+    await models.findAll('[aria-pressed]')[0].trigger('click')
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.emitted('save')?.[0][0] as ReloginSettings).template.model_mapping).toEqual({ ...existing, alias: 'gpt-6.1-sol' })
+    expect(existing.alias).toBe('gpt-6')
+    wrapper.unmount()
+  })
+  it('白名单可以搜索勾选、添加自定义模型和移除标签', async () => {
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
+    const selector = wrapper.getComponent(ModelWhitelistSelector)
+    await selector.get('.cursor-pointer').trigger('click')
+    await selector.get('input[placeholder="admin.accounts.searchModels"]').setValue('gpt-6.2-astra')
+    expect(selector.findAll('[data-testid="model-option"]')).toHaveLength(1)
+    await selector.get('[data-testid="select-model"]').trigger('click')
+    await selector.get('input[placeholder="admin.accounts.enterCustomModelName"]').setValue('custom-model')
+    await selector.get('input[placeholder="admin.accounts.enterCustomModelName"]').trigger('keydown.enter')
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.emitted('save')?.[0][0] as ReloginSettings).template.model_mapping).toEqual({ 'gpt-6.2-astra': 'gpt-6.2-astra', 'custom-model': 'custom-model' })
+    await selector.get('.cursor-pointer .grid button').trigger('click')
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.emitted('save')?.[1][0] as ReloginSettings).template.model_mapping).toEqual({ 'custom-model': 'custom-model' })
+    wrapper.unmount()
+  })
+  it('白名单清空后仍保留别名，完全清空时保存空配置', async () => {
+    const wrapper = mount(ReloginSettingsForm, { props: {
+      settings: { ...settings, template: { ...settings.template, model_mapping: { 'gpt-6': 'gpt-6', alias: 'gpt-6' } } }, options, busy: false
+    }, global: { plugins: [createPinia()] } })
+    const models = wrapper.getComponent(ReloginModelSettings)
+    models.getComponent(ModelWhitelistSelector).vm.$emit('update:modelValue', [])
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.emitted('save')?.[0][0] as ReloginSettings).template.model_mapping).toEqual({ alias: 'gpt-6' })
+    models.vm.$emit('update:modelMappings', [])
+    await wrapper.get('#relogin-load-factor').setValue('')
+    await wrapper.get('form').trigger('submit')
+    const saved = wrapper.emitted('save')?.[1][0] as ReloginSettings
+    expect(saved.template.model_mapping).toEqual({})
+    expect(saved.template.load_factor).toBeNull()
+    wrapper.unmount()
+  })
+  it.each([
+    [{ from: 'gpt-*-x', to: 'target' }],
+    [{ from: 'alias', to: 'gpt-*' }],
+    [{ from: 'alias', to: 'first' }, { from: 'alias', to: 'second' }]
+  ])('映射存在通配符错误或重复来源时阻止静默丢失配置 %#', async (...mappings) => {
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
+    wrapper.getComponent(ReloginModelSettings).vm.$emit('update:modelMappings', mappings)
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('save')).toBeUndefined()
+    expect(wrapper.get('[role="alert"]').isVisible()).toBe(true)
     wrapper.unmount()
   })
   it('隐藏标签内有不合法输入时自动定位对应设置', async () => {

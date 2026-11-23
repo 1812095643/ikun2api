@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/MACOS-DO/sub4api/internal/handler/dto"
 	"github.com/MACOS-DO/sub4api/internal/pkg/response"
 	"github.com/MACOS-DO/sub4api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -228,7 +229,7 @@ func (h *Handler) reloginOptions(c *gin.Context) {
 		return
 	}
 	g := []gin.H{}
-	p := []gin.H{}
+	p := []*dto.Proxy{}
 	for _, item := range groups {
 		if item.Status == "active" && (item.Platform == "openai" || (item.Platform == "composite" && (h.cfg == nil || h.cfg.RunMode != "simple"))) {
 			g = append(g, gin.H{"id": item.ID, "name": item.Name, "platform": item.Platform,
@@ -238,7 +239,7 @@ func (h *Handler) reloginOptions(c *gin.Context) {
 	}
 	for _, item := range proxies {
 		if item.IsActive() && !item.IsExpired(time.Now()) {
-			p = append(p, gin.H{"id": item.ID, "name": item.Name})
+			p = append(p, dto.ProxyFromService(&item))
 		}
 	}
 	response.Success(c, gin.H{"groups": g, "proxies": p})

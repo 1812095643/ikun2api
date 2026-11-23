@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Group } from '@/types'
+import type { Group, Proxy } from '@/types'
 
 export interface ReloginAccount {
   id: number
@@ -86,7 +86,7 @@ export interface ReloginState {
 }
 export interface ReloginOptions {
   groups: (Pick<Group, 'id' | 'name'> & Partial<Group> & { account_count?: number })[]
-  proxies: { id: number; name: string }[]
+  proxies: Proxy[]
 }
 export interface ImportedPage {
   items: ImportedAccount[]

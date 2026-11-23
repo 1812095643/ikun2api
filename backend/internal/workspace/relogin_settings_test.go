@@ -8,12 +8,64 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/MACOS-DO/sub4api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+type reloginOptionsAdmin struct {
+	service.AdminService
+}
+
+func (reloginOptionsAdmin) GetAllGroups(context.Context) ([]service.Group, error) {
+	return []service.Group{{ID: 2, Name: "GPT", Platform: "openai", Status: "active", RateMultiplier: 0.7, AccountCount: 5}}, nil
+}
+
+func (reloginOptionsAdmin) GetAllProxies(context.Context) ([]service.Proxy, error) {
+	expired := time.Now().Add(-time.Hour)
+	return []service.Proxy{
+		{ID: 3, Name: "默认代理", Protocol: "socks5", Host: "127.0.0.1", Port: 1080, Username: "owner", Password: "private-proxy-password", Status: "active"},
+		{ID: 4, Status: "inactive"},
+		{ID: 5, Status: "active", ExpiresAt: &expired},
+	}, nil
+}
+
+func TestReloginOptionsSupportsAccountSelectorsWithoutExposingProxyPassword(t *testing.T) {
+	h := &Handler{admin: reloginOptionsAdmin{}}
+	router := gin.New()
+	router.GET("/options", h.reloginOptions)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/options", nil))
+	require.Equal(t, 200, w.Code, w.Body.String())
+	var result struct {
+		Data struct {
+			Groups []struct {
+				RateMultiplier float64 `json:"rate_multiplier"`
+				AccountCount   int64   `json:"account_count"`
+			} `json:"groups"`
+			Proxies []struct {
+				ID       int64  `json:"id"`
+				Protocol string `json:"protocol"`
+				Host     string `json:"host"`
+				Port     int    `json:"port"`
+			} `json:"proxies"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	require.Len(t, result.Data.Groups, 1)
+	require.Equal(t, 0.7, result.Data.Groups[0].RateMultiplier)
+	require.EqualValues(t, 5, result.Data.Groups[0].AccountCount)
+	require.Len(t, result.Data.Proxies, 1)
+	require.EqualValues(t, 3, result.Data.Proxies[0].ID)
+	require.Equal(t, "socks5", result.Data.Proxies[0].Protocol)
+	require.Equal(t, "127.0.0.1", result.Data.Proxies[0].Host)
+	require.Equal(t, 1080, result.Data.Proxies[0].Port)
+	require.NotContains(t, w.Body.String(), "private-proxy-password")
+	require.NotContains(t, w.Body.String(), `"password"`)
+}
 
 type reloginSettingsAdmin struct {
 	service.AdminService
