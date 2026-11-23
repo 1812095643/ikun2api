@@ -193,6 +193,7 @@ describe('admin UsageView route filters', () => {
     getSnapshotV2.mockReset().mockResolvedValue({ trend: [], models: [], groups: [] })
     getModelStats.mockReset().mockResolvedValue({ models: [] })
     getById.mockReset()
+    listErrorLogs.mockReset().mockResolvedValue({ items: [], total: 0, pages: 0 })
   })
 
   afterEach(() => {
@@ -210,6 +211,29 @@ describe('admin UsageView route filters', () => {
     expect(getById).toHaveBeenCalledWith(42, true)
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ user_id: 42 }), expect.anything())
     expect(wrapper.find('[data-test="user-filter-label"]').text()).toBe('route-user@test.com')
+  })
+
+  it('从用户列表进入错误日志时直接打开错误标签，并按用户 ID 请求', async () => {
+    routeQuery.user_id = '43'
+    routeQuery.tab = 'errors'
+    getById.mockResolvedValue({ id: 43, email: 'second@example.test' })
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    expect((wrapper.vm as any).activeTab).toBe('errors')
+    expect(listErrorLogs).toHaveBeenCalledWith(expect.objectContaining({ user_id: 43 }))
+    expect(wrapper.find('[data-test="user-filter-label"]').text()).toBe('second@example.test')
+    wrapper.unmount()
+  })
+
+  it('未知标签回到使用记录，不发起错误日志查询', async () => {
+    routeQuery.user_id = '42'
+    routeQuery.tab = 'unknown'
+    getById.mockResolvedValue({ id: 42, email: 'route-user@test.com' })
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    expect((wrapper.vm as any).activeTab).toBe('usage')
+    expect(listErrorLogs).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('does not apply a stale routed user label after user_id changes', async () => {

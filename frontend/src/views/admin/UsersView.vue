@@ -300,7 +300,8 @@
                   {{ value.charAt(0).toUpperCase() }}
                 </span>
               </div>
-              <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span><router-link v-if="row.is_downstream" to="/admin/downstreams" class="badge badge-primary">{{ t('business.downstream') }}</router-link>
+              <UserEmailMenu :email="value" :options="userLogActions" @select="action => openUserLogs(row.id, action)" />
+              <router-link v-if="row.is_downstream" to="/admin/downstreams" class="badge badge-primary">{{ t('business.downstream') }}</router-link>
             </div>
           </template>
 
@@ -774,6 +775,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { useTableSelection } from '@/composables/useTableSelection'
@@ -808,9 +810,20 @@ import UserApiKeysModal from '@/components/admin/user/UserApiKeysModal.vue'
 import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsModal.vue'
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
+import UserEmailMenu, { type UserEmailMenuOption } from '@/components/admin/user/UserEmailMenu.vue'
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
 const appStore = useAppStore()
+const router = useRouter()
+const userLogActions: UserEmailMenuOption[] = [
+  { value: 'usage', label: '查看使用记录', icon: 'chart' },
+  { value: 'errors', label: '查看错误日志', icon: 'exclamationTriangle' }
+]
+
+function openUserLogs(userId: number, tab: string) {
+  if (tab !== 'usage' && tab !== 'errors') return
+  void router.push({ path: '/admin/usage', query: { user_id: String(userId), tab } })
+}
 
 // Generate dynamic attribute columns from enabled definitions
 const attributeColumns = computed<Column[]>(() =>

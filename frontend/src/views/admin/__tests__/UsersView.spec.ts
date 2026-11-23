@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 import type { AdminUser } from '@/types'
 import UsersView from '../UsersView.vue'
+import UserEmailMenu from '@/components/admin/user/UserEmailMenu.vue'
 
 const {
   listUsers,
@@ -13,7 +14,8 @@ const {
   getAllGroups,
   getBatchUsersUsage,
   listEnabledDefinitions,
-  getBatchUserAttributes
+  getBatchUserAttributes,
+  routerPush
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
   toggleStatus: vi.fn(),
@@ -23,7 +25,13 @@ const {
   getAllGroups: vi.fn(),
   getBatchUsersUsage: vi.fn(),
   listEnabledDefinitions: vi.fn(),
-  getBatchUserAttributes: vi.fn()
+  getBatchUserAttributes: vi.fn(),
+  routerPush: vi.fn()
+}))
+
+vi.mock('vue-router', async original => ({
+  ...await original<typeof import('vue-router')>(),
+  useRouter: () => ({ push: routerPush })
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -107,6 +115,7 @@ const DataTableStub = {
         <slot :name="'header-' + col.key" :column="col" />
       </template>
       <div v-for="row in data" :key="row.id">
+        <slot name="cell-email" :value="row.email" :row="row" />
         <slot name="cell-last_used_at" :value="row.last_used_at" :row="row" />
         <div :data-test="'actions-' + row.id"><slot name="cell-actions" :row="row" /></div>
       </div>
@@ -162,6 +171,7 @@ const mountBulkDeleteView = () => mount(UsersView, {
       UserBalanceModal: true,
       UserBalanceHistoryModal: true,
       GroupReplaceModal: true,
+      RouterLink: true,
       Icon: true,
       Teleport: true
     }
@@ -191,6 +201,7 @@ describe('admin UsersView', () => {
     getBatchUsersUsage.mockReset()
     listEnabledDefinitions.mockReset()
     getBatchUserAttributes.mockReset()
+    routerPush.mockReset()
 
     listUsers.mockResolvedValue({
       items: [createAdminUser()],
@@ -207,6 +218,23 @@ describe('admin UsersView', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it.each(['usage', 'errors'])('用户邮箱菜单跳到对应用户的 %s 列表', async tab => {
+    listUsers.mockResolvedValue({
+      items: [createAdminUser(), createAdminUser({ id: 43, email: 'second@example.com' })],
+      total: 2, page: 1, page_size: 20, pages: 1
+    })
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    const menus = wrapper.findAllComponents(UserEmailMenu)
+    expect(menus).toHaveLength(2)
+    expect(menus[1].props('email')).toBe('second@example.com')
+    expect(menus[1].props('options').map(option => option.value)).toEqual(['usage', 'errors'])
+    menus[1].vm.$emit('select', tab)
+    expect(routerPush).toHaveBeenCalledWith({ path: '/admin/usage', query: { user_id: '43', tab } })
+    expect(listUsers).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
   })
 
   it('cancels bulk deletion without deleting or clearing selected users', async () => {

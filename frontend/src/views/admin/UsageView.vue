@@ -330,6 +330,7 @@ const applyRouteQueryFilters = () => {
   const queryStartDate = getSingleQueryValue(route.query.start_date)
   const queryEndDate = getSingleQueryValue(route.query.end_date)
   const queryUserId = getNumericQueryValue(route.query.user_id)
+  activeTab.value = getSingleQueryValue(route.query.tab) === 'errors' ? 'errors' : 'usage'
 
   if (queryStartDate) {
     startDate.value = queryStartDate
@@ -876,6 +877,7 @@ const handleColumnClickOutside = (event: MouseEvent) => {
 onMounted(() => {
   applyRouteQueryFilters()
   void loadRouteUserFilterLabel()
+  if (activeTab.value === 'errors') void loadAdminErrors()
   loadLogs()
   loadStats()
   loadModelStats(modelDistributionSource.value, true)
