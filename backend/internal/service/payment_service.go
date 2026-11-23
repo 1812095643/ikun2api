@@ -147,12 +147,24 @@ type RefundResult struct {
 }
 
 type DashboardStats struct {
-	TodayAmount   CurrencyAmounts `json:"today_amount"`
-	TotalAmount   CurrencyAmounts `json:"total_amount"`
-	TodayCount    int             `json:"today_count"`
-	TotalCount    int             `json:"total_count"`
-	AvgAmount     CurrencyAmounts `json:"avg_amount"`
-	PendingOrders int             `json:"pending_orders"`
+	TodayAmount    CurrencyAmounts          `json:"today_amount"`
+	TotalAmount    CurrencyAmounts          `json:"total_amount"`
+	TodayCount     int                      `json:"today_count"`
+	TotalCount     int                      `json:"total_count"`
+	AvgAmount      CurrencyAmounts          `json:"avg_amount"`
+	PendingOrders  int                      `json:"pending_orders"`
+	OrderCount     int                      `json:"order_count"`
+	PayingUsers    int                      `json:"paying_users"`
+	RepeatPayers   int                      `json:"repeat_payers"`
+	PaidOrderRate  float64                  `json:"paid_order_rate"`
+	RefundAmount   CurrencyAmounts          `json:"refund_amount"`
+	RefundCount    int                      `json:"refund_count"`
+	NetAmount      CurrencyAmounts          `json:"net_amount"`
+	PreviousAmount CurrencyAmounts          `json:"previous_amount"`
+	PreviousCount  int                      `json:"previous_count"`
+	OrderStatuses  []PaymentOrderStatusStat `json:"order_statuses"`
+	OrderTypes     []PaymentMethodStat      `json:"order_types"`
+	HourlySeries   []PaymentHourStat        `json:"hourly_series"`
 
 	DailySeries    []DailyStats        `json:"daily_series"`
 	PaymentMethods []PaymentMethodStat `json:"payment_methods"`
@@ -167,6 +179,18 @@ type DailyStats struct {
 	Date   string          `json:"date"`
 	Amount CurrencyAmounts `json:"amount"`
 	Count  int             `json:"count"`
+	Refund CurrencyAmounts `json:"refund,omitempty"`
+	Net    CurrencyAmounts `json:"net,omitempty"`
+}
+
+type PaymentOrderStatusStat struct {
+	Status string `json:"status"`
+	Count  int    `json:"count"`
+}
+
+type PaymentHourStat struct {
+	Hour  int `json:"hour"`
+	Count int `json:"count"`
 }
 
 type PaymentMethodStat struct {

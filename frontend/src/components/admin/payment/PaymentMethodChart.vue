@@ -1,7 +1,7 @@
 <template>
   <div class="card p-4">
     <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-      {{ t('payment.admin.paymentDistribution') }}
+      {{ t(kind === 'order' ? 'payment.admin.orderTypeDistribution' : 'payment.admin.paymentDistribution') }}
     </h3>
     <div
       v-if="!methods?.length"
@@ -15,7 +15,7 @@
           <div class="flex items-center gap-2">
             <span :class="['inline-block h-3 w-3 rounded-full', colorMap[method.type] || 'bg-gray-400']"></span>
             <span class="text-sm text-gray-700 dark:text-gray-300">
-              {{ t('payment.methods.' + method.type, method.type) }}
+              {{ kind === 'order' ? t('payment.admin.' + (method.type === 'balance' ? 'balanceOrder' : 'subscriptionOrder')) : t('payment.methods.' + method.type, method.type) }}
             </span>
           </div>
           <div class="space-y-1 text-right">
@@ -35,6 +35,7 @@
               :style="{ width: barWidth(currency, amount) + '%' }"
             ></div>
           </div>
+          <span class="w-10 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">{{ barWidth(currency, amount).toFixed(1) }}%</span>
         </div>
       </div>
     </div>
@@ -48,9 +49,10 @@ import type { CurrencyAmounts, PaymentMethodStats } from '@/types/payment'
 
 const { t } = useI18n()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   methods: PaymentMethodStats[]
-}>()
+  kind?: 'method' | 'order'
+}>(), { kind: 'method' })
 
 const colorMap: Record<string, string> = {
   alipay: 'bg-blue-500',
@@ -58,6 +60,7 @@ const colorMap: Record<string, string> = {
   alipay_direct: 'bg-blue-400',
   wxpay_direct: 'bg-green-400',
   stripe: 'bg-purple-500',
+  balance: 'bg-primary-500', subscription: 'bg-amber-500',
 }
 
 const barColorMap: Record<string, string> = {
@@ -66,12 +69,13 @@ const barColorMap: Record<string, string> = {
   alipay_direct: 'bg-blue-400',
   wxpay_direct: 'bg-green-400',
   stripe: 'bg-purple-500',
+  balance: 'bg-primary-500', subscription: 'bg-amber-500',
 }
 
-const maxAmounts = computed<CurrencyAmounts>(() => {
+const totalAmounts = computed<CurrencyAmounts>(() => {
   return props.methods.reduce<CurrencyAmounts>((maximums, method) => {
     for (const [currency, amount] of Object.entries(method.amount)) {
-      maximums[currency] = Math.max(maximums[currency] || 0, amount)
+      maximums[currency] = (maximums[currency] || 0) + amount
     }
     return maximums
   }, {})
@@ -82,7 +86,7 @@ function sortedAmounts(amounts: CurrencyAmounts): [string, number][] {
 }
 
 function barWidth(currency: string, amount: number): number {
-  return Math.min((amount / (maxAmounts.value[currency] || 1)) * 100, 100)
+  return Math.min((amount / (totalAmounts.value[currency] || 1)) * 100, 100)
 }
 
 function formatMoney(currency: string, amount: number): string {

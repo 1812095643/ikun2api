@@ -25,6 +25,7 @@ import { useBusinessRequest } from '@/composables/useBusinessRequest'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import type { AdminUser } from '@/types'
+import { newBusinessOperationKey } from '@/utils/business'
 const { t } = useI18n()
 const app = useAppStore()
 function day(value: Date) {
@@ -37,6 +38,8 @@ const filter = reactive({
   search: '',
   page: 1,
   page_size: 20,
+  sort_by: 'id',
+  sort_order: 'desc' as 'asc' | 'desc',
   from: day(start),
   to: day(today)
 })
@@ -50,6 +53,7 @@ const usageUser = ref<DownstreamUser | null>(null)
 const debtUser = ref<ReceivableAccount | null>(null)
 const balanceUser = ref<AdminUser | null>(null)
 const creditLoading = ref(false)
+const policyBusy = reactive(new Set<number>())
 const { data, loading, error, load } = useBusinessRequest<DownstreamPage>()
 
 const presets = computed(() =>
@@ -79,6 +83,8 @@ function reload() {
     search: filter.search,
     page: filter.page,
     page_size: filter.page_size,
+    sort_by: filter.sort_by,
+    sort_order: filter.sort_order,
     ...range.value
   }
   void load((signal) => businessAPI.downstreams(params, signal))
@@ -113,6 +119,21 @@ function action(value: DownstreamAction, row?: DownstreamUser, group?: number) {
   targetIDs.value = row ? [row.id] : [...selected.value]
   initialGroup.value = group || null
   mode.value = value
+}
+function sort(key: string, order: 'asc' | 'desc') {
+  filter.sort_by = key
+  filter.sort_order = order
+  filter.page = 1
+}
+async function setPurchasePolicy(row: DownstreamUser, enabled: boolean) {
+  if (policyBusy.has(row.id)) return
+  policyBusy.add(row.id)
+  try {
+    await businessAPI.apply({ user_ids: [row.id], downstream_recharge_only: enabled, operation_key: newBusinessOperationKey() })
+    row.downstream_recharge_only = enabled
+  } catch (error) {
+    app.showError(extractApiErrorMessage(error, t('business.loadingFailed')))
+  } finally { policyBusy.delete(row.id) }
 }
 async function credit(row: DownstreamUser) {
   if (creditLoading.value) return
@@ -218,6 +239,7 @@ function debt(row: DownstreamUser) {
             @click="action('price')"
           >
             {{ t('business.pricing') }}</button
+          ><button class="btn btn-secondary btn-sm" :disabled="loading" @click="action('purchase')">{{ t('business.purchasePolicy') }}</button
           ><button
             class="btn btn-ghost btn-sm text-red-600"
             :disabled="loading"
@@ -245,11 +267,14 @@ function debt(row: DownstreamUser) {
         :items="data?.items || []"
         :loading="loading || creditLoading"
         :selected="selected"
+        :policy-busy="[...policyBusy]"
         @update:selected="selected = $event.map(Number)"
         @price="(row, group) => action('price', row, group)"
         @usage="usageUser = $event"
         @credit="credit"
         @debt="debt"
+        @sort="sort"
+        @policy="setPurchasePolicy"
     /></template>
     <template #pagination
       ><Pagination

@@ -51,6 +51,7 @@ func validateDownstreamGroups(ctx context.Context, tx *sql.Tx, ids map[int64]boo
 type downstreamApply struct {
 	UserIDs      []int64            `json:"user_ids"`
 	IsDownstream *bool              `json:"is_downstream"`
+	RechargeOnly *bool              `json:"downstream_recharge_only,omitempty"`
 	GroupRates   map[int64]*float64 `json:"group_rates"`
 	Key          string             `json:"operation_key"`
 }
@@ -71,7 +72,7 @@ func normalizeDownstreamApply(req *downstreamApply) error {
 	if err != nil || key == uuid.Nil || key.String() != req.Key {
 		return badRequest("请刷新后重试")
 	}
-	if req.IsDownstream == nil && len(req.GroupRates) == 0 {
+	if req.IsDownstream == nil && req.RechargeOnly == nil && len(req.GroupRates) == 0 {
 		return badRequest("请选择操作")
 	}
 	if len(req.GroupRates) > 1000 {
@@ -82,8 +83,8 @@ func normalizeDownstreamApply(req *downstreamApply) error {
 			return badRequest("分组倍率无效")
 		}
 	}
-	if req.IsDownstream != nil && !*req.IsDownstream && len(req.GroupRates) > 0 {
-		return badRequest("移出下游时不能同时调价")
+	if req.IsDownstream != nil && !*req.IsDownstream && (len(req.GroupRates) > 0 || req.RechargeOnly != nil) {
+		return badRequest("移出下游时不能同时修改价格或购买限制")
 	}
 	return nil
 }
@@ -173,7 +174,7 @@ func (h *Handler) applyDownstream(ctx context.Context, actorID int64, req downst
 		return 0, badRequest("部分用户已删除或不再是下游，请刷新后重试")
 	}
 	for _, id := range req.UserIDs {
-		if _, err = tx.ExecContext(ctx, `UPDATE users SET is_downstream=COALESCE($2,is_downstream),updated_at=NOW() WHERE id=$1`, id, req.IsDownstream); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE users SET is_downstream=COALESCE($2,is_downstream),downstream_recharge_only=COALESCE($3,downstream_recharge_only),updated_at=NOW() WHERE id=$1`, id, req.IsDownstream, req.RechargeOnly); err != nil {
 			return 0, err
 		}
 		for groupID, rate := range rates {
@@ -236,17 +237,45 @@ type downstreamGroupRate struct {
 }
 
 type downstreamUser struct {
-	GroupRates  []downstreamGroupRate `json:"group_rates"`
-	ID          int64                 `json:"id"`
-	Email       string                `json:"email"`
-	Username    string                `json:"username"`
-	Status      string                `json:"status"`
-	Balance     string                `json:"balance"`
-	Outstanding string                `json:"outstanding"`
-	Requests    int64                 `json:"requests"`
-	Tokens      int64                 `json:"tokens"`
-	Cost        string                `json:"cost"`
-	LastUsed    *time.Time            `json:"last_used_at"`
+	GroupRates   []downstreamGroupRate `json:"group_rates"`
+	ID           int64                 `json:"id"`
+	Email        string                `json:"email"`
+	Username     string                `json:"username"`
+	Status       string                `json:"status"`
+	RechargeOnly bool                  `json:"downstream_recharge_only"`
+	Balance      string                `json:"balance"`
+	Outstanding  string                `json:"outstanding"`
+	Requests     int64                 `json:"requests"`
+	Tokens       int64                 `json:"tokens"`
+	Cost         string                `json:"cost"`
+	LastUsed     *time.Time            `json:"last_used_at"`
+}
+
+func downstreamOrderClause(key, direction string) (string, bool, error) {
+	if key == "" {
+		key = "id"
+	}
+	columns := map[string]string{
+		"id": "s.id", "user": "LOWER(COALESCE(NULLIF(s.username,''),s.email))",
+		"balance": "s.balance", "outstanding": "s.outstanding", "requests": "s.requests",
+		"tokens": "s.tokens", "cost": "s.cost", "last_used_at": "s.last_used",
+		"downstream_recharge_only": "s.downstream_recharge_only",
+	}
+	column, ok := columns[key]
+	if !ok {
+		return "", false, badRequest("请选择可排序的用户、金额、用量或时间列")
+	}
+	if direction == "" {
+		direction = "desc"
+	}
+	if direction != "asc" && direction != "desc" {
+		return "", false, badRequest("排序方向应为 asc 或 desc")
+	}
+	clause := column + " " + strings.ToUpper(direction) + " NULLS LAST"
+	if key != "id" {
+		clause += ", s.id DESC"
+	}
+	return clause, key == "id" || key == "user" || key == "balance" || key == "downstream_recharge_only", nil
 }
 
 func (h *Handler) listDownstreams(c *gin.Context) {
@@ -260,6 +289,11 @@ func (h *Handler) listDownstreams(c *gin.Context) {
 		fail(c, badRequest("搜索内容过长"))
 		return
 	}
+	orderBy, paginateEarly, err := downstreamOrderClause(c.Query("sort_by"), c.Query("sort_order"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
 
 	page, size := pageNumber(c.Query("page"), 1, 100000), pageNumber(c.Query("page_size"), 20, 100)
 	ctx := c.Request.Context()
@@ -270,14 +304,23 @@ func (h *Handler) listDownstreams(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	rows, err := h.db.QueryContext(ctx, `WITH selected AS (SELECT u.id,u.email,u.username,u.status,u.balance`+filter+` ORDER BY u.id DESC LIMIT $2 OFFSET $3)
- SELECT s.id,s.email,s.username,s.status,s.balance::text,
- COALESCE((SELECT SUM(CASE WHEN kind IN ('credit','manual_credit') THEN amount ELSE -amount END) FROM admin_receivable_entries WHERE user_id=s.id),0)::text,
- x.requests,x.tokens,x.cost::text,x.last_used,
+	selectedPage, resultPage := "", " LIMIT $2 OFFSET $3"
+	if paginateEarly {
+		selectedPage = " ORDER BY " + strings.ReplaceAll(orderBy, "s.", "u.") + " LIMIT $2 OFFSET $3"
+		resultPage = ""
+	}
+	// 用量与欠款先汇总再分页，金额始终按 numeric 排序；基础字段保留先分页的快速路径。
+	rows, err := h.db.QueryContext(ctx, `WITH selected AS (SELECT u.id,u.email,u.username,u.status,u.balance,u.downstream_recharge_only`+filter+selectedPage+`),
+ measured AS (SELECT s.*,
+ COALESCE((SELECT SUM(CASE WHEN kind IN ('credit','manual_credit') THEN amount ELSE -amount END) FROM admin_receivable_entries WHERE user_id=s.id),0) outstanding,
+ x.requests,x.tokens,x.cost,x.last_used
+ FROM selected s CROSS JOIN LATERAL(
+ SELECT COUNT(*) requests,COALESCE(SUM(input_tokens::bigint+output_tokens+cache_creation_tokens+cache_read_tokens),0)::bigint tokens,COALESCE(SUM(actual_cost),0) cost,MAX(created_at) last_used FROM usage_logs WHERE user_id=s.id AND created_at >=$4 AND created_at <$5) x)
+ SELECT s.id,s.email,s.username,s.status,s.balance::text,s.downstream_recharge_only,
+ s.outstanding::text,s.requests,s.tokens,s.cost::text,s.last_used,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('group_id',r.group_id,'group_name',g.name,'rate',r.rate_multiplier) ORDER BY g.name,r.group_id)
  FROM user_group_rate_multipliers r JOIN groups g ON g.id=r.group_id WHERE r.user_id=s.id AND r.rate_multiplier IS NOT NULL AND g.deleted_at IS NULL),'[]'::jsonb)
- FROM selected s CROSS JOIN LATERAL(
- SELECT COUNT(*) requests,COALESCE(SUM(input_tokens::bigint+output_tokens+cache_creation_tokens+cache_read_tokens),0)::bigint tokens,COALESCE(SUM(actual_cost),0) cost,MAX(created_at) last_used FROM usage_logs WHERE user_id=s.id AND created_at >=$4 AND created_at <$5) x ORDER BY s.id DESC`, search, size, (page-1)*size, from, to)
+ FROM measured s ORDER BY `+orderBy+resultPage, search, size, (page-1)*size, from, to)
 	if err != nil {
 		fail(c, err)
 		return
@@ -287,7 +330,7 @@ func (h *Handler) listDownstreams(c *gin.Context) {
 	for rows.Next() {
 		var d downstreamUser
 		var rates []byte
-		if err = rows.Scan(&d.ID, &d.Email, &d.Username, &d.Status, &d.Balance, &d.Outstanding, &d.Requests, &d.Tokens, &d.Cost, &d.LastUsed, &rates); err != nil {
+		if err = rows.Scan(&d.ID, &d.Email, &d.Username, &d.Status, &d.Balance, &d.RechargeOnly, &d.Outstanding, &d.Requests, &d.Tokens, &d.Cost, &d.LastUsed, &rates); err != nil {
 			fail(c, err)
 			return
 		}

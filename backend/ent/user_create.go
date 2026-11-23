@@ -284,6 +284,20 @@ func (_c *UserCreate) SetNillableIsDownstream(v *bool) *UserCreate {
 	return _c
 }
 
+// SetDownstreamRechargeOnly sets the "downstream_recharge_only" field.
+func (_c *UserCreate) SetDownstreamRechargeOnly(v bool) *UserCreate {
+	_c.mutation.SetDownstreamRechargeOnly(v)
+	return _c
+}
+
+// SetNillableDownstreamRechargeOnly sets the "downstream_recharge_only" field if the given value is not nil.
+func (_c *UserCreate) SetNillableDownstreamRechargeOnly(v *bool) *UserCreate {
+	if v != nil {
+		_c.SetDownstreamRechargeOnly(*v)
+	}
+	return _c
+}
+
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
 func (_c *UserCreate) SetRestrictPublicGroups(v bool) *UserCreate {
 	_c.mutation.SetRestrictPublicGroups(v)
@@ -668,6 +682,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultIsDownstream
 		_c.mutation.SetIsDownstream(v)
 	}
+	if _, ok := _c.mutation.DownstreamRechargeOnly(); !ok {
+		v := user.DefaultDownstreamRechargeOnly
+		_c.mutation.SetDownstreamRechargeOnly(v)
+	}
 	if _, ok := _c.mutation.RestrictPublicGroups(); !ok {
 		v := user.DefaultRestrictPublicGroups
 		_c.mutation.SetRestrictPublicGroups(v)
@@ -768,6 +786,9 @@ func (_c *UserCreate) check() error {
 	}
 	if _, ok := _c.mutation.IsDownstream(); !ok {
 		return &ValidationError{Name: "is_downstream", err: errors.New(`ent: missing required field "User.is_downstream"`)}
+	}
+	if _, ok := _c.mutation.DownstreamRechargeOnly(); !ok {
+		return &ValidationError{Name: "downstream_recharge_only", err: errors.New(`ent: missing required field "User.downstream_recharge_only"`)}
 	}
 	if _, ok := _c.mutation.RestrictPublicGroups(); !ok {
 		return &ValidationError{Name: "restrict_public_groups", err: errors.New(`ent: missing required field "User.restrict_public_groups"`)}
@@ -889,6 +910,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.IsDownstream(); ok {
 		_spec.SetField(user.FieldIsDownstream, field.TypeBool, value)
 		_node.IsDownstream = value
+	}
+	if value, ok := _c.mutation.DownstreamRechargeOnly(); ok {
+		_spec.SetField(user.FieldDownstreamRechargeOnly, field.TypeBool, value)
+		_node.DownstreamRechargeOnly = value
 	}
 	if value, ok := _c.mutation.RestrictPublicGroups(); ok {
 		_spec.SetField(user.FieldRestrictPublicGroups, field.TypeBool, value)
@@ -1446,6 +1471,18 @@ func (u *UserUpsert) UpdateIsDownstream() *UserUpsert {
 	return u
 }
 
+// SetDownstreamRechargeOnly sets the "downstream_recharge_only" field.
+func (u *UserUpsert) SetDownstreamRechargeOnly(v bool) *UserUpsert {
+	u.Set(user.FieldDownstreamRechargeOnly, v)
+	return u
+}
+
+// UpdateDownstreamRechargeOnly sets the "downstream_recharge_only" field to the value that was provided on create.
+func (u *UserUpsert) UpdateDownstreamRechargeOnly() *UserUpsert {
+	u.SetExcluded(user.FieldDownstreamRechargeOnly)
+	return u
+}
+
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
 func (u *UserUpsert) SetRestrictPublicGroups(v bool) *UserUpsert {
 	u.Set(user.FieldRestrictPublicGroups, v)
@@ -1904,6 +1941,20 @@ func (u *UserUpsertOne) SetIsDownstream(v bool) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateIsDownstream() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateIsDownstream()
+	})
+}
+
+// SetDownstreamRechargeOnly sets the "downstream_recharge_only" field.
+func (u *UserUpsertOne) SetDownstreamRechargeOnly(v bool) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetDownstreamRechargeOnly(v)
+	})
+}
+
+// UpdateDownstreamRechargeOnly sets the "downstream_recharge_only" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateDownstreamRechargeOnly() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateDownstreamRechargeOnly()
 	})
 }
 
@@ -2549,6 +2600,20 @@ func (u *UserUpsertBulk) SetIsDownstream(v bool) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateIsDownstream() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateIsDownstream()
+	})
+}
+
+// SetDownstreamRechargeOnly sets the "downstream_recharge_only" field.
+func (u *UserUpsertBulk) SetDownstreamRechargeOnly(v bool) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetDownstreamRechargeOnly(v)
+	})
+}
+
+// UpdateDownstreamRechargeOnly sets the "downstream_recharge_only" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateDownstreamRechargeOnly() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateDownstreamRechargeOnly()
 	})
 }
 

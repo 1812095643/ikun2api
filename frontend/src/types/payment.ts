@@ -68,6 +68,7 @@ export interface MethodLimitsResponse {
 
 /** Response from /payment/checkout-info API — single call for the payment page */
 export interface CheckoutInfoResponse {
+  subscription_purchase_disabled?: boolean
   methods: Record<string, MethodLimit>
   global_min: number
   global_max: number
@@ -246,6 +247,8 @@ export interface DailyPaymentStats {
   date: string
   amount: CurrencyAmounts
   count: number
+  refund?: CurrencyAmounts
+  net?: CurrencyAmounts
 }
 
 export interface PaymentMethodStats {
@@ -266,7 +269,26 @@ export interface DashboardStats {
   today_count: number
   total_count: number
   avg_amount: CurrencyAmounts
+  pending_orders: number
+  order_count: number
+  paying_users: number
+  repeat_payers: number
+  paid_order_rate: number
+  refund_amount: CurrencyAmounts
+  refund_count: number
+  net_amount: CurrencyAmounts
+  previous_amount: CurrencyAmounts
+  previous_count: number
+  order_statuses: { status: string; count: number }[]
+  order_types: PaymentMethodStats[]
+  hourly_series: { hour: number; count: number }[]
   daily_series: DailyPaymentStats[]
   payment_methods: PaymentMethodStats[]
   top_users: Record<string, TopUserPaymentStats[]>
+}
+
+export interface PaymentDashboardQuery {
+  start_date: string
+  end_date: string
+  timezone: string
 }

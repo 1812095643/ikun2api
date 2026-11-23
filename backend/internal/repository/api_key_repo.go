@@ -963,6 +963,7 @@ func userEntityToService(u *dbent.User) *service.User {
 		BalanceNotifyEnabled:       u.BalanceNotifyEnabled,
 		RestrictPublicGroups:       u.RestrictPublicGroups,
 		IsDownstream:               u.IsDownstream,
+		DownstreamRechargeOnly:     u.DownstreamRechargeOnly,
 		BalanceNotifyThresholdType: u.BalanceNotifyThresholdType,
 		BalanceNotifyThreshold:     u.BalanceNotifyThreshold,
 		TotalRecharged:             u.TotalRecharged,

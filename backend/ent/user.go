@@ -55,6 +55,8 @@ type User struct {
 	LastActiveAt *time.Time `json:"last_active_at,omitempty"`
 	// IsDownstream holds the value of the "is_downstream" field.
 	IsDownstream bool `json:"is_downstream,omitempty"`
+	// DownstreamRechargeOnly holds the value of the "downstream_recharge_only" field.
+	DownstreamRechargeOnly bool `json:"downstream_recharge_only,omitempty"`
 	// RestrictPublicGroups holds the value of the "restrict_public_groups" field.
 	RestrictPublicGroups bool `json:"restrict_public_groups,omitempty"`
 	// BalanceNotifyEnabled holds the value of the "balance_notify_enabled" field.
@@ -241,7 +243,7 @@ func (*User) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case user.FieldTotpEnabled, user.FieldIsDownstream, user.FieldRestrictPublicGroups, user.FieldBalanceNotifyEnabled:
+		case user.FieldTotpEnabled, user.FieldIsDownstream, user.FieldDownstreamRechargeOnly, user.FieldRestrictPublicGroups, user.FieldBalanceNotifyEnabled:
 			values[i] = new(sql.NullBool)
 		case user.FieldBalance, user.FieldFrozenBalance, user.FieldBalanceNotifyThreshold, user.FieldTotalRecharged:
 			values[i] = new(sql.NullFloat64)
@@ -390,6 +392,12 @@ func (_m *User) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field is_downstream", values[i])
 			} else if value.Valid {
 				_m.IsDownstream = value.Bool
+			}
+		case user.FieldDownstreamRechargeOnly:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field downstream_recharge_only", values[i])
+			} else if value.Valid {
+				_m.DownstreamRechargeOnly = value.Bool
 			}
 		case user.FieldRestrictPublicGroups:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -606,6 +614,9 @@ func (_m *User) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_downstream=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsDownstream))
+	builder.WriteString(", ")
+	builder.WriteString("downstream_recharge_only=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DownstreamRechargeOnly))
 	builder.WriteString(", ")
 	builder.WriteString("restrict_public_groups=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RestrictPublicGroups))

@@ -335,6 +335,20 @@ func (_u *UserUpdate) SetNillableIsDownstream(v *bool) *UserUpdate {
 	return _u
 }
 
+// SetDownstreamRechargeOnly sets the "downstream_recharge_only" field.
+func (_u *UserUpdate) SetDownstreamRechargeOnly(v bool) *UserUpdate {
+	_u.mutation.SetDownstreamRechargeOnly(v)
+	return _u
+}
+
+// SetNillableDownstreamRechargeOnly sets the "downstream_recharge_only" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableDownstreamRechargeOnly(v *bool) *UserUpdate {
+	if v != nil {
+		_u.SetDownstreamRechargeOnly(*v)
+	}
+	return _u
+}
+
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
 func (_u *UserUpdate) SetRestrictPublicGroups(v bool) *UserUpdate {
 	_u.mutation.SetRestrictPublicGroups(v)
@@ -1099,6 +1113,9 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.IsDownstream(); ok {
 		_spec.SetField(user.FieldIsDownstream, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.DownstreamRechargeOnly(); ok {
+		_spec.SetField(user.FieldDownstreamRechargeOnly, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RestrictPublicGroups(); ok {
 		_spec.SetField(user.FieldRestrictPublicGroups, field.TypeBool, value)
@@ -2045,6 +2062,20 @@ func (_u *UserUpdateOne) SetNillableIsDownstream(v *bool) *UserUpdateOne {
 	return _u
 }
 
+// SetDownstreamRechargeOnly sets the "downstream_recharge_only" field.
+func (_u *UserUpdateOne) SetDownstreamRechargeOnly(v bool) *UserUpdateOne {
+	_u.mutation.SetDownstreamRechargeOnly(v)
+	return _u
+}
+
+// SetNillableDownstreamRechargeOnly sets the "downstream_recharge_only" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableDownstreamRechargeOnly(v *bool) *UserUpdateOne {
+	if v != nil {
+		_u.SetDownstreamRechargeOnly(*v)
+	}
+	return _u
+}
+
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
 func (_u *UserUpdateOne) SetRestrictPublicGroups(v bool) *UserUpdateOne {
 	_u.mutation.SetRestrictPublicGroups(v)
@@ -2839,6 +2870,9 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.IsDownstream(); ok {
 		_spec.SetField(user.FieldIsDownstream, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.DownstreamRechargeOnly(); ok {
+		_spec.SetField(user.FieldDownstreamRechargeOnly, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RestrictPublicGroups(); ok {
 		_spec.SetField(user.FieldRestrictPublicGroups, field.TypeBool, value)

@@ -50,6 +50,10 @@ func downstreamFixture(t *testing.T) *sql.DB {
 	require.NoError(t, e)
 	_, e = db.Exec(string(manualMigration))
 	require.NoError(t, e)
+	purchaseMigration, e := os.ReadFile("../../migrations/277_downstream_recharge_only.sql")
+	require.NoError(t, e)
+	_, e = db.Exec(string(purchaseMigration))
+	require.NoError(t, e)
 	return db
 }
 func TestDownstreamPostgresGroupPricingAndAtomicBatch(t *testing.T) {
@@ -165,6 +169,46 @@ func TestDownstreamPostgresQueriesScopeStatisticsAndReceivables(t *testing.T) {
 	require.Equal(t, 200, w.Code)
 	require.Contains(t, w.Body.String(), `"deleted":true`)
 }
+func TestDownstreamPostgresSortBeforePaginationAndBulkPurchasePolicy(t *testing.T) {
+	db := downstreamFixture(t)
+	h := &Handler{db: db}
+	_, err := db.Exec(`UPDATE users SET is_downstream=TRUE WHERE id IN (8,9);
+    INSERT INTO users(id,email,balance,is_downstream) VALUES(10,'third@example.test',100,TRUE),(11,'unused@example.test',0,TRUE);
+    INSERT INTO usage_logs(user_id,actual_cost) VALUES(8,2),(9,10),(10,1)`)
+	require.NoError(t, err)
+	router := gin.New()
+	router.GET("/downstreams", h.listDownstreams)
+	for _, tc := range []struct {
+		query string
+		id    int64
+	}{
+		{"sort_by=cost&sort_order=desc&page_size=1", 9},
+		{"sort_by=cost&sort_order=desc&page_size=1&page=2", 8},
+		{"sort_by=balance&sort_order=desc&page_size=1", 10},
+	} {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest("GET", "/downstreams?"+tc.query, nil))
+		require.Equal(t, 200, response.Code, response.Body.String())
+		var payload struct {
+			Data struct {
+				Items []downstreamUser `json:"items"`
+			} `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
+		require.Len(t, payload.Data.Items, 1)
+		require.Equal(t, tc.id, payload.Data.Items[0].ID)
+	}
+	enabled := true
+	req := downstreamApply{UserIDs: []int64{8, 9}, RechargeOnly: &enabled, Key: uuid.NewString()}
+	require.NoError(t, normalizeDownstreamApply(&req))
+	affected, err := h.applyDownstream(context.Background(), 1, req)
+	require.NoError(t, err)
+	require.Equal(t, 2, affected)
+	var count int
+	require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM users WHERE downstream_recharge_only`).Scan(&count))
+	require.Equal(t, 2, count)
+}
+
 func TestBusinessAdminRejectsRestrictedAdminKeys(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

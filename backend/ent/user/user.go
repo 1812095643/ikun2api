@@ -53,6 +53,8 @@ const (
 	FieldLastActiveAt = "last_active_at"
 	// FieldIsDownstream holds the string denoting the is_downstream field in the database.
 	FieldIsDownstream = "is_downstream"
+	// FieldDownstreamRechargeOnly holds the string denoting the downstream_recharge_only field in the database.
+	FieldDownstreamRechargeOnly = "downstream_recharge_only"
 	// FieldRestrictPublicGroups holds the string denoting the restrict_public_groups field in the database.
 	FieldRestrictPublicGroups = "restrict_public_groups"
 	// FieldBalanceNotifyEnabled holds the string denoting the balance_notify_enabled field in the database.
@@ -217,6 +219,7 @@ var Columns = []string{
 	FieldLastLoginAt,
 	FieldLastActiveAt,
 	FieldIsDownstream,
+	FieldDownstreamRechargeOnly,
 	FieldRestrictPublicGroups,
 	FieldBalanceNotifyEnabled,
 	FieldBalanceNotifyThresholdType,
@@ -288,6 +291,8 @@ var (
 	SignupSourceValidator func(string) error
 	// DefaultIsDownstream holds the default value on creation for the "is_downstream" field.
 	DefaultIsDownstream bool
+	// DefaultDownstreamRechargeOnly holds the default value on creation for the "downstream_recharge_only" field.
+	DefaultDownstreamRechargeOnly bool
 	// DefaultRestrictPublicGroups holds the default value on creation for the "restrict_public_groups" field.
 	DefaultRestrictPublicGroups bool
 	// DefaultBalanceNotifyEnabled holds the default value on creation for the "balance_notify_enabled" field.
@@ -403,6 +408,11 @@ func ByLastActiveAt(opts ...sql.OrderTermOption) OrderOption {
 // ByIsDownstream orders the results by the is_downstream field.
 func ByIsDownstream(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsDownstream, opts...).ToFunc()
+}
+
+// ByDownstreamRechargeOnly orders the results by the downstream_recharge_only field.
+func ByDownstreamRechargeOnly(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDownstreamRechargeOnly, opts...).ToFunc()
 }
 
 // ByRestrictPublicGroups orders the results by the restrict_public_groups field.

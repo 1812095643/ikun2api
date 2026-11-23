@@ -9,7 +9,7 @@
     >
       {{ t('payment.admin.noData') }}
     </div>
-    <div v-else class="space-y-2">
+    <div v-else class="max-h-80 space-y-2 overflow-y-auto">
       <div v-for="[currency, currencyUsers] in sortedUsers(props.users)" :key="currency" class="space-y-2">
         <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ currency }}</p>
         <div
@@ -17,18 +17,18 @@
           :key="user.user_id"
           class="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-dark-700"
         >
-          <div class="flex items-center gap-3">
+          <div class="flex min-w-0 items-center gap-2">
             <span
               :class="[
-                'flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold',
+                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold',
                 rankClass(idx),
               ]"
             >
               {{ idx + 1 }}
             </span>
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{ user.email }}</span>
+            <span class="truncate text-sm text-gray-700 dark:text-gray-300" :title="user.email">{{ user.email }}</span>
           </div>
-          <span class="text-sm font-medium text-gray-900 dark:text-white">
+          <span class="ml-2 shrink-0 text-sm font-medium tabular-nums text-gray-900 dark:text-white">
             {{ formatMoney(currency, user.amount) }}
           </span>
         </div>

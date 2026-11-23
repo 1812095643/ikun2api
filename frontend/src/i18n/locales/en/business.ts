@@ -3,6 +3,8 @@ export default {
   applyToDownstream: 'Apply to resellers',
   ledger: 'Receivables',
   downstreams: 'Resellers',
+  downstream_recharge_only: 'Balance recharge only',
+  purchasePolicy: 'Purchase policy',
   onAccount: 'Credit on account',
   onAccountHint: 'Credit balance before payment',
   downstream: 'Reseller',

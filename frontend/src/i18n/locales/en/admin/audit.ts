@@ -5,6 +5,27 @@ export default {
     clearAll: 'Clear All',
     empty: 'No audit logs yet',
     loadFailed: 'Failed to load audit logs',
+    otherAction: 'Other operation',
+    actionPattern: '{action} {resource}',
+    actionNames: {
+      navigationRead: 'Mark navigation message as read', apiKeyUsage: 'View API key usage',
+      login: 'Sign in', login2fa: 'Sign in with two-factor authentication', register: 'Register', tokenRefresh: 'Refresh session', sessionMismatch: 'Session binding mismatch',
+      stepUp: 'Verify identity', clearLogs: 'Clear audit logs', mcpAuthorize: 'Authorize MCP', mcpRevoke: 'Revoke MCP authorization'
+    },
+    verbs: {
+      create: 'Create', read: 'View', update: 'Update', delete: 'Delete', import: 'Import', export: 'Export',
+      refresh: 'Refresh', restore: 'Restore', download: 'Download', regenerate: 'Regenerate', probe: 'Probe',
+      batch_delete: 'Bulk delete', delete_preview: 'Preview deletion of', filter_delete: 'Delete filtered'
+    },
+    resources: {
+      users: 'user', accounts: 'account', groups: 'group', apiKeys: 'API key', proxies: 'proxy',
+      subscriptions: 'subscription', redeemCodes: 'redeem code', backups: 'backup', settings: 'system settings',
+      payment: 'payment configuration', channels: 'channel', auditLogs: 'audit logs', monitoring: 'monitoring configuration',
+      usage: 'usage records', announcements: 'announcement', navigation: 'navigation message', relogin: 'relogin settings',
+      tickets: 'ticket', downstreams: 'downstream settings', receivables: 'receivable entry', accountVault: 'account details',
+      upstreamBalances: 'upstream balance settings', workspace: 'workspace', promptAudit: 'prompt audit',
+      codexTicket: 'Codex ticket', dataManagement: 'data management settings', authentication: 'authentication settings', profile: 'profile settings'
+    },
     filters: {
       all: 'All',
       q: 'Keyword',

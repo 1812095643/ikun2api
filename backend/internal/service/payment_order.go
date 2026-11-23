@@ -13,6 +13,7 @@ import (
 
 	dbent "github.com/MACOS-DO/sub4api/ent"
 	"github.com/MACOS-DO/sub4api/ent/paymentorder"
+	dbuser "github.com/MACOS-DO/sub4api/ent/user"
 	"github.com/MACOS-DO/sub4api/internal/payment"
 	"github.com/MACOS-DO/sub4api/internal/payment/provider"
 	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
@@ -49,6 +50,9 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	}
 	if user.Status != payment.EntityStatusActive {
 		return nil, infraerrors.Forbidden("USER_INACTIVE", "user account is disabled")
+	}
+	if err := validateUserSubscriptionPurchase(user, req.OrderType); err != nil {
+		return nil, err
 	}
 	if s.notificationEmailService != nil {
 		s.notificationEmailService.RememberRecipientLocale(ctx, req.UserID, user.Email, req.Locale)
@@ -164,6 +168,16 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if req.OrderType == payment.OrderTypeSubscription {
+		// 与下游策略修改使用同一用户行锁，下单事务内再次核对，避免切换开关时使用旧快照。
+		current, err := tx.User.Query().Where(dbuser.IDEQ(req.UserID)).ForUpdate().Only(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateUserSubscriptionPurchase(&User{IsDownstream: current.IsDownstream, DownstreamRechargeOnly: current.DownstreamRechargeOnly}, req.OrderType); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.checkPendingLimit(ctx, tx, req.UserID, cfg.MaxPendingOrders); err != nil {
 		return nil, err
 	}

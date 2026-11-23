@@ -48,6 +48,7 @@ export interface DownstreamGroupRate {
   rate: number
 }
 export interface DownstreamUser {
+  downstream_recharge_only: boolean
   group_rates: DownstreamGroupRate[]
   id: number
   email: string
@@ -66,6 +67,7 @@ export interface DownstreamPage extends BusinessPage<DownstreamUser> {
   to: string
 }
 export interface DownstreamApply {
+  downstream_recharge_only?: boolean
   user_ids: number[]
   is_downstream?: boolean
   group_rates?: Record<number, number | null>

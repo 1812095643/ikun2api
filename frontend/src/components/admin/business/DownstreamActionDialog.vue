@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import BusinessError from './BusinessError.vue'
 import { adminAPI } from '@/api/admin'
 import { businessAPI, type DownstreamApply, type DownstreamUser } from '@/api/admin/business'
@@ -15,7 +16,7 @@ import { useBusinessRequest } from '@/composables/useBusinessRequest'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import type { AdminUser, Group, PaginatedResponse } from '@/types'
-export type DownstreamAction = 'add' | 'price' | 'remove'
+export type DownstreamAction = 'add' | 'price' | 'remove' | 'purchase'
 const props = defineProps<{
   mode: DownstreamAction | null
   userIds: number[]
@@ -33,6 +34,7 @@ const selected = ref<number[]>([])
 const search = ref('')
 const key = ref(newBusinessOperationKey())
 const submitting = ref(false)
+const rechargeOnly = ref(false)
 const groups = ref<Group[]>([])
 const groupError = ref('')
 const groupsLoading = ref(false)
@@ -47,7 +49,7 @@ const changedRates = computed(() => Object.fromEntries(changedGroups.value
   .map(id => [id, rates[id].trim() === '' ? null : Number(rates[id])])) as Record<number, number | null>)
 const title = computed(() =>
   t(
-    `business.${props.mode === 'add' ? 'addDownstream' : props.mode === 'price' ? 'pricing' : 'removeDownstream'}`
+    `business.${props.mode === 'add' ? 'addDownstream' : props.mode === 'price' ? 'pricing' : props.mode === 'purchase' ? 'purchasePolicy' : 'removeDownstream'}`
   )
 )
 const valid = computed(
@@ -119,6 +121,8 @@ watch(
     mixedGroups.value = []
     changedGroups.value = []
     selected.value = []
+    const purchaseUsers = props.users?.filter(user => props.userIds.includes(user.id)) || []
+    rechargeOnly.value = purchaseUsers.length > 0 && purchaseUsers.length === props.userIds.length && purchaseUsers.every(user => user.downstream_recharge_only)
     search.value = ''
     key.value = newBusinessOperationKey()
     if (mode === 'add') reloadUsers()
@@ -155,6 +159,7 @@ async function submit() {
   if (props.mode === 'add') request.is_downstream = true
   if (props.mode === 'price') request.group_rates = changedRates.value
   if (props.mode === 'remove') request.is_downstream = false
+  if (props.mode === 'purchase') request.downstream_recharge_only = rechargeOnly.value
   submitting.value = true
   try {
     const result = await businessAPI.apply(request)
@@ -248,6 +253,10 @@ async function submit() {
       <p v-if="mode === 'remove'" class="text-sm text-gray-500">
         {{ t('business.removeHint') }}
       </p>
+      <div v-if="mode === 'purchase'" class="flex items-center justify-between gap-4">
+        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('business.downstream_recharge_only') }}</span>
+        <Toggle v-model="rechargeOnly" :disabled="submitting" :aria-label="t('business.downstream_recharge_only')" @update:model-value="key = newBusinessOperationKey()" />
+      </div>
     </fieldset>
     <template #footer
       ><div class="flex justify-end gap-2">

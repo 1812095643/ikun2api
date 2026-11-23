@@ -5,6 +5,27 @@ export default {
     clearAll: '全部清理',
     empty: '暂无操作日志',
     loadFailed: '加载操作日志失败',
+    otherAction: '其他操作',
+    actionPattern: '{action}{resource}',
+    actionNames: {
+      navigationRead: '标记导航消息已读', apiKeyUsage: '查看 API Key 用量',
+      login: '登录', login2fa: '两步验证登录', register: '注册', tokenRefresh: '刷新登录凭据', sessionMismatch: '登录会话校验不匹配',
+      stepUp: '二次验证', clearLogs: '清理操作日志', mcpAuthorize: '授权 MCP', mcpRevoke: '撤销 MCP 授权'
+    },
+    verbs: {
+      create: '创建', read: '查看', update: '更新', delete: '删除', import: '导入', export: '导出',
+      refresh: '刷新', restore: '恢复', download: '下载', regenerate: '重新生成', probe: '检测',
+      batch_delete: '批量删除', delete_preview: '预览待删除的', filter_delete: '按条件删除'
+    },
+    resources: {
+      users: '用户', accounts: '账号', groups: '分组', apiKeys: 'API Key', proxies: '代理',
+      subscriptions: '订阅', redeemCodes: '兑换码', backups: '备份', settings: '系统设置',
+      payment: '支付配置', channels: '渠道', auditLogs: '操作日志', monitoring: '监控配置',
+      usage: '使用记录', announcements: '公告', navigation: '导航消息', relogin: '失效重登设置',
+      tickets: '工单', downstreams: '下游设置', receivables: '记账记录', accountVault: '账号资料',
+      upstreamBalances: '上游余额设置', workspace: '工作台', promptAudit: '提示词审计',
+      codexTicket: 'Codex 票据', dataManagement: '数据管理设置', authentication: '登录设置', profile: '个人设置'
+    },
     filters: {
       all: '全部',
       q: '关键字',

@@ -150,6 +150,11 @@ func IsDownstream(v bool) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldIsDownstream, v))
 }
 
+// DownstreamRechargeOnly applies equality check predicate on the "downstream_recharge_only" field. It's identical to DownstreamRechargeOnlyEQ.
+func DownstreamRechargeOnly(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldDownstreamRechargeOnly, v))
+}
+
 // RestrictPublicGroups applies equality check predicate on the "restrict_public_groups" field. It's identical to RestrictPublicGroupsEQ.
 func RestrictPublicGroups(v bool) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldRestrictPublicGroups, v))
@@ -1133,6 +1138,16 @@ func IsDownstreamEQ(v bool) predicate.User {
 // IsDownstreamNEQ applies the NEQ predicate on the "is_downstream" field.
 func IsDownstreamNEQ(v bool) predicate.User {
 	return predicate.User(sql.FieldNEQ(FieldIsDownstream, v))
+}
+
+// DownstreamRechargeOnlyEQ applies the EQ predicate on the "downstream_recharge_only" field.
+func DownstreamRechargeOnlyEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldDownstreamRechargeOnly, v))
+}
+
+// DownstreamRechargeOnlyNEQ applies the NEQ predicate on the "downstream_recharge_only" field.
+func DownstreamRechargeOnlyNEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldDownstreamRechargeOnly, v))
 }
 
 // RestrictPublicGroupsEQ applies the EQ predicate on the "restrict_public_groups" field.

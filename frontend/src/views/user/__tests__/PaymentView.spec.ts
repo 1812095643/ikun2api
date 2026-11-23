@@ -872,6 +872,14 @@ describe('PaymentView subscription feature flag', () => {
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(2)
   })
 
+  it('下游仅充值限制隐藏订阅并忽略订阅直链，余额充值继续可用', async () => {
+    const wrapper = await mountSubscriptionConfirm({ checkout: { subscription_purchase_disabled: true } })
+    expect(tabLabels(wrapper)).toEqual([])
+    expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
+    expect(wrapper.text()).toContain('payment.rechargeAccount')
+    expect(createOrder).not.toHaveBeenCalled()
+  })
+
   it('drops the subscribe tab, hides the switcher and ignores ?tab=subscription when subscriptions are disabled', async () => {
     appStoreState.setPublicSettings({ subscription_enabled: false })
     const wrapper = await mountSubscriptionPlanList(2)

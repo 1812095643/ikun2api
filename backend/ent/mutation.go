@@ -50440,6 +50440,7 @@ type UserMutation struct {
 	last_login_at                 *time.Time
 	last_active_at                *time.Time
 	is_downstream                 *bool
+	downstream_recharge_only      *bool
 	restrict_public_groups        *bool
 	balance_notify_enabled        *bool
 	balance_notify_threshold_type *string
@@ -51400,6 +51401,42 @@ func (m *UserMutation) OldIsDownstream(ctx context.Context) (v bool, err error) 
 // ResetIsDownstream resets all changes to the "is_downstream" field.
 func (m *UserMutation) ResetIsDownstream() {
 	m.is_downstream = nil
+}
+
+// SetDownstreamRechargeOnly sets the "downstream_recharge_only" field.
+func (m *UserMutation) SetDownstreamRechargeOnly(b bool) {
+	m.downstream_recharge_only = &b
+}
+
+// DownstreamRechargeOnly returns the value of the "downstream_recharge_only" field in the mutation.
+func (m *UserMutation) DownstreamRechargeOnly() (r bool, exists bool) {
+	v := m.downstream_recharge_only
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDownstreamRechargeOnly returns the old "downstream_recharge_only" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldDownstreamRechargeOnly(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDownstreamRechargeOnly is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDownstreamRechargeOnly requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDownstreamRechargeOnly: %w", err)
+	}
+	return oldValue.DownstreamRechargeOnly, nil
+}
+
+// ResetDownstreamRechargeOnly resets all changes to the "downstream_recharge_only" field.
+func (m *UserMutation) ResetDownstreamRechargeOnly() {
+	m.downstream_recharge_only = nil
 }
 
 // SetRestrictPublicGroups sets the "restrict_public_groups" field.
@@ -52464,7 +52501,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 27)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -52521,6 +52558,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.is_downstream != nil {
 		fields = append(fields, user.FieldIsDownstream)
+	}
+	if m.downstream_recharge_only != nil {
+		fields = append(fields, user.FieldDownstreamRechargeOnly)
 	}
 	if m.restrict_public_groups != nil {
 		fields = append(fields, user.FieldRestrictPublicGroups)
@@ -52589,6 +52629,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.LastActiveAt()
 	case user.FieldIsDownstream:
 		return m.IsDownstream()
+	case user.FieldDownstreamRechargeOnly:
+		return m.DownstreamRechargeOnly()
 	case user.FieldRestrictPublicGroups:
 		return m.RestrictPublicGroups()
 	case user.FieldBalanceNotifyEnabled:
@@ -52650,6 +52692,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldLastActiveAt(ctx)
 	case user.FieldIsDownstream:
 		return m.OldIsDownstream(ctx)
+	case user.FieldDownstreamRechargeOnly:
+		return m.OldDownstreamRechargeOnly(ctx)
 	case user.FieldRestrictPublicGroups:
 		return m.OldRestrictPublicGroups(ctx)
 	case user.FieldBalanceNotifyEnabled:
@@ -52805,6 +52849,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIsDownstream(v)
+		return nil
+	case user.FieldDownstreamRechargeOnly:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDownstreamRechargeOnly(v)
 		return nil
 	case user.FieldRestrictPublicGroups:
 		v, ok := value.(bool)
@@ -53074,6 +53125,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldIsDownstream:
 		m.ResetIsDownstream()
+		return nil
+	case user.FieldDownstreamRechargeOnly:
+		m.ResetDownstreamRechargeOnly()
 		return nil
 	case user.FieldRestrictPublicGroups:
 		m.ResetRestrictPublicGroups()

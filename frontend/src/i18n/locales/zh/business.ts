@@ -3,6 +3,8 @@ export default {
   applyToDownstream: '对代理生效',
   ledger: '记账收款',
   downstreams: '下游管理',
+  downstream_recharge_only: '仅允许余额充值',
+  purchasePolicy: '购买限制',
   onAccount: '记账跑付',
   onAccountHint: '未收款，先充余额',
   downstream: '下游',

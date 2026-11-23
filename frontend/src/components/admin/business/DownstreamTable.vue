@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DataTable from '@/components/common/DataTable.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import { type DownstreamUser } from '@/api/admin/business'
 import { businessMoney } from '@/utils/business'
 import { formatDateTime } from '@/utils/format'
@@ -9,6 +10,7 @@ defineProps<{
   items: DownstreamUser[]
   loading: boolean
   selected: number[]
+  policyBusy?: number[]
 }>()
 defineEmits<{
   'update:selected': [ids: (string | number)[]]
@@ -16,12 +18,15 @@ defineEmits<{
   usage: [user: DownstreamUser]
   credit: [user: DownstreamUser]
   debt: [user: DownstreamUser]
+  sort: [key: string, order: 'asc' | 'desc']
+  policy: [user: DownstreamUser, enabled: boolean]
 }>()
 const { t } = useI18n()
 const columns = computed(() =>
   [
     'user',
     'group_rates',
+    'downstream_recharge_only',
     'balance',
     'outstanding',
     'requests',
@@ -31,6 +36,7 @@ const columns = computed(() =>
     'actions'
   ].map((key) => ({
     key,
+    sortable: !['group_rates', 'actions'].includes(key),
     label: t(
       `business.${key === 'group_rates' ? 'customRate' : key === 'last_used_at' ? 'lastUsed' : key}`
     )
@@ -47,6 +53,11 @@ const columns = computed(() =>
     :selected-keys="selected"
     :sticky-first-column="true"
     :sticky-actions-column="true"
+    server-side-sort
+    default-sort-key="id"
+    default-sort-order="desc"
+    sort-storage-key="admin-downstreams-sort"
+    @sort="(key, order) => $emit('sort', key, order)"
     @update:selected-keys="$emit('update:selected', $event)"
   >
     <template #cell-user="{ row }"
@@ -96,6 +107,11 @@ const columns = computed(() =>
       </button></template
     >
     <template #cell-requests="{ value }">{{ value.toLocaleString() }}</template>
+    <template #cell-downstream_recharge_only="{ row }">
+      <Toggle :model-value="row.downstream_recharge_only || false" :disabled="loading || policyBusy?.includes(row.id)"
+        :aria-label="`${row.email} ${t('business.downstream_recharge_only')}`"
+        @update:model-value="$emit('policy', row, $event)" />
+    </template>
     <template #cell-tokens="{ value }">{{ value.toLocaleString() }}</template>
     <template #cell-cost="{ value }"
       ><span class="tabular-nums">{{ businessMoney(value) }}</span></template

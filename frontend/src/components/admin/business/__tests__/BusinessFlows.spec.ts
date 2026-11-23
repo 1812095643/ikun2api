@@ -4,6 +4,7 @@ import ReceivablePaymentDialog from '../ReceivablePaymentDialog.vue'
 import DownstreamActionDialog from '../DownstreamActionDialog.vue'
 import ReceivableCreditDialog from '../ReceivableCreditDialog.vue'
 import Select from '@/components/common/Select.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import type { ReceivableAccount } from '@/api/admin/business'
 const mocks = vi.hoisted(() => ({
   history: vi.fn(),
@@ -60,6 +61,25 @@ beforeEach(() => {
   mocks.apply.mockResolvedValue({ affected: 1 })
   mocks.list.mockResolvedValue({ items: [{ id: 8, email: user.email }], total: 1 })
 })
+describe('下游购买限制', () => {
+  it('默认关闭，批量开启与关闭都只修改选中下游的购买限制', async () => {
+    const wrapper = mount(DownstreamActionDialog, { props: { mode: 'purchase', userIds: [8, 9] }, global })
+    expect(wrapper.getComponent(Toggle).props('modelValue')).toBe(false)
+    wrapper.getComponent(Toggle).vm.$emit('update:modelValue', true)
+    await wrapper.vm.$nextTick()
+    const confirm = wrapper.findAll('button').find(button => button.text() === 'common.confirm')!
+    await confirm.trigger('click')
+    await flushPromises()
+    expect(mocks.apply).toHaveBeenCalledWith({ user_ids: [8, 9], downstream_recharge_only: true, operation_key: expect.any(String) })
+    wrapper.getComponent(Toggle).vm.$emit('update:modelValue', false)
+    await wrapper.vm.$nextTick()
+    await confirm.trigger('click')
+    await flushPromises()
+    expect(mocks.apply.mock.lastCall?.[0]).toMatchObject({downstream_recharge_only:false})
+    expect(mocks.getAllIncludingInactive).not.toHaveBeenCalled()
+  })
+})
+
 describe('receivable collection', () => {
   it('补录仅调用记账接口，超时重试使用同一操作编号', async () => {
     mocks.credit.mockRejectedValue({ message: 'timeout' })

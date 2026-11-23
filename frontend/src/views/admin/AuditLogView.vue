@@ -102,8 +102,8 @@
 
           <template #cell-action="{ row }">
             <div class="min-w-0 max-w-xs">
-              <div class="truncate font-mono text-sm text-gray-800 dark:text-gray-200" :title="row.action">
-                {{ row.action }}
+              <div class="truncate text-sm text-gray-800 dark:text-gray-200" :title="row.action">
+                {{ actionLabel(row.action) }}
               </div>
               <div class="mt-0.5 truncate font-mono text-xs text-gray-400" :title="`${row.method} ${row.path}`">
                 {{ row.method }} {{ row.path }}
@@ -182,8 +182,8 @@
               <span class="h-1.5 w-1.5 rounded-full" :class="statusDotClass(detail.status_code)"></span>
               {{ detail.status_code }} {{ statusText(detail.status_code) }}
             </span>
-            <span class="break-all font-mono text-base font-semibold text-gray-900 dark:text-white">
-              {{ detail.action }}
+            <span class="break-all text-base font-semibold text-gray-900 dark:text-white" :title="detail.action">
+              {{ actionLabel(detail.action) }}
             </span>
           </div>
 
@@ -366,8 +366,10 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useAppStore } from '@/stores'
+import { auditActionLabel } from '@/utils/auditAction'
 
 const { t } = useI18n()
+const actionLabel = (action: string) => auditActionLabel(action, t)
 const appStore = useAppStore()
 
 const loading = ref(false)

@@ -41,9 +41,26 @@ func (h *PaymentHandler) GetPaymentConfig(c *gin.Context) {
 	response.Success(c, cfg)
 }
 
-// GetPlans returns subscription plans available for sale.
+func (h *PaymentHandler) subscriptionPurchaseAllowed(c *gin.Context) (bool, error) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok || subject.UserID <= 0 {
+		return true, nil
+	}
+	return h.paymentService.SubscriptionPurchaseAllowed(c.Request.Context(), subject.UserID)
+}
+
+// GetPlans 返回当前用户可购买的订阅。
 // GET /api/v1/payment/plans
 func (h *PaymentHandler) GetPlans(c *gin.Context) {
+	allowed, err := h.subscriptionPurchaseAllowed(c)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if !allowed {
+		response.Success(c, []*dbent.SubscriptionPlan{})
+		return
+	}
 	plans, err := h.configService.ListPlansForSale(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -108,6 +125,11 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 // GET /api/v1/payment/checkout-info
 func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	ctx := c.Request.Context()
+	allowed, err := h.subscriptionPurchaseAllowed(c)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 
 	// Fetch limits (methods + global range)
 	limitsResp, err := h.configService.GetAvailableMethodLimits(ctx)
@@ -132,7 +154,10 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	}
 
 	// Fetch plans with group info
-	plans, _ := h.configService.ListPlansForSale(ctx)
+	plans := []*dbent.SubscriptionPlan{}
+	if allowed {
+		plans, _ = h.configService.ListPlansForSale(ctx)
+	}
 	groupInfo := h.configService.GetGroupInfoMap(ctx, plans)
 	planList := make([]checkoutPlan, 0, len(plans))
 	for _, p := range plans {
@@ -165,6 +190,7 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		GlobalMin:                     limitsResp.GlobalMin,
 		GlobalMax:                     limitsResp.GlobalMax,
 		Plans:                         planList,
+		SubscriptionPurchaseDisabled:  !allowed,
 		BalanceDisabled:               cfg.BalanceDisabled,
 		BalanceRechargeMultiplier:     cfg.BalanceRechargeMultiplier,
 		SubscriptionUSDToCNYRate:      cfg.SubscriptionUSDToCNYRate,
@@ -182,6 +208,7 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 }
 
 type checkoutInfoResponse struct {
+	SubscriptionPurchaseDisabled  bool                            `json:"subscription_purchase_disabled"`
 	Methods                       map[string]service.MethodLimits `json:"methods"`
 	GlobalMin                     float64                         `json:"global_min"`
 	GlobalMax                     float64                         `json:"global_max"`
