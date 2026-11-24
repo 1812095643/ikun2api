@@ -193,6 +193,16 @@ var claudeModels = []modelDef{
 
 // Antigravity 支持的 Gemini 模型
 var geminiModels = []modelDef{
+	{ID: "gemini-4-neon", DisplayName: "Gemini 4 Neon", IsReasoning: true},
+	{ID: "gemini-4-neon-low", DisplayName: "Gemini 4 Neon (Low)", IsReasoning: true},
+	{ID: "gemini-4-neon-medium", DisplayName: "Gemini 4 Neon (Medium)", IsReasoning: true},
+	{ID: "gemini-4-neon-high", DisplayName: "Gemini 4 Neon (High)", IsReasoning: true},
+	{ID: "gemini-4-neon-xhigh", DisplayName: "Gemini 4 Neon (Extra High)", IsReasoning: true},
+	{ID: "gemini-4-hydrogen", DisplayName: "Gemini 4 Hydrogen", IsReasoning: true},
+	{ID: "gemini-4-hydrogen-low", DisplayName: "Gemini 4 Hydrogen (Low)", IsReasoning: true},
+	{ID: "gemini-4-hydrogen-medium", DisplayName: "Gemini 4 Hydrogen (Medium)", IsReasoning: true},
+	{ID: "gemini-4-hydrogen-high", DisplayName: "Gemini 4 Hydrogen (High)", IsReasoning: true},
+	{ID: "gemini-4-hydrogen-xhigh", DisplayName: "Gemini 4 Hydrogen (Extra High)", IsReasoning: true},
 	{ID: "gemini-2.5-flash", DisplayName: "Gemini 2.5 Flash", CreatedAt: "2025-01-01T00:00:00Z"},
 	{ID: "gemini-2.5-flash-image", DisplayName: "Gemini 2.5 Flash Image", CreatedAt: "2025-01-01T00:00:00Z"},
 	{ID: "gemini-2.5-flash-image-preview", DisplayName: "Gemini 2.5 Flash Image Preview", CreatedAt: "2025-01-01T00:00:00Z"},

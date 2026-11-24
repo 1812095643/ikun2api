@@ -21,7 +21,7 @@ import (
 // 选中的后缀在映射表里不存在时按 high → medium → low → tiered 的顺序降级到存在的变体。
 // 显式映射（裸名本身在 model_mapping 里）始终优先，行为与现在完全一致。
 
-var geminiThinkingVariantSuffixes = []string{"-low", "-medium", "-high", "-tiered"}
+var geminiThinkingVariantSuffixes = []string{"-low", "-medium", "-high", "-xhigh", "-tiered"}
 
 const (
 	geminiThinkingBudgetLowMax    = 1024
@@ -65,6 +65,8 @@ func geminiThinkingLevelFromBody(body []byte) string {
 		return "medium"
 	case "high":
 		return "high"
+	case "xhigh":
+		return "xhigh"
 	}
 	if tc.ThinkingBudget == nil {
 		return "high"
@@ -89,7 +91,11 @@ func geminiThinkingLevelFromBody(body []byte) string {
 // OpenAI Responses / Chat Completions 在 effort=low/minimal/none 时可能只写 output_config.effort 而不写 thinking，
 // 优先读取显式 effort 可避免裸 Gemini 模型被默认归入 high 变体。
 func geminiThinkingLevelFromClaudeBody(claudeBody []byte, thinking *antigravity.ThinkingConfig) string {
-	switch parseClaudeThinkingIntent(claudeBody).tier {
+	intent := parseClaudeThinkingIntent(claudeBody)
+	if intent.extraHigh {
+		return "xhigh"
+	}
+	switch intent.tier {
 	case "minimal", "low":
 		return "low"
 	case "medium":
@@ -161,7 +167,7 @@ func resolveGeminiThinkingVariantForLevel(account *Account, requestedModel strin
 		preferred = "high"
 	}
 	order := []string{preferred}
-	for _, level := range []string{"high", "medium", "low", "tiered"} {
+	for _, level := range []string{"high", "medium", "low", "tiered", "xhigh"} {
 		if level != preferred {
 			order = append(order, level)
 		}

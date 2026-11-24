@@ -15,6 +15,8 @@ func TestBuiltinGeminiCacheStoragePrice(t *testing.T) {
 		want  float64
 	}{
 		// 已发布型号
+		{"gemini-4-neon", 0},
+		{"gemini-4-hydrogen", 0},
 		{"gemini-3.8-flash", 0.5e-6},
 		{"gemini-3.7-flash", 0.5e-6},
 		{"gemini-3.6-flash", 0.5e-6},

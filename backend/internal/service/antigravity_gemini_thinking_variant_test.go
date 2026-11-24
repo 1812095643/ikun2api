@@ -37,6 +37,7 @@ func TestGeminiThinkingLevelFromBody(t *testing.T) {
 		{"budget 24576", `{"generationConfig":{"thinkingConfig":{"thinkingBudget":24576}}}`, "high"},
 		{"thinkingLevel wins over budget", `{"generationConfig":{"thinkingConfig":{"thinkingBudget":24576,"thinkingLevel":"low"}}}`, "low"},
 		{"thinkingLevel medium", `{"generationConfig":{"thinkingConfig":{"thinkingLevel":"MEDIUM"}}}`, "medium"},
+		{"extra high", `{"generationConfig":{"thinkingConfig":{"thinkingLevel":"xhigh"}}}`, "xhigh"},
 		{"invalid json", `{"generationConfig":`, "high"},
 	}
 	for _, tt := range tests {
@@ -122,6 +123,19 @@ func TestResolveGeminiThinkingVariant(t *testing.T) {
 		require.False(t, matched)
 		require.Empty(t, got)
 	})
+}
+
+func TestNewGeminiVariantsResolveExtraHighWithoutExpandingCustomWhitelist(t *testing.T) {
+	for _, base := range []string{"gemini-4-neon", "gemini-4-hydrogen"} {
+		a := newAntigravityAccountWithMapping(map[string]string{base + "-xhigh": base + "-xhigh"})
+		model, ok := resolveGeminiThinkingVariant(a, base, []byte(`{"generationConfig":{"thinkingConfig":{"thinkingLevel":"xhigh"}}}`))
+		require.True(t, ok)
+		require.Equal(t, base+"-xhigh", model)
+		require.Equal(t, "xhigh", geminiThinkingLevelFromClaudeBody([]byte(`{"output_config":{"effort":"xhigh"}}`), nil))
+		a = newAntigravityAccountWithMapping(map[string]string{"claude-sonnet-4-6": "claude-sonnet-4-6"})
+		require.False(t, a.IsModelSupported(base))
+		require.False(t, a.IsModelSupported(base+"-xhigh"))
+	}
 }
 
 func TestGeminiThinkingLevelFromClaudeThinking(t *testing.T) {

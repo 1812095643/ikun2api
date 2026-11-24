@@ -12,6 +12,9 @@ func TestDefaultModels_ContainsFallbackCatalogModels(t *testing.T) {
 	}
 
 	required := []string{
+		"models/gemini-4-neon",
+		"models/gemini-4-hydrogen",
+		"models/gemini-nano-banana-2.1",
 		"models/gemini-4-carbon",
 		"models/gemini-3-pro-image",
 		"models/gemini-3.1-pro-preview-customtools",
@@ -51,5 +54,23 @@ func TestHasFallbackModel_Carbon(t *testing.T) {
 	}
 	if HasFallbackModel("gemini-4-carbon-preview") {
 		t.Fatal("must not invent a preview alias")
+	}
+}
+
+func TestCurrentModelFallbackMetadataMatchesListAndSynchronousLimits(t *testing.T) {
+	for _, expected := range []struct {
+		id            string
+		input, output int
+	}{
+		{"gemini-4-neon", 1048576, 65536}, {"gemini-4-hydrogen", 1048576, 65536},
+		{"gemini-nano-banana-2.1", 131072, 32768},
+	} {
+		model := FallbackModel("models/" + expected.id)
+		if model.DisplayName == "" || model.InputTokenLimit != expected.input || model.OutputTokenLimit != expected.output {
+			t.Fatalf("模型元数据不完整: %+v", model)
+		}
+		if HasFallbackModel(expected.id + "-preview") {
+			t.Fatal("不应编造 preview 别名")
+		}
 	}
 }

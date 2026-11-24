@@ -66,3 +66,19 @@ func TestCarbonTransformUsesMappedModelForThinking(t *testing.T) {
 	require.NotContains(t, string(data), `thinkingBudget`)
 	require.NotContains(t, string(data), `stopSequences`)
 }
+
+func TestNeonHydrogenThinkingLevelsAndExplicitTiers(t *testing.T) {
+	for _, model := range []string{"gemini-4-neon", "gemini-4-hydrogen"} {
+		for _, effort := range []string{"low", "medium", "high", "xhigh"} {
+			cfg := buildGenerationConfig(&ClaudeRequest{Model: model, MaxTokens: 4096, OutputConfig: &ClaudeOutputConfig{Effort: effort}, Thinking: &ThinkingConfig{Type: "adaptive"}})
+			require.NotNil(t, cfg.ThinkingConfig)
+			require.Equal(t, effort, cfg.ThinkingConfig.ThinkingLevel)
+			require.Zero(t, cfg.ThinkingConfig.ThinkingBudget)
+			require.Equal(t, 4096, cfg.MaxOutputTokens)
+			require.True(t, IsGeminiReasoningModel(model+"-"+effort))
+			cfg = buildGenerationConfig(&ClaudeRequest{Model: model + "-" + effort, OutputConfig: &ClaudeOutputConfig{Effort: "low"}, Thinking: &ThinkingConfig{Type: "adaptive"}})
+			require.Empty(t, cfg.ThinkingConfig.ThinkingLevel, "显式模型后缀不能被正文档位覆盖")
+			require.Zero(t, cfg.ThinkingConfig.ThinkingBudget)
+		}
+	}
+}

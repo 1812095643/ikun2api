@@ -79,6 +79,7 @@ type claudeThinkingIntent struct {
 	thinkingType string // enabled / adaptive / disabled / 空
 	tier         string // minimal / low / medium / high / 空
 	budgetTokens int    // thinking.type=enabled 时的 budget_tokens
+	extraHigh    bool   // 保留 xhigh/max 意图，仅已验证支持的模型发送 xhigh
 }
 
 // parseClaudeThinkingIntent 读取 Anthropic 请求的思考参数。thinking.type=disabled 优先于
@@ -98,8 +99,11 @@ func parseClaudeThinkingIntent(claudeBody []byte) claudeThinkingIntent {
 		intent.tier = "low"
 	case "medium":
 		intent.tier = "medium"
-	case "high", "xhigh", "max":
+	case "high":
 		intent.tier = "high"
+	case "xhigh", "max":
+		intent.tier = "high"
+		intent.extraHigh = true
 	}
 	if intent.thinkingType == "enabled" {
 		intent.budgetTokens = int(gjson.GetBytes(claudeBody, "thinking.budget_tokens").Int())
@@ -133,11 +137,15 @@ func geminiThinkingLevelFor(model string, intent claudeThinkingIntent) string {
 		}
 	}
 	name := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(model)), "models/")
+	supportsExtraHigh := name == "gemini-4-neon" || name == "gemini-4-hydrogen"
+	if supportsExtraHigh && intent.extraHigh {
+		return "xhigh"
+	}
 	isFlash := strings.Contains(name, "flash")
 	if tier == "minimal" && !isFlash {
 		tier = "low"
 	}
-	if tier == "medium" && !isFlash && !strings.HasPrefix(name, "gemini-3.1-pro") && name != "gemini-4-carbon" {
+	if tier == "medium" && !isFlash && !strings.HasPrefix(name, "gemini-3.1-pro") && name != "gemini-4-carbon" && !supportsExtraHigh {
 		tier = "high"
 	}
 	return tier

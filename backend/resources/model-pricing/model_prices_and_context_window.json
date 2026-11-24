@@ -2800,6 +2800,42 @@
     "supports_web_search": true,
     "web_search_billing_unit": "per_query"
   },
+  "gemini-3.5-flash-lite": {
+    "cache_read_input_token_cost": 3e-08,
+    "cache_read_input_token_cost_priority": 5e-08,
+    "cache_storage_cost_per_token_per_hour": 1e-06,
+    "input_cost_per_token": 3e-07,
+    "input_cost_per_token_priority": 5.4e-07,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 65536,
+    "max_tokens": 65536,
+    "mode": "chat",
+    "output_cost_per_token": 2.5e-06,
+    "output_cost_per_token_priority": 4.5e-06,
+    "source": "https://aistudio.google.com/docs/models/gemini-3.5-flash-lite",
+    "supported_modalities": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true,
+    "supports_function_calling": true,
+    "supports_native_streaming": true,
+    "supports_pdf_input": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_service_tier": true,
+    "supports_system_messages": true,
+    "supports_video_input": true,
+    "supports_vision": true,
+    "supports_web_search": true
+  },
   "gemini-3.6-flash": {
     "cache_read_input_token_cost": 7.5e-08,
     "cache_read_input_token_cost_priority": 1.35e-07,
@@ -2816,6 +2852,78 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_service_tier": true
+  },
+  "gemini-3.7-flash": {
+    "cache_read_input_token_cost": 7.5e-08,
+    "cache_read_input_token_cost_priority": 1.35e-07,
+    "cache_storage_cost_per_token_per_hour": 5e-07,
+    "input_cost_per_token": 7.5e-07,
+    "input_cost_per_token_priority": 1.35e-06,
+    "litellm_provider": "vertex_ai-language-models",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 65536,
+    "max_tokens": 65536,
+    "mode": "chat",
+    "output_cost_per_token": 3.75e-06,
+    "output_cost_per_token_priority": 6.75e-06,
+    "source": "https://aistudio.google.com/docs/models/gemini-3.7-flash",
+    "supported_modalities": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true,
+    "supports_function_calling": true,
+    "supports_native_streaming": true,
+    "supports_pdf_input": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_service_tier": true,
+    "supports_system_messages": true,
+    "supports_video_input": true,
+    "supports_vision": true,
+    "supports_web_search": true
+  },
+  "gemini-3.8-flash": {
+    "cache_read_input_token_cost": 7.5e-08,
+    "cache_read_input_token_cost_priority": 1.35e-07,
+    "cache_storage_cost_per_token_per_hour": 5e-07,
+    "input_cost_per_token": 7.5e-07,
+    "input_cost_per_token_priority": 1.35e-06,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 65536,
+    "max_tokens": 65536,
+    "mode": "chat",
+    "output_cost_per_token": 3.75e-06,
+    "output_cost_per_token_priority": 6.75e-06,
+    "source": "https://aistudio.google.com/docs/models/gemini-3.8-flash",
+    "supported_modalities": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true,
+    "supports_function_calling": true,
+    "supports_native_streaming": true,
+    "supports_pdf_input": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_service_tier": true,
+    "supports_system_messages": true,
+    "supports_video_input": true,
+    "supports_vision": true,
+    "supports_web_search": true
   },
   "gemini-4-argon": {
     "cache_read_input_token_cost": 1e-07,
@@ -2851,6 +2959,41 @@
     "supports_reasoning": true,
     "supports_service_tier": true
   },
+  "gemini-4-neon": {
+    "cache_read_input_token_cost": 1.5e-07,
+    "cache_read_input_token_cost_priority": 2.7e-07,
+    "input_cost_per_token": 3e-06,
+    "input_cost_per_token_priority": 5.4e-06,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 65536,
+    "max_tokens": 65536,
+    "mode": "chat",
+    "output_cost_per_token": 1.5e-05,
+    "output_cost_per_token_priority": 2.7e-05,
+    "source": "https://aistudio.google.com/docs/models/gemini-4-neon",
+    "supported_modalities": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true,
+    "supports_function_calling": true,
+    "supports_native_streaming": true,
+    "supports_pdf_input": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_service_tier": true,
+    "supports_system_messages": true,
+    "supports_video_input": true,
+    "supports_vision": true,
+    "supports_web_search": true
+  },
   "gemini-4-argon-cyber-permissive": {
     "cache_read_input_token_cost": 2e-07,
     "cache_read_input_token_cost_priority": 3.6e-07,
@@ -2884,6 +3027,35 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_service_tier": true
+  },
+  "gemini-nano-banana-2.1": {
+    "input_cost_per_token": 1.5e-06,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 131072,
+    "max_output_tokens": 32768,
+    "max_tokens": 32768,
+    "mode": "image_generation",
+    "output_cost_per_image_token": 3e-05,
+    "output_cost_per_token": 7.5e-06,
+    "source": "https://aistudio.google.com/docs/models/gemini-nano-banana-2.1",
+    "supported_modalities": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+    ],
+    "supported_output_modalities": [
+      "text",
+      "image"
+    ],
+    "supports_function_calling": false,
+    "supports_pdf_input": true,
+    "supports_prompt_caching": false,
+    "supports_reasoning": true,
+    "supports_response_schema": false,
+    "supports_video_input": true,
+    "supports_vision": true,
+    "supports_web_search": true
   },
   "gemini-embedding-001": {
     "input_cost_per_token": 1.5e-07,

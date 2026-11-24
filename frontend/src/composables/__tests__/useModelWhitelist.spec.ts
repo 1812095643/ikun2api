@@ -7,6 +7,19 @@ vi.mock('@/api/admin/accounts', () => ({
 import { buildModelMappingObject, getModelsByPlatform, getPresetMappingsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
 
 describe('useModelWhitelist', () => {
+  it('Gemini 与 Antigravity 同步新目录并保持平台边界', () => {
+    const gemini = getModelsByPlatform('gemini')
+    const ag = getModelsByPlatform('antigravity')
+    for (const name of ['gemini-4-neon', 'gemini-4-hydrogen']) {
+      expect(gemini).toContain(name)
+      expect(ag).toContain(name)
+      for (const tier of ['low', 'medium', 'high', 'xhigh']) expect(ag).toContain(name + '-' + tier)
+      expect(gemini).not.toContain(name + '-xhigh')
+      expect(getPresetMappingsByPlatform('antigravity')).toContainEqual(expect.objectContaining({ from: name + '-xhigh', to: name + '-xhigh' }))
+    }
+    expect(gemini).toContain('gemini-nano-banana-2.1')
+    expect(ag).not.toContain('gemini-nano-banana-2.1')
+  })
   it('openai 模型列表包含 GPT-5.4 官方快照', () => {
     const models = getModelsByPlatform('openai')
 
