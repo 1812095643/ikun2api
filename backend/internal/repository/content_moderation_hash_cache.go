@@ -2,13 +2,15 @@ package repository
 
 import (
 	"context"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/service"
 	"github.com/redis/go-redis/v9"
 )
 
-const contentModerationFlaggedHashSetKey = "content_moderation:flagged_hashes"
+const contentModerationFlaggedHashSetKey = "content_moderation:flagged_hashes:v2"
 
 type contentModerationHashCache struct {
 	rdb *redis.Client
@@ -23,7 +25,14 @@ func (c *contentModerationHashCache) RecordFlaggedInputHash(ctx context.Context,
 	if c == nil || c.rdb == nil || inputHash == "" {
 		return nil
 	}
-	return c.rdb.SAdd(ctx, contentModerationFlaggedHashSetKey, inputHash).Err()
+	_, err := c.rdb.TxPipelined(ctx, func(p redis.Pipeliner) error {
+		p.ZAdd(ctx, contentModerationFlaggedHashSetKey, redis.Z{Score: float64(time.Now().Add(24 * time.Hour).Unix()), Member: inputHash})
+		p.ZRemRangeByScore(ctx, contentModerationFlaggedHashSetKey, "-inf", strconv.FormatInt(time.Now().Unix(), 10))
+		p.ZRemRangeByRank(ctx, contentModerationFlaggedHashSetKey, 0, -100001)
+		p.Expire(ctx, contentModerationFlaggedHashSetKey, 48*time.Hour)
+		return nil
+	})
+	return err
 }
 
 func (c *contentModerationHashCache) HasFlaggedInputHash(ctx context.Context, inputHash string) (bool, error) {
@@ -31,7 +40,11 @@ func (c *contentModerationHashCache) HasFlaggedInputHash(ctx context.Context, in
 	if c == nil || c.rdb == nil || inputHash == "" {
 		return false, nil
 	}
-	return c.rdb.SIsMember(ctx, contentModerationFlaggedHashSetKey, inputHash).Result()
+	expires, err := c.rdb.ZScore(ctx, contentModerationFlaggedHashSetKey, inputHash).Result()
+	if err == redis.Nil {
+		return false, nil
+	}
+	return expires > float64(time.Now().Unix()), err
 }
 
 func (c *contentModerationHashCache) DeleteFlaggedInputHash(ctx context.Context, inputHash string) (bool, error) {
@@ -39,7 +52,7 @@ func (c *contentModerationHashCache) DeleteFlaggedInputHash(ctx context.Context,
 	if c == nil || c.rdb == nil || inputHash == "" {
 		return false, nil
 	}
-	deleted, err := c.rdb.SRem(ctx, contentModerationFlaggedHashSetKey, inputHash).Result()
+	deleted, err := c.rdb.ZRem(ctx, contentModerationFlaggedHashSetKey, inputHash).Result()
 	if err != nil {
 		return false, err
 	}
@@ -50,7 +63,7 @@ func (c *contentModerationHashCache) ClearFlaggedInputHashes(ctx context.Context
 	if c == nil || c.rdb == nil {
 		return 0, nil
 	}
-	deleted, err := c.rdb.SCard(ctx, contentModerationFlaggedHashSetKey).Result()
+	deleted, err := c.CountFlaggedInputHashes(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -67,5 +80,5 @@ func (c *contentModerationHashCache) CountFlaggedInputHashes(ctx context.Context
 	if c == nil || c.rdb == nil {
 		return 0, nil
 	}
-	return c.rdb.SCard(ctx, contentModerationFlaggedHashSetKey).Result()
+	return c.rdb.ZCount(ctx, contentModerationFlaggedHashSetKey, "("+strconv.FormatInt(time.Now().Unix(), 10), "+inf").Result()
 }

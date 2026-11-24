@@ -302,9 +302,12 @@
             <span v-else class="text-gray-400">—</span>
           </template>
           <template #cell-schedulable="{ row }">
+            <div class="flex items-center gap-2">
             <button @click="handleToggleSchedulable(row)" :disabled="togglingSchedulable === row.id" class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800" :class="[row.schedulable ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500']" :title="row.schedulable ? t('admin.accounts.schedulableEnabled') : t('admin.accounts.schedulableDisabled')">
               <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="[row.schedulable ? 'translate-x-4' : 'translate-x-0']" />
             </button>
+            <button type="button" class="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700" :aria-label="t('accountTimer.title')" :title="t('accountTimer.title')" @click.stop="timerAccount = row"><Icon name="clock" size="sm" /></button>
+            </div>
           </template>
           <template #cell-today_stats="{ row }">
             <AccountTodayStatsCell
@@ -469,6 +472,7 @@
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" @completed="handleAccountTestCompleted" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
+    <AccountTimerModal :show="!!timerAccount" :account-id="timerAccount?.id ?? null" :account-name="timerAccount?.name" @close="timerAccount = null" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
     <CodexTicketDashboard v-if="CODEX_TICKET_ENABLED" :show="showCodexTickets" :account="codexTicketAcc" @close="showCodexTickets = false" @updated="handleAccountUpdated" />
     <CodexDiagnosticModal :show="showCodexDiagnostic" :account="codexDiagnosticAcc" @close="showCodexDiagnostic = false" @completed="handleCodexDiagnosticCompleted" />
@@ -534,6 +538,7 @@ import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vu
 import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
+import AccountTimerModal from '@/components/admin/account/AccountTimerModal.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
@@ -612,6 +617,7 @@ const selTypes = computed<AccountType[]>(() => {
 })
 const showCreate = ref(false)
 const showEdit = ref(false)
+const timerAccount = ref<Account | null>(null)
 const showCodexTickets = ref(false)
 const codexTicketAcc = ref<Account | null>(null)
 const showCodexDiagnostic = ref(false)

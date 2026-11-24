@@ -43,9 +43,10 @@ type OpsRuntimeSettingsRefreshHealth struct {
 
 // OpsService provides ingestion and query APIs for the Ops monitoring module.
 type OpsService struct {
-	opsRepo     OpsRepository
-	settingRepo SettingRepository
-	cfg         *config.Config
+	connectionTraces *connectionTraceSink
+	opsRepo          OpsRepository
+	settingRepo      SettingRepository
+	cfg              *config.Config
 
 	accountRepo AccountRepository
 	userRepo    UserRepository
@@ -137,6 +138,9 @@ func NewOpsService(
 		geminiCompatService:       geminiCompatService,
 		antigravityGatewayService: antigravityGatewayService,
 		systemLogSink:             systemLogSink,
+	}
+	if traces, ok := opsRepo.(ConnectionTraceRepository); ok {
+		svc.connectionTraces = newConnectionTraceSink(traces)
 	}
 	svc.initRuntimeSettings(context.Background())
 	svc.applyRuntimeLogConfigOnStartup(context.Background())

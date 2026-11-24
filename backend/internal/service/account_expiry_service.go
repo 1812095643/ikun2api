@@ -5,6 +5,8 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"github.com/MACOS-DO/sub4api/internal/accounttimer"
 )
 
 // AccountExpiryService periodically pauses expired accounts when auto-pause is enabled.
@@ -33,17 +35,43 @@ func (s *AccountExpiryService) Start() {
 		defer s.wg.Done()
 		ticker := time.NewTicker(s.interval)
 		defer ticker.Stop()
+		timers := time.NewTicker(accounttimer.PollInterval)
+		defer timers.Stop()
 
 		s.runOnce()
+		s.runTimers()
 		for {
 			select {
 			case <-ticker.C:
 				s.runOnce()
+			case <-timers.C:
+				s.runTimers()
 			case <-s.stopCh:
 				return
 			}
 		}
 	}()
+}
+
+// 定时启停只修改调度开关，账号健康检查、冷却和并发限制仍独立生效。
+func (s *AccountExpiryService) runTimers() {
+	provider, ok := s.accountRepo.(interface {
+		SchedulableTimers() accounttimer.Repository
+	})
+	if !ok || provider.SchedulableTimers() == nil {
+		return
+	}
+	repo := provider.SchedulableTimers()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := repo.RunDue(ctx); err != nil {
+		log.Printf("[AccountTimer] execution failed: %v", err)
+	}
+	if recurring, ok := repo.(interface{ RunRecurringDue(context.Context) error }); ok {
+		if err := recurring.RunRecurringDue(ctx); err != nil {
+			log.Printf("[AccountTimer] recurring execution failed: %v", err)
+		}
+	}
 }
 
 func (s *AccountExpiryService) Stop() {

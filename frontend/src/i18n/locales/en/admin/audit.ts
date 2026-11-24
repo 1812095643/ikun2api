@@ -9,6 +9,7 @@ export default {
     actionPattern: '{action} {resource}',
     resourceOperation: '{resource} operation',
     actionNames: {
+      viewAccountTimer: 'View account schedule', previewAccountTimer: 'Preview account schedule', saveAccountTimer: 'Save account schedule', cancelAccountTimer: 'Cancel account schedule', viewConnections: 'View connection diagnostics',
       navigationRead: 'Mark navigation message as read', apiKeyUsage: 'View API key usage',
       login: 'Sign in', login2fa: 'Sign in with two-factor authentication', register: 'Register', tokenRefresh: 'Refresh session', sessionMismatch: 'Session binding mismatch',
       stepUp: 'Verify identity', clearLogs: 'Clear audit logs', mcpAuthorize: 'Authorize MCP', mcpRevoke: 'Revoke MCP authorization'
@@ -19,6 +20,7 @@ export default {
       batch_delete: 'Bulk delete', delete_preview: 'Preview deletion of', filter_delete: 'Delete filtered'
     },
     resources: {
+      accountTimers: 'account schedule', connectionDiagnostics: 'connection diagnostics',
       paymentOrders: 'payment order', paymentPlans: 'subscription plan', paymentProviders: 'payment provider',
       accountCredentials: 'account credentials', userApiKeys: 'user API keys', groupApiKeys: 'group API keys', backupStorage: 'backup storage settings', adminApiKey: 'admin API key',
       users: 'user', accounts: 'account', groups: 'group', apiKeys: 'API key', proxies: 'proxy',

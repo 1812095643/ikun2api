@@ -1427,7 +1427,7 @@ func TestContentModerationCheck_PreHashUsesRedisHashCache(t *testing.T) {
 	hashCache := &contentModerationTestHashCache{hashes: map[string]struct{}{}}
 	content := ContentModerationInput{Text: "blocked prompt"}
 	content.Normalize()
-	hashCache.hashes[content.Hash()] = struct{}{}
+	hashCache.hashes[cfg.flaggedCacheKey(content.Hash())] = struct{}{}
 
 	repo := &contentModerationTestRepo{}
 	userRepo := &contentModerationTestUserRepo{user: &User{ID: 1001, Status: StatusActive}}
@@ -1673,7 +1673,7 @@ func TestContentModerationCheck_PreBlockFlaggedWritesRedisHashCache(t *testing.T
 	require.NoError(t, err)
 	require.True(t, decision.Blocked)
 	require.Equal(t, ContentModerationActionHashBlock, decision.Action)
-	require.Equal(t, recorded[0], decision.InputHash)
+	require.Equal(t, recorded[0], cfg.flaggedCacheKey(decision.InputHash))
 	require.Equal(t, 1, requestCount)
 	logs := requireContentModerationLogCount(t, repo, 2)
 	require.Equal(t, ContentModerationActionBlock, logs[0].Action)

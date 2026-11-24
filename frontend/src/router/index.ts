@@ -459,6 +459,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/connections',
+    name: 'AdminConnectionDiagnostics',
+    component: () => import('@/views/admin/ConnectionDiagnosticsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Connection diagnostics', titleKey: 'connections.title' }
+  },
+  {
     path: '/admin/audit-logs',
     name: 'AdminAuditLogs',
     component: () => import('@/views/admin/AuditLogView.vue'),

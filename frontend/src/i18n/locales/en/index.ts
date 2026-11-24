@@ -1,3 +1,4 @@
+import operations from './operations'
 import openaiServiceTiers from './openaiServiceTiers'
 import business from './business'
 import adminAccessKeys from './adminAccessKeys'
@@ -12,6 +13,7 @@ import admin from './admin'
 import misc from './misc'
 
 export default {
+  ...operations,
   openaiServiceTiers,
   business,
   adminAccessKeys,

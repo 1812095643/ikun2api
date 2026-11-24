@@ -23,7 +23,7 @@ export const menuPageGroups = [
     ['/settings/mcp', 'MCP 连接', 'MCP connection'],
   ]) },
   { id: 'admin', zh: '管理员端', en: 'Admin pages', pages: pages([
-    ['/admin/dashboard', '仪表盘', 'Dashboard'], ['/admin/ops', '运行监控', 'Operations'],
+    ['/admin/dashboard', '仪表盘', 'Dashboard'], ['/admin/ops', '运行监控', 'Operations'], ['/admin/connections', '连接诊断', 'Connection diagnostics'],
     ['/admin/receivables', '记账收款', 'Receivables'], ['/admin/downstreams', '下游管理', 'Resellers'],
     ['/admin/users', '用户管理', 'Users'], ['/admin/groups', '分组管理', 'Groups'],
     ['/admin/channels', '渠道管理', 'Channels'], ['/admin/channels/pricing', '渠道定价', 'Channel pricing'],

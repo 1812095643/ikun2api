@@ -538,6 +538,7 @@ func provideCleanup(
 			{"OpsRuntimeSettingsRefresh", func() error {
 				if opsService != nil {
 					opsService.StopRuntimeSettingsRefresh()
+					opsService.StopConnectionDiagnostics()
 				}
 				return nil
 			}},

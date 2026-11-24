@@ -1120,6 +1120,8 @@
             </div>
           </div>
 
+          <p v-if="inputDetailRow.engine_meta?.confirmation" class="text-sm font-medium" :class="inputDetailRow.engine_meta.confirmation === 'cleared' ? 'text-emerald-600' : 'text-amber-600'">{{ t(inputDetailRow.engine_meta.confirmation === 'cleared' ? 'connections.auditCleared' : 'connections.auditConfirmed') }}</p>
+
           <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>

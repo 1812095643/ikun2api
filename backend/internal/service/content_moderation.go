@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -23,6 +24,7 @@ import (
 	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
 	"github.com/MACOS-DO/sub4api/internal/pkg/httpclient"
 	"github.com/MACOS-DO/sub4api/internal/pkg/pagination"
+	"github.com/MACOS-DO/sub4api/internal/pkg/requesttiming"
 	"github.com/MACOS-DO/sub4api/internal/pkg/servertiming"
 )
 
@@ -822,6 +824,7 @@ func (s *ContentModerationService) TestAPIKeys(ctx context.Context, input TestCo
 }
 
 func (s *ContentModerationService) Check(ctx context.Context, input ContentModerationCheckInput) (decision *ContentModerationDecision, err error) {
+	defer requesttiming.Observe(ctx, "content_audit")()
 	allow := &ContentModerationDecision{Allowed: true, Action: ContentModerationActionAllow}
 	if s == nil || s.settingRepo == nil || s.repo == nil {
 		slog.Info("content_moderation.skip_unavailable",
@@ -994,8 +997,8 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		"text_runes", len([]rune(content.Text)),
 		"image_count", len(content.Images))
 	hashText := content.Hash()
-	if cfg.PreHashCheckEnabled && s.hashCache != nil {
-		matched, err := s.hashCache.HasFlaggedInputHash(ctx, hashText)
+	if cfg.PreHashCheckEnabled && cfg.Mode == ContentModerationModePreBlock && !input.riskControlLogOnly && s.hashCache != nil {
+		matched, err := s.hashCache.HasFlaggedInputHash(ctx, cfg.flaggedCacheKey(hashText))
 		if err != nil {
 			slog.Warn("content_moderation.hash_check_failed", "user_id", input.UserID, "endpoint", input.Endpoint, "error", err)
 		}
@@ -1379,7 +1382,19 @@ func (s *ContentModerationService) DeleteFlaggedInputHash(ctx context.Context, i
 	if s == nil || s.hashCache == nil {
 		return nil, infraerrors.InternalServer("CONTENT_MODERATION_HASH_CACHE_UNAVAILABLE", "内容审计哈希缓存不可用")
 	}
-	deleted, err := s.hashCache.DeleteFlaggedInputHash(ctx, inputHash)
+	deletedRaw, rawErr := s.hashCache.DeleteFlaggedInputHash(ctx, inputHash)
+	if rawErr != nil {
+		return nil, rawErr
+	}
+	if deletedRaw || s.settingRepo == nil {
+		return &ContentModerationDeleteHashResult{InputHash: inputHash, Deleted: deletedRaw}, nil
+	}
+	cfg, err := s.loadConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cacheKey := cfg.effectiveEngine(cfg.Engine).flaggedCacheKey(inputHash)
+	deleted, err := s.hashCache.DeleteFlaggedInputHash(ctx, cacheKey)
 	if err != nil {
 		return nil, fmt.Errorf("delete content moderation flagged hash: %w", err)
 	}
@@ -1951,7 +1966,7 @@ func (s *ContentModerationService) persistContentModerationLog(ctx context.Conte
 		recordHash, applySideEffects = false, false
 	}
 	if recordHash && s.hashCache != nil {
-		if err := s.hashCache.RecordFlaggedInputHash(ctx, hashText); err != nil {
+		if err := s.hashCache.RecordFlaggedInputHash(ctx, cfg.flaggedCacheKey(hashText)); err != nil {
 			slog.Warn("content_moderation.record_hash_failed", "user_id", contentModerationEmailUserID(log), "endpoint", log.Endpoint, "error", err)
 		}
 	}
@@ -2750,23 +2765,21 @@ type moderationAPIResult struct {
 }
 
 func evaluateModerationScores(scores map[string]float64, thresholds map[string]float64) (bool, string, float64) {
-	flagged := false
-	highestCategory := ""
-	highestScore := 0.0
+	flagged, highestCategory, highestScore := false, "", 0.0
 	for _, category := range contentModerationCategoryOrder {
-		score := scores[category]
-		if score > highestScore || highestCategory == "" {
-			highestScore = score
-			highestCategory = category
+		score, present := scores[category]
+		if !present || score < 0 || score > 1 || math.IsNaN(score) || math.IsInf(score, 0) {
+			continue
 		}
-		if score >= thresholds[category] {
+		hit := moderationCategoryHit(scores, thresholds, category)
+		if hit && !flagged {
+			highestCategory, highestScore = category, score
+		}
+		if hit {
 			flagged = true
 		}
-	}
-	for category, score := range scores {
-		if score > highestScore || highestCategory == "" {
-			highestScore = score
-			highestCategory = category
+		if (hit || !flagged) && (highestCategory == "" || score > highestScore) {
+			highestCategory, highestScore = category, score
 		}
 	}
 	return flagged, highestCategory, highestScore

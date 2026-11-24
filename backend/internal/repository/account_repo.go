@@ -25,6 +25,7 @@ import (
 	dbgroup "github.com/MACOS-DO/sub4api/ent/group"
 	dbpredicate "github.com/MACOS-DO/sub4api/ent/predicate"
 	dbproxy "github.com/MACOS-DO/sub4api/ent/proxy"
+	"github.com/MACOS-DO/sub4api/internal/accounttimer"
 	"github.com/MACOS-DO/sub4api/internal/pkg/adminaccess"
 	"github.com/MACOS-DO/sub4api/internal/pkg/logger"
 	"github.com/MACOS-DO/sub4api/internal/pkg/pagination"
@@ -509,6 +510,9 @@ func (r *accountRepository) updateAccount(
 	)
 	if err != nil {
 		return translatePersistenceError(err, service.ErrAccountNotFound, nil)
+	}
+	if err := cancelManualAccountTimers(ctx, client, account.ID); err != nil {
+		return err
 	}
 	if err := enqueueSchedulerOutbox(ctx, client, service.SchedulerOutboxEventAccountChanged, &account.ID, nil, buildSchedulerGroupPayload(account.GroupIDs)); err != nil {
 		return err
@@ -2857,6 +2861,9 @@ func (r *accountRepository) SetSchedulable(ctx context.Context, id int64, schedu
 	if scoped := r.accountTransactionScope(ctx); scoped != r {
 		return scoped.SetSchedulable(ctx, id, schedulable)
 	}
+	if accounttimer.ManualActor(ctx) > 0 {
+		return r.setManualSchedulable(ctx, id, schedulable)
+	}
 	_, err := r.client.Account.Update().
 		Where(dbaccount.IDEQ(id)).
 		SetSchedulable(schedulable).
@@ -3457,6 +3464,13 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		}
 		if rows != expectedRows {
 			return 0, service.ErrUpstreamBillingProbeAccountInvalid
+		}
+	}
+	if rows > 0 && updates.Schedulable != nil {
+		for _, id := range ids {
+			if err := cancelManualAccountTimers(ctx, exec, id); err != nil {
+				return 0, err
+			}
 		}
 	}
 	if rows > 0 {

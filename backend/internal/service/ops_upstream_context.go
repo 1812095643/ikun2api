@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/pkg/ctxkey"
+	"github.com/MACOS-DO/sub4api/internal/pkg/requesttiming"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -83,6 +84,12 @@ func SetOpsLatencyMs(c *gin.Context, key string, value int64) {
 		return
 	}
 	c.Set(key, value)
+	if c.Request != nil {
+		switch key {
+		case OpsAuthLatencyMsKey, OpsRoutingLatencyMsKey, OpsUpstreamLatencyMsKey, OpsResponseLatencyMsKey, OpsOpenAIWSQueueWaitMsKey, OpsOpenAIWSConnPickMsKey:
+			requesttiming.RecordDuration(c.Request.Context(), key, time.Duration(value)*time.Millisecond)
+		}
+	}
 }
 
 // SetOpsUpstreamModel stores only the effective model slug for final Ops

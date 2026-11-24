@@ -21,4 +21,12 @@ describe('审计动作翻译', () => {
     expect(auditActionLabel('workspace.navigation.read.create', i18n.global.t)).toBe('Mark navigation message as read')
     expect(auditActionLabel('future.unknown.create', i18n.global.t)).toBe('Other operation')
   })
+  it('正确区分定时计划预览、保存、取消和连接诊断', () => {
+    i18n.global.locale.value = 'zh'
+    expect(auditActionLabel('admin.accounts.schedulable_timers.preview.create', i18n.global.t)).toBe('预览定时启停计划')
+    expect(auditActionLabel('accounts.schedulable_timers.create', i18n.global.t)).toBe('保存定时启停计划')
+    expect(auditActionLabel('accounts.schedulable_timers.open.delete', i18n.global.t)).toBe('取消定时启停计划')
+    expect(auditActionLabel('admin.ops.connections.read', i18n.global.t)).toBe('查看连接诊断')
+  })
+
 })

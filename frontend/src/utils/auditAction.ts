@@ -1,4 +1,11 @@
 const exactActions: Record<string, string> = {
+  'accounts.schedulable_timers.read': 'viewAccountTimer',
+  'accounts.schedulable_timers.preview.create': 'previewAccountTimer',
+  'accounts.schedulable_timers.create': 'saveAccountTimer',
+  'accounts.schedulable_timers.open.delete': 'cancelAccountTimer',
+  'accounts.schedulable_timers.close.delete': 'cancelAccountTimer',
+  'accounts.schedulable_timers.recurring.delete': 'cancelAccountTimer',
+  'ops.connections.read': 'viewConnections',
   'workspace.navigation.read.create': 'navigationRead',
   'usage.dashboard.api_keys_usage.create': 'apiKeyUsage',
   'auth.login': 'login', 'auth.login_2fa': 'login2fa', 'auth.register': 'register',
@@ -10,6 +17,7 @@ const exactActions: Record<string, string> = {
 }
 
 const resources: Record<string, string> = {
+  'accounts.schedulable_timers': 'accountTimers', 'ops.connections': 'connectionDiagnostics',
   'payment.orders': 'paymentOrders', 'payment.plans': 'paymentPlans', 'payment.providers': 'paymentProviders',
   'accounts.credentials': 'accountCredentials', 'users.api_keys': 'userApiKeys', 'groups.api_keys': 'groupApiKeys',
   'backups.s3_config': 'backupStorage', 'data_management.s3_config': 'backupStorage', admin_api_key: 'adminApiKey',
@@ -28,7 +36,8 @@ const verbs = new Set(['create', 'read', 'update', 'delete', 'import', 'export',
 const endpointVerbs: Record<string, string> = { apply: 'update', sync: 'refresh', test: 'probe', probe: 'probe', refresh: 'refresh', restore: 'restore', regenerate: 'regenerate', batch_delete: 'batch_delete', batch_update: 'update', bulk_update: 'update', export: 'export', import: 'import' }
 
 export function auditActionLabel(action: string, t: (key: string, params?: Record<string, string>) => string): string {
-  if (exactActions[action]) return t(`admin.audit.actionNames.${exactActions[action]}`)
+  const exact = exactActions[action] || exactActions[action.replace(/^admin\./, '')]
+  if (exact) return t(`admin.audit.actionNames.${exact}`)
   const parts = action.split('.')
   let verb = parts.pop() || ''
   if (parts[0] === 'admin') parts.shift()
