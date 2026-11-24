@@ -6,6 +6,9 @@ import (
 )
 
 func (h *OpenAIGatewayHandler) cyberPolicyLogOnly(c *gin.Context, apiKey *service.APIKey) bool {
+	if h != nil && c != nil && c.Request != nil && h.contentModerationService.IsAccountAuditExempt(c.Request.Context(), c.GetInt64(opsAccountIDKey)) {
+		return true
+	}
 	return h != nil && c != nil && c.Request != nil && h.gatewayService.CyberPolicyLogOnly(c.Request.Context(), apiKey)
 }
 

@@ -3076,6 +3076,7 @@ func maskSecretTail(secret string) string {
 // CyberPolicyRecordInput 是一次 cyber_policy 硬阻断的风控记录入参。
 type CyberPolicyRecordInput struct {
 	LogOnly         bool // Trusted platform user: retain evidence without penalties or notifications.
+	AccountID       int64
 	RequestID       string
 	UserID          int64
 	UserEmail       string
@@ -3097,6 +3098,9 @@ type CyberPolicyRecordInput struct {
 // 受 risk_control_enabled 总开关和内容审核 group/model scope 约束，
 // 不受内容审核 Enabled/Mode/sample 约束。
 func (s *ContentModerationService) RecordCyberPolicyEvent(ctx context.Context, in CyberPolicyRecordInput) {
+	if s.IsAccountAuditExempt(ctx, in.AccountID) {
+		return
+	}
 	if s == nil || s.repo == nil {
 		return
 	}

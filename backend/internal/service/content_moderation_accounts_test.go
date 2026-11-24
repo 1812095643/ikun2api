@@ -175,3 +175,12 @@ func TestAccountContentModerationRejectionDoesNotAffectUpstreamHealth(t *testing
 	var gateway *OpenAIGatewayService
 	require.False(t, gateway.ReportOpenAIAccountScheduleResult(account, "model-test", false, nil, err))
 }
+
+func TestAccountContentModerationExemptionAlsoSkipsCyberSideEffects(t *testing.T) {
+	svc, _ := accountModerationFixture(t, ContentModerationModePreBlock, []int64{11})
+	require.True(t, svc.IsAccountAuditExempt(context.Background(), 11))
+	require.False(t, svc.IsAccountAuditExempt(context.Background(), 22))
+	svc.RecordCyberPolicyEvent(context.Background(), CyberPolicyRecordInput{AccountID: 11, UserID: 7, Model: "test-model"})
+	require.Empty(t, svc.repo.(*contentModerationTestRepo).snapshotLogs())
+	require.Empty(t, svc.asyncQueue)
+}

@@ -51,6 +51,18 @@ func accountModerationDeferred(ctx context.Context) bool {
 	return ctx != nil && ctx.Value(accountModerationContextKey{}) != nil
 }
 
+func (s *ContentModerationService) IsAccountAuditExempt(ctx context.Context, accountID int64) bool {
+	if s == nil || accountID <= 0 {
+		return false
+	}
+	snapshot, err := s.loadRuntimeSnapshot(ctx)
+	if err != nil {
+		return false
+	}
+	_, exempt := snapshot.config.exemptAccounts[accountID]
+	return exempt
+}
+
 type AccountContentModerationError struct {
 	Decision *ContentModerationDecision
 	err      error
