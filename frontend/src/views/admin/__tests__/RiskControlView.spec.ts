@@ -6,6 +6,10 @@ import type { DOMWrapper, VueWrapper } from '@vue/test-utils'
 import RiskControlView from '../RiskControlView.vue'
 import type { ContentModerationAPIKeyStatus, ContentModerationConfig, UpdateContentModerationConfig } from '@/api/admin/riskControl'
 
+vi.mock('@/api/admin/accounts', () => ({
+  accountsAPI: { list: vi.fn().mockResolvedValue({ items: [] }), getById: vi.fn().mockRejectedValue(new Error('unavailable account')) },
+}))
+
 const {
   getConfig,
   updateConfig,
@@ -218,6 +222,21 @@ describe('admin RiskControlView', () => {
       api_key_masks: [],
       api_key_statuses: [],
     }))
+  })
+
+  it('loads and saves the account exemption list in the audit scope settings', async () => {
+    getConfig.mockResolvedValue({ ...baseConfig(), exempt_account_ids: [11] })
+    const wrapper = mount(RiskControlView, { global: { stubs: { AppLayout: AppLayoutStub, BaseDialog: BaseDialogStub, Icon: true, Select: true, Toggle: true, Pagination: true, ModelWhitelistSelector: ModelWhitelistSelectorStub, ProxySelector: true, AccountAuditAllowlist: true } } })
+    await flushPromises()
+    await findButtonByText(wrapper, 'admin.riskControl.openSettings').trigger('click')
+    await findButtonByText(wrapper, 'admin.riskControl.tabs.scope').trigger('click')
+    const allowlist = wrapper.findComponent({ name: 'AccountAuditAllowlist' })
+    expect(allowlist.props('modelValue')).toEqual([11])
+    allowlist.vm.$emit('update:modelValue', [11, 22])
+    await findButtonByText(wrapper, 'admin.riskControl.saveConfig').trigger('click')
+    await flushPromises()
+    expect(updateConfig).toHaveBeenCalledWith(expect.objectContaining({ exempt_account_ids: [11, 22] }))
+    wrapper.unmount()
   })
 
   it.each(['openai', 'typesafe'] as const)('shows the selected draft engine keys while %s remains active', async (activeEngine) => {

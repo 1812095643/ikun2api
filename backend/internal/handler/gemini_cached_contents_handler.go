@@ -209,6 +209,10 @@ func (h *GatewayHandler) GeminiCachedContentsCreate(c *gin.Context) {
 		account = latest
 		attempts++
 		setOpsSelectedAccount(c, account.ID, account.Platform)
+		if err := service.CheckAccountContentModeration(c.Request.Context(), c, account); err != nil {
+			accountReleaseFunc()
+			return
+		}
 
 		mappedModel := account.GetMappedModel(modelName)
 		usageFields := clientRequestedUsageFields(c, channelMapping, reqModel, mappedModel)

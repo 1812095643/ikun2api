@@ -2598,6 +2598,12 @@ func (s *OpenAIGatewayService) isOpenAIAccountTransportCompatible(account *Accou
 }
 
 func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResult(account *Account, model string, success bool, firstTokenMs *int, observedErr ...error) bool {
+	for _, err := range observedErr {
+		var auditErr *AccountContentModerationError
+		if errors.As(err, &auditErr) {
+			return false // 本地审计拒绝没有请求上游，不应污染账号健康和调度评分。
+		}
+	}
 	if account == nil {
 		return false
 	}

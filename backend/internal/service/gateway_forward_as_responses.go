@@ -35,6 +35,10 @@ func (s *GatewayService) ForwardAsResponses(
 	body []byte,
 	parsed *ParsedRequest,
 ) (*ForwardResult, error) {
+	if err := CheckAccountContentModeration(ctx, c, account); err != nil {
+		return nil, err
+	}
+
 	if !s.isModelSupportedForAnthropicForward(ctx, account, gjson.GetBytes(body, "model").String()) {
 		writeResponsesError(c, http.StatusForbidden, "permission_error", "该账号的模型白名单不允许此模型")
 		return nil, fmt.Errorf("account model allowlist rejected request")

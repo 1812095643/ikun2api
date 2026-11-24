@@ -223,6 +223,9 @@ func responsesWebSearchEnabled(ctx context.Context, c *gin.Context, account *Acc
 // Anthropic and Antigravity Responses adapters. The callback remains the only
 // upstream transport, preserving authentication, routing and usage observation.
 func (s *GatewayService) ForwardResponsesWithWebSearch(ctx context.Context, c *gin.Context, account *Account, body []byte, forward func([]byte) (*ForwardResult, error)) (*ForwardResult, error) {
+	if err := CheckAccountContentModeration(ctx, c, account); err != nil {
+		return nil, err
+	}
 	if !responsesWebSearchEnabled(ctx, c, account, s.settingService, s.channelService) {
 		next, err := normalizeResponsesWebSearchHistory(c, body)
 		if err != nil {

@@ -210,6 +210,10 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 		service.SetOpsLatencyMs(c, service.OpsResponseLatencyMsKey, time.Since(forwardStart).Milliseconds())
 
 		if forwardErr != nil {
+			var auditErr *service.AccountContentModerationError
+			if errors.As(forwardErr, &auditErr) {
+				return
+			}
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(forwardErr, &failoverErr) {
 				switch fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr) {

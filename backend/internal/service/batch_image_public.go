@@ -235,6 +235,9 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	if err != nil {
 		return nil, err
 	}
+	if err := CheckAccountContentModeration(ctx, nil, account); err != nil {
+		return nil, err
+	}
 	pricingSnapshot, err := s.resolvePricingSnapshot(ctx, owner, normalized, provider.Name(), account)
 	if err != nil {
 		return nil, err

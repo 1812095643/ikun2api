@@ -51,3 +51,25 @@ func TestContentModerationEngineHandlerRoundTrip(t *testing.T) {
 	require.Contains(t, settings.value, "legacy-secret")
 	require.Contains(t, settings.value, "new-secret")
 }
+
+func TestContentModerationAccountAllowlistHandlerRoundTrip(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	settings := &moderationEngineSettings{value: `{}`}
+	svc := service.NewContentModerationService(settings, nil, nil, nil, nil, nil, nil, nil)
+	h := NewContentModerationHandler(svc)
+	router := gin.New()
+	router.PUT("/config", h.UpdateConfig)
+	router.GET("/config", h.GetConfig)
+	for _, body := range []string{`{"exempt_account_ids":[11,22,11]}`, `{}`, `{"exempt_account_ids":[]}`} {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		if body != `{"exempt_account_ids":[]}` {
+			require.Contains(t, settings.value, `"exempt_account_ids":[11,22]`)
+		} else {
+			require.Contains(t, w.Body.String(), `"exempt_account_ids":[]`)
+		}
+	}
+}

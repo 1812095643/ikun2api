@@ -20,6 +20,10 @@ import (
 
 // Forward forwards request to OpenAI API
 func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
+	if err := CheckAccountContentModeration(ctx, c, account); err != nil {
+		return nil, err
+	}
+
 	if responsesWebSearchEnabled(ctx, c, account, s.settingService, s.channelService) {
 		return forwardHostedResponsesWebSearch(ctx, c, account, body, func(next []byte) (*OpenAIForwardResult, error) {
 			return s.forwardWithoutHostedWebSearch(ctx, c, account, next)

@@ -3097,6 +3097,14 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		// captured by the previous failover account before credential lookup.
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 		currentAccountRelease = wrapReleaseOnDone(ctx, accountReleaseFunc)
+		if err := service.CheckAccountContentModeration(c.Request.Context(), nil, account); err != nil {
+			var auditErr *service.AccountContentModerationError
+			if errors.As(err, &auditErr) {
+				writeContentModerationWSError(ctx, wsConn, auditErr.Decision)
+				closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, auditErr.Decision.Message)
+			}
+			return
+		}
 		if err := h.gatewayService.BindStickySessionAfterProfitAdmission(ctx, apiKey.GroupID, sessionHash, account.ID); err != nil {
 			reqLog.Warn("openai.websocket_bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 		}
@@ -3226,6 +3234,14 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				if decision := h.checkSecurityAuditStage(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, model, payload, "subsequent_turn"); decision != nil && !decision.AllowNextStage {
 					writeSecurityAuditWSError(ctx, wsConn, decision)
 					return service.NewOpenAIWSClientCloseError(securityAuditWSCloseStatus(decision), securityAuditWSCloseReason(decision), nil)
+				}
+				if err := service.CheckAccountContentModeration(c.Request.Context(), nil, account); err != nil {
+					var auditErr *service.AccountContentModerationError
+					if errors.As(err, &auditErr) {
+						writeContentModerationWSError(ctx, wsConn, auditErr.Decision)
+						return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, auditErr.Decision.Message, err)
+					}
+					return err
 				}
 				return nil
 			},

@@ -75,7 +75,18 @@ func runSecurityAudit(c *gin.Context, reqLog *zap.Logger, coordinator *securitya
 			return nil
 		}
 	}
+	prepareAccountModeration := func() {
+		if legacy == nil {
+			return
+		}
+		input := buildContentModerationInput(c, apiKey, subject, protocol, model, body)
+		ctx := legacy.PrepareAccountModeration(c.Request.Context(), input, func(current *gin.Context, decision *service.ContentModerationDecision) {
+			writeAccountContentModerationError(current, protocol, decision)
+		})
+		c.Request = c.Request.WithContext(ctx)
+	}
 	if coordinator == nil {
+		prepareAccountModeration()
 		legacyDecision := runContentModeration(c, reqLog, legacy, apiKey, subject, protocol, model, body)
 		if legacyDecision == nil {
 			return nil
@@ -106,6 +117,7 @@ func runSecurityAudit(c *gin.Context, reqLog *zap.Logger, coordinator *securitya
 					return &decision
 				}
 			}
+			prepareAccountModeration()
 			logSecurityAuditStart(reqLog, request, len(body), false)
 			decision := coordinator.Check(c.Request.Context(), request)
 			if decision.Kind == securityaudit.DecisionAllow {
@@ -117,6 +129,7 @@ func runSecurityAudit(c *gin.Context, reqLog *zap.Logger, coordinator *securitya
 			return &decision
 		}
 	}
+	prepareAccountModeration()
 	logSecurityAuditStart(reqLog, request, len(body), false)
 	decision := coordinator.Check(c.Request.Context(), request)
 	if decision.AllowNextStage && cacheCompletion {

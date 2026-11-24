@@ -176,6 +176,10 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 		}
 
 		account := selection.Account
+		if err := CheckAccountContentModeration(ctx, nil, account); err != nil {
+			selection.ReleaseFunc()
+			return nil, err
+		}
 		leaseID := generateRequestID()
 		acquired, acquireErr := liveCache.AcquireLiveLease(
 			ctx,

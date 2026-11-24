@@ -139,6 +139,10 @@ func (s *GatewayService) isModelSupportedForAnthropicForward(ctx context.Context
 
 // Forward 转发请求到Claude API
 func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, parsed *ParsedRequest) (result *ForwardResult, err error) {
+	if err := CheckAccountContentModeration(ctx, c, account); err != nil {
+		return nil, err
+	}
+
 	startTime := time.Now()
 	if parsed == nil {
 		return nil, fmt.Errorf("parse request: empty request")
