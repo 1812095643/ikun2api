@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
+	"github.com/MACOS-DO/sub4api/internal/pkg/claude"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +50,8 @@ func TestGatewayService_AcceptEncodingOnWire(t *testing.T) {
 				{name: "gzip", encoding: "gzip", want: "gzip"},
 				{name: "multiple encodings", encoding: "gzip, deflate, br", want: "gzip, deflate, br"},
 				{name: "identity", encoding: "identity", want: "identity"},
-				{name: "omitted", want: "gzip"},
+				// OAuth requests supply the current Claude client profile when the caller omits negotiation.
+				{name: "omitted", want: claude.DefaultHeaders()["Accept-Encoding"]},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					c, _ := gin.CreateTestContext(httptest.NewRecorder())

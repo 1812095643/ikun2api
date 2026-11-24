@@ -291,6 +291,8 @@ export default {
       // Error Details Modal
       errorDetails: {
         upstreamErrors: '上游错误',
+        accountFilter: '只看上游账号 #{id}',
+        clearAccountFilter: '查看全部账号',
         requestErrors: '请求错误',
         unresolved: '未解决',
         resolved: '已解决',

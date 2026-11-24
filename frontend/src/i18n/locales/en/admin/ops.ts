@@ -291,6 +291,8 @@ export default {
       // Error Details Modal
       errorDetails: {
         upstreamErrors: 'Upstream Errors',
+        accountFilter: 'Upstream account #{id} only',
+        clearAccountFilter: 'Show all accounts',
         requestErrors: 'Request Errors',
         unresolved: 'Unresolved',
         resolved: 'Resolved',

@@ -105,6 +105,7 @@ func (r *passwordResetTestRefresh) DeleteUserRefreshTokens(context.Context, int6
 
 func newPasswordResetTestService(t *testing.T) (*AuthService, *passwordResetTestCache, *passwordResetTestRepo, *passwordResetTestRefresh) {
 	t.Helper()
+	guardRuntimeModelMappingOptions(t)
 	cache := &passwordResetTestCache{}
 	hash, err := bcrypt.GenerateFromPassword([]byte("old-password"), bcrypt.MinCost)
 	require.NoError(t, err)

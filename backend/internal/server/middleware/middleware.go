@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"net/http"
 
 	"github.com/MACOS-DO/sub4api/internal/pkg/ctxkey"
@@ -76,12 +77,18 @@ func NewErrorResponse(code, message string) ErrorResponse {
 
 // AbortWithError 中断请求并返回JSON错误
 func AbortWithError(c *gin.Context, statusCode int, code, message string) {
+	if c.Request != nil {
+		telemetry.FromContext(c.Request.Context()).LocalError(telemetry.LocalReasonCode(code))
+	}
 	c.JSON(statusCode, NewErrorResponse(code, message))
 	c.Abort()
 }
 
 // abortWithOpenAIQuotaError writes the OpenAI-compatible insufficient quota response.
 func abortWithOpenAIQuotaError(c *gin.Context, statusCode int, message string) {
+	if c.Request != nil {
+		telemetry.FromContext(c.Request.Context()).LocalError("user_balance_exhausted")
+	}
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
 			"message": message,

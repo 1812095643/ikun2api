@@ -62,61 +62,57 @@ func newReductionLockFixture(t *testing.T, name string) (*service.RedeemService,
 	redeem := service.NewRedeemService(codes, NewUserRepository(client, integrationDB), subscriptions, nil, nil, client, nil, nil)
 	return redeem, repo, userSubscriptionEntityToService(sub), user.ID, values
 }
-func TestRedeemReductionPreservesRenewal(t *testing.T) {
+
+// Legacy group subscriptions remain readable, but redemption is retired.
+// Exercise rejection against PostgreSQL instead of reviving the removed path.
+func TestLegacyRedeemReductionPreservesRenewal(t *testing.T) {
 	redeem, repo, sub, userID, codes := newReductionLockFixture(t, "reduction-renewal")
+	ctx := context.Background()
 	renewed := sub.ExpiresAt.AddDate(0, 0, 10)
-	repo.afterRead = func(stale *service.UserSubscription) {
-		// Commit renewal on another connection after the deduction's initial read.
-		require.NoError(t, repo.UserSubscriptionRepository.ExtendExpiry(context.Background(), stale.ID, renewed))
-		require.NoError(t, repo.UserSubscriptionRepository.UpdateNotes(context.Background(), stale.ID, "renewal"))
-	}
-	_, err := redeem.RedeemForAdminFulfillment(context.Background(), userID, codes[0])
+	require.NoError(t, repo.UserSubscriptionRepository.ExtendExpiry(ctx, sub.ID, renewed))
+	require.NoError(t, repo.UserSubscriptionRepository.UpdateNotes(ctx, sub.ID, "renewal"))
+	_, err := redeem.RedeemForAdminFulfillment(ctx, userID, codes[0])
+	require.ErrorIs(t, err, service.ErrLegacySubscriptionRetired)
+	got, err := repo.GetByID(ctx, sub.ID)
 	require.NoError(t, err)
-	got, err := repo.GetByID(context.Background(), sub.ID)
+	require.True(t, renewed.Equal(got.ExpiresAt))
+	require.Equal(t, "renewal", got.Notes)
+	require.Zero(t, repo.lockReads.Load())
+	code, err := NewRedeemCodeRepository(testEntClient(t)).GetByCode(ctx, codes[0])
 	require.NoError(t, err)
-	require.True(t, renewed.AddDate(0, 0, -1).Equal(got.ExpiresAt))
-	require.Contains(t, got.Notes, "renewal")
-	require.Contains(t, got.Notes, codes[0])
-	require.EqualValues(t, 1, repo.lockReads.Load())
+	require.Equal(t, service.StatusUnused, code.Status)
 }
-func TestRedeemConcurrentReductionsBothApply(t *testing.T) {
+
+func TestLegacyRedeemConcurrentReductionsBothRejected(t *testing.T) {
 	redeem, repo, sub, userID, codes := newReductionLockFixture(t, "reduction-concurrent")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	ready := make(chan struct{}, 2)
-	release := make(chan struct{})
-	repo.afterRead = func(*service.UserSubscription) {
-		ready <- struct{}{}
-		select {
-		case <-release:
-		case <-ctx.Done():
-		}
-	}
+	start := make(chan struct{})
 	results := make(chan error, 2)
 	for _, code := range codes {
-		go func(code string) { _, err := redeem.RedeemForAdminFulfillment(ctx, userID, code); results <- err }(code)
+		go func(code string) {
+			<-start
+			_, err := redeem.RedeemForAdminFulfillment(ctx, userID, code)
+			results <- err
+		}(code)
 	}
-	for range 2 {
-		select {
-		case <-ready:
-		case <-ctx.Done():
-			t.Fatal("both deductions did not reach the read barrier")
-		}
-	}
-	close(release)
+	close(start)
 	for range 2 {
 		select {
 		case err := <-results:
-			require.NoError(t, err)
+			require.ErrorIs(t, err, service.ErrLegacySubscriptionRetired)
 		case <-ctx.Done():
-			t.Fatal("deductions did not finish")
+			t.Fatal("retired redemption did not finish")
 		}
 	}
 	got, err := repo.GetByID(ctx, sub.ID)
 	require.NoError(t, err)
-	require.True(t, sub.ExpiresAt.AddDate(0, 0, -2).Equal(got.ExpiresAt))
-	for _, code := range codes {
-		require.Contains(t, got.Notes, code)
+	require.True(t, sub.ExpiresAt.Equal(got.ExpiresAt))
+	require.Equal(t, sub.Notes, got.Notes)
+	for _, value := range codes {
+		code, err := NewRedeemCodeRepository(testEntClient(t)).GetByCode(ctx, value)
+		require.NoError(t, err)
+		require.Equal(t, service.StatusUnused, code.Status)
 	}
-	require.EqualValues(t, 2, repo.lockReads.Load())
+	require.Zero(t, repo.lockReads.Load())
 }

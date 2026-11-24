@@ -119,8 +119,11 @@
           :platform="platform"
           :group-id="groupId"
           :error-type="errorDetailsType"
+          :account-id="errorDetailsAccountId"
+          :initial-status-code="errorDetailsStatusCode"
           :resume-state="resumeListState"
           @update:show="showErrorDetails = $event"
+          @update:account-id="errorDetailsAccountId = $event"
           @openErrorDetail="openError"
         />
 
@@ -213,6 +216,8 @@ const QUERY_KEYS = {
   // Deep links
   openErrorDetails: 'open_error_details',
   errorType: 'error_type',
+  errorAccountId: 'account_id',
+  errorStatusCode: 'status_code',
   alertRuleId: 'alert_rule_id',
   openAlertRules: 'open_alert_rules'
 } as const
@@ -310,6 +315,11 @@ const applyRouteQueryToState = () => {
   if (openErr === '1' || openErr === 'true') {
     const typ = readQueryString(QUERY_KEYS.errorType)
     errorDetailsType.value = typ === 'upstream' ? 'upstream' : 'request'
+    // Deep links (e.g. from the anomaly monitor) can narrow the list to one upstream account and status.
+    const account = readQueryNumber(QUERY_KEYS.errorAccountId)
+    const status = readQueryNumber(QUERY_KEYS.errorStatusCode)
+    errorDetailsAccountId.value = typeof account === 'number' && account > 0 ? account : null
+    errorDetailsStatusCode.value = typeof status === 'number' && status >= 100 && status < 600 ? status : null
     showErrorDetails.value = true
   }
 }
@@ -370,6 +380,8 @@ const selectedErrorId = ref<number | null>(null)
 const showErrorModal = ref(false)
 
 const showErrorDetails = ref(false)
+const errorDetailsAccountId = ref<number | null>(null)
+const errorDetailsStatusCode = ref<number | null>(null)
 const errorDetailsType = ref<'request' | 'upstream'>('request')
 
 const showRequestDetails = ref(false)
@@ -467,6 +479,8 @@ function handleOpenRequestDetails(preset?: OpsRequestDetailsPreset) {
 
 function openErrorDetails(kind: 'request' | 'upstream') {
   errorDetailsType.value = kind
+  errorDetailsAccountId.value = null
+  errorDetailsStatusCode.value = null
   // Ensure only one modal visible at a time.
   showRequestDetails.value = false
   showErrorModal.value = false
@@ -734,13 +748,15 @@ async function fetchData() {
   dashboardFetchSeq += 1
   const fetchSeq = dashboardFetchSeq
   dashboardFetchController = new AbortController()
+  // 离开页面时 abortDashboardFetch 会把 controller 置空；await 之后仍用本次请求自己的 signal
+  const signal = dashboardFetchController.signal
 
   loading.value = true
   errorMessage.value = ''
   try {
     await Promise.all([
-      refreshCoreSnapshotWithCancel(fetchSeq, dashboardFetchController.signal),
-      refreshSwitchTrendWithCancel(fetchSeq, dashboardFetchController.signal),
+      refreshCoreSnapshotWithCancel(fetchSeq, signal),
+      refreshSwitchTrendWithCancel(fetchSeq, signal),
     ])
     if (fetchSeq !== dashboardFetchSeq) return
 
@@ -755,7 +771,7 @@ async function fetchData() {
     }
 
     // Defer non-core visual panels to reduce initial blocking.
-    void refreshDeferredPanels(fetchSeq, dashboardFetchController.signal)
+    void refreshDeferredPanels(fetchSeq, signal)
   } catch (err) {
     if (!isOpsDisabledError(err)) {
       console.error('[ops] failed to fetch dashboard data', err)

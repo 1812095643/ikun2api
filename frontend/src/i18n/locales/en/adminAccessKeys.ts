@@ -155,7 +155,7 @@ export default {
       "category": "Accounts"
     },
     "accounts_dschedule": {
-      "label": "Change concurrency, priority, and expiration",
+      "label": "Manage concurrency, priority, expiration, and scheduled availability",
       "category": "Accounts"
     },
     "accounts_drefresh": {

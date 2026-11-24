@@ -134,6 +134,7 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 		UpstreamStatusCode: 0,
 		Passthrough:        passthrough,
 		Kind:               "request_error",
+		Reason:             monitorTransportReason(c, err),
 		Message:            safeErr,
 	})
 

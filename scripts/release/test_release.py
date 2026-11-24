@@ -58,6 +58,12 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('version=0.2.8', (self.root / 'output').read_text())
 
+    def test_registry_repository_is_lowercase(self):
+        self.env['GITHUB_REPOSITORY'] = 'ExampleOwner/IKUN2api'
+        result = self.prepare()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ghcr=ghcr.io/exampleowner/ikun2api\n', (self.root / 'output').read_text())
+
     def test_missing_notes_empty_body_and_credentials_stop_early(self):
         notes = self.root / 'changelog/0.2.7/CHANGELOG.md'
         for text in ['', '# v0.2.7\n', '# v0.2.7\n\n## \u65b0\u589e\u529f\u80fd\n']:

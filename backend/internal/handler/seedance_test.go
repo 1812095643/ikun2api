@@ -45,12 +45,31 @@ func TestSeedanceHandlerLifecycleAndOwnership(t *testing.T) {
 	require.Equal(t, 200, w.Code, w.Body.String())
 	require.Positive(t, owner)
 	require.Len(t, bindings.pending, 1)
+	// Creation must persist the balance funding source independently of later key changes.
+	key, ok := middleware.GetAPIKeyFromContext(c)
+	require.True(t, ok)
+	switched := *key
+	switched.FundingSource = service.FundingSourceUniversal
+	_, pinned, done, resumedUniversal, err := h.billingCacheService.ResumeMediaFunding(t.Context(), &switched, "seedance:task-ark")
+	require.NoError(t, err)
+	defer done()
+	require.False(t, resumedUniversal)
+	require.Equal(t, service.FundingSourceBalance, pinned.FundingSource)
 	slots.assertReleased(t)
-	for _, method := range []string{http.MethodGet, http.MethodDelete} {
-		c, w = newContext(method)
-		h.SeedanceTasks(c)
-		require.Equal(t, 200, w.Code, w.Body.String())
-		slots.assertReleased(t)
+	for _, source := range []string{service.FundingSourceBalance, service.FundingSourceUniversal} {
+		for _, method := range []string{http.MethodGet, http.MethodDelete} {
+			c, w = newContext(method)
+			lookupKey, ok := middleware.GetAPIKeyFromContext(c)
+			require.True(t, ok)
+			lookupKey.FundingSource = source
+			before := upstream.calls
+			h.SeedanceTasks(c)
+			require.Equal(t, 200, w.Code, "method=%s source=%s body=%s", method, source, w.Body.String())
+			require.Equal(t, source, lookupKey.FundingSource, "the shared API key object must remain unchanged")
+			require.Equal(t, before+1, upstream.calls, "the owned task must reach its original upstream account")
+			require.Nil(t, service.InflightReservationFromContext(c.Request.Context()), "a balance task must not resume a subscription hold")
+			slots.assertReleased(t)
+		}
 	}
 	for _, other := range []string{"user", "key", "group", "task", "provider"} {
 		c, w = newContext(http.MethodGet)
@@ -79,7 +98,7 @@ func TestSeedanceHandlerLifecycleAndOwnership(t *testing.T) {
 		slots.assertReleased(t)
 	}
 	c, _ = newContext(http.MethodGet)
-	key, _ := middleware.GetAPIKeyFromContext(c)
+	key, _ = middleware.GetAPIKeyFromContext(c)
 	subject, _ := middleware.GetAuthSubjectFromContext(c)
 	result := &service.OpenAIForwardResult{Usage: service.OpenAIUsage{OutputTokens: 12345}, ResponseID: "seedance:task-ark"}
 	for i := range 20 {

@@ -558,7 +558,11 @@ func TestBuildSchedulerMetadataAccount_KeepsQuotaStateForCachedAccounts(t *testi
 			require.True(t, hit)
 			require.Len(t, snapshot, 1)
 			cached := snapshot[0]
-			require.Equal(t, tc.extra, cached.Extra)
+			expectedExtra := tc.extra
+			if tc.platform == service.PlatformAnthropic {
+				expectedExtra[service.AccountModelAllowlistExtraKey] = map[string]any{"enabled": false}
+			}
+			require.Equal(t, expectedExtra, cached.Extra)
 			require.NotContains(t, cached.Extra, "unrelated")
 			require.Equal(t, tc.quotaExceeded, cached.IsQuotaExceeded())
 			require.Equal(t, !tc.quotaExceeded, cached.IsSchedulable())

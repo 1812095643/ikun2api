@@ -3,6 +3,8 @@ package middleware
 import (
 	"errors"
 	"fmt"
+	mondomain "github.com/MACOS-DO/sub4api/internal/monitoring/domain"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"strings"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
@@ -81,6 +83,14 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		// 同 api_key_auth.go：早退中断前也写入 Ops 回退 key，便于错误日志展示
 		// user/group/platform。
 		SetOpsFallbackAPIKey(c, apiKey)
+		obs := mondomain.Observation{UserID: apiKey.UserID, KeyID: apiKey.ID}
+		if apiKey.GroupID != nil {
+			obs.GroupID = *apiKey.GroupID
+		}
+		if apiKey.Group != nil {
+			obs.Platform = apiKey.Group.Platform
+		}
+		telemetry.FromContext(c.Request.Context()).Update(obs)
 
 		// disabled / 未知状态 → 无条件拦截（expired 和 quota_exhausted 留给计费阶段，
 		// 与主中间件 api_key_auth.go 保持一致）。

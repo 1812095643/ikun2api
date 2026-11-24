@@ -26,10 +26,15 @@ export function buildEmbeddedUrl(
   try {
     const url = new URL(baseUrl, typeof window === 'undefined' ? undefined : window.location.origin)
     const isPoolShare = preservePoolShareCredential(url)
-    if (userId && !isPoolShare) {
+    const isLocalMonitor = typeof window !== 'undefined' && url.origin === window.location.origin && url.pathname === '/ops-monitor-ui/'
+    if (isLocalMonitor) {
+      url.searchParams.delete(EMBEDDED_USER_ID_QUERY_KEY)
+      url.searchParams.delete(EMBEDDED_AUTH_TOKEN_QUERY_KEY)
+    }
+    if (userId && !isPoolShare && !isLocalMonitor) {
       url.searchParams.set(EMBEDDED_USER_ID_QUERY_KEY, String(userId))
     }
-    if (authToken && !isPoolShare) {
+    if (authToken && !isPoolShare && !isLocalMonitor) {
       url.searchParams.set(EMBEDDED_AUTH_TOKEN_QUERY_KEY, authToken)
     }
     url.searchParams.set(EMBEDDED_THEME_QUERY_KEY, theme)
@@ -38,7 +43,7 @@ export function buildEmbeddedUrl(
     }
     url.searchParams.set(EMBEDDED_UI_MODE_QUERY_KEY, EMBEDDED_UI_MODE_VALUE)
     // Source tracking: let the embedded page know where it's being loaded from
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !isLocalMonitor) {
       url.searchParams.set(EMBEDDED_SRC_HOST_QUERY_KEY, window.location.origin)
       url.searchParams.set(EMBEDDED_SRC_QUERY_KEY, window.location.href)
     }

@@ -147,24 +147,41 @@ func claudeThinkingBlockDigest(block gjson.Result) ([32]byte, bool) {
 	return sha256.Sum256(encoded), true
 }
 
+// Borrow the JSON only during synchronous inspection. No message text or raw
+// result escapes into the diagnostic caches, which retain fixed-size digests.
+func visitClaudeThinkingBlocks(body []byte, visit func(gjson.Result) bool) {
+	messages := parseRawJSONView(body).Get("messages")
+	if !messages.IsArray() {
+		return
+	}
+	keepGoing := true
+	messages.ForEach(func(_, message gjson.Result) bool {
+		if message.Get("role").String() != "assistant" {
+			return true
+		}
+		content := message.Get("content")
+		if !content.IsArray() {
+			return true
+		}
+		content.ForEach(func(_, block gjson.Result) bool {
+			keepGoing = visit(block)
+			return keepGoing
+		})
+		return keepGoing
+	})
+}
+
 func claudeThinkingBlockDigests(body []byte) map[[32]byte]struct{} {
 	var digests map[[32]byte]struct{}
-	for _, message := range gjson.GetBytes(body, "messages").Array() {
-		if message.Get("role").String() != "assistant" {
-			continue
-		}
-		for _, block := range message.Get("content").Array() {
-			if digest, ok := claudeThinkingBlockDigest(block); ok {
-				if digests == nil {
-					digests = make(map[[32]byte]struct{})
-				}
-				digests[digest] = struct{}{}
-				if len(digests) >= claudeThinkingRecoveryMaxEntries {
-					return digests
-				}
+	visitClaudeThinkingBlocks(body, func(block gjson.Result) bool {
+		if digest, ok := claudeThinkingBlockDigest(block); ok {
+			if digests == nil {
+				digests = make(map[[32]byte]struct{})
 			}
+			digests[digest] = struct{}{}
 		}
-	}
+		return len(digests) < claudeThinkingRecoveryMaxEntries
+	})
 	return digests
 }
 
@@ -238,7 +255,7 @@ func logClaudeThinkingHistoryRejection(c *gin.Context, accountID int64, mimic bo
 	if err1 != nil || err2 != nil {
 		return
 	}
-	block := gjson.GetBytes(wire, fmt.Sprintf("messages.%d.content.%d", messageIndex, blockIndex))
+	block := parseRawJSONView(wire).Get(fmt.Sprintf("messages.%d.content.%d", messageIndex, blockIndex))
 	digest, valid := claudeThinkingBlockDigest(block)
 	_, unchanged := input[digest]
 	// Presence in the snapshot proves preservation of this block through Forward;

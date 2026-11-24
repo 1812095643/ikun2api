@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"hash/fnv"
 	"log/slog"
 	"math"
@@ -1479,6 +1480,13 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 			ID:             account.ID,
 			MaxConcurrency: account.EffectiveLoadFactor(),
 		})
+	}
+	if telemetry.FromContext(ctx) != nil {
+		reasons := map[string]float64{}
+		for k, v := range filterStats.reasons {
+			reasons[k] = float64(v)
+		}
+		telemetry.Pool(ctx, req.GroupID, req.RequestedModel, len(accounts), len(filtered), reasons)
 	}
 	if len(filtered) == 0 {
 		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false, filterStats.summary(""))

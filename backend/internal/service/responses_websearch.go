@@ -300,7 +300,7 @@ func forwardHostedResponsesWebSearch[T any](ctx context.Context, c *gin.Context,
 	// Hosted mode targets function-tool upstreams. Foreign native search IDs
 	// cannot be resolved by this gateway and must not leak through as native
 	// items or be replaced by invented evidence.
-	for _, item := range gjson.GetBytes(body, "input").Array() {
+	for _, item := range parseRawJSONView(body).Get("input").Array() {
 		if item.Get("type").String() == "web_search_call" {
 			err := errors.New("native web search history cannot be replayed by this gateway; resend the complete search evidence as messages")
 			writeResponsesWebSearchRequestError(c, err)
@@ -635,7 +635,7 @@ func normalizeResponsesWebSearchHistory(c *gin.Context, body []byte) ([]byte, er
 	}
 	pending, hasPending := getResponsesWebSearchReplay(scope, "pending:"+previousID)
 	ownedHistory := false
-	gjson.GetBytes(body, "input").ForEach(func(_, item gjson.Result) bool {
+	parseRawJSONView(body).Get("input").ForEach(func(_, item gjson.Result) bool {
 		if item.Get("type").String() == "web_search_call" && (item.Get("id").String() == "" || strings.HasPrefix(item.Get("id").String(), responsesWebSearchIDPrefix)) {
 			ownedHistory = true
 			return false

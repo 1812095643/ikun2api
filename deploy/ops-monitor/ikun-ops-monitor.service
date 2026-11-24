@@ -1,0 +1,39 @@
+[Unit]
+Description=IKUN independent anomaly monitor
+After=network-online.target
+Wants=network-online.target
+# Deliberately no Requires on gateway/PostgreSQL/Redis.
+
+[Service]
+Type=simple
+User=ops-monitor
+Group=ops-monitor
+EnvironmentFile=/etc/ikun-ops-monitor/monitor.env
+ExecStart=/opt/ikun-ops-monitor/ops-monitor -state /var/lib/ikun-ops-monitor/state.db -health 127.0.0.1:9188 -socket /run/ikun-ops-monitor/admin.sock -gateway http://127.0.0.1:8080/internal/ops-monitor/v1/snapshot
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+StateDirectory=ikun-ops-monitor
+StateDirectoryMode=0700
+RuntimeDirectory=ikun-ops-monitor
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=256M
+CPUQuota=50%
+TasksMax=64
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

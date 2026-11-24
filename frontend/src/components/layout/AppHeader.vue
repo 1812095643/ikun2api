@@ -229,6 +229,7 @@ import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMi
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import TutorialLink from '@/components/common/TutorialLink.vue'
 import { useNavigationStore } from '@/stores/navigation'
+import { onLayoutPageChange } from '@/components/layout/layoutShell'
 import Icon from '@/components/icons/Icon.vue'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { resolveRouteMetaKeys } from '@/router/title'
@@ -247,6 +248,8 @@ const navigationStore = useNavigationStore()
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+// 顶栏常驻后不再随页面重建：换页时收起下拉菜单（原来由重建完成）
+onLayoutPageChange(() => { dropdownOpen.value = false })
 const contactInfo = computed(() => appStore.contactInfo)
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 const availableBalance = computed(() => Number(user.value?.balance || 0))

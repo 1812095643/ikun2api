@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"github.com/MACOS-DO/sub4api/internal/pkg/requesttiming"
 	"github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
@@ -79,6 +80,34 @@ func TestConnectionDiagnosticsCapturesWithoutPayloads(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConnectionDiagnosticsAndObservationSeeBodyLimit(t *testing.T) {
+	hub := telemetry.New("test", "gateway", "test", 10, 100)
+	recorder := &traceRecorderFixture{enabled: true}
+	router := gin.New()
+	router.Use(middleware.ClientRequestID(), hub.Middleware(), ConnectionDiagnosticsMiddleware(recorder), middleware.RequestBodyLimit(4))
+	router.POST("/test", func(c *gin.Context) {
+		_, err := io.ReadAll(c.Request.Body)
+		var limitErr *http.MaxBytesError
+		require.ErrorAs(t, err, &limitErr)
+		c.AbortWithStatus(http.StatusRequestEntityTooLarge)
+	})
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/test", strings.NewReader("oversized")))
+	require.Equal(t, http.StatusRequestEntityTooLarge, response.Code)
+	id := response.Header().Get("X-Client-Request-ID")
+	require.NotEmpty(t, id)
+	require.Len(t, recorder.records, 1)
+	require.Equal(t, id, recorder.records[0].ClientRequestID)
+	require.Equal(t, response.Code, recorder.records[0].Status)
+	events := hub.Snapshot(0, time.Now()).Events
+	require.NotEmpty(t, events)
+	completed := events[len(events)-1]
+	require.Equal(t, id, completed.RequestID)
+	require.Equal(t, response.Code, completed.ClientStatus)
+	require.Equal(t, "failed", completed.Outcome)
 }
 
 func TestConnectionDiagnosticsDisabledDoesNotWrapBody(t *testing.T) {

@@ -36,6 +36,7 @@ func (s *GeminiMessagesCompatService) handleUpstreamTransportError(ctx context.C
 		AccountName:        account.Name,
 		UpstreamStatusCode: 0,
 		Kind:               "request_error",
+		Reason:             monitorTransportReason(c, err),
 		Message:            safeErr,
 	}
 	event.ProxyID, event.ProxyName = opsUpstreamProxyAttribution(account)

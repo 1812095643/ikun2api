@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import checker from 'vite-plugin-checker'
 import { resolve } from 'path'
 import { navigationVersions } from './config/navigationVersions'
+import { seoBundle } from './config/seoBundle'
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -92,7 +93,8 @@ export default defineConfig(({ mode }) => {
       checker({
         vueTsc: true
       }),
-      injectPublicSettings(backendUrl)
+      injectPublicSettings(backendUrl),
+      seoBundle(__dirname)
     ],
   resolve: {
     alias: {

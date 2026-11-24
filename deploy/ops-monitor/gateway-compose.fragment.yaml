@@ -1,0 +1,14 @@
+# Merge into the existing gateway service; do not replace its other configuration.
+services:
+  ikun2api:
+    # Preserve supplemental groups; root entrypoint su-exec drops them.
+    user: "1000:1000"
+    environment:
+      OPS_SITE_ID: ikun2api
+      OPS_OBSERVATION_TOKEN: ${OPS_OBSERVATION_TOKEN:?set securely}
+      OPS_MONITOR_SOCKET: /run/ikun-ops-monitor/admin.sock
+    group_add:
+      - ${OPS_MONITOR_GID:?host ops-monitor group numeric ID}
+    volumes:
+      - /run/ikun-ops-monitor:/run/ikun-ops-monitor:ro
+# Never mount /var/lib/ikun-ops-monitor or /etc/ikun-ops-monitor into the gateway.

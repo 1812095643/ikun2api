@@ -1321,63 +1321,45 @@ func stripAnthropicMessageOutputConfigUnlessBeta(body []byte, anthropicBetaHeade
 	if !bytes.Contains(body, []byte("output_config")) {
 		return body, false
 	}
-	msgsRes := gjson.GetBytes(body, "messages")
-	if !msgsRes.Exists() || !msgsRes.IsArray() {
+	messages := parseRawJSONView(body).Get("messages")
+	if !messages.IsArray() {
 		return body, false
 	}
-
-	hasMessageOutputConfig := false
-	for _, msg := range msgsRes.Array() {
+	hasOutputConfig := false
+	messages.ForEach(func(_, msg gjson.Result) bool {
 		if msg.Get("output_config").Exists() {
-			hasMessageOutputConfig = true
-			break
+			hasOutputConfig = true
+			return false
 		}
-	}
-	if !hasMessageOutputConfig {
+		return true
+	})
+	if !hasOutputConfig || !gjson.Valid(messages.Raw) {
 		return body, false
 	}
-
-	var messages []json.RawMessage
-	if err := json.Unmarshal([]byte(msgsRes.Raw), &messages); err != nil {
-		// gjson 的 IsArray 只做形态判断、不保证 JSON 完整合法；此分支保守返回原 body。
-		return body, false
-	}
-
+	items := make([]string, 0)
 	changed := false
-	rebuilt := make([]json.RawMessage, 0, len(messages))
-	for _, msg := range messages {
-		if !gjson.GetBytes(msg, "output_config").Exists() {
-			rebuilt = append(rebuilt, msg)
-			continue
+	messages.ForEach(func(_, msg gjson.Result) bool {
+		if !msg.Get("output_config").Exists() {
+			items = append(items, msg.Raw)
+			return true
+		}
+		if msg.Get("role").String() == "system" && !anthropicMessageContentHasBody(msg.Get("content")) {
+			changed = true
+			return true
+		}
+		next, err := sjson.Delete(msg.Raw, "output_config")
+		if err != nil {
+			items = append(items, msg.Raw)
+			return true
 		}
 		changed = true
-
-		// 空正文的 system 控制消息整条删除；其余消息只剥字段。
-		if gjson.GetBytes(msg, "role").String() == "system" &&
-			!anthropicMessageContentHasBody(gjson.GetBytes(msg, "content")) {
-			continue
-		}
-		stripped, err := sjson.DeleteBytes(msg, "output_config")
-		if err != nil {
-			// 不应发生：字段存在且 msg 是合法 JSON。保守整条保留，不产出半成品。
-			rebuilt = append(rebuilt, msg)
-			continue
-		}
-		rebuilt = append(rebuilt, json.RawMessage(stripped))
-	}
+		items = append(items, next)
+		return true
+	})
 	if !changed {
 		return body, false
 	}
-
-	rebuiltBytes, err := json.Marshal(rebuilt)
-	if err != nil {
-		return body, false
-	}
-	out, err := sjson.SetRawBytes(body, "messages", rebuiltBytes)
-	if err != nil {
-		return body, false
-	}
-	return out, true
+	return replaceRawJSONArray(body, messages, items), true
 }
 
 // anthropicMessageContentHasBody 判断单条消息的 content 是否携带正文。

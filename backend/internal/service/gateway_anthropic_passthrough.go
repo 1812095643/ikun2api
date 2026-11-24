@@ -78,6 +78,18 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	if c != nil {
 		c.Set("anthropic_passthrough", true)
 	}
+	// Preserve passive provenance alongside the bounded signature recovery below.
+	signatureSession := signatureMonitorSession(c, input.Body)
+	originalSession := ""
+	if id := ParseMetadataUserID(gjson.GetBytes(input.Body, "metadata.user_id").String()); id != nil {
+		originalSession = id.SessionID
+	}
+	signatureTrace := s.beginClaudeThinkingTrace(c, account, input.RequestModel, originalSession, input.Body)
+	var signatureInput map[[32]byte]struct{}
+	if ShouldApplyRetryFilters(input.RequestModel) {
+		signatureInput = claudeThinkingBlockDigests(input.Body)
+	}
+	var signatureWire []byte
 	// Pre-filter: strip empty text blocks (including nested in tool_result) to prevent upstream 400.
 	input.Body = StripEmptyTextBlocks(input.Body)
 	// Pre-filter: strip web-search history blocks the upstream cannot accept
@@ -146,15 +158,24 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 			})
 		}
 
+		signatureWire = wireBody
 		// A precise Anthropic thinking-signature 400 is safe to repair once on the
 		// same API Key account. Other 400 responses stay untouched and continue
 		// through the existing passthrough handling below.
 		if resp.StatusCode == http.StatusBadRequest && !retriedThinkingSignature {
 			respBody, readErr := s.readUpstreamErrorBody(resp)
+			if readErr != nil {
+				// A failed peek has already consumed bytes. Preserve that evidence
+				// instead of rereading an exhausted body and returning an empty 400.
+				defer func() { _ = resp.Body.Close() }()
+				return s.handleErrorResponseBody(ctx, resp, c, account, respBody, readErr, input.RequestModel)
+			}
 			if readErr == nil {
 				originalHeader := resp.Header.Clone()
 				shouldRepair := s.shouldRectifySignatureError(ctx, account, respBody, input.RequestModel)
 				if !shouldRepair {
+					// Replacing the body must release the original transport resource.
+					_ = resp.Body.Close()
 					resp.Body = io.NopCloser(bytes.NewReader(respBody))
 				} else {
 					_ = resp.Body.Close()
@@ -196,7 +217,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 			}
 		}
 
-		// 透传分支禁止 400 请求体降级重试（该重试会改写请求体）
+		// 非签名 400 禁止通用请求体降级重试；精确签名恢复已在上方处理。
 		if resp.StatusCode >= 400 && resp.StatusCode != 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
 			if attempt < maxRetryAttempts {
 				elapsed := time.Since(retryStart)
@@ -323,7 +344,11 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	}
 
 	if resp.StatusCode >= 400 {
-		return s.handleErrorResponse(ctx, resp, c, account, input.RequestModel)
+		body, readErr := s.readUpstreamErrorBody(resp)
+		if resp.StatusCode == 400 && readErr == nil {
+			monitorClaudeSignatureRejection(c, account.ID, signatureSession, signatureInput, signatureTrace, signatureWire, body)
+		}
+		return s.handleErrorResponseBody(ctx, resp, c, account, body, readErr, input.RequestModel)
 	}
 
 	var usage *ClaudeUsage
@@ -605,6 +630,8 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 		if event.hasData {
 			data := strings.TrimSpace(event.data)
 			observer.ObserveAnthropic([]byte(data))
+			claudeThinkingTraceFromContext(c).observeEvent([]byte(data))
+			claudeThinkingTraceFromContext(c).commit()
 			if data != "" && anthropicStreamEventIsTerminal(event.eventName, data) {
 				sawTerminalEvent = true
 			}
@@ -1003,6 +1030,9 @@ func (s *GatewayService) handleNonStreamingResponseAnthropicAPIKeyPassthrough(
 			return nil, invalidNonStreamingJSONFailoverError(ctx, s.rateLimitService, resp, account, body, err)
 		}
 	}
+
+	claudeThinkingTraceFromContext(c).observeJSON(body)
+	claudeThinkingTraceFromContext(c).commit()
 
 	usage := parseClaudeUsageFromResponseBody(body)
 	if IsForceCacheBilling(ctx) && usage.InputTokens > 0 {

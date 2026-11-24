@@ -1096,11 +1096,15 @@ func (r *apiKeyRepository) rewriteAPIKeyGroups(ctx context.Context, filter predi
 	if dbent.TxFromContext(ctx) == nil {
 		var err error
 		tx, err = r.client.Tx(ctx)
-		if err != nil {
+		if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
 			return 0, err
 		}
-		defer func() { _ = tx.Rollback() }()
-		client = tx.Client()
+		if err == nil {
+			defer func() { _ = tx.Rollback() }()
+			client = tx.Client()
+		}
+		// A caller may supply tx.Client() without an Ent transaction in ctx.
+		// Reuse that client; only the owner may commit or roll it back.
 	}
 	models, err := client.APIKey.Query().Where(apikey.DeletedAtIsNil(), filter).ForUpdate().All(ctx)
 	if err != nil {
@@ -1149,6 +1153,11 @@ func rewriteAPIKeyRouteIDs(ids []int64, oldID, newID int64) []int64 {
 // Single-group keys retain their deleted group for existing audit semantics.
 // Only smart-route keys promote a remaining group during group cascade.
 func (r *apiKeyRepository) RemoveGroupFromSmartRoutes(ctx context.Context, id int64) (int64, error) {
-	filter := apikey.And(apiKeyGroupMembership(id), func(sel *entsql.Selector) { sel.Where(sqljson.LenGT(apikey.FieldRouteGroupIds, 1)) })
+	filter := apikey.And(apiKeyGroupMembership(id), func(sel *entsql.Selector) {
+		column := sel.C(apikey.FieldRouteGroupIds)
+		// Single-group keys can store JSON null, which is not an array. CASE
+		// also avoids relying on PostgreSQL's predicate evaluation order.
+		sel.Where(entsql.ExprP("CASE WHEN jsonb_typeof(" + column + ") = 'array' THEN jsonb_array_length(" + column + ") > 1 ELSE FALSE END"))
+	})
 	return r.rewriteAPIKeyGroups(ctx, filter, id, 0)
 }

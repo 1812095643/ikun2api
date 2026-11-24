@@ -370,10 +370,14 @@ func (s *GatewayService) readUpstreamErrorBody(resp *http.Response) ([]byte, err
 }
 
 func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, requestedModel ...string) (*ForwardResult, error) {
-	// Upstream returned a non-success HTTP status; count Ollama Cloud / OpenCode Go activity.
+	body, readErr := s.readUpstreamErrorBody(resp)
+	return s.handleErrorResponseBody(ctx, resp, c, account, body, readErr, requestedModel...)
+}
+
+// Reuse already-read error bytes so passive diagnostics never consume or truncate a second read.
+func (s *GatewayService) handleErrorResponseBody(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, body []byte, readErr error, requestedModel ...string) (*ForwardResult, error) {
 	scheduleOllamaCloudUsageActivity(s.deferredService, account)
 	scheduleOpenCodeGoUsageActivity(s.deferredService, account)
-	body, readErr := s.readUpstreamErrorBody(resp)
 	if readErr != nil {
 		// 读取失败时 body 可能被截断，错误分类会基于不完整数据；记录日志以便排查，
 		// 避免静默吞掉导致误判。

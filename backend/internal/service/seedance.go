@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"net/http"
 	"strings"
 	"time"
@@ -146,6 +147,20 @@ func (s *OpenAIGatewayService) ForwardSeedance(ctx context.Context, c *gin.Conte
 	if endpoint == SeedanceEndpointStatus {
 		result.ResponseID = taskID
 		result.UpstreamModel = gjson.GetBytes(responseBody, "model").String()
+		monitor := telemetry.FromContext(ctx)
+		switch state := gjson.GetBytes(responseBody, "status").String(); state {
+		case "succeeded":
+			if gjson.GetBytes(responseBody, "content.video_url").String() != "" {
+				monitor.Task("media.completed", taskID, "deliverable_confirmed", map[string]float64{"deliverable": 1, "billing_expected": 1}, time.Now())
+			}
+		case "failed", "expired":
+			monitor.Task("media.failed", taskID, "upstream_task_failed", nil, time.Now())
+		case "cancelled":
+			monitor.Task("media.cancelled", taskID, "task_cancelled", nil, time.Now())
+		case "queued", "running":
+			monitor.Task("media.pending", taskID, "provider_pending", nil, time.Now())
+		}
+
 		if gjson.GetBytes(responseBody, "status").String() == "succeeded" {
 			result.Usage.OutputTokens = max(0, int(gjson.GetBytes(responseBody, "usage.completion_tokens").Int()))
 		}

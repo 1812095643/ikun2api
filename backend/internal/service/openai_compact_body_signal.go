@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -110,44 +111,37 @@ func PromoteOpenAILegacyCompactRequest(c *gin.Context, account *Account, body []
 
 var compactionTriggerToken = []byte("compaction_trigger")
 
-// compactionTriggerNeedsDecode lets bodies whose input order cannot change
-// skip the full decode. Without a \u escape that spells plain ASCII, every
-// decoded "compaction_trigger" string is a literal occurrence of the token, so:
-//   - no occurrence means no trigger;
-//   - a single occurrence that is the type of the last input item, as read
-//     through the zero-copy view, means the decoder sees either that same item
-//     as the only trigger or, when a duplicate member shadows it, no trigger.
-//
-// Either way the body is returned unchanged. Such a body must still be a valid
-// JSON object, so decode errors keep surfacing from the original path.
+// Inspect actual input items, not keywords in prompts or tool descriptions.
+// A single final trigger already has the required order. Ambiguous JSON still
+// uses the original decoder, whose duplicate-key behavior differs from GJSON.
 func compactionTriggerNeedsDecode(body []byte) bool {
-	if JSONMayEscapePlainASCII(body) {
-		return true
-	}
-	switch bytes.Count(body, compactionTriggerToken) {
-	case 0:
+	if !bytes.Contains(body, compactionTriggerToken) && !JSONMayEscapePlainASCII(body) {
 		trimmed := bytes.TrimLeft(body, " \t\r\n")
 		return len(trimmed) == 0 || trimmed[0] != '{' || !gjson.ValidBytes(body)
-	case 1:
-		return !compactionTriggerIsLastInputItem(body) || !gjson.ValidBytes(body)
-	default:
+	}
+	root := parseRawJSONView(body)
+	if !root.IsObject() || !gjson.ValidBytes(body) || !utf8.Valid(body) || hasDuplicateJSONObjectKeys(root) {
 		return true
 	}
-}
-
-// compactionTriggerIsLastInputItem reports whether the last element of the
-// top-level input array is an object whose type is "compaction_trigger".
-func compactionTriggerIsLastInputItem(body []byte) bool {
-	input := parseRawJSONView(body).Get("input")
+	input := root.Get("input")
 	if !input.IsArray() {
 		return false
 	}
-	var last gjson.Result
+	triggers := 0
+	lastIsTrigger := false
+	ambiguous := false
 	input.ForEach(func(_, item gjson.Result) bool {
-		last = item
+		if item.IsObject() && hasDuplicateJSONObjectKeys(item) {
+			ambiguous = true
+			return false
+		}
+		lastIsTrigger = item.IsObject() && item.Get("type").String() == "compaction_trigger"
+		if lastIsTrigger {
+			triggers++
+		}
 		return true
 	})
-	return last.IsObject() && last.Get("type").String() == "compaction_trigger"
+	return ambiguous || triggers > 1 || (triggers == 1 && !lastIsTrigger)
 }
 
 func isOpenAINativeCompactionV2(c *gin.Context) bool {
@@ -252,10 +246,10 @@ func applyOpenAICodexBetaFeatures(c *gin.Context, account *Account, h http.Heade
 // literally unless a \u escape spells plain ASCII, so other bodies skip the
 // structural scan.
 func HasCompactionTriggerInInput(body []byte) bool {
-	if len(body) == 0 {
+	if !bytes.Contains(body, compactionTriggerToken) && !JSONMayEscapePlainASCII(body) {
 		return false
 	}
-	if !bytes.Contains(body, compactionTriggerToken) && !JSONMayEscapePlainASCII(body) {
+	if len(body) == 0 {
 		return false
 	}
 	input := parseRawJSONView(body).Get("input")

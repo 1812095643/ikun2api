@@ -189,6 +189,7 @@ func TestMimicBillingUsesOriginalUserAfterSystemMigration(t *testing.T) {
 	require.Contains(t, extractFirstUserText(body), "[System Instructions]")
 	out := syncBillingHeaderVersion(body, "claude-cli/2.1.283 (external, cli)", c)
 	require.Contains(t, gjson.GetBytes(out, "system.0.text").String(), "cc_version=2.1.283.d80;")
-	require.Contains(t, gjson.GetBytes(out, "system.0.text").String(), "cch=00000;")
+	// Legacy attribution helpers no longer synthesize the removed checksum.
+	require.NotContains(t, gjson.GetBytes(out, "system.0.text").String(), "cch=")
 	require.Equal(t, gjson.GetBytes(body, "messages").Raw, gjson.GetBytes(out, "messages").Raw)
 }

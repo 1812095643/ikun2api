@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	mondomain "github.com/MACOS-DO/sub4api/internal/monitoring/domain"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"io"
 	"log/slog"
 	"net"
@@ -156,6 +158,9 @@ func (g *ProxyFailureGuard) Begin(ctx context.Context, accountID int64, supplied
 		return nil, fmt.Errorf("account unavailable")
 	}
 	if snapshot.State != nil {
+		t := telemetry.FromContext(ctx)
+		t.Update(mondomain.Observation{AccountID: accountID, Metrics: map[string]float64{"quarantined_at_selection": 1, "quarantine_since_ms": float64(snapshot.State.NotBefore.Add(-ProxyFailureCooldown).UnixMilli())}})
+		t.Task("account.selected_quarantined", snapshot.State.Generation, "guard_rejected_selected_account", nil, g.now())
 		return nil, ErrProxyQuarantined
 	}
 	g.mu.Lock()
@@ -280,6 +285,11 @@ func (g *ProxyFailureGuard) trip(l *ProxyRequestLease) {
 		g.mu.Lock()
 		g.blocks[l.snapshot.AccountID] = proxyFailureLocal{snapshot: l.snapshot, state: state, persisted: true}
 		g.mu.Unlock()
+		metrics := map[string]float64{}
+		if l.snapshot.ProxyID != nil {
+			metrics["proxy_id"] = float64(*l.snapshot.ProxyID)
+		}
+		telemetry.Default().Emit(mondomain.Observation{Kind: "account.quarantined", AccountID: l.snapshot.AccountID, TaskID: state.Generation, Reason: "proxy_failure", OccurredAt: g.now(), Metrics: metrics})
 		slog.Warn("proxy_failure_guard.account_quarantined", "account_id", l.snapshot.AccountID, "until", state.NotBefore)
 	} else if current, snapshotErr := g.repo.GetAccountProxySnapshot(ctx, l.snapshot.AccountID); snapshotErr == nil && current != nil && current.ResetEpoch != l.snapshot.ResetEpoch {
 		g.mu.Lock()
@@ -419,6 +429,7 @@ func (g *ProxyFailureGuard) recoverOne(ctx context.Context, id int64) {
 		delete(g.blocks, id)
 	}
 	g.mu.Unlock()
+	telemetry.Default().Emit(mondomain.Observation{Kind: "account.recovered", AccountID: id, TaskID: state.Generation, Reason: "probe_succeeded", OccurredAt: g.now()})
 	slog.Info("proxy_failure_guard.account_recovered", "account_id", id)
 }
 

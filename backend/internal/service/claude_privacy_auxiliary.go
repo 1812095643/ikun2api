@@ -19,7 +19,7 @@ func sanitizeClaudeCacheControl(value gjson.Result) ([]byte, bool, error) {
 	if value.Get("type").Type != gjson.String || value.Get("type").String() != "ephemeral" {
 		return nil, false, fmt.Errorf("Claude cache_control.type must be ephemeral")
 	}
-	next, err := filterClaudePrivacyObject([]byte(value.Raw), claudePrivacyCacheFields, func(key string, v gjson.Result) ([]byte, bool, error) {
+	next, err := filterClaudePrivacyObject(claudeBorrowRawJSON(value.Raw), claudePrivacyCacheFields, func(key string, v gjson.Result) ([]byte, bool, error) {
 		if v.Type == gjson.Null && key != "type" {
 			return nil, false, nil
 		}
@@ -36,7 +36,7 @@ func sanitizeClaudeCacheControl(value gjson.Result) ([]byte, bool, error) {
 				return nil, false, fmt.Errorf("Claude cache_control.scope must be org or global")
 			}
 		}
-		return []byte(v.Raw), true, nil
+		return claudeBorrowRawJSON(v.Raw), true, nil
 	})
 	return next, true, err
 }
@@ -48,14 +48,14 @@ func sanitizeClaudeDiagnostics(value gjson.Result) ([]byte, bool, error) {
 	if !value.IsObject() {
 		return nil, false, fmt.Errorf("Claude diagnostics must be an object")
 	}
-	next, err := filterClaudePrivacyObject([]byte(value.Raw), claudePrivacyDiagnosticsFields, func(_ string, v gjson.Result) ([]byte, bool, error) {
+	next, err := filterClaudePrivacyObject(claudeBorrowRawJSON(value.Raw), claudePrivacyDiagnosticsFields, func(_ string, v gjson.Result) ([]byte, bool, error) {
 		if v.Type == gjson.Null {
 			return nil, false, nil
 		}
 		if v.Type != gjson.String || !claudePreviousMessageID.MatchString(v.String()) {
 			return nil, false, fmt.Errorf("Claude diagnostics.previous_message_id must be a message ID")
 		}
-		return []byte(v.Raw), true, nil
+		return claudeBorrowRawJSON(v.Raw), true, nil
 	})
 	return next, true, err
 }
@@ -64,7 +64,7 @@ func sanitizeClaudeDiagnostics(value gjson.Result) ([]byte, bool, error) {
 // text/signatures and other user data are opaque, even if they use these names.
 func sanitizeClaudeCacheArray(value gjson.Result, content bool, depth int) ([]byte, bool, error) {
 	if !value.IsArray() {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	if depth > 32 {
 		return nil, false, fmt.Errorf("Claude content nesting is too deep")
@@ -73,10 +73,10 @@ func sanitizeClaudeCacheArray(value gjson.Result, content bool, depth int) ([]by
 	changed := false
 	for _, item := range value.Array() {
 		if !item.IsObject() {
-			items = append(items, []byte(item.Raw))
+			items = append(items, claudeBorrowRawJSON(item.Raw))
 			continue
 		}
-		next, err := filterClaudePrivacyObject([]byte(item.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
+		next, err := filterClaudePrivacyObject(claudeBorrowRawJSON(item.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
 			if key == "cache_control" {
 				if item.Get("type").String() == "thinking" || item.Get("type").String() == "redacted_thinking" {
 					if field.Type != gjson.Null {
@@ -93,7 +93,7 @@ func sanitizeClaudeCacheArray(value gjson.Result, content bool, depth int) ([]by
 			if content && key == "content" {
 				return sanitizeClaudeCacheArray(field, true, depth+1)
 			}
-			return []byte(field.Raw), true, nil
+			return claudeBorrowRawJSON(field.Raw), true, nil
 		})
 		if err != nil {
 			return nil, false, err
@@ -102,7 +102,7 @@ func sanitizeClaudeCacheArray(value gjson.Result, content bool, depth int) ([]by
 		items = append(items, next)
 	}
 	if !changed {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	return buildJSONArrayRaw(items), true, nil
 }
@@ -123,7 +123,7 @@ func SanitizeClaudePrivacyAuxiliary(body []byte) ([]byte, error) {
 		case "messages":
 			return sanitizeClaudeCacheArray(field, true, 0)
 		default:
-			return []byte(field.Raw), true, nil
+			return claudeBorrowRawJSON(field.Raw), true, nil
 		}
 	})
 }

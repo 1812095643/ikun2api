@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestRedeemReductionPreservesPartialDay(t *testing.T) {
+func TestLegacyRedeemReductionPreservesPartialDay(t *testing.T) {
 	ctx := context.Background()
 	client := testEntClient(t)
 	user, err := client.User.Create().SetEmail("reduction-remainder@example.com").SetPasswordHash("test").Save(ctx)
@@ -40,12 +40,12 @@ func TestRedeemReductionPreservesPartialDay(t *testing.T) {
 	subscriptions := service.NewSubscriptionService(nil, repo, nil, client, nil)
 	redeem := service.NewRedeemService(codes, NewUserRepository(client, integrationDB), subscriptions, nil, nil, client, nil, nil)
 	_, err = redeem.RedeemForAdminFulfillment(ctx, user.ID, code.Code)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, service.ErrLegacySubscriptionRetired)
 	got, err := repo.GetByID(ctx, sub.ID)
 	require.NoError(t, err)
 	require.Equal(t, service.SubscriptionStatusActive, got.Status)
-	require.True(t, expiry.AddDate(0, 0, -1).Equal(got.ExpiresAt))
+	require.True(t, expiry.Equal(got.ExpiresAt))
 	used, err := codes.GetByID(ctx, code.ID)
 	require.NoError(t, err)
-	require.Equal(t, service.StatusUsed, used.Status)
+	require.Equal(t, service.StatusUnused, used.Status)
 }

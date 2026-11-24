@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, shallowRef } from 'vue'
+import { onLayoutPageChange } from '@/components/layout/layoutShell'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
@@ -19,6 +20,7 @@ const isModalOpen = shallowRef(false)
 const selectedID = shallowRef<number | null>(null)
 const unreadOnly = shallowRef(false)
 const marking = shallowRef(false)
+onLayoutPageChange(() => { isModalOpen.value = false })
 const selected = computed(() => announcements.value.find(a => a.id === selectedID.value) || null)
 const items = computed(() => unreadOnly.value ? announcements.value.filter(a => !a.read_at) : announcements.value)
 function openModal() { selectedID.value = null; isModalOpen.value = true; void store.fetchAnnouncements(true) }

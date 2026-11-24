@@ -224,7 +224,7 @@ func normalizeOpenAIRequestLocale(ctx context.Context, account *Account, body []
 		before = append(before, prior)
 		after = append(after, current)
 	}
-	input := gjson.GetBytes(body, "input")
+	input := parseRawJSONView(body).Get("input")
 	if input.IsArray() {
 		for inputIndex, item := range input.Array() {
 			if item.Get("role").String() != "user" {

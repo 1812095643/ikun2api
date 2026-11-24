@@ -3,7 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/ownership"
 	"math"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -690,6 +693,28 @@ func buildOpsAlertDescription(rule *OpsAlertRule, value float64, windowMinutes i
 func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runtimeCfg *OpsAlertRuntimeSettings, rule *OpsAlertRule, event *OpsAlertEvent) bool {
 	if s == nil || s.emailService == nil || s.opsService == nil || event == nil || rule == nil {
 		return false
+	}
+	if socket := os.Getenv("OPS_MONITOR_SOCKET"); socket != "" {
+		group := int64(0)
+		if value, ok := event.Dimensions["group_id"]; ok {
+			switch v := value.(type) {
+			case int64:
+				group = v
+			case int:
+				group = int64(v)
+			case float64:
+				group = int64(v)
+			}
+		}
+		platform, _ := event.Dimensions["platform"].(string)
+		suppressed, err := ownership.Suppressed(filepath.Join(filepath.Dir(socket), "ownership.json"), rule.ID, group, platform)
+		if err != nil {
+			logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] monitor ownership unavailable; legacy delivery paused")
+			return false
+		}
+		if suppressed {
+			return false
+		}
 	}
 	if event.EmailSent {
 		return false

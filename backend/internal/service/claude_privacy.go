@@ -180,12 +180,16 @@ func stripClaudePrivacySystemText(text string) string {
 // 只重建发生变化的对象，保留其余字段的顺序、数字精度和字节内容。
 // 拒绝重复键，防止本地与上游 JSON 解析器选择不同值而绕过过滤。
 func filterClaudePrivacyObject(raw []byte, allowed map[string]bool, transform func(string, gjson.Result) ([]byte, bool, error)) ([]byte, error) {
-	root := gjson.ParseBytes(raw)
+	root := parseRawJSONView(raw)
 	if !root.IsObject() || !gjson.ValidBytes(raw) {
 		return nil, fmt.Errorf("Claude 请求包络格式不正确，请使用 JSON 对象")
 	}
 	seen := make(map[string]bool)
-	parts := make([][]byte, 0)
+	type fieldPart struct {
+		name  string
+		value []byte
+	}
+	parts := make([]fieldPart, 0)
 	changed := false
 	var transformErr error
 	root.ForEach(func(key, value gjson.Result) bool {
@@ -199,7 +203,7 @@ func filterClaudePrivacyObject(raw []byte, allowed map[string]bool, transform fu
 			changed = true
 			return true
 		}
-		next := []byte(value.Raw)
+		next := claudeBorrowRawJSON(value.Raw)
 		keep := true
 		if transform != nil {
 			next, keep, transformErr = transform(name, value)
@@ -212,9 +216,7 @@ func filterClaudePrivacyObject(raw []byte, allowed map[string]bool, transform fu
 			return true
 		}
 		changed = changed || string(next) != value.Raw
-		encodedKey, _ := json.Marshal(name)
-		part := append(encodedKey, ':')
-		parts = append(parts, append(part, next...))
+		parts = append(parts, fieldPart{name: name, value: next})
 		return true
 	})
 	if transformErr != nil {
@@ -223,12 +225,26 @@ func filterClaudePrivacyObject(raw []byte, allowed map[string]bool, transform fu
 	if !changed {
 		return raw, nil
 	}
-	out := []byte{'{'}
+	// Materialize only changed objects, once. Values are borrowed read-only
+	// while validation runs; do not create a full copy for every nesting level.
+	keys := make([][]byte, len(parts))
+	size := 2
+	for i, part := range parts {
+		keys[i], _ = json.Marshal(part.name)
+		size += len(keys[i]) + 1 + len(part.value)
+		if i > 0 {
+			size++
+		}
+	}
+	out := make([]byte, 0, size)
+	out = append(out, '{')
 	for i, part := range parts {
 		if i > 0 {
 			out = append(out, ',')
 		}
-		out = append(out, part...)
+		out = append(out, keys[i]...)
+		out = append(out, ':')
+		out = append(out, part.value...)
 	}
 	return append(out, '}'), nil
 }
@@ -240,7 +256,7 @@ func sanitizeClaudePrivacySystem(value gjson.Result) ([]byte, bool, error) {
 	if value.Type == gjson.String {
 		text := stripClaudePrivacySystemText(value.String())
 		if text == value.String() {
-			return []byte(value.Raw), true, nil
+			return claudeBorrowRawJSON(value.Raw), true, nil
 		}
 		encoded, err := json.Marshal(text)
 		return encoded, strings.TrimSpace(text) != "", err
@@ -251,7 +267,7 @@ func sanitizeClaudePrivacySystem(value gjson.Result) ([]byte, bool, error) {
 	items := make([][]byte, 0)
 	changed := false
 	for _, block := range value.Array() {
-		next, err := filterClaudePrivacyObject([]byte(block.Raw), claudePrivacySystemFields, func(name string, field gjson.Result) ([]byte, bool, error) {
+		next, err := filterClaudePrivacyObject(claudeBorrowRawJSON(block.Raw), claudePrivacySystemFields, func(name string, field gjson.Result) ([]byte, bool, error) {
 			if name == "text" && field.Type == gjson.String {
 				text := stripClaudePrivacySystemText(field.String())
 				if text != field.String() {
@@ -262,7 +278,7 @@ func sanitizeClaudePrivacySystem(value gjson.Result) ([]byte, bool, error) {
 			if name == "cache_control" {
 				return sanitizeClaudeCacheControl(field)
 			}
-			return []byte(field.Raw), true, nil
+			return claudeBorrowRawJSON(field.Raw), true, nil
 		})
 		if err != nil {
 			return nil, false, err
@@ -278,7 +294,7 @@ func sanitizeClaudePrivacySystem(value gjson.Result) ([]byte, bool, error) {
 		items = append(items, next)
 	}
 	if !changed {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	return buildJSONArrayRaw(items), len(items) > 0, nil
 }
@@ -287,29 +303,29 @@ func sanitizeClaudePrivacyMessageContent(value gjson.Result) ([]byte, bool, erro
 	if value.Type == gjson.String {
 		clean := stripClaudePrivacyAutoContext(value.String())
 		if clean == value.String() {
-			return []byte(value.Raw), true, nil
+			return claudeBorrowRawJSON(value.Raw), true, nil
 		}
 		encoded, err := json.Marshal(clean)
 		return encoded, clean != "", err
 	}
 	if !value.IsArray() {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	items := make([][]byte, 0)
 	changed := false
 	for _, block := range value.Array() {
 		if block.Get("type").String() != "text" {
-			items = append(items, []byte(block.Raw))
+			items = append(items, claudeBorrowRawJSON(block.Raw))
 			continue
 		}
 		clean := stripClaudePrivacyAutoContext(block.Get("text").String())
 		// 即使正文未变，也拒绝目标文本块的重复键，避免另一解析器读到未过滤值。
-		next, err := filterClaudePrivacyObject([]byte(block.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
+		next, err := filterClaudePrivacyObject(claudeBorrowRawJSON(block.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
 			if key == "text" && clean != field.String() {
 				encoded, err := json.Marshal(clean)
 				return encoded, true, err
 			}
-			return []byte(field.Raw), true, nil
+			return claudeBorrowRawJSON(field.Raw), true, nil
 		})
 		if err != nil {
 			return nil, false, err
@@ -322,23 +338,23 @@ func sanitizeClaudePrivacyMessageContent(value gjson.Result) ([]byte, bool, erro
 		items = append(items, next)
 	}
 	if !changed {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	return buildJSONArrayRaw(items), len(items) > 0, nil
 }
 
 func sanitizeClaudePrivacyMessages(value gjson.Result) ([]byte, bool, error) {
 	if !value.IsArray() {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	items := make([][]byte, 0)
 	changed := false
 	for _, message := range value.Array() {
 		keepMessage := true
 		role := message.Get("role").String()
-		next, err := filterClaudePrivacyObject([]byte(message.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
+		next, err := filterClaudePrivacyObject(claudeBorrowRawJSON(message.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
 			if key != "content" || (role != "user" && role != "system") {
-				return []byte(field.Raw), true, nil
+				return claudeBorrowRawJSON(field.Raw), true, nil
 			}
 			clean, keep, err := sanitizeClaudePrivacyMessageContent(field)
 			keepMessage = keep
@@ -353,7 +369,7 @@ func sanitizeClaudePrivacyMessages(value gjson.Result) ([]byte, bool, error) {
 		}
 	}
 	if !changed {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	if len(items) == 0 {
 		return nil, false, fmt.Errorf("Claude 请求仅包含客户端自动上下文，请补充需要处理的消息")
@@ -379,10 +395,10 @@ func sanitizeClaudePrivacyBody(body []byte) ([]byte, error) {
 			if !value.IsObject() {
 				return nil, false, nil
 			}
-			next, err = filterClaudePrivacyObject([]byte(value.Raw), claudePrivacyMetadataFields, func(key string, field gjson.Result) ([]byte, bool, error) {
+			next, err = filterClaudePrivacyObject(claudeBorrowRawJSON(value.Raw), claudePrivacyMetadataFields, func(key string, field gjson.Result) ([]byte, bool, error) {
 				if field.Type == gjson.String && strings.HasPrefix(strings.TrimSpace(field.String()), "{") {
 					identity, err := filterClaudePrivacyObject([]byte(field.String()), claudePrivacyIdentityFields, func(_ string, id gjson.Result) ([]byte, bool, error) {
-						return []byte(id.Raw), id.Type == gjson.String && claudePrivacyOpaqueID.MatchString(id.String()), nil
+						return claudeBorrowRawJSON(id.Raw), id.Type == gjson.String && claudePrivacyOpaqueID.MatchString(id.String()), nil
 					})
 					if err != nil {
 						return nil, false, err
@@ -390,7 +406,7 @@ func sanitizeClaudePrivacyBody(body []byte) ([]byte, error) {
 					encoded, err := json.Marshal(string(identity))
 					return encoded, true, err
 				}
-				return []byte(field.Raw), field.Type == gjson.Null || (field.Type == gjson.String && claudePrivacyOpaqueID.MatchString(field.String())), nil
+				return claudeBorrowRawJSON(field.Raw), field.Type == gjson.Null || (field.Type == gjson.String && claudePrivacyOpaqueID.MatchString(field.String())), nil
 			})
 		case "diagnostics":
 			return sanitizeClaudeDiagnostics(value)
@@ -399,7 +415,7 @@ func sanitizeClaudePrivacyBody(body []byte) ([]byte, error) {
 		case "safeguards":
 			return sanitizeClaudePrivacySafeguards(value)
 		default:
-			return []byte(value.Raw), true, nil
+			return claudeBorrowRawJSON(value.Raw), true, nil
 		}
 		return next, true, err
 	})

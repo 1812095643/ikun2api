@@ -16,11 +16,15 @@ interface Props {
   groupId?: number | null
   errorType: 'request' | 'upstream'
   resumeState?: boolean
+  /** Narrows the list to one upstream account (deep links from the anomaly monitor). */
+  accountId?: number | null
+  initialStatusCode?: number | null
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'update:show', value: boolean): void
+  (e: 'update:accountId', value: null): void
   (e: 'openErrorDetail', errorId: number): void
 }>()
 
@@ -127,6 +131,7 @@ async function fetchErrorLogs() {
     const platform = String(props.platform || '').trim()
     if (platform) params.platform = platform
     if (typeof props.groupId === 'number' && props.groupId > 0) params.group_id = props.groupId
+    if (typeof props.accountId === 'number' && props.accountId > 0) params.account_id = props.accountId
 
     if (q.value.trim()) params.q = q.value.trim()
     if (statusCode.value === 'other') params.status_codes_other = '1'
@@ -155,8 +160,9 @@ async function fetchErrorLogs() {
 
   function resetFilters() {
     q.value = ''
-    statusCode.value = null
-    phase.value = props.errorType === 'upstream' ? 'upstream' : ''
+    statusCode.value = props.initialStatusCode ?? null
+    // One account's errors include connection failures, which are not in the upstream phase.
+    phase.value = props.errorType === 'upstream' && !props.accountId ? 'upstream' : ''
     errorOwner.value = ''
     viewMode.value = 'errors'
     page.value = 1
@@ -176,7 +182,7 @@ watch(
 )
 
 watch(
-  () => [props.timeRange, props.customStartTime, props.customEndTime, props.platform, props.groupId] as const,
+  () => [props.timeRange, props.customStartTime, props.customEndTime, props.platform, props.groupId, props.accountId] as const,
   () => {
     if (!props.show) return
     page.value = 1
@@ -220,6 +226,10 @@ watch(
     <div class="flex h-full min-h-0 flex-col">
       <!-- Filters -->
       <div class="mb-4 flex-shrink-0 border-b border-gray-200 pb-4 dark:border-dark-700">
+        <div v-if="accountId" class="mb-2 flex items-center gap-2 text-xs">
+          <span class="rounded-md bg-blue-50 px-2 py-1 font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">{{ t('admin.ops.errorDetails.accountFilter', { id: accountId }) }}</span>
+          <button type="button" class="text-gray-500 underline hover:text-gray-700 dark:hover:text-gray-300" @click="emit('update:accountId', null)">{{ t('admin.ops.errorDetails.clearAccountFilter') }}</button>
+        </div>
         <div class="grid grid-cols-2 gap-2 md:grid-cols-8">
           <div class="col-span-2 compact-select">
             <div class="relative group">
