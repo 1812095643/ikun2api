@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html"
 	"math"
-	"regexp"
 	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/handler/dto"
@@ -29,12 +28,15 @@ type accountTemplate struct {
 	ModelMapping       map[string]string    `json:"model_mapping"`
 }
 type reloginConfig struct {
-	AutoEnabled    bool            `json:"auto_enabled"`
-	Template       accountTemplate `json:"template"`
-	QuotaEnabled   bool            `json:"quota_enabled"`
-	QuotaInterval  int             `json:"quota_interval"`
-	QuotaThreshold float64         `json:"quota_threshold"`
-	Recipients     []string        `json:"recipients"`
+	AutoEnabled            bool            `json:"auto_enabled"`
+	AutoErrorThreshold     int             `json:"auto_error_threshold"`
+	AutoErrorWindowMinutes int             `json:"auto_error_window_minutes"`
+	AutoCooldownMinutes    int             `json:"auto_cooldown_minutes"`
+	Template               accountTemplate `json:"template"`
+	QuotaEnabled           bool            `json:"quota_enabled"`
+	QuotaInterval          int             `json:"quota_interval"`
+	QuotaThreshold         float64         `json:"quota_threshold"`
+	Recipients             []string        `json:"recipients"`
 }
 
 func (h *Handler) loadReloginSettings(ctx context.Context) (reloginConfig, error) {
@@ -62,6 +64,15 @@ func (h *Handler) loadReloginSettings(ctx context.Context) (reloginConfig, error
 	}
 	if err := normalizeReloginTemplate(&s.Template); err != nil {
 		return s, err
+	}
+	if s.AutoErrorThreshold == 0 {
+		s.AutoErrorThreshold = 5
+	}
+	if s.AutoErrorWindowMinutes == 0 {
+		s.AutoErrorWindowMinutes = 10
+	}
+	if s.AutoCooldownMinutes == 0 {
+		s.AutoCooldownMinutes = 360
 	}
 	if err := h.pruneDeletedReloginGroups(ctx, &s); err != nil {
 		return s, err
@@ -151,6 +162,10 @@ func (h *Handler) saveReloginSettings(c *gin.Context) {
 	}
 	if err := body(c, &s, 64<<10); err != nil {
 		fail(c, err)
+		return
+	}
+	if s.AutoErrorThreshold < 1 || s.AutoErrorThreshold > 100 || s.AutoErrorWindowMinutes < 1 || s.AutoErrorWindowMinutes > 60 || s.AutoCooldownMinutes < 1 || s.AutoCooldownMinutes > 1440 {
+		fail(c, badRequest("认证异常次数应为 1 至 100 次，统计窗口应为 1 至 60 分钟，重登间隔应为 1 至 1440 分钟。"))
 		return
 	}
 	if s.Template.Concurrency < 1 || s.Template.Concurrency > 10000 || s.Template.Priority < 0 || s.Template.RateMultiplier < 0 || math.IsNaN(s.Template.RateMultiplier) || math.IsInf(s.Template.RateMultiplier, 0) || s.QuotaInterval < 60 || s.QuotaInterval > 86400 || s.QuotaThreshold < 0 || math.IsNaN(s.QuotaThreshold) || math.IsInf(s.QuotaThreshold, 0) || len(s.Recipients) > 20 {
@@ -245,9 +260,13 @@ func (h *Handler) reloginOptions(c *gin.Context) {
 	response.Success(c, gin.H{"groups": g, "proxies": p})
 }
 
-var expiredCredentials = regexp.MustCompile(`(?i)401|unauthorized|token revoked|invalidated|authentication failed`)
-
 func (h *Handler) automaticRelogin(ctx context.Context) (int, error) {
+	h.reloginScanMu.Lock()
+	defer h.reloginScanMu.Unlock()
+	s, err := h.loadReloginSettings(ctx)
+	if err != nil {
+		return 0, err
+	}
 	accounts, err := h.allOpenAIAccounts(ctx)
 	if err != nil {
 		return 0, err
@@ -257,16 +276,37 @@ func (h *Handler) automaticRelogin(ctx context.Context) (int, error) {
 		if count >= 20 {
 			break
 		}
-		if a.Status != "error" || a.ParentAccountID != nil || !expiredCredentials.MatchString(a.ErrorMessage) {
+		if !service.IsOpenAIOAuthReloginAccount(&a) {
+			continue
+		}
+		pending := service.OpenAIOAuthRecoveryPending(&a)
+		thresholdReached := h.recovery != nil && a.IsActive() && a.Schedulable && h.recovery.OpenAIOAuthAuthFailureCount(&a, time.Duration(s.AutoErrorWindowMinutes)*time.Minute) >= s.AutoErrorThreshold
+		if !pending && !thresholdReached {
 			continue
 		}
 		email := accountEmail(a)
 		var recent int
-		if err = h.db.QueryRowContext(ctx, "SELECT count(*) FROM workspace_relogin_runs WHERE account_id=$1 AND trigger='auto' AND started_at>NOW()-INTERVAL '6 hours'", a.ID).Scan(&recent); err != nil {
+		if err = h.db.QueryRowContext(ctx, `SELECT count(*) FROM workspace_relogin_runs WHERE account_id=$1 AND trigger='auto'
+		 AND (status IN ('running','challenge') OR started_at>NOW()-$2*INTERVAL '1 minute')`, a.ID, s.AutoCooldownMinutes).Scan(&recent); err != nil {
 			return count, err
 		}
 		if recent > 0 {
 			continue
+		}
+		// 先暂停达到阈值的坏凭据；缺少登录资料也不能继续反复失败。
+		if thresholdReached || (pending && a.Extra[service.OpenAIOAuthRecoveryExtraKey] == nil) {
+			message := a.ErrorMessage
+			if thresholdReached {
+				message = fmt.Sprintf("OpenAI OAuth authentication failed: %d 次认证异常，等待自动重登", s.AutoErrorThreshold)
+			}
+			if h.recovery == nil {
+				continue
+			}
+			paused, pauseErr := h.recovery.PauseOpenAIOAuthForRelogin(ctx, &a, message, true)
+			if pauseErr != nil {
+				continue
+			}
+			a = *paused
 		}
 		secret, e := h.loadSecret(ctx, email)
 		if e != nil {

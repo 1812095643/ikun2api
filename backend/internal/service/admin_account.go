@@ -748,8 +748,10 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		// 目录观察和能力 metadata 只由同步写入。表单里的旧值或注入值不能进入本次更新。
 		delete(normalizedExtra, grokObservedModelsExtraKey)
 		delete(normalizedExtra, UpstreamModelMetadataExtraKey)
+		delete(normalizedExtra, OpenAIOAuthRecoveryExtraKey)
 		// 保留配额用量和专用服务受管字段，防止普通账号编辑意外覆盖。
 		for _, key := range []string{
+			OpenAIOAuthRecoveryExtraKey,
 			"quota_used",
 			"quota_daily_used",
 			"quota_daily_start",
@@ -903,6 +905,11 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	if input.Status != "" {
 		account.Status = input.Status
+		if account.Extra == nil {
+			account.Extra = map[string]any{}
+		}
+		// 管理员手动选择状态后，不由旧的自动重登任务恢复调度。
+		account.Extra[OpenAIOAuthRecoveryExtraKey] = nil
 	}
 	if input.ExpiresAt != nil {
 		if *input.ExpiresAt <= 0 {

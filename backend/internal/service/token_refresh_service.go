@@ -1003,7 +1003,8 @@ func (s *TokenRefreshService) refreshWithRetryWithRateGate(
 		if isNonRetryableRefreshError(err) {
 			errorMsg := "Token refresh failed (non-retryable): " + logredact.RedactText(err.Error())
 			isGrokOAuth := account.IsGrokOAuth()
-			if !isGrokOAuth {
+			isOpenAIOAuth := IsOpenAIOAuthReloginAccount(account)
+			if !isGrokOAuth && !isOpenAIOAuth {
 				s.notifyAccountSchedulingBlocked(account, time.Time{}, "token_refresh_non_retryable")
 			}
 			s.clearAntigravityForceTokenRefresh(ctx, account, "non_retryable")
@@ -1028,6 +1029,20 @@ func (s *TokenRefreshService) refreshWithRetryWithRateGate(
 						return errRefreshSkipped
 					}
 				}
+			} else if isOpenAIOAuth {
+				conditionalRepo, ok := s.accountRepo.(OpenAIOAuthRecoveryRepository)
+				if !ok {
+					return &providerConfigurationRefreshError{err: errors.New("OpenAI OAuth recovery repository is unavailable")}
+				}
+				persistentlyBlocked, setErr = conditionalRepo.PauseOpenAIOAuthIfUnchanged(ctx, account, OpenAIOAuthRejectedMessage, true)
+				if setErr == nil && !persistentlyBlocked {
+					// 统一刷新入口可能已暂停同一失败凭据；仍需执行缓存失效。
+					current, readErr := s.accountRepo.GetByID(ctx, account.ID)
+					persistentlyBlocked = readErr == nil && current != nil && OpenAIOAuthRecoveryPending(current) && OpenAIOAuthRecoveryFingerprint(current) == OpenAIOAuthRecoveryFingerprint(account)
+					if !persistentlyBlocked {
+						return errRefreshSkipped
+					}
+				}
 			} else {
 				setErr = s.accountRepo.SetError(ctx, account.ID, errorMsg)
 				persistentlyBlocked = setErr == nil
@@ -1046,7 +1061,7 @@ func (s *TokenRefreshService) refreshWithRetryWithRateGate(
 				s.notifyAccountSchedulingBlocked(account, time.Time{}, "token_refresh_non_retryable")
 			}
 			cacheInvalidationFailed := false
-			if account.Type == AccountTypeOAuth && (!isGrokOAuth || persistentlyBlocked) {
+			if account.Type == AccountTypeOAuth && ((!isGrokOAuth && !isOpenAIOAuth) || persistentlyBlocked) {
 				if s.cacheInvalidator == nil {
 					cacheInvalidationFailed = true
 				} else if invalidateErr := s.cacheInvalidator.InvalidateToken(ctx, account); invalidateErr != nil {

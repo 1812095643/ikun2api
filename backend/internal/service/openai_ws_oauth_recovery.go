@@ -69,6 +69,9 @@ func (s *OpenAIGatewayService) acquireOpenAIWSWithAuthRecovery(ctx context.Conte
 	}
 	headers, owner, recovered := s.recoverOpenAIOAuthHeaders(ctx, request.Account, request.Headers)
 	if !recovered {
+		if s.openAITokenProvider != nil && s.openAITokenProvider.refreshAPI != nil {
+			s.openAITokenProvider.refreshAPI.RecordOpenAIOAuthAuthFailure(request.Account, dialErr.StatusCode, nil)
+		}
 		return nil, err
 	}
 	request.Headers = headers

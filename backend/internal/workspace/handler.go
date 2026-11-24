@@ -38,6 +38,8 @@ type Handler struct {
 	settings      *service.SettingService
 	quota         *service.OpenAIQuotaService
 	invalidator   service.TokenCacheInvalidator
+	recovery      *service.OAuthRefreshAPI
+	reloginScanMu sync.Mutex
 	client        *http.Client
 	feedMu        sync.Mutex
 	feedCache     map[string]cachedFeed
@@ -49,6 +51,10 @@ type Handler struct {
 	background    context.Context
 	stop          context.CancelFunc
 	balanceWake   chan struct{}
+}
+
+func (h *Handler) ConfigureReloginRecovery(recovery *service.OAuthRefreshAPI) {
+	h.recovery = recovery
 }
 
 func NewHandler(db *sql.DB, admin service.AdminService, oauth *service.OpenAIOAuthService, encryptor service.SecretEncryptor, email *service.EmailService, settings *service.SettingService, quota *service.OpenAIQuotaService, invalidator service.TokenCacheInvalidator, cfg *config.Config) *Handler {

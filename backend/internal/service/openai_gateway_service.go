@@ -1287,6 +1287,15 @@ func (s *OpenAIGatewayService) GetAccessToken(ctx context.Context, account *Acco
 		if s.openAITokenProvider != nil {
 			accessToken, err := s.openAITokenProvider.GetAccessToken(ctx, account)
 			if err != nil {
+				var rejection *openai.RefreshTokenError
+				if errors.As(err, &rejection) && rejection.Permanent {
+					return "", "", &UpstreamFailoverError{
+						StatusCode: http.StatusUnauthorized, Stage: GatewayFailureStageAccountAuth,
+						Scope: GatewayFailureScopeAccount, Reason: "openai_oauth_credentials_rejected",
+						NextAccountAction: NextAccountRetry, ClientStatusCode: http.StatusBadGateway,
+						ClientMessage: "账号授权暂不可用，请稍后重试。",
+					}
+				}
 				return "", "", err
 			}
 			return accessToken, "oauth", nil

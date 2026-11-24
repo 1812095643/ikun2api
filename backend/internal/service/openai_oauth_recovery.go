@@ -126,6 +126,7 @@ func (p *OpenAITokenProvider) RecordUnauthorizedAfterRefresh(ctx context.Context
 		return
 	}
 	p.refreshAPI.recordOpenAIRefreshFailure(latest, &openai.RefreshTokenError{StatusCode: http.StatusUnauthorized, Permanent: true})
+	p.refreshAPI.pauseRejectedOpenAIOAuth(ctx, latest)
 	if p.tokenCache != nil {
 		_ = p.tokenCache.DeleteAccessToken(ctx, OpenAITokenCacheKey(latest))
 	}

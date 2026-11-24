@@ -134,6 +134,9 @@ func (s *OpenAIGatewayService) setOpenAICapacityModelCooldown(
 // handleOpenAIAccountUpstreamError expects canonicalModel to be the model used
 // for scheduling after applying account mapping exactly once.
 func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte, canonicalModel ...string) bool {
+	if s != nil && s.openAITokenProvider != nil && s.openAITokenProvider.refreshAPI != nil {
+		s.openAITokenProvider.refreshAPI.RecordOpenAIOAuthAuthFailure(account, statusCode, responseBody)
+	}
 	if account != nil && account.Platform == PlatformGrok && isGrokContentPolicyRejection(statusCode, responseBody) {
 		return false
 	}
@@ -183,6 +186,15 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 		message := "OpenAI upstream account or workspace is unavailable"
 		if upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(responseBody)); upstreamMsg != "" {
 			message = upstreamMsg
+		}
+		if s != nil && s.rateLimitService != nil && IsOpenAIOAuthReloginAccount(account) {
+			if repo, ok := s.rateLimitService.accountRepo.(OpenAIOAuthRecoveryRepository); ok {
+				_, err := repo.PauseOpenAIOAuthIfUnchanged(stateCtx, account, "OpenAI OAuth account_disabled: "+message, false)
+				if err != nil {
+					slog.Warn("openai_oauth_disabled_pause_failed", "account_id", account.ID)
+				}
+				return true
+			}
 		}
 		if s != nil && s.rateLimitService != nil {
 			s.rateLimitService.handleAuthError(stateCtx, account, message)

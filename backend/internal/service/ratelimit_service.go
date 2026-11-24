@@ -989,6 +989,14 @@ func (s *RateLimitService) GeminiCooldown(ctx context.Context, account *Account)
 
 // handleAuthError 处理认证类错误(401/403)，停止账号调度
 func (s *RateLimitService) handleAuthError(ctx context.Context, account *Account, errorMsg string) {
+	if IsOpenAIOAuthReloginAccount(account) {
+		if repo, ok := s.accountRepo.(OpenAIOAuthRecoveryRepository); ok {
+			if _, err := repo.PauseOpenAIOAuthIfUnchanged(ctx, account, errorMsg, true); err != nil {
+				slog.Warn("openai_oauth_auth_pause_failed", "account_id", account.ID)
+			}
+			return
+		}
+	}
 	s.notifyAccountSchedulingBlocked(account, time.Time{}, "auth_error")
 	if err := s.accountRepo.SetError(ctx, account.ID, errorMsg); err != nil {
 		slog.Warn("account_set_error_failed", "account_id", account.ID, "error", err)

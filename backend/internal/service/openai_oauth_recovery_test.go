@@ -207,6 +207,8 @@ func TestOpenAIOAuthRecovery_SecondUnauthorizedBlocksOnlyRejectedVersion(t *test
 	token, err = provider.GetAccessToken(context.Background(), account)
 	require.NoError(t, err)
 	require.Equal(t, "reauthorized-access", token)
+	_, rejected := provider.refreshAPI.openAIFailures.Load(account.ID)
+	require.False(t, rejected)
 	require.Zero(t, repo.setError)
 }
 

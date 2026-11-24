@@ -135,11 +135,14 @@ func snapshotOAuthRefreshAccount(account *Account) *Account {
 // OAuthRefreshAPI 统一的 OAuth Token 刷新入口
 // 封装分布式锁、进程内互斥锁、DB 重读、已刷新检查、竞争恢复等通用逻辑
 type OAuthRefreshAPI struct {
-	accountRepo    AccountRepository
-	tokenCache     GeminiTokenCache // 可选，nil = 无分布式锁
-	lockTTL        time.Duration
-	localLocks     sync.Map // key: cacheKey string -> value: *contextMutex
-	openAIFailures sync.Map // account ID -> credential-scoped OpenAI rejection
+	accountRepo        AccountRepository
+	tokenCache         GeminiTokenCache // 可选，nil = 无分布式锁
+	lockTTL            time.Duration
+	localLocks         sync.Map // key: cacheKey string -> value: *contextMutex
+	openAIFailures     sync.Map // account ID -> credential-scoped OpenAI rejection
+	openAIAuthMu       sync.Mutex
+	openAIAuthFailures map[int64]openAIOAuthAuthFailures
+	openAIAuthPrunedAt time.Time
 }
 
 // NewOAuthRefreshAPI 创建统一刷新 API
@@ -336,6 +339,7 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 				return nil, &oauthRefreshStateUnavailableError{err: errOAuthRefreshAccountStateChanged}
 			}
 			api.recordOpenAIRefreshFailure(attemptedAccount, openAIError)
+			api.pauseRejectedOpenAIOAuth(ctx, attemptedAccount)
 		}
 		// Preserve the exact account snapshot used by the failed upstream call.
 		// Callers can then conditionally mutate only that credential version and

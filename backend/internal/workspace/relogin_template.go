@@ -18,6 +18,7 @@ type accountTemplateExtra struct {
 func defaultReloginConfig() reloginConfig {
 	load := 10000
 	return reloginConfig{
+		AutoErrorThreshold: 5, AutoErrorWindowMinutes: 10, AutoCooldownMinutes: 360,
 		Template: accountTemplate{
 			GroupIDs: []int64{}, Concurrency: 100, LoadFactor: &load, Priority: 1,
 			RateMultiplier: 1, AutoPauseOnExpired: true, ModelMapping: map[string]string{},

@@ -53,6 +53,10 @@ func (r *accountRepository) setManualSchedulable(ctx context.Context, id int64, 
 	if n == 0 {
 		return service.ErrAccountNotFound
 	}
+	if _, err := client.ExecContext(ctx, `UPDATE accounts SET extra=jsonb_set(COALESCE(extra,'{}'::jsonb),'{openai_oauth_recovery}','null'::jsonb)
+	 WHERE id=$1 AND platform='openai' AND type='oauth'`, id); err != nil {
+		return err
+	}
 	if err := cancelManualAccountTimers(ctx, client, id); err != nil {
 		return err
 	}

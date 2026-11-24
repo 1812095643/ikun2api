@@ -56,11 +56,23 @@ describe('账号授权入口', () => {
 
 describe('失效重登设置标签', () => {
   const settings: ReloginSettings = {
-    auto_enabled: true, template: { proxy_id: null, concurrency: 100, load_factor: 10000, priority: 1, rate_multiplier: 1, group_ids: [2], auto_pause_on_expired: true,
+    auto_enabled: true, auto_error_threshold: 5, auto_error_window_minutes: 10, auto_cooldown_minutes: 360,
+    template: { proxy_id: null, concurrency: 100, load_factor: 10000, priority: 1, rate_multiplier: 1, group_ids: [2], auto_pause_on_expired: true,
       extra: { codex_fingerprint_mode: 'full', openai_long_context_billing_enabled: true, openai_oauth_responses_websockets_v2_mode: 'ctx_pool', openai_oauth_responses_websockets_v2_enabled: true }, model_mapping: {} },
     quota_enabled: false, quota_interval: 300, quota_threshold: 20, recipients: ['owner@example.test']
   }
   const options = { groups: [{ id: 2, name: 'GPT' }], proxies: [] }
+  it('认证异常阈值、窗口和冷却间隔可以独立保存', async () => {
+    const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
+    await wrapper.get('#relogin-error-threshold').setValue(8)
+    await wrapper.get('#relogin-error-window').setValue(15)
+    await wrapper.get('#relogin-cooldown').setValue(60)
+    await wrapper.get('form').trigger('submit')
+    const saved = wrapper.emitted('save')?.[0][0] as ReloginSettings
+    expect([saved.auto_error_threshold, saved.auto_error_window_minutes, saved.auto_cooldown_minutes]).toEqual([8, 15, 60])
+    expect(settings.auto_error_threshold).toBe(5)
+    wrapper.unmount()
+  })
   it('代理、档位、开关与数字输入沿用账号编辑组件', async () => {
     const wrapper = mount(ReloginSettingsForm, { props: { settings, options, busy: false }, global: { plugins: [createPinia()] } })
     expect(wrapper.getComponent(ProxySelector).props('proxies')).toEqual([])

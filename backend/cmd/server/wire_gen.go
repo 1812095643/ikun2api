@@ -160,7 +160,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	emailQueueService := service.ProvideEmailQueueService(emailService)
 	totpService := service.NewTotpService(userRepository, secretEncryptor, totpCache, settingService, emailService, emailQueueService)
 	userService := service.NewUserService(userRepository, settingRepository, apiKeyAuthCacheInvalidator, billingCache)
-	workspaceHandler := handler.ProvideWorkspaceHandler(db, adminService, openAIOAuthService, secretEncryptor, emailService, settingService, openAIQuotaService, compositeTokenCacheInvalidator, configConfig, gatewayService, accountUsageService, totpService, userService)
+	workspaceHandler := handler.ProvideWorkspaceHandler(db, adminService, openAIOAuthService, secretEncryptor, emailService, settingService, openAIQuotaService, compositeTokenCacheInvalidator, configConfig, gatewayService, accountUsageService, totpService, userService, oAuthRefreshAPI)
 	refreshTokenCache := repository.NewRefreshTokenCache(redisClient)
 	turnstileVerifier := repository.NewTurnstileVerifier()
 	turnstileService := service.NewTurnstileService(settingService, turnstileVerifier)

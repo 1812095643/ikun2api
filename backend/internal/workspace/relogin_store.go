@@ -34,19 +34,20 @@ type importedAccount struct {
 	LastUsedAt  *time.Time `json:"last_used_at"`
 }
 type reloginRun struct {
-	ID           int64          `json:"id"`
-	Email        string         `json:"email"`
-	AccountID    *int64         `json:"account_id"`
-	Trigger      string         `json:"trigger"`
-	Status       string         `json:"status"`
-	StartedAt    time.Time      `json:"started_at"`
-	FinishedAt   *time.Time     `json:"finished_at"`
-	ErrorMessage string         `json:"error_message"`
-	PlanType     string         `json:"plan_type"`
-	Applied      bool           `json:"applied"`
-	ApplyAction  string         `json:"apply_action"`
-	Challenge    map[string]any `json:"challenge,omitempty"`
-	Blob         string         `json:"-"`
+	ID                 int64          `json:"id"`
+	Email              string         `json:"email"`
+	AccountID          *int64         `json:"account_id"`
+	Trigger            string         `json:"trigger"`
+	Status             string         `json:"status"`
+	StartedAt          time.Time      `json:"started_at"`
+	FinishedAt         *time.Time     `json:"finished_at"`
+	ErrorMessage       string         `json:"error_message"`
+	PlanType           string         `json:"plan_type"`
+	Applied            bool           `json:"applied"`
+	ApplyAction        string         `json:"apply_action"`
+	Challenge          map[string]any `json:"challenge,omitempty"`
+	Blob               string         `json:"-"`
+	AccountFingerprint string         `json:"-"`
 }
 type accountSummary struct {
 	ID           int64     `json:"id"`
@@ -450,11 +451,11 @@ func (h *Handler) deleteInvalidImported(c *gin.Context) {
 	response.Success(c, gin.H{"deleted": count})
 }
 
-const runColumns = "id,email,account_id,trigger,status,started_at,finished_at,error_message,plan_type,applied,apply_action,result_blob"
+const runColumns = "id,email,account_id,trigger,status,started_at,finished_at,error_message,plan_type,applied,apply_action,result_blob,account_fingerprint"
 
 func scanRun(row rowScanner) (reloginRun, error) {
 	var run reloginRun
-	err := row.Scan(&run.ID, &run.Email, &run.AccountID, &run.Trigger, &run.Status, &run.StartedAt, &run.FinishedAt, &run.ErrorMessage, &run.PlanType, &run.Applied, &run.ApplyAction, &run.Blob)
+	err := row.Scan(&run.ID, &run.Email, &run.AccountID, &run.Trigger, &run.Status, &run.StartedAt, &run.FinishedAt, &run.ErrorMessage, &run.PlanType, &run.Applied, &run.ApplyAction, &run.Blob, &run.AccountFingerprint)
 	return run, err
 }
 func (h *Handler) loadRun(ctx context.Context, id int64) (reloginRun, error) {

@@ -102,9 +102,22 @@ function save() {
       <div class="flex items-center justify-between gap-4">
         <div>
           <label class="input-label mb-0" for="relogin-auto-enabled">自动重登</label>
-          <p class="input-hint">凭据失效时使用已保存资料重登，同一账号间隔至少 6 小时。</p>
         </div>
         <Toggle id="relogin-auto-enabled" v-model="draft.auto_enabled" aria-label="自动重登" :disabled="busy" />
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div>
+          <label class="input-label" for="relogin-error-threshold">认证异常次数</label>
+          <input id="relogin-error-threshold" v-model.number="draft.auto_error_threshold" class="input" type="number" min="1" max="100" required />
+        </div>
+        <div>
+          <label class="input-label" for="relogin-error-window">统计窗口（分钟）</label>
+          <input id="relogin-error-window" v-model.number="draft.auto_error_window_minutes" class="input" type="number" min="1" max="60" required />
+        </div>
+        <div>
+          <label class="input-label" for="relogin-cooldown">重登间隔（分钟）</label>
+          <input id="relogin-cooldown" v-model.number="draft.auto_cooldown_minutes" class="input" type="number" min="1" max="1440" required />
+        </div>
       </div>
     </section>
     <section id="relogin-settings-panel-account" v-show="activeTab === 'account'" data-settings-tab="account"

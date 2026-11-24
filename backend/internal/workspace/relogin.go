@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -94,6 +95,11 @@ func requestSession(ctx context.Context, payload map[string]any) (map[string]any
 	}
 	defer r.Body.Close()
 	if r.StatusCode < 200 || r.StatusCode >= 300 {
+		data, readErr := io.ReadAll(io.LimitReader(r.Body, (1<<20)+1))
+		var result map[string]any
+		if readErr == nil && len(data) <= 1<<20 && json.Unmarshal(data, &result) == nil && reloginTerminalFailure(result) != "" {
+			return result, nil
+		}
 		return nil, &requestError{502, "重登服务未完成这次请求，请检查账号资料后重试。"}
 	}
 	reader := io.LimitReader(r.Body, (1<<20)+1)
@@ -125,6 +131,12 @@ func requestSession(ctx context.Context, payload map[string]any) (map[string]any
 			result, _ = event["payload"].(map[string]any)
 		} else if findCredentials(event) != nil {
 			result = event
+		} else if event["type"] == "error" || event["type"] == "failed" {
+			if payload, ok := event["payload"].(map[string]any); ok {
+				result = payload
+			} else {
+				result = event
+			}
 		}
 	}
 	if scanner.Err() != nil || result == nil {
@@ -142,6 +154,8 @@ func (h *Handler) saveRunResult(ctx context.Context, id int64, email string, res
 	} else if _, ok := result["challenge"].(map[string]any); ok {
 		status = "challenge"
 		message = ""
+	} else if terminal := reloginTerminalFailure(result); terminal != "" {
+		message = terminal
 	}
 	raw, err := json.Marshal(map[string]any{"email": email, "result": result})
 	if err != nil {
@@ -187,11 +201,24 @@ func (h *Handler) queueRelogin(ctx context.Context, secret loginSecret, accountI
 	if err := h.validateTargetAccount(ctx, secret.Email, accountID); err != nil {
 		return 0, err
 	}
+	var target *service.Account
+	if accountID != nil && *accountID > 0 {
+		var err error
+		target, err = h.admin.GetAccount(ctx, *accountID)
+		if err != nil {
+			return 0, err
+		}
+		if !service.IsOpenAIOAuthReloginAccount(target) || accountEmail(*target) != secret.Email {
+			return 0, badRequest("请选择对应邮箱的 OpenAI OAuth 账号。")
+		}
+		if trigger == "auto" && !service.OpenAIOAuthRecoveryPending(target) {
+			return 0, &requestError{409, "账号状态已经变化，已跳过自动重登。"}
+		}
+	}
 	if !h.acquireRun(secret.Email) {
 		return 0, &requestError{409, "这个账号已有重登任务，请等待当前任务完成。"}
 	}
-	var id int64
-	err := h.db.QueryRowContext(ctx, "INSERT INTO workspace_relogin_runs(email,account_id,trigger) VALUES($1,$2,$3) RETURNING id", secret.Email, accountID, trigger).Scan(&id)
+	id, err := h.insertReloginRun(ctx, secret.Email, accountID, trigger, service.OpenAIOAuthRecoveryFingerprint(target))
 	if err != nil {
 		h.releaseRun(secret.Email)
 		return 0, err
@@ -224,6 +251,11 @@ func (h *Handler) queueRelogin(ctx context.Context, secret loginSecret, accountI
 			h.failRun(id, e)
 			return
 		}
+		if message := reloginTerminalFailure(result); status == "failed" && message != "" && target != nil && h.recovery != nil {
+			if _, e = h.recovery.PauseOpenAIOAuthForRelogin(job, target, message, false); e != nil {
+				h.failRun(id, &requestError{409, "登录确认异常，但账号状态已变化；未覆盖当前账号，请检查账号状态。"})
+			}
+		}
 		_, _ = h.db.ExecContext(job, "UPDATE workspace_relogin_accounts SET last_used_at=NOW() WHERE email=$1", secret.Email)
 		if status == "success" && apply {
 			if e = h.applyRun(job, id); e != nil {
@@ -233,6 +265,38 @@ func (h *Handler) queueRelogin(ctx context.Context, secret loginSecret, accountI
 		h.pruneRuns(job)
 	}()
 	return id, nil
+}
+
+func (h *Handler) insertReloginRun(ctx context.Context, email string, accountID *int64, trigger, fingerprint string) (int64, error) {
+	var id int64
+	if trigger != "auto" || accountID == nil {
+		err := h.db.QueryRowContext(ctx, "INSERT INTO workspace_relogin_runs(email,account_id,trigger,account_fingerprint) VALUES($1,$2,$3,$4) RETURNING id", email, accountID, trigger, fingerprint).Scan(&id)
+		return id, err
+	}
+	s, err := h.loadReloginSettings(ctx)
+	if err != nil {
+		return 0, err
+	}
+	tx, err := h.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	// 数据库锁与冷却检查共用事务，多实例扫描也只能启动一项自动任务。
+	if _, err = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock($1)", int64(0x52454c4f00000000)^*accountID); err != nil {
+		return 0, err
+	}
+	err = tx.QueryRowContext(ctx, `INSERT INTO workspace_relogin_runs(email,account_id,trigger,account_fingerprint)
+	 SELECT $1,$2,'auto',$3 WHERE NOT EXISTS (
+	 SELECT 1 FROM workspace_relogin_runs WHERE account_id=$2 AND trigger='auto'
+	 AND (status IN ('running','challenge') OR started_at>NOW()-$4*INTERVAL '1 minute')) RETURNING id`, email, accountID, fingerprint, s.AutoCooldownMinutes).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, &requestError{409, "这个账号正在重登或仍在重登间隔内。"}
+	}
+	if err != nil {
+		return 0, err
+	}
+	return id, tx.Commit()
 }
 
 func (h *Handler) startRelogin(c *gin.Context) {
@@ -303,6 +367,18 @@ func (h *Handler) resumeRelogin(c *gin.Context) {
 		fail(c, badRequest("验证会话已失效，请重新登录。"))
 		return
 	}
+	var target *service.Account
+	if run.AccountID != nil {
+		target, err = h.admin.GetAccount(c.Request.Context(), *run.AccountID)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		if !reloginResultMatchesAccount(run, target) {
+			fail(c, &requestError{409, "账号已重新授权或更换代理，请重新发起登录。"})
+			return
+		}
+	}
 	if !h.acquireRun(run.Email) {
 		fail(c, &requestError{409, "这个账号正在处理，请稍后再试。"})
 		return
@@ -332,9 +408,15 @@ func (h *Handler) resumeRelogin(c *gin.Context) {
 			h.failRun(id, e)
 			return
 		}
-		_, e = h.saveRunResult(ctx, id, run.Email, result)
+		status, e := h.saveRunResult(ctx, id, run.Email, result)
 		if e != nil {
 			h.failRun(id, e)
+			return
+		}
+		if message := reloginTerminalFailure(result); status == "failed" && message != "" && target != nil && h.recovery != nil {
+			if _, e = h.recovery.PauseOpenAIOAuthForRelogin(ctx, target, message, false); e != nil {
+				h.failRun(id, &requestError{409, "账号状态已变化，本次旧结果未覆盖当前账号。"})
+			}
 		}
 	}()
 	response.Success(c, gin.H{"id": id, "status": "running"})
@@ -403,6 +485,12 @@ func (h *Handler) applyRun(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
+		if !reloginResultMatchesAccount(run, existing) {
+			return &requestError{409, "账号已重新授权或更换代理，本次旧结果未覆盖当前凭据。"}
+		}
+		if run.Trigger == "auto" && !service.OpenAIOAuthRecoveryPending(existing) {
+			return &requestError{409, "账号状态已经变化，本次自动重登结果未覆盖当前凭据。"}
+		}
 		proxyID = existing.ProxyID
 	}
 	if run.Trigger != "refresh_token" && result["verified"] != true {
@@ -433,9 +521,12 @@ func (h *Handler) applyRun(ctx context.Context, id int64) error {
 	var account *service.Account
 	if existing != nil {
 		merged := service.SanitizeStoredCredentials("openai", service.MergeCredentials(existing.Credentials, credentials))
-		account, err = h.admin.UpdateAccount(ctx, existing.ID, &service.UpdateAccountInput{Credentials: merged})
-		if err == nil {
-			account, err = h.admin.ClearAccountError(ctx, existing.ID)
+		if h.recovery == nil {
+			return errors.New("OpenAI OAuth recovery is unavailable")
+		}
+		account, err = h.recovery.ApplyOpenAIOAuthRelogin(ctx, existing, merged)
+		if errors.Is(err, service.ErrOpenAIOAuthRecoveryStateChanged) {
+			return &requestError{409, "账号状态或授权已更新，本次旧结果未覆盖当前账号。"}
 		}
 	} else {
 		accounts, e := h.allOpenAIAccounts(ctx)
@@ -455,7 +546,7 @@ func (h *Handler) applyRun(ctx context.Context, id int64) error {
 	if account == nil {
 		return errors.New("empty account after authorization")
 	}
-	if _, err = h.db.ExecContext(ctx, "UPDATE workspace_relogin_runs SET account_id=$2 WHERE id=$1", id, account.ID); err != nil {
+	if _, err = h.db.ExecContext(ctx, "UPDATE workspace_relogin_runs SET account_id=$2,account_fingerprint=$3 WHERE id=$1", id, account.ID, service.OpenAIOAuthRecoveryFingerprint(account)); err != nil {
 		return err
 	}
 	if h.invalidator != nil {
@@ -466,8 +557,10 @@ func (h *Handler) applyRun(ctx context.Context, id int64) error {
 	action := "applied"
 	plan := strings.ToLower(stringValue(credentials, "plan_type"))
 	if plan == "free" {
-		if _, err = h.admin.SetAccountSchedulable(ctx, account.ID, false); err != nil {
-			return err
+		if existing == nil {
+			if _, err = h.admin.SetAccountSchedulable(ctx, account.ID, false); err != nil {
+				return err
+			}
 		}
 		action = "paused_free"
 	}

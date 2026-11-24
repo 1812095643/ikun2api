@@ -332,8 +332,9 @@ var ProviderSet = wire.NewSet(
 func ProvideWorkspaceHandler(db *sql.DB, admin service.AdminService, oauth *service.OpenAIOAuthService,
 	encryptor service.SecretEncryptor, email *service.EmailService, settings *service.SettingService,
 	quota *service.OpenAIQuotaService, invalidator service.TokenCacheInvalidator, cfg *config.Config,
-	gateway *service.GatewayService, usage *service.AccountUsageService, totp *service.TotpService, users *service.UserService) *workspace.Handler {
+	gateway *service.GatewayService, usage *service.AccountUsageService, totp *service.TotpService, users *service.UserService, recovery *service.OAuthRefreshAPI) *workspace.Handler {
 	h := workspace.NewHandler(db, admin, oauth, encryptor, email, settings, quota, invalidator, cfg)
 	h.ConfigureAccountTools(gateway, usage, totp, users)
+	h.ConfigureReloginRecovery(recovery)
 	return h
 }

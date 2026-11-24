@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -143,17 +145,25 @@ func (p *OpenAITokenProvider) GetAccessToken(ctx context.Context, account *Accou
 		return "", errors.New("not an openai oauth account")
 	}
 	if p.refreshAPI != nil {
-		if _, rejected := p.refreshAPI.openAIFailures.Load(account.ID); rejected {
+		if recorded, rejected := p.refreshAPI.openAIFailures.Load(account.ID); rejected {
 			if p.accountRepo == nil {
 				return "", errors.New("OpenAI OAuth credential state is unavailable")
 			}
 			latest, err := p.accountRepo.GetByID(ctx, account.ID)
-			if err != nil || latest == nil || latest.ID != account.ID || !latest.IsActive() || !latest.IsOpenAIOAuth() {
+			if err != nil || latest == nil || latest.ID != account.ID || !latest.IsOpenAIOAuth() {
 				return "", errors.New("OpenAI OAuth credential state is unavailable")
 			}
 			if failure := p.refreshAPI.openAIRefreshFailure(latest); failure != nil {
+				if latest.IsActive() {
+					p.refreshAPI.pauseRejectedOpenAIOAuth(ctx, latest)
+				}
 				return "", failure
 			}
+			if !latest.IsActive() {
+				return "", errors.New("OpenAI OAuth credential state is unavailable")
+			}
+			// 新授权解除旧版本拒绝标记，避免后续每个正常请求都重新查询数据库。
+			p.refreshAPI.openAIFailures.CompareAndDelete(account.ID, recorded)
 			account = latest
 			if p.tokenCache != nil {
 				_ = p.tokenCache.DeleteAccessToken(ctx, OpenAITokenCacheKey(account))
@@ -184,7 +194,7 @@ func (p *OpenAITokenProvider) GetAccessToken(ctx context.Context, account *Accou
 			// 永久故障：缺失 refresh_token 时账号无法自愈，必须立即从调度池剔除，
 			// 否则会被反复选中、每次都在 token 阶段直接返回错误，对用户呈现持续 502。
 			p.disableAccountMissingRefreshToken(account, reason)
-			return "", errors.New(reason)
+			return "", fmt.Errorf("%s: %w", reason, &openai.RefreshTokenError{Permanent: true, StatusCode: http.StatusUnauthorized, Code: "refresh_token_missing"})
 		}
 		needsRefresh = false
 	}
@@ -307,6 +317,16 @@ func (p *OpenAITokenProvider) GetAccessToken(ctx context.Context, account *Accou
 // 使用 background context 是因为请求 context 可能很快结束。
 func (p *OpenAITokenProvider) disableAccountMissingRefreshToken(account *Account, reason string) {
 	if p == nil || p.accountRepo == nil || account == nil {
+		return
+	}
+	if p.refreshAPI != nil {
+		p.refreshAPI.recordOpenAIRefreshFailure(account, &openai.RefreshTokenError{Permanent: true, StatusCode: http.StatusUnauthorized, Code: "refresh_token_missing"})
+		p.refreshAPI.pauseRejectedOpenAIOAuth(context.Background(), account)
+		if p.tokenCache != nil {
+			ctx, cancel := openAIAccountStateContext(context.Background())
+			defer cancel()
+			_ = p.tokenCache.DeleteAccessToken(ctx, OpenAITokenCacheKey(account))
+		}
 		return
 	}
 	if p.runtimeBlocker != nil {

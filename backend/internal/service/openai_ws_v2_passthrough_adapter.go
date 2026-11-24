@@ -950,6 +950,9 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			continue
 		}
 		if statusCode == http.StatusUnauthorized {
+			if s.openAITokenProvider != nil && s.openAITokenProvider.refreshAPI != nil {
+				s.openAITokenProvider.refreshAPI.RecordOpenAIOAuthAuthFailure(account, statusCode, responseBody)
+			}
 			if !oauthRecoveryTried {
 				oauthRecoveryTried = true
 				var recovered bool

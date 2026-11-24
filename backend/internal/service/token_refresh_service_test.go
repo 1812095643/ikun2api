@@ -110,6 +110,30 @@ func (r *tokenRefreshAccountRepo) SetError(ctx context.Context, id int64, errorM
 	return r.setErrorErr
 }
 
+func (r *tokenRefreshAccountRepo) PauseOpenAIOAuthIfUnchanged(ctx context.Context, expected *Account, message string, retry bool) (bool, error) {
+	if r.beforeConditionalState != nil {
+		hook := r.beforeConditionalState
+		r.beforeConditionalState = nil
+		hook()
+	}
+	current := r.accountsByID[expected.ID]
+	if current == nil || current.Status != StatusActive || current.Status != expected.Status || !reflect.DeepEqual(current.Credentials, expected.Credentials) || !reflect.DeepEqual(current.ProxyID, expected.ProxyID) {
+		return false, nil
+	}
+	if err := r.SetError(ctx, expected.ID, message); err != nil {
+		return false, err
+	}
+	copy := snapshotOAuthRefreshAccount(current)
+	copy.Extra = map[string]any{OpenAIOAuthRecoveryExtraKey: map[string]any{"fingerprint": OpenAIOAuthRecoveryFingerprint(expected), "reason": message, "auto_retry": retry, "resume_schedulable": expected.Schedulable}}
+	copy.Status, copy.Schedulable, copy.ErrorMessage = StatusError, false, message
+	r.accountsByID[expected.ID] = copy
+	return true, nil
+}
+
+func (*tokenRefreshAccountRepo) ApplyOpenAIOAuthReloginIfUnchanged(context.Context, *Account, map[string]any) (bool, error) {
+	panic("后台令牌刷新测试不调用账号登录写回")
+}
+
 func (r *tokenRefreshAccountRepo) ClearTempUnschedulable(ctx context.Context, id int64) error {
 	r.clearTempCalls++
 	return nil
@@ -915,7 +939,9 @@ func TestTokenRefreshService_RefreshWithRetry_NonRetryableErrorAllPlatforms(t *t
 				ID:       16,
 				Platform: tt.platform,
 				Type:     AccountTypeOAuth,
+				Status:   StatusActive,
 			}
+			repo.accountsByID = map[int64]*Account{account.ID: account}
 			refresher := &tokenRefresherStub{
 				err: errors.New("invalid_grant: token revoked"),
 			}
@@ -940,7 +966,9 @@ func TestTokenRefreshService_RefreshWithRetry_NoRefreshTokenDoesNotTempUnschedul
 		ID:       18,
 		Platform: PlatformOpenAI,
 		Type:     AccountTypeOAuth,
+		Status:   StatusActive,
 	}
+	repo.accountsByID = map[int64]*Account{account.ID: account}
 	refresher := &tokenRefresherStub{
 		err: errors.New("no refresh token available"),
 	}

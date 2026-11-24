@@ -121,6 +121,25 @@ func (r *tokenRefreshCandidateRepo) SetError(context.Context, int64, string) err
 	return nil
 }
 
+func (r *tokenRefreshCandidateRepo) PauseOpenAIOAuthIfUnchanged(_ context.Context, expected *Account, message string, retry bool) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.accounts {
+		current := &r.accounts[i]
+		if current.ID == expected.ID && current.Status == StatusActive && current.Status == expected.Status && reflect.DeepEqual(current.Credentials, expected.Credentials) && reflect.DeepEqual(current.ProxyID, expected.ProxyID) {
+			r.setErrorCalls++
+			current.Extra = map[string]any{OpenAIOAuthRecoveryExtraKey: map[string]any{"fingerprint": OpenAIOAuthRecoveryFingerprint(expected), "reason": message, "auto_retry": retry, "resume_schedulable": expected.Schedulable}}
+			current.Status, current.Schedulable, current.ErrorMessage = StatusError, false, message
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (*tokenRefreshCandidateRepo) ApplyOpenAIOAuthReloginIfUnchanged(context.Context, *Account, map[string]any) (bool, error) {
+	panic("后台令牌刷新测试不调用账号登录写回")
+}
+
 func (r *tokenRefreshCandidateRepo) SetTempUnschedulable(_ context.Context, _ int64, _ time.Time, reason string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -263,11 +282,13 @@ func TestTokenRefreshService_RefreshFailureDoesNotCallPrivacy(t *testing.T) {
 				ID:       11,
 				Platform: PlatformOpenAI,
 				Type:     AccountTypeOAuth,
+				Status:   StatusActive,
 				Credentials: map[string]any{
 					"access_token":  "old-access-token",
 					"refresh_token": "refresh-token",
 				},
 			}
+			repo.accounts = []Account{*account}
 
 			err := svc.refreshWithRetry(context.Background(), account, &tokenRefreshTestRefresher{err: tt.err}, nil, time.Hour)
 

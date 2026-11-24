@@ -3200,6 +3200,14 @@ func ollamaCloudUsageSnapshotClearRequested(extra map[string]any) bool {
 }
 
 func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates service.AccountBulkUpdate) (int64, error) {
+	if updates.Schedulable != nil || updates.Status != nil {
+		extra := make(map[string]any, len(updates.Extra)+1)
+		for key, value := range updates.Extra {
+			extra[key] = value
+		}
+		updates.Extra = extra
+		updates.Extra[service.OpenAIOAuthRecoveryExtraKey] = nil
+	}
 	if len(ids) == 0 {
 		return 0, nil
 	}
