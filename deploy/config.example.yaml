@@ -236,6 +236,8 @@ gateway:
   # Timeout for waiting upstream response headers (seconds)
   # 等待上游响应头超时时间（秒）
   response_header_timeout: 600
+  # 通用流式请求发送完毕后等待响应头的预算（秒，0关闭；OpenAI/Codex/Grok及独立长连接通道保持原策略）
+  stream_response_header_timeout: 90
   # OpenAI/Codex upstream response header timeout (seconds, 0=disabled)
   # OpenAI/Codex 等待上游响应头超时时间（秒，0=禁用本地响应头超时）
   openai_response_header_timeout: 0

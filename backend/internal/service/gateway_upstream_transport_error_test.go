@@ -5,12 +5,14 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	pkghttputil "github.com/MACOS-DO/sub4api/internal/pkg/httputil"
 	"github.com/gin-gonic/gin"
 )
 
@@ -201,5 +203,63 @@ func TestHandleUpstreamTransportError_UpstreamDeadlineStillFailsOver(t *testing.
 	}
 	if repo.calls != 0 {
 		t.Fatalf("SetTempUnschedulable called %d times for upstream deadline, want 0", repo.calls)
+	}
+}
+
+func TestHandleUpstreamTransportError_StreamHeaderTimeoutFailsOverAndCoolsDown(t *testing.T) {
+	repo := &transportTempUnschedRepoStub{}
+	s := &GatewayService{accountRepo: repo}
+	c := newTransportErrorTestGin(t)
+	account := &Account{ID: 24, Platform: PlatformAnthropic}
+	before := time.Now()
+	err := s.handleUpstreamTransportError(context.Background(), c, account,
+		fmt.Errorf("%w after 1m30s", pkghttputil.ErrStreamResponseHeaderTimeout), OpsUpstreamErrorEvent{})
+	var failover *UpstreamFailoverError
+	if !errors.As(err, &failover) || !failover.ShouldRetryNextAccount() {
+		t.Fatalf("expected account failover, got %v", err)
+	}
+	if repo.calls != 1 || repo.lastID != account.ID {
+		t.Fatalf("unexpected cooldown write: calls=%d account=%d", repo.calls, repo.lastID)
+	}
+	if repo.lastUntil.Before(before.Add(time.Minute)) || repo.lastUntil.After(time.Now().Add(time.Minute)) {
+		t.Fatalf("unexpected cooldown deadline: %v", repo.lastUntil)
+	}
+	if !strings.HasPrefix(repo.lastReason, "upstream stream response header timeout") {
+		t.Fatalf("unexpected cooldown reason: %q", repo.lastReason)
+	}
+	if c.Writer.Written() {
+		t.Fatal("failover must remain available before committing the response")
+	}
+}
+
+func TestDetachStreamUpstreamContextMarksOnlyStreamingRequests(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		for _, parent := range []context.Context{nil, context.Background()} {
+			ctx, release := detachStreamUpstreamContext(parent, stream)
+			release()
+			if pkghttputil.IsStreamRequest(ctx) != stream {
+				t.Fatalf("stream marker mismatch: stream=%v parent=%v", stream, parent)
+			}
+			if err := ctx.Err(); err != nil {
+				t.Fatalf("construction release canceled the request: %v", err)
+			}
+		}
+	}
+}
+
+func TestHandleUpstreamTransportError_StreamHeaderTimeoutAfterClientLeavesDoesNotRetry(t *testing.T) {
+	repo := &transportTempUnschedRepoStub{}
+	s := &GatewayService{accountRepo: repo}
+	c := newTransportErrorTestGin(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := s.handleUpstreamTransportError(ctx, c, &Account{ID: 24, Platform: PlatformAnthropic},
+		pkghttputil.ErrStreamResponseHeaderTimeout, OpsUpstreamErrorEvent{})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected client cancellation, got %v", err)
+	}
+	var failover *UpstreamFailoverError
+	if errors.As(err, &failover) || repo.calls != 0 || c.Writer.Written() {
+		t.Fatal("a departed client must not cause another account request or cooldown")
 	}
 }

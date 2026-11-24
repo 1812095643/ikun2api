@@ -1988,6 +1988,11 @@ func TestValidateConfigErrors(t *testing.T) {
 			wantErr: "gateway.response_header_timeout",
 		},
 		{
+			name:    "gateway stream response header timeout",
+			mutate:  func(c *Config) { c.Gateway.StreamResponseHeaderTimeout = -1 },
+			wantErr: "gateway.stream_response_header_timeout",
+		},
+		{
 			name:    "gateway openai response header timeout",
 			mutate:  func(c *Config) { c.Gateway.OpenAIResponseHeaderTimeout = -1 },
 			wantErr: "gateway.openai_response_header_timeout",
@@ -2749,6 +2754,30 @@ func TestLoad_DefaultGatewayUsageRecordConfig(t *testing.T) {
 	}
 	if cfg.Gateway.UsageRecord.AutoScaleCooldownSeconds != 10 {
 		t.Fatalf("auto_scale_cooldown_seconds = %d, want 10", cfg.Gateway.UsageRecord.AutoScaleCooldownSeconds)
+	}
+}
+
+func TestLoad_StreamResponseHeaderTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  string
+		want int
+	}{
+		{"default", "", 90},
+		{"disabled", "0", 0},
+		{"override", "120", 120},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetViperWithJWTSecret(t)
+			t.Setenv("GATEWAY_STREAM_RESPONSE_HEADER_TIMEOUT", tc.env)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Gateway.StreamResponseHeaderTimeout != tc.want {
+				t.Fatalf("stream response header timeout = %d, want %d", cfg.Gateway.StreamResponseHeaderTimeout, tc.want)
+			}
+		})
 	}
 }
 

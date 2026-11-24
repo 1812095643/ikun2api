@@ -653,12 +653,12 @@ func detachedBillingContext(ctx context.Context) (context.Context, context.Cance
 
 func detachStreamUpstreamContext(ctx context.Context, stream bool) (context.Context, context.CancelFunc) {
 	if ctx == nil {
-		return context.Background(), func() {}
+		ctx = context.Background()
 	}
 	if !stream {
 		return ctx, func() {}
 	}
-	return pkghttputil.DetachUpstreamContext(ctx), func() {}
+	return pkghttputil.MarkStreamRequest(pkghttputil.DetachUpstreamContext(ctx)), func() {}
 }
 
 func detachUpstreamContext(ctx context.Context, drainTimeout ...time.Duration) (context.Context, context.CancelFunc) {

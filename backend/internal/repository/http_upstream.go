@@ -222,7 +222,7 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	// 执行请求
 	client := s.httpClientForUpstreamRequest(entry.client, req)
 	client = httpClientWithGrokAccessDeniedFallback(client)
-	resp, err := doUpstreamRequest(client, req, s.upstreamDrainTimeout())
+	resp, err := doUpstreamRequestWithHeaderTimeout(client, req, s.upstreamDrainTimeout(), s.streamResponseHeaderTimeout(profile))
 	if err != nil {
 		s.recordOpenAIHTTP2Failure(profile, entry.protocolMode, entry.proxyKey, err)
 		// 请求失败，立即减少计数
@@ -285,7 +285,7 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 
 	client := s.httpClientForUpstreamRequest(entry.client, req)
 	client = httpClientWithGrokAccessDeniedFallback(client)
-	resp, err := doUpstreamRequest(client, req, s.upstreamDrainTimeout())
+	resp, err := doUpstreamRequestWithHeaderTimeout(client, req, s.upstreamDrainTimeout(), s.streamResponseHeaderTimeout(upstreamProfile))
 	if err != nil {
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
@@ -315,6 +315,10 @@ func doUpstreamRequest(client *http.Client, req *http.Request, drainTimeouts ...
 	if len(drainTimeouts) > 0 {
 		drainTimeout = drainTimeouts[0]
 	}
+	return doUpstreamRequestWithHeaderTimeout(client, req, drainTimeout, 0)
+}
+
+func doUpstreamRequestWithHeaderTimeout(client *http.Client, req *http.Request, drainTimeout, headerTimeout time.Duration) (*http.Response, error) {
 	ctx, cancel := pkghttputil.NewUpstreamAttemptContext(req.Context(), drainTimeout)
 	wireRequest := req.WithContext(ctx)
 	if err := compressCodexResponsesRequest(wireRequest); err != nil {
@@ -324,7 +328,15 @@ func doUpstreamRequest(client *http.Client, req *http.Request, drainTimeouts ...
 		}
 		return nil, err
 	}
+	wireRequest, finishHeaderWait := withStreamResponseHeaderTimeout(wireRequest, headerTimeout)
 	resp, err := servertiming.Do(client, wireRequest)
+	if finishHeaderWait() {
+		cancel()
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		return nil, fmt.Errorf("%w after %s", pkghttputil.ErrStreamResponseHeaderTimeout, headerTimeout)
+	}
 	if err != nil {
 		cancel()
 		return resp, err

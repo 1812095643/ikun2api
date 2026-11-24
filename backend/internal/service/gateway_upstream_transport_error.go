@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	pkghttputil "github.com/MACOS-DO/sub4api/internal/pkg/httputil"
 	"github.com/MACOS-DO/sub4api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -15,6 +16,9 @@ import (
 // unscheduled after a durable transport failure (matches the OpenAI-side
 // openAITransportErrorTempUnschedDuration).
 const gatewayTransportErrorTempUnschedDuration = 10 * time.Minute
+
+// 接收请求后长时间不回响应头通常是上游排队，短暂冷却即可。
+const gatewayStreamHeaderTimeoutTempUnschedDuration = time.Minute
 
 // gatewayTransportFailoverBody is the Anthropic-format error body attached to
 // the failover error for a transport-level failure. Kept identical to the
@@ -40,6 +44,10 @@ var gatewayTransportFailoverBody = []byte(`{"type":"error","error":{"type":"upst
 // It deliberately does NOT write to the response: the handler owns the
 // response (failover, or a protocol-correct error once failover is exhausted).
 func (s *GatewayService) handleUpstreamTransportError(ctx context.Context, c *gin.Context, account *Account, err error, event OpsUpstreamErrorEvent) error {
+	// 流式记账允许断线后继续读取，但此时不能因响应头超时再发起切号请求。
+	if errors.Is(err, pkghttputil.ErrStreamResponseHeaderTimeout) && ctx != nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if isClientCanceledTransportError(ctx, err) {
 		return err
 	}
@@ -63,7 +71,10 @@ func (s *GatewayService) handleUpstreamTransportError(ctx context.Context, c *gi
 	// Transport attempt left local validation; count Ollama Cloud activity.
 	scheduleOllamaCloudUsageActivity(s.deferredService, account)
 
-	if classifyUpstreamTransportError(err).Persistent {
+	if errors.Is(err, pkghttputil.ErrStreamResponseHeaderTimeout) {
+		tempUnscheduleAccountForDuration(ctx, s.accountRepo, account, gatewayStreamHeaderTimeoutTempUnschedDuration,
+			"upstream stream response header timeout (auto temp-unschedule 1m): "+safeErr)
+	} else if classifyUpstreamTransportError(err).Persistent {
 		s.tempUnscheduleTransportError(ctx, account, safeErr)
 	}
 
@@ -95,11 +106,15 @@ func (s *GatewayService) tempUnscheduleTransportError(ctx context.Context, accou
 // shared by every forward path whose scheduler reads the persisted
 // temp-unschedulable state (Anthropic/Bedrock and Gemini).
 func tempUnscheduleAccountForTransportError(ctx context.Context, repo AccountRepository, account *Account, safeErr string) {
+	tempUnscheduleAccountForDuration(ctx, repo, account, gatewayTransportErrorTempUnschedDuration,
+		"upstream transport error (proxy/network): "+safeErr)
+}
+
+func tempUnscheduleAccountForDuration(ctx context.Context, repo AccountRepository, account *Account, duration time.Duration, reason string) {
 	if account == nil || repo == nil {
 		return
 	}
-	until := time.Now().Add(gatewayTransportErrorTempUnschedDuration)
-	reason := "upstream transport error (proxy/network): " + safeErr
+	until := time.Now().Add(duration)
 
 	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), openAIAccountStateUpdateTimeout)
 	defer cancel()
