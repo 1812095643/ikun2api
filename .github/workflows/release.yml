@@ -206,10 +206,11 @@ jobs:
           docker exec -e PGPASSWORD=fixture-only ikun-release-business psql -h 127.0.0.1 -U ikun_test -d ikun_business_fixture -v ON_ERROR_STOP=1 -tAc 'SELECT 1'
           export IKUN_BUSINESS_TEST_DSN='host=127.0.0.1 port=19984 user=ikun_test password=fixture-only dbname=ikun_business_fixture sslmode=disable'
           export IKUN_TOOLS_TEST_DSN="$IKUN_BUSINESS_TEST_DSN"
+          export IKUN_RELOGIN_TEST_DSN="$IKUN_BUSINESS_TEST_DSN"
           export IKUN_UNIVERSAL_TEST_DSN="$IKUN_BUSINESS_TEST_DSN"
           cd backend
-          go test -tags unit ./internal/service ./internal/workspace ./internal/handler/admin -run 'Test(AdminReceivables|ManualReceivables|ValidateReceivable|OnAccount|BusinessAdmin|Downstream|Relogin|UpstreamBalance|PaymentFee|PaymentMethodLimitsExpose|CreateOrderInTxKeepsMethod|GetAvailableMethodLimits|UpdatePaymentConfig|ParsePaymentConfig|GetPaymentConfig|CalculateCreateOrder)' -count=1 -timeout=180s
-          go test -tags unit ./internal/repository -run 'Test(UsageBillingBatchPostgres|OpenAIServiceTierPostgresPersistence|SchedulerMetadata|SchedulerSnapshotKeepsOpenAIServiceTiers)' -count=1 -timeout=180s
+          go test -tags unit ./internal/service ./internal/workspace ./internal/handler/admin -run 'Test(AdminReceivables|ManualReceivables|ValidateReceivable|OnAccount|BusinessAdmin|Downstream|Relogin|AutomaticRelogin|UpstreamBalance|PaymentFee|PaymentMethodLimitsExpose|CreateOrderInTxKeepsMethod|GetAvailableMethodLimits|UpdatePaymentConfig|ParsePaymentConfig|GetPaymentConfig|CalculateCreateOrder)' -count=1 -timeout=180s
+          go test -tags unit ./internal/repository -run 'Test(UsageBillingBatchPostgres|OpenAIServiceTierPostgresPersistence|SchedulerMetadata|SchedulerSnapshotKeepsOpenAIServiceTiers|OpenAIRecoveryPostgres)' -count=1 -timeout=180s
           cd ../frontend
           pnpm exec vitest run src/views/user/__tests__/PaymentView.spec.ts src/views/admin/orders/__tests__/PlanEditDialog.spec.ts src/components/admin/settings/__tests__/PaymentFeeSettings.spec.ts src/utils/__tests__/paymentFees.spec.ts src/components/admin/usage/__tests__/UsageUserMenu.spec.ts src/components/workspace/relogin/ReloginForms.spec.ts src/components/common/__tests__/GroupSelector.spec.ts src/composables/workspace/useTicketNotification.spec.ts
 
@@ -238,6 +239,13 @@ jobs:
           go test -tags integration ./internal/repository
           -run 'TestUsageBillingRepositoryApplyBatch|TestUsageBillingLaneCombiner_ConcurrentRequestsOfOneUser|TestAccountRepositoryBatchUpdateLastUsed|TestGroupUsageRollup|TestGetByKeyForAuthCarriesGroupForceOpenAI|TestSchedulerSnapshotConfiguredMembership|TestChannelUltrafastPricing'
           -count=1 -timeout=240s
+
+      - name: 失效重登与新模型目录计价回归
+        run: |
+          cd backend
+          go test -tags unit ./internal/service ./internal/pkg/gemini ./internal/pkg/geminicli ./internal/pkg/antigravity ./internal/domain -run 'Test(OpenAIOAuth|CurrentGemini|NanoBanana21|GeminiCarbon|DefaultPricingIncludesGeminiCarbon|GeminiThinking|ResolveGeminiThinkingVariant|NewGeminiVariants|BuiltinGeminiCacheStoragePrice|ApplyGeminiCompatThinkingConfig|DefaultModels|DefaultAntigravityModelMapping|CurrentModelFallback|NeonHydrogen|CarbonGeneration|CarbonTier|CarbonTransform)' -count=1 -timeout=180s
+          cd ../frontend
+          pnpm exec vitest run src/composables/__tests__/useModelWhitelist.spec.ts
 
       # ---------------- 五个平台二进制 ----------------
 
