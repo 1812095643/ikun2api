@@ -7,8 +7,8 @@ function readSource(path: string): string {
 }
 
 describe('admin platform filters', () => {
-  it('uses the group platform catalog on the subscriptions page', () => {
-    const source = readSource('src/views/admin/SubscriptionsView.vue')
+  it('uses the group platform catalog on the legacy subscriptions page', () => {
+    const source = readSource('src/views/admin/LegacySubscriptionsView.vue')
     expect(source).toContain("import { GROUP_PLATFORM_OPTIONS } from '@/constants/platforms'")
     expect(source).toMatch(/const platformFilterOptions[\s\S]*?\.\.\.GROUP_PLATFORM_OPTIONS/)
   })

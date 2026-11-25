@@ -1535,9 +1535,9 @@ func (s *GatewayService) buildRecordUsageLog(
 		SubscriptionID:           optionalSubscriptionID(subscription),
 		CreatedAt:                time.Now(),
 	}
-	if IsClaudeOAuthSchedulingAccount(input.Account) {
-		applyGatewayTiming(usageLog, input.Timing)
-	}
+	// 网关侧耗时是诊断数据，与调度约束无关：所有账号类型（含 apikey 中转）都要记录，
+	// 否则中转账号的上传/排队/首字拆分无法排查。
+	applyGatewayTiming(usageLog, input.Timing)
 	if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier
 	}

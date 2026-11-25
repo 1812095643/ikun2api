@@ -486,7 +486,7 @@ func TestSweepExpiredProxyWithoutFallbackInvalidatesOnlyExistingProbeSnapshot(t 
 	require.Equal(t, []int64{withSnapshot.ID}, payload)
 }
 
-func TestSweepExpiredProxyFallbackRerouteDeletesProbeSnapshot(t *testing.T) {
+func TestSweepExpiredProxyLegacyDirectFallbackKeepsProxyAndInvalidatesProbe(t *testing.T) {
 	ctx := context.Background()
 	tx := testEntTx(t)
 	proxyRepo := newProxyRepositoryWithSQL(tx.Client(), tx)
@@ -517,11 +517,12 @@ func TestSweepExpiredProxyFallbackRerouteDeletesProbeSnapshot(t *testing.T) {
 
 	changed, err := proxyRepo.SweepExpiredProxies(ctx, time.Now())
 	require.NoError(t, err)
-	require.EqualValues(t, 1, changed)
+	require.Zero(t, changed, "automatic expiry must not remove the assigned proxy")
 
 	got, err := accountRepo.GetByID(ctx, account.ID)
 	require.NoError(t, err)
-	require.Nil(t, got.ProxyID)
+	require.NotNil(t, got.ProxyID)
+	require.Equal(t, proxy.ID, *got.ProxyID)
 	require.NotContains(t, got.Extra, service.UpstreamBillingProbeExtraKey)
 	require.Equal(t, []int64{account.ID}, latestBulkAccountOutboxPayload(t, ctx, tx))
 }

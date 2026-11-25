@@ -24,14 +24,14 @@ func sanitizeClaudeToolOwnership(value gjson.Result) ([]byte, bool, error) {
 		value.Get("owner").Type != gjson.String || value.Get("owner").String() != "mcp" {
 		return nil, false, invalid
 	}
-	next, err := filterClaudePrivacyObject([]byte(value.Raw), claudePrivacyToolOwnershipFields, nil)
+	next, err := filterClaudePrivacyObject(claudeBorrowRawJSON(value.Raw), claudePrivacyToolOwnershipFields, nil)
 	return next, true, err
 }
 
 // Only the protocol definition is traversed. input_schema, descriptions, tool
 // arguments/results and signed thinking blocks remain opaque and byte-stable.
 func sanitizeClaudeToolDefinition(value gjson.Result) ([]byte, error) {
-	return filterClaudePrivacyObject([]byte(value.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
+	return filterClaudePrivacyObject(claudeBorrowRawJSON(value.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
 		switch key {
 		case "ownership_metadata":
 			return sanitizeClaudeToolOwnership(field)
@@ -42,20 +42,20 @@ func sanitizeClaudeToolDefinition(value gjson.Result) ([]byte, error) {
 			}
 			return sanitizeClaudeCacheControl(field)
 		default:
-			return []byte(field.Raw), true, nil
+			return claudeBorrowRawJSON(field.Raw), true, nil
 		}
 	})
 }
 
 func sanitizeClaudeToolDefinitions(value gjson.Result) ([]byte, bool, error) {
 	if !value.IsArray() {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	items := make([][]byte, 0, len(value.Array()))
 	changed := false
 	for _, item := range value.Array() {
 		if !item.IsObject() {
-			items = append(items, []byte(item.Raw))
+			items = append(items, claudeBorrowRawJSON(item.Raw))
 			continue
 		}
 		next, err := sanitizeClaudeToolDefinition(item)
@@ -66,18 +66,18 @@ func sanitizeClaudeToolDefinitions(value gjson.Result) ([]byte, bool, error) {
 		items = append(items, next)
 	}
 	if !changed {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	return buildJSONArrayRaw(items), true, nil
 }
 
 func sanitizeClaudeToolAddition(value gjson.Result) ([]byte, bool, error) {
-	next, err := filterClaudePrivacyObject([]byte(value.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
+	next, err := filterClaudePrivacyObject(claudeBorrowRawJSON(value.Raw), nil, func(key string, field gjson.Result) ([]byte, bool, error) {
 		if key == "definition" {
 			definition, err := sanitizeClaudeToolDefinition(field)
 			return definition, true, err
 		}
-		return []byte(field.Raw), true, nil
+		return claudeBorrowRawJSON(field.Raw), true, nil
 	})
 	return next, true, err
 }
@@ -100,7 +100,7 @@ func stripClaudeToolOwnershipUnlessBeta(body []byte, finalBeta string) ([]byte, 
 			}
 		}
 	}
-	messages := gjson.GetBytes(body, "messages")
+	messages := parseRawJSONView(body).Get("messages")
 	if messages.IsArray() {
 		for i, message := range messages.Array() {
 			content := message.Get("content")

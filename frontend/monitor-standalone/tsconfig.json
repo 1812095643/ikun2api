@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "./**/*.ts",
+    "./**/*.vue",
+    "../src/env.d.ts",
+    "../src/types/global.d.ts",
+    "../src/navigation-env.d.ts"
+  ],
+  "exclude": [
+    "./**/*.spec.ts",
+    "./vite.config.ts"
+  ]
+}

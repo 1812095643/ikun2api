@@ -59,6 +59,7 @@ func (s *GatewayService) handleUpstreamTransportError(ctx context.Context, c *gi
 	event.AccountName = account.Name
 	event.UpstreamStatusCode = 0
 	event.Kind = "request_error"
+	event.Reason = monitorTransportReason(c, err)
 	event.Message = safeErr
 	appendOpsUpstreamError(c, event)
 

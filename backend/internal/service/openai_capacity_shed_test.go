@@ -109,7 +109,7 @@ func TestOpenAIHTTPCapacityShedAppliesConfiguredTempUnschedulable(t *testing.T) 
 		Credentials: map[string]any{
 			"temp_unschedulable_enabled": true,
 			"temp_unschedulable_rules": []any{map[string]any{
-				"scope":            "model",
+				"scope":            TempUnschedScopeModel,
 				"error_code":       float64(http.StatusServiceUnavailable),
 				"keywords":         []any{"servers are currently overloaded"},
 				"duration_minutes": float64(30),

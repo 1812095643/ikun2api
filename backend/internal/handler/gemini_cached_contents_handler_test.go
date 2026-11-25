@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
+	"github.com/MACOS-DO/sub4api/internal/securityaudit"
 	middleware "github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -93,6 +94,30 @@ func newGeminiCachedContentTestContext(method, target string, apiKey *service.AP
 	c.Set(string(middleware.ContextKeyAPIKey), apiKey)
 	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: apiKey.UserID, Concurrency: 10})
 	return c, rec
+}
+
+func TestGeminiCachedContentsCreateAuditsBeforeUpstreamAndBilling(t *testing.T) {
+	repo := &geminiCachedContentHandlerRepoStub{}
+	h := newGeminiCachedContentHandlerForTest(repo)
+	engine := blockingHandlerPromptEngine()
+	h.securityAuditCoordinator = securityaudit.NewCoordinator(nil, engine)
+	apiKey := geminiCachedContentTestAPIKey(service.PlatformGemini)
+	c, recorder := newGeminiCachedContentTestContext(http.MethodPost, "/v1beta/cachedContents", apiKey)
+	body := `{"model":"models/gemini-2.5-pro","contents":[{"role":"user","parts":[{"text":"blocked cache content"}]}],"ttl":"3600s"}`
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/cachedContents", strings.NewReader(body))
+
+	// Routing, billing and upstream dependencies are deliberately absent: a
+	// blocking decision must return before touching any of them or persisting data.
+	h.GeminiCachedContentsCreate(c)
+
+	require.Equal(t, http.StatusForbidden, recorder.Code)
+	require.Contains(t, recorder.Body.String(), securityaudit.ErrorCodeBlocked)
+	require.Empty(t, repo.records)
+	evaluated, enqueued, requests := engine.snapshot()
+	require.Equal(t, 1, evaluated)
+	require.Zero(t, enqueued)
+	require.Len(t, requests, 1)
+	require.JSONEq(t, body, string(requests[0].Body))
 }
 
 func seedGeminiCachedContent(repo *geminiCachedContentHandlerRepoStub, publicID string, apiKeyID int64, expire time.Time) *service.GeminiCachedContent {

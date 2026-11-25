@@ -654,7 +654,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 2. Re-check billing eligibility after wait
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -666,7 +666,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
 	if err != nil {
 		reqLog.Info("openai.inflight_reservation_rejected", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -1357,7 +1357,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -1368,7 +1368,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
 	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
 	if inflightErr != nil {
-		status, code, message, retryAfter := billingErrorDetails(inflightErr)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, inflightErr)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -1805,37 +1805,6 @@ func normalizeCodexAutomationBootstrap(body []byte) ([]byte, bool) {
 		return body, false
 	}
 	return normalizeCodexCallOutputBootstrap(body, isCodexAutomationCandidate, false)
-}
-
-// mayContainCodexCallOutputCandidate is a necessary condition for a bootstrap
-// candidate, checked before the full uniqueness scan and decode. Its type and
-// tool name are JSON strings, which appear literally unless a \u escape spells
-// their letters; without either, normalization cannot change the body. Escapes
-// that real clients emit (control characters, HTML-safe and non-ASCII runes)
-// cannot spell those letters and must not force the full decode.
-//
-// Tool declarations carry the same names, so a literal hit is confirmed by a
-// zero-copy scan for an input item of type function_call_output whose name
-// starts with one of toolNames. The full path rejects bodies with duplicate
-// members, and without duplicates the scan reads the same values as the
-// decoder.
-func mayContainCodexCallOutputCandidate(body []byte, toolNames ...string) bool {
-	if !service.JSONMayEscapePlainASCII(body) && !containsCodexCallOutputLiterals(body, toolNames) {
-		return false
-	}
-	return service.ResponsesInputHasFunctionCallOutputNamed(body, toolNames...)
-}
-
-func containsCodexCallOutputLiterals(body []byte, toolNames []string) bool {
-	if !bytes.Contains(body, []byte("function_call_output")) {
-		return false
-	}
-	for _, name := range toolNames {
-		if bytes.Contains(body, []byte(name)) {
-			return true
-		}
-	}
-	return false
 }
 
 func normalizeCodexCallOutputBootstrap(body []byte, isCandidate func(map[string]any) bool, allowHistoricalContext bool) ([]byte, bool) {

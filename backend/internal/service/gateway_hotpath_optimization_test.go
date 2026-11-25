@@ -309,7 +309,7 @@ func TestGetUserGroupRateMultiplier_CacheHitAndNilRepo(t *testing.T) {
 		userGroupRateRepo:  repo,
 		userGroupRateCache: gocache.New(time.Minute, time.Minute),
 	}
-	key := "101:202"
+	key := userGroupRateCacheKey(101, 202)
 	svc.userGroupRateCache.Set(key, 2.3, time.Minute)
 
 	got := svc.getUserGroupRateMultiplier(context.Background(), 101, 202, 1.1)
@@ -322,7 +322,7 @@ func TestGetUserGroupRateMultiplier_CacheHitAndNilRepo(t *testing.T) {
 	require.Equal(t, int64(0), fallback)
 	require.Equal(t, int64(0), repo.calls.Load())
 
-	// 无 repo 时直接返回分组默认倍率
+	// 无 repo 时仍可命中当前代缓存；未命中时返回分组默认倍率
 	svc2 := &GatewayService{
 		userGroupRateCache: gocache.New(time.Minute, time.Minute),
 	}

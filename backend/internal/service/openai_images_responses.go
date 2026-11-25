@@ -1920,6 +1920,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 			UpstreamStatusCode: 0,
 			UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
 			Kind:               "request_error",
+			Reason:             monitorTransportReason(c, err),
 			Message:            safeErr,
 		})
 		return nil, fmt.Errorf("upstream request failed: %s", safeErr)

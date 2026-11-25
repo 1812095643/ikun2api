@@ -24,7 +24,7 @@ func SanitizeClaudePrivacySafeguards(body []byte) ([]byte, error) {
 		if name == "safeguards" {
 			return sanitizeClaudePrivacySafeguards(value)
 		}
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	})
 }
 
@@ -47,7 +47,7 @@ func sanitizeClaudePrivacySafeguards(value gjson.Result) ([]byte, bool, error) {
 		items = append(items, clean)
 	}
 	if !changed {
-		return []byte(value.Raw), true, nil
+		return claudeBorrowRawJSON(value.Raw), true, nil
 	}
 	return buildJSONArrayRaw(items), true, nil
 }
@@ -177,7 +177,7 @@ func sanitizeClaudePrivacySafetyRules(value gjson.Result) ([]byte, error) {
 					return claudePrivacySafetyField(item, item.Type == gjson.String)
 				case "root":
 					if item.Type == gjson.Null || item.Type == gjson.String && item.Str == "" {
-						return []byte(item.Raw), true, nil
+						return claudeBorrowRawJSON(item.Raw), true, nil
 					}
 					return nil, false, errClaudePrivacySafetyPaths
 				default:
@@ -188,7 +188,7 @@ func sanitizeClaudePrivacySafetyRules(value gjson.Result) ([]byte, error) {
 				return nil, false, err
 			}
 		}
-		return []byte(field.Raw), true, nil
+		return claudeBorrowRawJSON(field.Raw), true, nil
 	})
 }
 
@@ -196,7 +196,7 @@ func filterClaudePrivacySafetyObject(value gjson.Result, transform func(string, 
 	if !value.IsObject() {
 		return nil, errClaudePrivacySafetyShape
 	}
-	return filterClaudePrivacyObject([]byte(value.Raw), nil, transform)
+	return filterClaudePrivacyObject(claudeBorrowRawJSON(value.Raw), nil, transform)
 }
 
 func claudePrivacySafetyEmpty(value gjson.Result, object bool) ([]byte, bool, error) {
@@ -211,7 +211,7 @@ func claudePrivacySafetyEmpty(value gjson.Result, object bool) ([]byte, bool, er
 	if nonempty {
 		return nil, false, errClaudePrivacySafetyPaths
 	}
-	return []byte(value.Raw), true, nil
+	return claudeBorrowRawJSON(value.Raw), true, nil
 }
 
 func claudePrivacySafetyBool(value gjson.Result) bool {
@@ -234,5 +234,5 @@ func claudePrivacySafetyField(value gjson.Result, valid bool) ([]byte, bool, err
 	if !valid {
 		return nil, false, errClaudePrivacySafetyShape
 	}
-	return []byte(value.Raw), true, nil
+	return claudeBorrowRawJSON(value.Raw), true, nil
 }

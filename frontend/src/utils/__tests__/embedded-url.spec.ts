@@ -72,3 +72,12 @@ describe('embedded-url', () => {
     expect(detectTheme()).toBe('dark')
   })
 })
+
+describe('same-origin independent monitor', () => {
+  it('never puts login credentials into the monitor iframe URL', () => {
+    const result = new URL(buildEmbeddedUrl('/ops-monitor-ui/', 42, 'sensitive-test-token'))
+    expect(result.searchParams.has('token')).toBe(false)
+    expect(result.searchParams.has('user_id')).toBe(false)
+    expect(result.pathname).toBe('/ops-monitor-ui/')
+  })
+})

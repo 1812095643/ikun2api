@@ -51,6 +51,9 @@ func thinkingContentPairDigest(kind string, content, signature [32]byte) [32]byt
 }
 
 func thinkingBlockTraceDigests(block gjson.Result) (signature, pair [32]byte, ok bool) {
+	if !block.IsObject() || len(block.Raw) > claudeThinkingDigestMaxBytes {
+		return signature, pair, false
+	}
 	kind := block.Get("type").String()
 	text, signed := "", ""
 	switch kind {
@@ -81,10 +84,9 @@ func (s *GatewayService) beginClaudeThinkingTrace(c *gin.Context, account *Accou
 	}
 	// A failover can reuse gin.Context. Never reuse the previous account's trace.
 	c.Set(claudeThinkingTraceContextKey, (*claudeThinkingTrace)(nil))
-	// Source tracing remains limited to native OAuth/setup-token accounts. API
-	// Key accounts use the same recovery cache, but do not inherit the older
-	// diagnostic trace contract.
-	if account == nil || !account.IsAnthropicOAuthOrSetupToken() || !ShouldApplyRetryFilters(model) {
+	// Keep provenance independent from recovery eligibility: the local diagnostic
+	// contract covers OAuth/setup-token and API Key passthrough accounts.
+	if account == nil || !ShouldApplyRetryFilters(model) || !(account.IsAnthropicOAuthOrSetupToken() || account.IsAnthropicAPIKeyPassthroughEnabled()) {
 		return nil
 	}
 	scope, valid := claudeThinkingRecoveryScope(c, account, model, originalSession)
@@ -94,22 +96,12 @@ func (s *GatewayService) beginClaudeThinkingTrace(c *gin.Context, account *Accou
 	trace := &claudeThinkingTrace{cache: &s.claudeThinkingObserved, scope: scope,
 		prior: s.claudeThinkingObserved.known(scope, time.Now()), input: make(map[[32]byte][32]byte),
 		blocks: make(map[int]*claudeThinkingStreamDigest)}
-	for _, message := range gjson.GetBytes(body, "messages").Array() {
-		if message.Get("role").String() != "assistant" {
-			continue
+	visitClaudeThinkingBlocks(body, func(block gjson.Result) bool {
+		if signature, pair, ok := thinkingBlockTraceDigests(block); ok {
+			trace.input[signature] = pair
 		}
-		for _, block := range message.Get("content").Array() {
-			if signature, pair, ok := thinkingBlockTraceDigests(block); ok {
-				trace.input[signature] = pair
-				if len(trace.input) >= claudeThinkingRecoveryMaxBatch {
-					break
-				}
-			}
-		}
-		if len(trace.input) >= claudeThinkingRecoveryMaxBatch {
-			break
-		}
-	}
+		return len(trace.input) < claudeThinkingRecoveryMaxBatch
+	})
 	c.Set(claudeThinkingTraceContextKey, trace)
 	return trace
 }
@@ -127,11 +119,16 @@ func (trace *claudeThinkingTrace) observeJSON(body []byte) {
 	if trace == nil {
 		return
 	}
-	for _, block := range gjson.GetBytes(body, "content").Array() {
+	content := parseRawJSONView(body).Get("content")
+	if !content.IsArray() {
+		return
+	}
+	content.ForEach(func(_, block gjson.Result) bool {
 		if signature, pair, ok := thinkingBlockTraceDigests(block); ok {
 			trace.record(signature, pair)
 		}
-	}
+		return len(trace.observed) < claudeThinkingRecoveryMaxBatch
+	})
 }
 
 func (trace *claudeThinkingTrace) record(signature, pair [32]byte) {
@@ -146,7 +143,7 @@ func (trace *claudeThinkingTrace) observeEvent(data []byte) {
 	if trace == nil {
 		return
 	}
-	root := gjson.ParseBytes(data)
+	root := parseRawJSONView(data)
 	index := root.Get("index")
 	if index.Type != gjson.Number || index.Int() < 0 || index.Int() > 1<<20 {
 		return
@@ -210,6 +207,9 @@ func (trace *claudeThinkingTrace) commit() {
 func (trace *claudeThinkingTrace) origin(block gjson.Result) string {
 	if trace == nil {
 		return "unavailable"
+	}
+	if len(block.Raw) > claudeThinkingDigestMaxBytes {
+		return "diagnostic_block_size_limit"
 	}
 	signature, pair, valid := thinkingBlockTraceDigests(block)
 	if !valid {

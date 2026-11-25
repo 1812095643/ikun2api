@@ -82,6 +82,8 @@ function filenameFromDisposition(value: unknown, format: UserRequestAuditExportF
   const match = value.match(/filename\*?=(?:UTF-8''|"?)([^";]+)"?/i)
   let candidate = ''
   try { candidate = match?.[1] ? decodeURIComponent(match[1]) : '' } catch { candidate = '' }
+  // Download names must remove control characters as well as path separators.
+  // eslint-disable-next-line no-control-regex -- Intentionally sanitize all C0 controls (U+0000–U+001F).
   candidate = candidate.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim()
   return candidate || fallback
 }

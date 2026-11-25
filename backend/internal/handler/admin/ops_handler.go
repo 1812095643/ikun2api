@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -14,7 +15,8 @@ import (
 )
 
 type OpsHandler struct {
-	opsService *service.OpsService
+	opsService   *service.OpsService
+	monitorProxy gin.HandlerFunc
 }
 
 // GetErrorLogByID returns ops error log detail.
@@ -69,7 +71,7 @@ func parseOpsViewParam(c *gin.Context) string {
 }
 
 func NewOpsHandler(opsService *service.OpsService) *OpsHandler {
-	return &OpsHandler{opsService: opsService}
+	return &OpsHandler{opsService: opsService, monitorProxy: NewMonitorProxy(os.Getenv("OPS_MONITOR_SOCKET"))}
 }
 
 // GetErrorLogs lists ops error logs.

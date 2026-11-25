@@ -236,6 +236,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		body = parsed.Body.Bytes()
 	}
 	defer claudeToolTextFromContext(c).finishAll()
+	signatureSession := signatureMonitorSession(c, body)
 	thinkingTrace := s.beginClaudeThinkingTrace(c, account, validationModel, telemetryClientSession, body)
 	var thinkingInputDigests map[[32]byte]struct{}
 	if supportsClaudeThinkingHistoryRecovery(account, validationModel) {
@@ -545,6 +546,8 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			if readErr == nil {
 				_ = resp.Body.Close()
 
+				monitorClaudeSignatureRejection(c, account.ID, signatureSession, thinkingInputDigests, thinkingTrace, lastWireBody, respBody)
+
 				if s.shouldRectifySignatureError(ctx, account, respBody, reqModel) {
 					signatureRetryStart := time.Now()
 					appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -596,7 +599,6 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 					var recoveredThinking [][32]byte
 					officialThinkingRecovery := false
 					if supportsClaudeThinkingHistoryRecovery(account, reqModel) && isClaudeInvalidThinkingSignature(respBody) {
-						logClaudeThinkingHistoryRejection(c, account.ID, shouldMimicClaudeCode, thinkingInputDigests, thinkingTrace, lastWireBody, respBody)
 						if clean, digests, changed := stripClaudeThinkingHistory(body, nil); changed {
 							filteredBody, recoveredThinking, officialThinkingRecovery = clean, digests, true
 						}
@@ -683,6 +685,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 											UpstreamStatusCode: 0,
 											UpstreamURL:        safeUpstreamURL(retryReq2.URL.String()),
 											Kind:               "signature_retry_tools_request_error",
+											Reason:             monitorTransportReason(c, retryErr2),
 											Message:            sanitizeUpstreamErrorMessage(retryErr2.Error()),
 										})
 										logger.LegacyPrintf("service.gateway", "Account %d: tool-downgrade signature retry failed: %v", account.ID, retryErr2)

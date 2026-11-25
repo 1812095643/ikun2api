@@ -1,6 +1,10 @@
 package service
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/MACOS-DO/sub4api/internal/pkg/xai"
+)
 
 func TestResolveOpenAIForwardModel(t *testing.T) {
 	tests := []struct {
@@ -296,6 +300,8 @@ func TestResolveOpenAIForwardMappedModels_CompactMappingPrecedence(t *testing.T)
 }
 
 func TestCanonicalOpenAIAccountSchedulingModelMatchesForwardSemantics(t *testing.T) {
+	guardRuntimeModelMappingOptions(t)
+	xai.SetRuntimeModelMappingOptions(xai.ModelMappingOptions{})
 	tests := []struct {
 		name    string
 		account *Account
@@ -330,6 +336,18 @@ func TestCanonicalOpenAIAccountSchedulingModelMatchesForwardSemantics(t *testing
 				t.Fatalf("canonical scheduling model = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCanonicalOpenAIAccountSchedulingModelUsesEnabledGrokCrossClientMapping(t *testing.T) {
+	guardRuntimeModelMappingOptions(t)
+	xai.SetRuntimeModelMappingOptions(xai.ModelMappingOptions{
+		DefaultText:          "grok-build-0.1",
+		EnableCrossClientMap: true,
+	})
+	account := &Account{Platform: PlatformGrok, Type: AccountTypeOAuth}
+	if got := canonicalOpenAIAccountSchedulingModel(account, "gpt-5.6"); got != "grok-build-0.1" {
+		t.Fatalf("canonical scheduling model = %q, want enabled Grok mapping", got)
 	}
 }
 

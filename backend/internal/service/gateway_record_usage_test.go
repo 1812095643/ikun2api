@@ -828,6 +828,36 @@ func TestGatewayServiceRecordUsage_FastSpeedHonouredKeepsPremium(t *testing.T) {
 	require.InDelta(t, fastCost.TotalCost, usageRepo.lastLog.TotalCost, 1e-10)
 }
 
+// apikey 中转账号也必须记录网关耗时（诊断上传慢/排队/首字慢），不能只限 OAuth 账号。
+func TestGatewayServiceRecordUsage_PersistsGatewayTimingForAPIKeyAccount(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	svc := newGatewayRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{})
+	upstreamTTFT := 2200
+
+	err := svc.RecordUsage(context.Background(), &RecordUsageInput{
+		Result: &ForwardResult{
+			RequestID:    "gateway_timing_apikey",
+			Usage:        ClaudeUsage{InputTokens: 10, OutputTokens: 6},
+			Model:        "claude-sonnet-4",
+			Stream:       true,
+			Duration:     5 * time.Second,
+			FirstTokenMs: &upstreamTTFT,
+		},
+		APIKey:        &APIKey{ID: 503, Quota: 100},
+		User:          &User{ID: 603},
+		Account:       &Account{ID: 703, Platform: PlatformAnthropic, Type: AccountTypeAPIKey},
+		APIKeyService: &openAIRecordUsageAPIKeyQuotaStub{},
+		Timing:        &GatewayRequestTiming{Upload: 9 * time.Second, SlotWait: 0, PreForward: 9500 * time.Millisecond, SwitchCount: 0},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, 9000, *usageRepo.lastLog.UploadMs)
+	require.Equal(t, 0, *usageRepo.lastLog.GatewayWaitMs)
+	require.Equal(t, 9500, *usageRepo.lastLog.PreForwardMs)
+	require.Equal(t, 11700, *usageRepo.lastLog.ClientFirstTokenMs)
+}
+
 func TestGatewayServiceRecordUsage_PersistsGatewayTiming(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 	svc := newGatewayRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{})

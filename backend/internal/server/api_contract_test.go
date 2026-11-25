@@ -266,13 +266,14 @@ func TestAPIContracts(t *testing.T) {
 			setup: func(t *testing.T, deps *contractDeps) {
 				t.Helper()
 				deps.apiKeyRepo.MustSeed(&service.APIKey{
-					ID:        100,
-					UserID:    1,
-					Key:       "sk_custom_1234567890",
-					Name:      "Key One",
-					Status:    service.StatusActive,
-					CreatedAt: deps.now,
-					UpdatedAt: deps.now,
+					ID:                100,
+					ForcedServiceTier: "priority",
+					UserID:            1,
+					Key:               "sk_custom_1234567890",
+					Name:              "Key One",
+					Status:            service.StatusActive,
+					CreatedAt:         deps.now,
+					UpdatedAt:         deps.now,
 				})
 			},
 			method:     http.MethodGet,
@@ -311,7 +312,7 @@ func TestAPIContracts(t *testing.T) {
 							"created_at": "2025-01-02T03:04:05Z",
 							"updated_at": "2025-01-02T03:04:05Z",
 							"funding_source": "",
-							"forced_service_tier": "",
+							"forced_service_tier": "priority",
 							"group_ids": null
 						}
 					],

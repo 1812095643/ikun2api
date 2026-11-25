@@ -19,10 +19,12 @@ if body.startswith('# '):
 if not body or not any(line.strip() and not line.lstrip().startswith('#') for line in body.splitlines()):
     raise SystemExit('Release notes must contain a nonempty body')
 PYNOTES
+# Keep registry names lowercase on macOS's Bash 3.2 as well as CI Bash.
+repository=$(printf '%s' "$GITHUB_REPOSITORY" | LC_ALL=C tr '[:upper:]' '[:lower:]')
 {
   echo "version=$version"
   echo "tag=v$version"
-  echo "ghcr=ghcr.io/${GITHUB_REPOSITORY,,}"
+  echo "ghcr=ghcr.io/$repository"
   echo "date=$(git show -s --format=%cI HEAD)"
   echo "commit=$(git rev-parse HEAD)"
 } >> "$GITHUB_OUTPUT"

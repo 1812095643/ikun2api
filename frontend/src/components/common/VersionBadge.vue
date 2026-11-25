@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, ref, onMounted, onBeforeUnmount } from 'vue'
+import { onLayoutPageChange } from '@/components/layout/layoutShell'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { getRollbackVersions, type RollbackVersionInfo } from '@/api/admin/system'
@@ -36,6 +37,16 @@ const rollbackVersions = ref<RollbackVersionInfo[]>([])
 const rollbackVersionsLoading = shallowRef(false)
 const rollbackVersionsError = shallowRef('')
 const selectedRollbackVersion = shallowRef('')
+// 常驻侧边栏：换页时收起面板；版本检查原来每次换页都会请求，改为最多每分钟一次
+let lastVersionCheck = Date.now()
+onLayoutPageChange(() => {
+  dropdownOpen.value = false
+  rollbackPanelOpen.value = false
+  if (isAdmin.value && Date.now() - lastVersionCheck > 60000) {
+    lastVersionCheck = Date.now()
+    void system.check(false)
+  }
+})
 const rollingBack = computed(() => busy.value && successKind.value === 'rollback')
 const { copied, copyToClipboard } = useClipboard()
 const manualTab = shallowRef<'script' | 'docker'>('script')

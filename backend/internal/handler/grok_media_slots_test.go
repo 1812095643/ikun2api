@@ -4,6 +4,7 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	dbent "github.com/MACOS-DO/sub4api/ent"
 	"github.com/MACOS-DO/sub4api/internal/config"
 	middleware2 "github.com/MACOS-DO/sub4api/internal/server/middleware"
 	"github.com/MACOS-DO/sub4api/internal/service"
@@ -21,6 +24,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
+	_ "modernc.org/sqlite"
 )
 
 type grokMediaSlotsCache struct {
@@ -238,10 +245,119 @@ func newGrokMediaSlotHandler(t *testing.T, oauth, mismatch bool, platforms ...st
 	groupID := int64(24)
 	require.NoError(t, gateway.BindGrokMediaVideoRequestAccount(context.Background(), &groupID, "task", 10, 20, 1))
 	bindings.writes = 0
-	billing := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
-	t.Cleanup(billing.Stop)
+	billing := newGrokMediaSlotBilling(t, cfg)
 	handler := NewOpenAIGatewayHandler(gateway, concurrency, billing, service.NewAPIKeyService(nil, nil, nil, nil, nil, nil, cfg), nil, nil, nil, nil, cfg)
 	return handler, slots, bindings, upstream
+}
+
+// Media status now restores the create-time funding snapshot even for balance
+// keys. Use real isolated storage so lifecycle tests still reach owner/slot logic.
+func newGrokMediaSlotBilling(t *testing.T, cfg *config.Config) *service.BillingCacheService {
+	t.Helper()
+	db, err := sql.Open("sqlite", ":memory:")
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	for _, statement := range []string{
+		`CREATE TABLE universal_subscription_holds (id TEXT PRIMARY KEY, subscription_id INTEGER, amount REAL)`,
+		`CREATE TABLE universal_media_funding (task_id TEXT NOT NULL, user_id INTEGER NOT NULL, api_key_id INTEGER NOT NULL, source TEXT NOT NULL, hold_id TEXT, PRIMARY KEY (task_id, user_id, api_key_id))`,
+	} {
+		_, err = db.Exec(statement)
+		require.NoError(t, err)
+	}
+	client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.SQLite, db)))
+	billing := service.ProvideBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil, client)
+	t.Cleanup(billing.Stop)
+	return billing
+}
+
+// The reverse switch must resume the original subscription hold even when the
+// current key uses balance. SQL expectations cover owner scoping and release;
+// PostgreSQL charge/locking integration remains in service integration tests.
+func TestMediaLookupResumesSubscriptionAfterKeySwitchToBalance(t *testing.T) {
+	for _, provider := range []string{"grok", "seedance"} {
+		t.Run(provider, func(t *testing.T) {
+			platforms := []string(nil)
+			if provider == "seedance" {
+				platforms = []string{service.PlatformOpenAI}
+			}
+			h, slots, bindings, upstream := newGrokMediaSlotHandler(t, false, false, platforms...)
+			c, w := grokMediaSlotContext(t.Context(), false)
+			key, ok := middleware2.GetAPIKeyFromContext(c)
+			require.True(t, ok)
+			key.FundingSource = service.FundingSourceBalance
+			taskID := "task"
+			if provider == "seedance" {
+				taskID = "seedance:task"
+				key.Group.Platform = service.PlatformOpenAI
+				c.Params = gin.Params{{Key: "task_id", Value: "task"}}
+				upstream.call = func(_ *http.Request, accountID int64) (*http.Response, error) {
+					require.Equal(t, int64(1), accountID)
+					return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}},
+						Body: io.NopCloser(strings.NewReader(`{"id":"task","status":"queued"}`))}, nil
+				}
+			}
+			require.NoError(t, h.gatewayService.BindGrokMediaVideoRequestAccount(t.Context(), key.GroupID, taskID, 10, 20, 1))
+			bindings.writes = 0
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = db.Close() })
+			client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+			billing := service.ProvideBillingCacheService(nil, nil, nil, nil, nil, nil,
+				&config.Config{RunMode: config.RunModeSimple}, nil, client)
+			t.Cleanup(billing.Stop)
+			h.billingCacheService = billing
+			mock.ExpectQuery(`SELECT f.source,f.hold_id,h.subscription_id,h.amount FROM universal_media_funding`).
+				WithArgs(taskID, int64(10), int64(20)).
+				WillReturnRows(sqlmock.NewRows([]string{"source", "hold_id", "subscription_id", "amount"}).
+					AddRow(service.FundingSourceUniversal, "existing-hold", int64(42), 2.0))
+			mock.ExpectExec(`UPDATE universal_subscription_holds SET state=`).
+				WithArgs("existing-hold", "unknown").WillReturnResult(sqlmock.NewResult(0, 1))
+			if provider == "seedance" {
+				h.SeedanceTasks(c)
+			} else {
+				h.GrokVideoStatus(c)
+			}
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			require.Equal(t, 1, upstream.calls)
+			require.NotNil(t, service.InflightReservationFromContext(c.Request.Context()))
+			require.Equal(t, service.FundingSourceBalance, key.FundingSource, "do not mutate the shared key")
+			require.Zero(t, bindings.writes)
+			slots.assertReleased(t)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestMediaLookupFailsClosedWithoutFundingStorage(t *testing.T) {
+	for _, provider := range []string{"grok", "seedance"} {
+		for _, source := range []string{service.FundingSourceBalance, service.FundingSourceUniversal} {
+			t.Run(provider+"/"+source, func(t *testing.T) {
+				h, slots, bindings, upstream := newGrokMediaSlotHandler(t, false, false)
+				unavailable := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil,
+					&config.Config{RunMode: config.RunModeSimple}, nil)
+				t.Cleanup(unavailable.Stop)
+				h.billingCacheService = unavailable
+				c, w := grokMediaSlotContext(t.Context(), false)
+				key, ok := middleware2.GetAPIKeyFromContext(c)
+				require.True(t, ok)
+				key.FundingSource = source
+				if provider == "seedance" {
+					key.Group.Platform = service.PlatformOpenAI
+					c.Params = gin.Params{{Key: "task_id", Value: "task"}}
+					h.SeedanceTasks(c)
+				} else {
+					h.GrokVideoStatus(c)
+				}
+				require.Equal(t, http.StatusServiceUnavailable, w.Code, w.Body.String())
+				require.Contains(t, w.Body.String(), "billing_unavailable")
+				require.Zero(t, upstream.calls)
+				require.Zero(t, slots.acquired)
+				require.Zero(t, bindings.writes)
+				slots.assertReleased(t)
+			})
+		}
+	}
 }
 
 func grokMediaSlotContext(ctx context.Context, generation bool) (*gin.Context, *httptest.ResponseRecorder) {

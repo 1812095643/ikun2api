@@ -220,7 +220,15 @@ func TestGeminiNativeModelsUsesDeclaredMappings(t *testing.T) {
 		rec := f.get(model)
 		require.Equal(t, status, rec.Code, model+": "+rec.Body.String())
 		if status == http.StatusOK {
-			require.JSONEq(t, `{"name":"models/`+model+`","supportedGenerationMethods":["generateContent","streamGenerateContent"]}`, rec.Body.String())
+			want := gemini.Model{Name: "models/" + model, SupportedGenerationMethods: []string{"generateContent", "streamGenerateContent"}}
+			if model == "gemini-4-argon" {
+				want.DisplayName = "Gemini 4 Argon"
+				want.InputTokenLimit = 1048576
+				want.OutputTokenLimit = 65536
+			}
+			expected, err := json.Marshal(want)
+			require.NoError(t, err)
+			require.JSONEq(t, string(expected), rec.Body.String())
 		} else {
 			require.Contains(t, rec.Body.String(), "models/"+model+" is not found")
 		}

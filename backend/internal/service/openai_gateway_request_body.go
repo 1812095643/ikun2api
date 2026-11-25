@@ -483,7 +483,7 @@ func SanitizeOpenAICrossModeFailoverReasoning(body []byte) (sanitized []byte, ch
 	if len(body) == 0 {
 		return body, false, nil
 	}
-	if !gjson.GetBytes(body, "input").Exists() {
+	if !parseRawJSONView(body).Get("input").Exists() {
 		return body, false, nil
 	}
 	var decoded map[string]any
@@ -836,7 +836,7 @@ func normalizeOpenAIAPIKeyStoreFalseReasoningReplayDecoded(body []byte, knownSto
 	if !knownStoreFalse && gjson.GetBytes(body, "store").Type != gjson.False {
 		return body, false, nil
 	}
-	input := gjson.GetBytes(body, "input")
+	input := parseRawJSONView(body).Get("input")
 	if !input.IsArray() {
 		return body, false, nil
 	}
@@ -2509,7 +2509,7 @@ func openAIRequestBodyMayContainImageInput(body []byte) bool {
 	if len(body) == 0 {
 		return false
 	}
-	input := gjson.GetBytes(body, "input")
+	input := parseRawJSONView(body).Get("input")
 	messages := gjson.GetBytes(body, "messages.#-1")
 	return openAIJSONValueMayContainImageInput(input) || openAIJSONValueMayContainImageInput(messages)
 }

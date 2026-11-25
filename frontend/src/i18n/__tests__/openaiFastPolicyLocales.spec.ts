@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+const { appStore } = vi.hoisted(() => ({ appStore: { siteName: '' } }))
+vi.mock('@/stores/app', () => ({ useAppStore: () => appStore }))
+
+import { i18n, loadLocaleMessages } from '..'
 
 import en from '../locales/en'
 import zh from '../locales/zh'
@@ -7,7 +12,7 @@ describe('OpenAI Fast/Flex policy locale keys', () => {
   it('exposes user scope copy at the runtime zh path', () => {
     expect(zh.admin.settings.openaiFastPolicy).toMatchObject({
       userIds: '指定用户',
-      userIdsHint: '输入任意邮箱关键词进行模糊搜索。留空表示对全部 IKUN2api 用户生效；选中用户的 API Key 请求优先匹配用户规则。',
+      userIdsHint: '输入任意邮箱关键词进行模糊搜索。留空表示对全部 __SITE_NAME__ 用户生效；选中用户的 API Key 请求优先匹配用户规则。',
       userSearchPlaceholder: '输入用户邮箱搜索',
       userSearchEmpty: '未找到匹配用户',
       userDeleted: '（已删除）',
@@ -19,13 +24,24 @@ describe('OpenAI Fast/Flex policy locale keys', () => {
   it('exposes user scope copy at the runtime en path', () => {
     expect(en.admin.settings.openaiFastPolicy).toMatchObject({
       userIds: 'Specific users',
-      userIdsHint: 'Type any part of a user email to search. Leave empty to apply to all IKUN2api users. Selected users match requests from their API keys and take precedence over global rules.',
+      userIdsHint: 'Type any part of a user email to search. Leave empty to apply to all __SITE_NAME__ users. Selected users match requests from their API keys and take precedence over global rules.',
       userSearchPlaceholder: 'Search by user email',
       userSearchEmpty: 'No matching users found',
       userDeleted: '(deleted)',
       userIdFallback: 'User #{id}',
       removeUser: 'Remove user'
     })
+  })
+
+  it.each(['zh', 'en'] as const)('renders default and configured branding in %s', async locale => {
+    await loadLocaleMessages(locale)
+    i18n.global.locale.value = locale
+    for (const [siteName, expected] of [['', 'IKUN2api'], ['青云 AI', '青云 AI']] as const) {
+      appStore.siteName = siteName
+      const message = i18n.global.t('admin.settings.openaiFastPolicy.userIdsHint')
+      expect(message).toContain(expected)
+      expect(message).not.toContain('__SITE_NAME__')
+    }
   })
 
   it('describes target and other-model actions without whitelist terminology', () => {

@@ -180,6 +180,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { onLayoutPageChange } from '@/components/layout/layoutShell'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { useSubscriptionStore } from '@/stores'
@@ -199,6 +200,14 @@ const activeSubscriptions = computed(() => subscriptionStore.activeSubscriptions
 const hasActiveSubscriptions = computed(() => subscriptionStore.hasActiveSubscriptions)
 // 订阅功能关闭后，即使用户仍持有后台分配的订阅，顶栏也不再露出订阅进度与「查看全部订阅」入口。
 const subscriptionFeatureEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.subscription))
+// 常驻顶栏：换页时与原来重建一样收起浮层，并按缓存规则刷新订阅（缓存未过期时不发请求）
+onLayoutPageChange(() => {
+  tooltipOpen.value = false
+  if (!subscriptionFeatureEnabled.value) return
+  subscriptionStore.fetchActiveSubscriptions().catch((error) => {
+    console.error('Failed to load subscriptions in SubscriptionProgressMini:', error)
+  })
+})
 
 const displaySubscriptions = computed(() => {
   // Sort by most usage (highest percentage first)

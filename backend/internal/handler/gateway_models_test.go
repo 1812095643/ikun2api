@@ -370,16 +370,22 @@ func TestGatewayModels_UnmappedOpenAIAccountsSupplementMappedModels(t *testing.T
 			want:     []string{sparkModel, alias},
 		},
 		{
-			// A passthrough account with a stale mapping behaves like an unmapped
-			// one: it adds the defaults but never its own mapping keys, and it no
-			// longer hides the aliases declared on ordinary accounts.
-			name: "passthrough account contributes defaults without hiding mapped aliases",
+			name: "explicitly unfiltered passthrough contributes defaults and other account aliases",
 			accounts: append([]service.Account{{
 				ID: 5, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth,
 				Credentials: map[string]any{"model_mapping": map[string]any{"stale-model": "stale-model"}},
-				Extra:       map[string]any{"openai_passthrough": true},
+				Extra:       map[string]any{"openai_passthrough": true, "openai_passthrough_model_filter": false},
 			}}, accounts[1:]...),
 			want: append(append([]string{}, subscriptionDefaults...), alias),
+		},
+		{
+			name: "legacy passthrough identity mapping contributes only listed models alongside other accounts",
+			accounts: append([]service.Account{{
+				ID: 5, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth,
+				Credentials: map[string]any{"model_mapping": map[string]any{"listed-model": "listed-model"}},
+				Extra:       map[string]any{"openai_passthrough": true},
+			}}, accounts[1:]...),
+			want: []string{"listed-model", sparkModel, alias},
 		},
 		{
 			name:     "unmapped accounts from another platform do not add defaults",

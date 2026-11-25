@@ -155,7 +155,7 @@ export default {
       "category": "账户"
     },
     "accounts_dschedule": {
-      "label": "修改并发、优先级与有效期",
+      "label": "管理并发、优先级、有效期与定时启停计划",
       "category": "账户"
     },
     "accounts_drefresh": {

@@ -167,7 +167,18 @@ func TestOpenAIGatewayService_SetupTokenLegacy_SanitizesAndTransforms(t *testing
 	require.Equal(t, "max", gjson.GetBytes(upstream.lastBody, "reasoning.effort").String())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "reasoning.mode").Exists())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "input.0.id").Exists())
-	require.Len(t, gjson.GetBytes(upstream.lastBody, "input").Array(), 1)
+	// Orphan outputs are removed, and the surviving custom call receives an
+	// explicit aborted result so Codex never sees an unmatched history call.
+	input := gjson.GetBytes(upstream.lastBody, "input").Array()
+	require.Len(t, input, 2)
+	require.Equal(t, "custom_tool_call", input[0].Get("type").String())
+	require.Equal(t, "apply_patch", input[0].Get("name").String())
+	require.Equal(t, "patch", input[0].Get("input").String())
+	require.Equal(t, "ctc_custom_1", input[0].Get("call_id").String())
+	require.Equal(t, "custom_tool_call_output", input[1].Get("type").String())
+	require.Equal(t, input[0].Get("call_id").String(), input[1].Get("call_id").String())
+	require.Equal(t, "aborted", input[1].Get("output").String())
+	require.NotContains(t, string(upstream.lastBody), "call_orphan")
 }
 
 // TestOpenAIGatewayService_APIKeyPassthrough_StripsInvalidReasoningItemIDs
