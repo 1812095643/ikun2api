@@ -13,7 +13,10 @@ const { api, showError } = vi.hoisted(() => ({
 }))
 vi.mock('@/api/admin/ops', () => ({ opsAPI: api }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError, showSuccess: vi.fn() }) }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', async importOriginal => ({
+  ...await importOriginal<typeof import('vue-i18n')>(),
+  useI18n: () => ({ t: (key: string) => key })
+}))
 
 describe('Ops client restriction error filter', () => {
   beforeEach(() => {
