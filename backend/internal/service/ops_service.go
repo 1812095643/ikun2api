@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
+	monitorruntime "github.com/MACOS-DO/sub4api/internal/monitoring/runtime"
 	infraerrors "github.com/MACOS-DO/sub4api/internal/pkg/errors"
 )
 
@@ -43,6 +44,7 @@ type OpsRuntimeSettingsRefreshHealth struct {
 
 // OpsService provides ingestion and query APIs for the Ops monitoring module.
 type OpsService struct {
+	monitor          *monitorruntime.Native
 	connectionTraces *connectionTraceSink
 	opsRepo          OpsRepository
 	settingRepo      SettingRepository

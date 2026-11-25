@@ -759,6 +759,9 @@ func ProvideOpsService(
 	settingService *SettingService,
 	authCacheInvalidationWorker *AuthCacheInvalidationWorker,
 	apiKeyService *APIKeyService,
+	db *sql.DB,
+	emailService *EmailService,
+	encryptor SecretEncryptor,
 ) *OpsService {
 	svc := NewOpsService(
 		opsRepo,
@@ -782,6 +785,7 @@ func ProvideOpsService(
 	svc.authCacheInvalidationWorker = authCacheInvalidationWorker
 	svc.apiKeyService = apiKeyService
 	svc.StartRuntimeSettingsRefresh(context.Background())
+	svc.startMonitor(db, emailService, encryptor)
 	return svc
 }
 

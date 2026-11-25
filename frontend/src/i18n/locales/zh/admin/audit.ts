@@ -9,6 +9,7 @@ export default {
     actionPattern: '{action}{resource}',
     resourceOperation: '{resource}操作',
     actionNames: {
+      controlIncident: '处理异常事件', configureMonitor: '配置监控规则', saveNotificationChannel: '保存通知渠道', testNotificationChannel: '测试通知渠道',
       viewAccountTimer: '查看定时启停计划', previewAccountTimer: '预览定时启停计划', saveAccountTimer: '保存定时启停计划', cancelAccountTimer: '取消定时启停计划', viewConnections: '查看连接诊断',
       navigationRead: '标记导航消息已读', apiKeyUsage: '查看 API Key 用量',
       login: '登录', login2fa: '两步验证登录', register: '注册', tokenRefresh: '刷新登录凭据', sessionMismatch: '登录会话校验不匹配',

@@ -132,6 +132,9 @@ func (s *OpsService) RecordConnectionTrace(record ConnectionTrace) {
 }
 
 func (s *OpsService) StopConnectionDiagnostics() {
+	if s != nil && s.monitor != nil {
+		s.monitor.Stop()
+	}
 	if s == nil || s.connectionTraces == nil {
 		return
 	}

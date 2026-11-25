@@ -654,7 +654,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 2. Re-check billing eligibility after wait
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -666,7 +666,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
 	if err != nil {
 		reqLog.Info("openai.inflight_reservation_rejected", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -853,6 +853,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			jsonKeepaliveStarted = true
 		}
 		forwardStart := time.Now()
+		observeGatewayForwardStart(c, forwardStart)
 		// 用扣除非语义心跳字节的口径快照：心跳注释不构成语义响应，
 		// 不能因心跳字节变化而放弃 failover 换号（#3887）。
 		writerSizeBeforeForward := service.OpenAICompactKeepaliveAdjustedWrittenSize(c)
@@ -1357,7 +1358,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -1368,7 +1369,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
 	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
 	if inflightErr != nil {
-		status, code, message, retryAfter := billingErrorDetails(inflightErr)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, inflightErr)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -1477,6 +1478,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		forwardStart := time.Now()
+		observeGatewayForwardStart(c, forwardStart)
 
 		defaultMappedModel := strings.TrimSpace(effectiveMappedModel)
 		// 应用渠道模型映射到请求体

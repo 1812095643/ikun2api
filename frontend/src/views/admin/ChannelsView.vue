@@ -1107,7 +1107,7 @@ function accountStatsRulesToAPI(): AccountStatsPricingRule[] {
             platform: section.platform,
             models: p.models,
             billing_mode: p.billing_mode,
-        apply_to_downstream: p.apply_to_downstream !== false,
+            apply_to_downstream: p.apply_to_downstream !== false,
             input_price: mTokToPerToken(p.input_price),
             output_price: mTokToPerToken(p.output_price),
             cache_write_price: mTokToPerToken(p.cache_write_price),
@@ -1250,6 +1250,8 @@ function apiToForm(channel: Channel): PlatformSection[] {
       .map(p => ({
         models: p.models || [],
         billing_mode: p.billing_mode,
+        // 回填已保存的下游范围，避免关闭状态被表单默认值覆盖。
+        apply_to_downstream: p.apply_to_downstream !== false,
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
         cache_write_price: perTokenToMTok(p.cache_write_price),
@@ -1448,6 +1450,7 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
       pricing: (apiRule.pricing || []).map(p => ({
         models: [...(p.models || [])],
         billing_mode: p.billing_mode,
+        apply_to_downstream: p.apply_to_downstream !== false,
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
         cache_write_price: perTokenToMTok(p.cache_write_price),

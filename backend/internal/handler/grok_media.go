@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"net/http"
 	"strconv"
 	"strings"
@@ -170,9 +171,11 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			h.errorResponse(c, http.StatusServiceUnavailable, "billing_unavailable", "任务计费信息暂时不可用")
 			return
 		}
+		// The snapshot also pins balance-funded tasks. matched only indicates a
+		// resumed subscription hold, not whether the funding source was restored.
+		apiKey = pinned
 		if matched {
 			c.Request = c.Request.WithContext(resumed)
-			apiKey = pinned
 			resumeUniversal = true
 			defer done()
 		} else if service.IsUniversalFunding(apiKey) {
@@ -187,7 +190,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		return h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey))
 	}(); err != nil {
 		reqLog.Info("grok_media.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -203,7 +206,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		return reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body))
 	}()
 	if inflightErr != nil {
-		status, code, message, retryAfter := billingErrorDetails(inflightErr)
+		status, code, message, retryAfter := billingErrorDetailsObserved(c, inflightErr)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -409,6 +412,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		forwardStart := time.Now()
+		observeGatewayForwardStart(c, forwardStart)
 		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer releaseAccount()
@@ -509,6 +513,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 
 		h.gatewayService.ReportOpenAIAccountScheduleResult(account, grokMediaScheduleModel(account, routingModel, result), true, nil)
 		if isGrokVideoCreateEndpoint(endpoint) && strings.TrimSpace(result.ResponseID) != "" {
+			telemetry.FromContext(requestCtx).Task("media.accepted", result.ResponseID, "accepted", nil, time.Now())
 			if err := h.gatewayService.BindGrokMediaVideoRequestAccount(
 				requestCtx, apiKey.GroupID, result.ResponseID, subject.UserID, apiKey.ID, account.ID,
 			); err != nil {
@@ -522,6 +527,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			// model/duration/resolution so status can still price if upstream omits them.
 			// Retry once: missing pending causes silent underpricing (status omits resolution).
 			if e := h.billingCacheService.StoreMediaFunding(requestCtx, apiKey, result.ResponseID); e != nil {
+				telemetry.FromContext(requestCtx).Task("billing.metadata_failed", result.ResponseID, "funding_missing", nil, time.Now())
 				reqLog.Error("grok_media.persist_funding_failed", zap.Error(e))
 			}
 			pending := service.GrokVideoPendingBilling{
@@ -543,6 +549,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				if err2 := h.gatewayService.StoreGrokVideoPendingBilling(requestCtx, result.ResponseID, subject.UserID, apiKey.ID, pending); err2 != nil {
 					// Response body may already be committed; completion path will fail-closed
 					// when pending is still missing and status cannot price duration.
+					telemetry.FromContext(requestCtx).Task("billing.metadata_failed", result.ResponseID, "pending_missing", nil, time.Now())
 					reqLog.Error("grok_media.store_video_pending_billing_failed",
 						zap.Int64("account_id", account.ID),
 						zap.String("request_id", result.ResponseID),
@@ -656,6 +663,7 @@ func prepareGrokVideoCompletionBilling(
 		return nil
 	}
 	taskRequestID = strings.TrimSpace(firstNonEmptyString(taskRequestID, statusResult.ResponseID))
+	telemetry.FromContext(ctx).Task("media.completed", taskRequestID, "deliverable_confirmed", map[string]float64{"deliverable": 1, "billing_expected": 1}, time.Now())
 	if taskRequestID == "" {
 		return nil
 	}
@@ -669,6 +677,7 @@ func prepareGrokVideoCompletionBilling(
 		// Status omits resolution; without pending we would silently default to 480p and underbill.
 		// Allow billing only when official status carries duration (still may default resolution).
 		if statusResult.VideoDurationSeconds <= 0 {
+			telemetry.FromContext(ctx).Task("billing.metadata_failed", taskRequestID, "pending_missing", nil, time.Now())
 			reqLog.Error("grok_media.video_billing_skipped_missing_pending",
 				zap.String("request_id", taskRequestID),
 				zap.String("reason", "no create-time snapshot and status has no video.duration"),
@@ -793,6 +802,7 @@ func recordGrokMediaUsage(
 		}
 	}
 	requestPayloadHash := service.HashUsageRequestPayload(payloadForHash)
+	monitorTracker := telemetry.FromContext(c.Request.Context())
 	h.submitOpenAIUsageRecordTask(c.Request.Context(), result, func(ctx context.Context) {
 		if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
 			Result:             result,
@@ -811,6 +821,7 @@ func recordGrokMediaUsage(
 			ChannelUsageFields: channelUsageFields,
 		}); err != nil {
 			if videoTaskID != "" {
+				monitorTracker.Task("billing.failed", videoTaskID, "billing_write_failed", nil, time.Now())
 				if releaseErr := h.gatewayService.ReleaseGrokVideoBilling(ctx, videoTaskID, subject.UserID, apiKey.ID); releaseErr != nil {
 					reqLog.Warn("grok_media.video_billing_claim_release_failed",
 						zap.String("request_id", videoTaskID),
@@ -827,6 +838,8 @@ func recordGrokMediaUsage(
 				zap.Int64("account_id", account.ID),
 			).Error("grok_media.record_usage_failed", zap.Error(err))
 			reqLog.Debug("grok_media.record_usage_failed", zap.Error(err))
+		} else if videoTaskID != "" {
+			monitorTracker.Task("billing.applied", videoTaskID, "billing_confirmed", map[string]float64{"billing_confirmed": 1}, time.Now())
 		}
 	})
 }

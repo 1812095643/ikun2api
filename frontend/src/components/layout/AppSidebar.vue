@@ -223,6 +223,8 @@ import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import { useSidebarNotices } from '@/composables/useSidebarNotices'
 import SidebarBadge from './SidebarBadge.vue'
+import { prefetchRoutePaths, cancelMenuPrefetch } from '@/composables/useRoutePrefetch'
+import { onLayoutPageChange } from '@/components/layout/layoutShell'
 import type { NavigationBadge } from '@/api/navigation'
 
 interface NavItem {
@@ -297,6 +299,8 @@ const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboar
 // a chevron click records the user's choice, which wins over the automatic
 // state so an active group can still be collapsed manually.
 const groupExpandOverrides = ref<Map<string, boolean>>(new Map())
+// 侧边栏常驻后不再随页面重建：换页时清掉手动展开/收起，回到按当前页面自动展开（与原行为一致）
+onLayoutPageChange(() => { groupExpandOverrides.value = new Map() })
 
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
@@ -1016,6 +1020,29 @@ function handleGroupClick(item: NavItem) {
   groupExpandOverrides.value.set(item.path, true)
 }
 
+// 空闲时预加载当前可见菜单的页面代码：首次点开任一菜单不用再等下载（已加载过的自动跳过）。
+const prefetchMenuPaths = computed(() => {
+  const paths: string[] = []
+  const walk = (items: NavItem[]) => {
+    for (const item of items) {
+      if (!item.external && !item.expandOnly) paths.push(item.path)
+      if (item.children) walk(item.children)
+    }
+  }
+  if (isAdmin.value) {
+    walk(adminNavItems.value)
+    walk(personalNavItems.value)
+  } else {
+    walk(userNavItems.value)
+  }
+  return paths
+})
+watch(() => [authStore.user?.id, authStore.user?.role], () => {
+  cancelMenuPrefetch()
+  prefetchRoutePaths(router, prefetchMenuPaths.value)
+})
+watch(prefetchMenuPaths, (paths) => prefetchRoutePaths(router, paths), { immediate: true })
+
 // Initialize theme
 const savedTheme = localStorage.getItem('theme')
 if (
@@ -1053,6 +1080,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  cancelMenuPrefetch()
   if (sidebarNavRef.value) {
     appStore.sidebarScrollTop = sidebarNavRef.value.scrollTop
   }

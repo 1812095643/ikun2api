@@ -1,4 +1,5 @@
 const exactActions: Record<string, string> = {
+  'ops.incident.control': 'controlIncident', 'ops.monitor.configure': 'configureMonitor', 'ops.notification.channel.save': 'saveNotificationChannel', 'ops.notification.test': 'testNotificationChannel',
   'accounts.schedulable_timers.read': 'viewAccountTimer',
   'accounts.schedulable_timers.preview.create': 'previewAccountTimer',
   'accounts.schedulable_timers.create': 'saveAccountTimer',

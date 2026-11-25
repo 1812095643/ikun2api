@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	mondomain "github.com/MACOS-DO/sub4api/internal/monitoring/domain"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"log"
 	"net"
 	"net/http"
@@ -445,6 +447,9 @@ func setOpsRequestContext(c *gin.Context, model string, stream bool) {
 	}
 	model = strings.TrimSpace(model)
 	c.Set(opsModelKey, model)
+	if c.Request != nil {
+		telemetry.FromContext(c.Request.Context()).Update(mondomain.Observation{Model: model})
+	}
 	c.Set(opsStreamKey, stream)
 	if c.Request != nil && model != "" {
 		ctx := context.WithValue(c.Request.Context(), ctxkey.Model, model)
@@ -471,6 +476,16 @@ func setOpsSelectedAccount(c *gin.Context, accountID int64, platform ...string) 
 	service.ClearOpsUpstreamModel(c)
 	c.Set(opsAccountIDKey, accountID)
 	if c.Request != nil {
+		t := telemetry.FromContext(c.Request.Context())
+		if key, ok := middleware2.GetAPIKeyFromContext(c); ok && key != nil && key.GroupID != nil {
+			t.Update(mondomain.Observation{GroupID: *key.GroupID})
+		}
+		t.Attempt(accountID, c.GetString(opsModelKey), time.Now())
+		if len(platform) > 0 {
+			t.Update(mondomain.Observation{Platform: platform[0]})
+		}
+	}
+	if c.Request != nil {
 		ctx := context.WithValue(c.Request.Context(), ctxkey.AccountID, accountID)
 		if len(platform) > 0 {
 			p := strings.TrimSpace(platform[0])
@@ -487,6 +502,11 @@ func markOpsRoutingCapacityLimited(c *gin.Context) {
 		return
 	}
 	c.Set(opsRoutingCapacityLimitedKey, true)
+	if c.Request != nil {
+		t := telemetry.FromContext(c.Request.Context())
+		t.Update(mondomain.Observation{Metrics: map[string]float64{"eligible": 0}})
+		t.Event("pool.empty", "no_eligible_account", 0, 0, time.Now())
+	}
 }
 
 func markOpsRoutingCapacityLimitedIfNoAvailable(c *gin.Context, err error) {

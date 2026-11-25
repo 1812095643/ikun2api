@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"strconv"
 	"strings"
 	"time"
@@ -467,6 +468,21 @@ const (
 func appendOpsUpstreamError(c *gin.Context, ev OpsUpstreamErrorEvent) {
 	if c == nil {
 		return
+	}
+	if c.Request != nil {
+		reason := telemetry.ReasonCode(gjson.Get(ev.UpstreamResponseBody, "error.code").String())
+		if reason == "unclassified" {
+			switch ev.Reason {
+			case "dns", "connect", "tls", "proxy", "timeout", "transport_unknown", "client_cancelled":
+				reason = ev.Reason
+			}
+		}
+		if reason == "unclassified" && ev.UpstreamStatusCode == 0 && strings.HasSuffix(ev.Kind, "request_error") {
+			reason = "transport_unknown"
+		}
+		if reason != "client_cancelled" {
+			telemetry.FromContext(c.Request.Context()).Event("attempt.failed", reason, ev.UpstreamStatusCode, ev.AccountID, time.Now())
+		}
 	}
 	if ev.AtUnixMs <= 0 {
 		ev.AtUnixMs = time.Now().UnixMilli()

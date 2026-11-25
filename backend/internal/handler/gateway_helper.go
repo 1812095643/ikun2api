@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	mondomain "github.com/MACOS-DO/sub4api/internal/monitoring/domain"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"math/rand/v2"
 	"net/http"
 	"strings"
@@ -43,6 +45,7 @@ func gatewayRequestTiming(c *gin.Context, requestStart, bodyReadDone, forwardSta
 	if !bodyReadDone.IsZero() {
 		timing.Upload = bodyReadDone.Sub(requestStart)
 	}
+	telemetry.FromContext(c.Request.Context()).Update(mondomain.Observation{Metrics: map[string]float64{"upload_ms": float64(timing.Upload.Milliseconds()), "queue_ms": float64(timing.SlotWait.Milliseconds()), "pre_forward_ms": float64(timing.PreForward.Milliseconds()), "switches": float64(timing.SwitchCount)}})
 	return timing
 }
 
@@ -428,7 +431,9 @@ func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType 
 // 流式请求在等待期间按 pingInterval 发送 ping。acquire 收到的 ctx 带有等待超时。
 func (h *ConcurrencyHelper) pollSlotWithPing(c *gin.Context, slotType string, timeout time.Duration, isStream bool, streamStarted *bool, tryImmediate bool, wake <-chan struct{}, acquire func(ctx context.Context) (*service.AcquireResult, error)) (func(), error) {
 	waitStart := time.Now()
-	defer func() { addGatewayWait(c, time.Since(waitStart)) }()
+	tracker := telemetry.FromContext(c.Request.Context())
+	tracker.Queue(true, slotType, waitStart)
+	defer func() { tracker.Queue(false, slotType, time.Now()); addGatewayWait(c, time.Since(waitStart)) }()
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 	defer cancel()
 
@@ -720,4 +725,10 @@ func nextBackoff(current time.Duration) time.Duration {
 		return maxBackoff
 	}
 	return jittered
+}
+
+func observeGatewayForwardStart(c *gin.Context, now time.Time) {
+	if c != nil && c.Request != nil {
+		telemetry.FromContext(c.Request.Context()).Forward(now)
+	}
 }

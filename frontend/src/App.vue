@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
+import PersistentLayout from '@/components/layout/PersistentLayout.vue'
 import { computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import Toast from '@/components/common/Toast.vue'
 import NavigationProgress from '@/components/common/NavigationProgress.vue'
@@ -167,7 +168,9 @@ onMounted(async () => {
 
 <template>
   <NavigationProgress />
-  <RouterView />
+  <PersistentLayout :key="`${authStore.user?.id ?? 'guest'}:${authStore.user?.role ?? 'guest'}`">
+    <RouterView />
+  </PersistentLayout>
   <UserOnboarding v-if="authStore.isAuthenticated" />
   <Toast />
   <AnnouncementPopup />

@@ -245,6 +245,9 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 
 		if breachedNow && consecutive >= required {
 			if activeEvent != nil {
+				if !activeEvent.EmailSent {
+					s.maybeSendAlertEmail(ctx, runtimeCfg, rule, activeEvent)
+				}
 				continue
 			}
 
@@ -306,6 +309,9 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] resolve event failed (event=%d): %v", activeEvent.ID, err)
 			} else {
 				eventsResolved++
+				if s.opsService != nil {
+					_, _ = s.opsService.QueueLegacyAlert(ctx, rule, activeEvent, true)
+				}
 			}
 		}
 	}
@@ -714,6 +720,11 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 		if isOpsAlertSilenced(time.Now().UTC(), rule, event, runtimeCfg.Silencing) {
 			return false
 		}
+	}
+
+	if s.opsService.Monitor() != nil {
+		queued, err := s.opsService.QueueLegacyAlert(ctx, rule, event, false)
+		return err == nil && queued
 	}
 
 	// Apply/update rate limiter.

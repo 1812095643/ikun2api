@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { opsAPI } from '@/api/admin/ops'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import OpsMonitorSettings from './OpsMonitorSettings.vue'
 import Select from '@/components/common/Select.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import type { OpsAlertRuntimeSettings, EmailNotificationConfig, AlertSeverity, OpsAdvancedSettings, OpsMetricThresholds } from '../types'
@@ -20,6 +21,7 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+const settingsSection = ref('general')
 const loading = ref(false)
 const saving = ref(false)
 
@@ -236,7 +238,9 @@ async function saveAllSettings() {
 
 <template>
   <BaseDialog :show="show" :title="t('admin.ops.settings.title')" width="extra-wide" @close="emit('close')">
-    <div v-if="loading" class="py-10 text-center text-sm text-gray-500">
+    <nav class="mb-4 flex gap-4 border-b border-gray-100 dark:border-dark-700"><button v-for="value in ['general','monitor']" :key="value" class="border-b-2 py-2 text-sm" :class="settingsSection === value ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400'" @click="settingsSection = value">{{ t(`admin.ops.enhanced.section.${value}`) }}</button></nav>
+    <OpsMonitorSettings v-if="settingsSection === 'monitor'" @saved="emit('saved')" />
+    <div v-else-if="loading" class="py-10 text-center text-sm text-gray-500">
       {{ t('common.loading') }}
     </div>
 
@@ -653,7 +657,7 @@ async function saveAllSettings() {
       </details>
     </div>
 
-    <template #footer>
+    <template v-if="settingsSection === 'general'" #footer>
       <div class="flex justify-end gap-2">
         <button class="btn btn-secondary" @click="emit('close')">{{ t('common.cancel') }}</button>
         <button class="btn btn-primary" :disabled="saving || !validation.valid" @click="saveAllSettings">

@@ -254,6 +254,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		forwardStart := time.Now()
+		observeGatewayForwardStart(c, forwardStart)
 
 		forwardBody := body
 		if channelMapping.Mapped {

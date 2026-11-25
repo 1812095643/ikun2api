@@ -203,6 +203,7 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 		service.SetOpsUpstreamModel(c, model)
 
 		forwardStart := time.Now()
+		observeGatewayForwardStart(c, forwardStart)
 		result, forwardErr := h.gatewayService.ForwardSystemOne(c.Request.Context(), c, account, body)
 		if accountRelease != nil {
 			accountRelease()

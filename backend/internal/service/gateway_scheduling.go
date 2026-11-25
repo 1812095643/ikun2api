@@ -7,6 +7,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"log/slog"
 	mathrand "math/rand"
 	"sort"
@@ -736,6 +737,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		"total_accounts", len(accounts),
 	)
 	candidates, channelRestrictedCount := s.filterLoadAwareCandidates(ctx, accounts, isExcluded, isChannelRestricted, platform, useMixed, requestedModel)
+	telemetry.Pool(ctx, groupID, requestedModel, len(accounts), len(candidates), map[string]float64{"channel_restricted": float64(channelRestrictedCount)})
 
 	if len(candidates) == 0 {
 		if channelRestrictedCount > 0 {
@@ -2629,6 +2631,7 @@ func (s *GatewayService) logDetailedSelectionFailure(
 	allowMixedScheduling bool,
 ) selectionFailureStats {
 	stats := s.collectSelectionFailureStats(ctx, accounts, requestedModel, platform, excludedIDs, allowMixedScheduling)
+	telemetry.Pool(ctx, groupID, requestedModel, stats.Total, stats.Eligible, map[string]float64{"excluded": float64(stats.Excluded), "unschedulable": float64(stats.Unschedulable), "model_unsupported": float64(stats.ModelUnsupported), "model_rate_limited": float64(stats.ModelRateLimited), "platform_filtered": float64(stats.PlatformFiltered)})
 	logger.LegacyPrintf(
 		"service.gateway",
 		"[SelectAccountDetailed] group_id=%v model=%s platform=%s session=%s total=%d eligible=%d excluded=%d unschedulable=%d platform_filtered=%d model_unsupported=%d model_rate_limited=%d profit_threshold=%d profit_invalid_account_rate=%d sample_platform_filtered=%v sample_model_unsupported=%v sample_model_rate_limited=%v",

@@ -189,6 +189,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		writerSizeBeforeForward := c.Writer.Size()
 		forwardStart := time.Now()
+		observeGatewayForwardStart(c, forwardStart)
 		var result *service.OpenAIForwardResult
 		result, err = func() (*service.OpenAIForwardResult, error) {
 			if accountRelease != nil {

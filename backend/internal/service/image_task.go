@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	mondomain "github.com/MACOS-DO/sub4api/internal/monitoring/domain"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"net/http"
 	"strings"
 	"time"
@@ -166,6 +168,7 @@ func (s *ImageTaskService) Create(ctx context.Context, owner ImageTaskOwner) (*I
 	if err := s.store.Save(ctx, task, s.ttl); err != nil {
 		return nil, ErrImageTaskUnavailable.WithCause(err)
 	}
+	telemetry.Default().Emit(mondomain.Observation{Kind: "media.accepted", TaskID: task.ID, UserID: task.UserID, KeyID: task.APIKeyID, Reason: "async_image", OccurredAt: now, Metrics: map[string]float64{"sla_ms": float64(s.executionTimeout.Milliseconds())}})
 	return imageTaskToPublic(task), nil
 }
 
@@ -232,6 +235,13 @@ func (s *ImageTaskService) finish(ctx context.Context, id, status string, status
 	if err := s.store.Save(ctx, task, s.ttl); err != nil {
 		return ErrImageTaskUnavailable.WithCause(err)
 	}
+	kind := "media.completed"
+	reason := "image_task_completed"
+	if status == ImageTaskStatusFailed {
+		kind = "media.failed"
+		reason = "image_task_failed"
+	}
+	telemetry.Default().Emit(mondomain.Observation{Kind: kind, TaskID: task.ID, UserID: task.UserID, KeyID: task.APIKeyID, Reason: reason, OccurredAt: now, ClientStatus: statusCode, Metrics: map[string]float64{"async_image": 1}})
 	return nil
 }
 

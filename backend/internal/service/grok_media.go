@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -771,6 +772,15 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 		}
 	}
 	if endpoint == GrokMediaEndpointVideoStatus {
+		tracker := telemetry.FromContext(ctx)
+		switch state := gjson.GetBytes(respBody, "status").String(); state {
+		case "pending", "queued", "processing", "running":
+			tracker.Task("media.pending", requestID, "provider_pending", nil, time.Now())
+		case "failed", "expired":
+			tracker.Task("media.failed", requestID, "upstream_task_failed", nil, time.Now())
+		case "cancelled":
+			tracker.Task("media.cancelled", requestID, "task_cancelled", nil, time.Now())
+		}
 		respBody = rewriteGrokMediaVideoContentURLs(
 			respBody,
 			requestID,

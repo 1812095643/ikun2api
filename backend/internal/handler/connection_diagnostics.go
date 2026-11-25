@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"github.com/MACOS-DO/sub4api/internal/pkg/ctxkey"
 	"github.com/MACOS-DO/sub4api/internal/pkg/requesttiming"
 	"github.com/MACOS-DO/sub4api/internal/server/middleware"
@@ -177,6 +178,7 @@ func ConnectionDiagnosticsMiddleware(ops connectionDiagnosticsRecorder) gin.Hand
 				row.FirstTokenMS = nil
 			}
 			collector.WhenFinished(func(snapshot requesttiming.Snapshot) {
+				telemetry.FromContext(c.Request.Context()).Timing(snapshot)
 				row.TraceID = snapshot.TraceID
 				row.StartedAt = snapshot.StartedAt
 				row.Status = snapshot.Status

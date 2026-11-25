@@ -41,7 +41,8 @@ type FrontendServer struct {
 	baseHTML    []byte
 	cache       *HTMLCache
 	settings    PublicSettingsProvider
-	overrideDir string // local file override directory
+	overrideDir string   // local file override directory
+	seo         *seoData // nil when the build carries no seo.json
 }
 
 // NewFrontendServer creates a new frontend server with settings injection
@@ -73,6 +74,7 @@ func NewFrontendServer(settingsProvider PublicSettingsProvider) (*FrontendServer
 		cache:       cache,
 		settings:    settingsProvider,
 		overrideDir: filepath.Join("data", "public"),
+		seo:         parseSEOData(readDistFile(distFS, "seo.json")),
 	}, nil
 }
 
@@ -94,6 +96,9 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			return
 		}
 		if s.serveStandaloneStudio(c) {
+			return
+		}
+		if s.serveSEOFile(c, path) {
 			return
 		}
 
@@ -157,7 +162,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 		// per-request nonce. Otherwise the browser would reuse HTML carrying a
 		// stale nonce that no longer matches the CSP header of this request.
 		if nonce == "" && !privateSharePage {
-			if match := c.GetHeader("If-None-Match"); match == cached.ETag {
+			if match := c.GetHeader("If-None-Match"); match == seoETag(cached.ETag, c.Request.Host+c.Request.URL.Path) {
 				applyHTMLNoCacheHeaders(c.Writer.Header())
 				c.Status(http.StatusNotModified)
 				c.Abort()
@@ -165,11 +170,12 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 			}
 		}
 
+		page, etag := s.seoVariant(c, cached)
 		// Replace nonce placeholder with actual nonce before serving
-		content := replaceNoncePlaceholder(cached.Content, nonce)
+		content := replaceNoncePlaceholder(page, nonce)
 
 		if !privateSharePage {
-			c.Header("ETag", cached.ETag)
+			c.Header("ETag", etag)
 		}
 		applyHTMLNoCacheHeaders(c.Writer.Header())
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
@@ -201,13 +207,17 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 
 	rendered := s.injectSettings(settingsJSON)
 	s.cache.Set(rendered, settingsJSON)
+	cached = s.cache.Get()
+	if cached == nil {
+		cached = &CachedHTML{Content: rendered, Settings: settingsJSON}
+	}
+	page, etag := s.seoVariant(c, cached)
 
 	// Replace nonce placeholder with actual nonce before serving
-	content := replaceNoncePlaceholder(rendered, nonce)
+	content := replaceNoncePlaceholder(page, nonce)
 
-	cached = s.cache.Get()
-	if cached != nil && !privateSharePage {
-		c.Header("ETag", cached.ETag)
+	if etag != "" && !privateSharePage {
+		c.Header("ETag", etag)
 	}
 	applyHTMLNoCacheHeaders(c.Writer.Header())
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
@@ -368,6 +378,7 @@ func tryServeOverrideFile(c *gin.Context, overrideDir, cleanPath string) bool {
 func shouldBypassEmbeddedFrontend(path string) bool {
 	trimmed := strings.TrimSpace(path)
 	return strings.HasPrefix(trimmed, "/api/") ||
+		strings.HasPrefix(trimmed, "/internal/ops-monitor/") ||
 		trimmed == "/.well-known/oauth-protected-resource" ||
 		trimmed == "/.well-known/oauth-protected-resource/api/v1/mcp" ||
 		trimmed == "/.well-known/oauth-authorization-server" ||
@@ -422,4 +433,71 @@ func setPoolSharePageHeaders(c *gin.Context) bool {
 func HasEmbeddedFrontend() bool {
 	_, err := frontendFS.ReadFile("dist/index.html")
 	return err == nil
+}
+
+func readDistFile(fsys fs.FS, name string) []byte {
+	f, err := fsys.Open(name)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+	raw, _ := io.ReadAll(io.LimitReader(f, 8<<20))
+	return raw
+}
+
+// seoETag varies the settings ETag by path, since each public page now has its own head and body.
+func seoETag(etag, path string) string {
+	if etag == "" {
+		return ""
+	}
+	sum := sha256Hex(path)
+	return strings.TrimSuffix(etag, `"`) + "-" + sum[:8] + `"`
+}
+
+// seoVariant adds per-page metadata and crawlable text to public pages and
+// noindex to app-only routes.
+func (s *FrontendServer) seoVariant(c *gin.Context, cached *CachedHTML) ([]byte, string) {
+	etag := seoETag(cached.ETag, c.Request.Host+c.Request.URL.Path)
+	if s.seo == nil {
+		return cached.Content, etag
+	}
+	origin := seoOrigin(c.Request.Host)
+	settings := parseSEOSettings(cached.Settings)
+	if page, ok := s.seo.page(c.Request.URL.Path, settings, origin); ok && origin != "" {
+		return renderSEO(cached.Content, page, settings.SiteName), etag
+	}
+	return renderNoIndex(cached.Content), etag
+}
+
+// serveSEOFile answers robots.txt, sitemap.xml and llms.txt for the requesting host.
+func (s *FrontendServer) serveSEOFile(c *gin.Context, path string) bool {
+	if s.seo == nil || (path != "/robots.txt" && path != "/sitemap.xml" && path != "/llms.txt" && path != "/llms-full.txt") {
+		return false
+	}
+	origin := seoOrigin(c.Request.Host)
+	if origin == "" {
+		return false
+	}
+	var raw []byte
+	if cached := s.cache.Get(); cached != nil {
+		raw = cached.Settings
+	} else {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		if settings, err := s.settings.GetPublicSettingsForInjection(ctx); err == nil {
+			raw, _ = json.Marshal(settings)
+		}
+	}
+	settings := parseSEOSettings(raw)
+	c.Header("Cache-Control", "public, max-age=3600")
+	switch path {
+	case "/robots.txt":
+		c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(s.seo.robots(origin)))
+	case "/sitemap.xml":
+		c.Data(http.StatusOK, "application/xml; charset=utf-8", []byte(s.seo.sitemap(settings, origin)))
+	default:
+		c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(s.seo.llms(settings, origin, path == "/llms-full.txt")))
+	}
+	c.Abort()
+	return true
 }

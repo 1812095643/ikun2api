@@ -94,7 +94,7 @@
       </div>
 
       <!-- Alert Events -->
-      <OpsAlertEventsCard v-if="opsEnabled && showAlertEvents && !(loading && !hasLoadedOnce)" />
+      <OpsIncidentEvents v-if="opsEnabled && showAlertEvents && !(loading && !hasLoadedOnce)" :filters="incidentFilters" :refresh-token="dashboardRefreshToken" @settings="showSettingsDialog = true" />
 
       <!-- System Logs -->
       <OpsSystemLogTable
@@ -167,7 +167,7 @@ import OpsErrorTrendChart from './components/OpsErrorTrendChart.vue'
 import OpsLatencyChart from './components/OpsLatencyChart.vue'
 import OpsThroughputTrendChart from './components/OpsThroughputTrendChart.vue'
 import OpsSwitchRateTrendChart from './components/OpsSwitchRateTrendChart.vue'
-import OpsAlertEventsCard from './components/OpsAlertEventsCard.vue'
+import OpsIncidentEvents from './components/OpsIncidentEvents.vue'
 import OpsOpenAITokenStatsCard from './components/OpsOpenAITokenStatsCard.vue'
 import OpsSystemLogTable from './components/OpsSystemLogTable.vue'
 import OpsRequestDetailsModal, { type OpsRequestDetailsPreset } from './components/OpsRequestDetailsModal.vue'
@@ -199,6 +199,12 @@ const groupId = ref<number | null>(null)
 const queryMode = ref<QueryMode>('auto')
 const customStartTime = ref<string | null>(null)
 const customEndTime = ref<string | null>(null)
+const incidentFilters = computed(() => ({
+  platform: platform.value || undefined, group_id: groupId.value ?? undefined,
+  ...(timeRange.value === 'custom' && customStartTime.value && customEndTime.value
+    ? { start_time: customStartTime.value, end_time: customEndTime.value }
+    : { time_range: timeRange.value === 'custom' ? '1h' : timeRange.value })
+}))
 const switchTrendWindowHours = 5
 const switchTrendTimeRange = `${switchTrendWindowHours}h`
 const switchTrendWindowMs = switchTrendWindowHours * 60 * 60 * 1000

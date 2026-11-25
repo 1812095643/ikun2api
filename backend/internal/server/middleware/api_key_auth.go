@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	mondomain "github.com/MACOS-DO/sub4api/internal/monitoring/domain"
+	"github.com/MACOS-DO/sub4api/internal/monitoring/telemetry"
 	"net/http"
 	"strings"
 
@@ -126,6 +128,14 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// apiKey 已加载（含 User/Group）。即便后续因分组停用/Key 停用/用户停用/
 		// IP 限制等早退中断，也让 Ops 错误日志能回退取到 user/group/platform。
 		SetOpsFallbackAPIKey(c, apiKey)
+		obs := mondomain.Observation{UserID: apiKey.UserID, KeyID: apiKey.ID}
+		if apiKey.GroupID != nil {
+			obs.GroupID = *apiKey.GroupID
+		}
+		if apiKey.Group != nil {
+			obs.Platform = apiKey.Group.Platform
+		}
+		telemetry.FromContext(c.Request.Context()).Update(obs)
 
 		// ── 3. 基础鉴权（始终执行） ─────────────────────────────────
 

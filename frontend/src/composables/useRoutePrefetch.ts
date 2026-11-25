@@ -200,3 +200,64 @@ export function useRoutePrefetch(router?: Router) {
 // 兼容旧测试的导出
 export const _adminPrefetchMap = PREFETCH_ADJACENCY
 export const _userPrefetchMap = PREFETCH_ADJACENCY
+
+type NetworkInformationLike = { saveData?: boolean; effectiveType?: string }
+
+const menuPrefetchQueue: ComponentImportFn[] = []
+let menuPrefetchSeen = new WeakSet<ComponentImportFn>()
+let menuPrefetchGeneration = 0
+let menuPrefetchRunning = false
+
+function menuPrefetchAllowed(): boolean {
+  const connection = (navigator as Navigator & { connection?: NetworkInformationLike }).connection
+  if (connection?.saveData) return false
+  return !['slow-2g', '2g'].includes(connection?.effectiveType || '')
+}
+
+function runMenuPrefetch(): void {
+  const next = menuPrefetchQueue.shift()
+  if (!next) {
+    menuPrefetchRunning = false
+    return
+  }
+  menuPrefetchRunning = true
+  const generation = menuPrefetchGeneration
+  scheduleIdleCallback(() => {
+    if (generation !== menuPrefetchGeneration) return
+    if (!menuPrefetchAllowed()) { cancelMenuPrefetch(); return }
+    // 单个失败静默跳过；部署后旧 chunk 不存在时，真正导航仍由 router.onError 处理。
+    Promise.resolve().then(next).catch(() => undefined).finally(() => { if (generation === menuPrefetchGeneration) runMenuPrefetch() })
+  }, { timeout: 3000 })
+}
+
+/**
+ * 空闲时逐个预加载菜单能到达的页面代码，首次点开任意菜单不必再等待下载。
+ * 只取尚未加载的懒加载组件（vue-router 加载后会把函数替换为组件对象）；省流量或 2G 网络下不预加载。
+ */
+export function prefetchRoutePaths(router: Router, paths: string[]): void {
+  if (!menuPrefetchAllowed()) return
+  for (const path of paths) {
+    let matched
+    try {
+      matched = router.resolve(path).matched
+    } catch {
+      continue
+    }
+    for (const record of matched) {
+      const component = record.components?.default
+      if (typeof component !== 'function') continue
+      const importFn = component as ComponentImportFn
+      if (menuPrefetchSeen.has(importFn)) continue
+      menuPrefetchSeen.add(importFn)
+      menuPrefetchQueue.push(importFn)
+    }
+  }
+  if (!menuPrefetchRunning) runMenuPrefetch()
+}
+
+export function cancelMenuPrefetch(): void {
+  menuPrefetchGeneration++
+  menuPrefetchQueue.length = 0
+  menuPrefetchSeen = new WeakSet<ComponentImportFn>()
+  menuPrefetchRunning = false
+}

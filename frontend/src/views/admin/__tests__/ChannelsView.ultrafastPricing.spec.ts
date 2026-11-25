@@ -37,6 +37,8 @@ function mountView() {
           props: ['show'], template: '<section v-if="show"><slot /><slot name="footer" /></section>'
         }),
         DataTable: defineComponent({
+          inheritAttrs: false,
+          emits: ['sort'],
           props: ['data'],
           template: '<div v-for="row in data" :key="row.id"><slot name="cell-actions" :row="row" /></div>'
         }),
@@ -138,6 +140,49 @@ describe('ChannelsView Ultra Fast pricing', () => {
     await clickButton(wrapper, 'common.edit')
     await clickButton(wrapper, 'admin.groups.platforms.openai')
     expect(multiplierInput(wrapper).value).toBe('')
+    wrapper.unmount()
+  })
+
+  it('下游生效开关关闭和开启后，刷新页面重开仍保留已保存状态', async () => {
+    let wrapper = await createPricingForm()
+    for (const enabled of [false, true]) {
+      await wrapper.get('[data-test="pricing-downstream-scope"]').setValue(enabled)
+      await wrapper.get('#channel-form').trigger('submit')
+      await flushPromises()
+      const request = enabled ? update.mock.lastCall![1] : create.mock.lastCall![0]
+      expect(request.model_pricing[0].apply_to_downstream).toBe(enabled)
+      expect(showError).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+      wrapper = mountView()
+      await flushPromises()
+      await clickButton(wrapper, 'common.edit')
+      await clickButton(wrapper, 'admin.groups.platforms.openai')
+      expect(wrapper.get<HTMLInputElement>('[data-test="pricing-downstream-scope"]').element.checked).toBe(enabled)
+    }
+    wrapper.unmount()
+  })
+
+  it('只编辑渠道名称时，保留已有定价及账号统计规则的下游范围', async () => {
+    const pricing = {
+      platform: 'openai', models: ['gpt-6-astra'], billing_mode: 'token' as const,
+      apply_to_downstream: false, intervals: [], time_pricing: null,
+      input_price: null, output_price: null, cache_write_price: null, cache_read_price: null,
+      image_input_price: null, image_output_price: null, per_request_price: null
+    }
+    stored = [{
+      ...makeChannel(), model_pricing: [pricing],
+      account_stats_pricing_rules: [{ name: '本地回归规则', group_ids: [22], account_ids: [], pricing: [pricing] }]
+    }]
+    const wrapper = mountView()
+    await flushPromises()
+    await clickButton(wrapper, 'common.edit')
+    await wrapper.get('input[required]').setValue('仅修改渠道名称')
+    await wrapper.get('#channel-form').trigger('submit')
+    await flushPromises()
+    expect(showError).not.toHaveBeenCalled()
+    expect(update.mock.lastCall![1].model_pricing[0].apply_to_downstream).toBe(false)
+    expect(update.mock.lastCall![1].account_stats_pricing_rules[0].pricing[0].apply_to_downstream).toBe(false)
     wrapper.unmount()
   })
 

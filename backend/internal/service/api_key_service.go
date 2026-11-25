@@ -494,10 +494,9 @@ func (s *APIKeyService) incrementAPIKeyErrorCount(ctx context.Context, userID in
 }
 
 // canUserBindGroup 检查用户是否可以绑定指定分组
-// 对于订阅类型分组：检查用户是否有有效订阅
-// 对于标准类型分组：使用原有的 AllowedGroups 和 IsExclusive 逻辑
+// 所有分组均使用明确授权、专属标记与公开分组限制；旧分组订阅不再授予绑定权限。
 func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group *Group) bool {
-	// 订阅类型分组：需要有效订阅
+	// 兼容旧分组类型，但不读取已退役的订阅授权。
 	if group.IsSubscriptionType() {
 		return user.CanBindGroup(group.ID, group.IsExclusive)
 	}
@@ -1095,8 +1094,7 @@ func (s *APIKeyService) GetBillingGroupInfo(ctx context.Context, groupID int64, 
 
 // GetAvailableGroups 获取用户有权限绑定的分组列表
 // 返回用户可以选择的分组：
-// - 标准类型分组：公开的（非专属）或用户被明确允许的
-// - 订阅类型分组：用户有有效订阅的
+// 所有类型均按 User.CanBindGroup 的公开/专属规则与明确授权过滤，仅返回活跃分组。
 func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([]Group, error) {
 	// 获取用户信息
 	user, err := s.userRepo.GetByID(ctx, userID)
@@ -1123,9 +1121,9 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 	return availableGroups, nil
 }
 
-// canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）
+// canUserBindGroupInternal 检查用户是否可以绑定分组；旧订阅参数仅为内部兼容保留，不参与授权。
 func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group, subscribedGroupIDs map[int64]bool) bool {
-	// 订阅类型分组：需要有效订阅
+	// 兼容旧分组类型，但不读取已退役的订阅授权。
 	if group.IsSubscriptionType() {
 		return user.CanBindGroup(group.ID, group.IsExclusive)
 	}
@@ -1141,11 +1139,11 @@ func (s *APIKeyService) SearchAPIKeys(ctx context.Context, userID int64, keyword
 	return keys, nil
 }
 
-// GetUserGroupVisibility 返回 user_allowed_groups 授权及有效订阅的分组 ID 集合，
+// GetUserGroupVisibility 返回 user_allowed_groups 明确授权的分组 ID 集合，
 // 以及该用户是否开启了公开分组限制。开启时公开分组的可见性也要落在该集合内。
 //
 // 与 GetAvailableGroups 的区别：这里保留普通授权分组的「橱窗」语义，不检查
-// 分组是否活跃；有效订阅也授予对应分组的可见性。返回值恒非 nil。
+// 分组是否活跃。旧分组订阅已退役，不再授予可见性。返回值恒非 nil。
 func (s *APIKeyService) GetUserGroupVisibility(ctx context.Context, userID int64) (map[int64]struct{}, bool, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
@@ -1154,13 +1152,6 @@ func (s *APIKeyService) GetUserGroupVisibility(ctx context.Context, userID int64
 	allowed := make(map[int64]struct{}, len(user.AllowedGroups))
 	for _, id := range user.AllowedGroups {
 		allowed[id] = struct{}{}
-	}
-	subscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
-	if err != nil {
-		return nil, false, fmt.Errorf("list active subscriptions: %w", err)
-	}
-	for _, sub := range subscriptions {
-		allowed[sub.GroupID] = struct{}{}
 	}
 	return allowed, user.RestrictPublicGroups, nil
 }

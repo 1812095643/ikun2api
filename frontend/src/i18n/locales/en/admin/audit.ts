@@ -9,6 +9,7 @@ export default {
     actionPattern: '{action} {resource}',
     resourceOperation: '{resource} operation',
     actionNames: {
+      controlIncident: 'Control incident', configureMonitor: 'Configure monitor', saveNotificationChannel: 'Save notification channel', testNotificationChannel: 'Test notification channel',
       viewAccountTimer: 'View account schedule', previewAccountTimer: 'Preview account schedule', saveAccountTimer: 'Save account schedule', cancelAccountTimer: 'Cancel account schedule', viewConnections: 'View connection diagnostics',
       navigationRead: 'Mark navigation message as read', apiKeyUsage: 'View API key usage',
       login: 'Sign in', login2fa: 'Sign in with two-factor authentication', register: 'Register', tokenRefresh: 'Refresh session', sessionMismatch: 'Session binding mismatch',

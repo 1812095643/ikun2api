@@ -14,6 +14,9 @@ interface Props {
   customEndTime?: string | null
   platform?: string
   groupId?: number | null
+  accountId?: number
+  requestId?: string
+  model?: string
   errorType: 'request' | 'upstream'
   resumeState?: boolean
 }
@@ -128,6 +131,9 @@ async function fetchErrorLogs() {
     if (platform) params.platform = platform
     if (typeof props.groupId === 'number' && props.groupId > 0) params.group_id = props.groupId
 
+    if (props.accountId) params.account_id = props.accountId
+    if (props.requestId) params.request_id = props.requestId
+    if (props.model) params.model = props.model
     if (q.value.trim()) params.q = q.value.trim()
     if (statusCode.value === 'other') params.status_codes_other = '1'
     else if (typeof statusCode.value === 'number') params.status_codes = String(statusCode.value)

@@ -1136,7 +1136,7 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Category:    "ops",
 		Optional:    false,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
-			"rule_name", "severity", "alert_status", "metric_type", "operator", "metric_value", "threshold_value", "triggered_at", "alert_description"),
+			"rule_name", "severity", "alert_status", "metric_type", "operator", "metric_value", "threshold_value", "triggered_at", "alert_description", "event_id", "detail_url", "request_count", "account_count"),
 	},
 	NotificationEmailEventOpsScheduledReport: {
 		Event:       NotificationEmailEventOpsScheduledReport,
