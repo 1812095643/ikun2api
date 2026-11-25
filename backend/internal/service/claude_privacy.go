@@ -407,9 +407,20 @@ func sanitizeClaudePrivacyBody(body []byte) ([]byte, error) {
 
 // 在账号覆写和指纹注入之后再收口，禁止设置、混合大小写或新客户端头绕过允许列表。
 func sanitizeClaudePrivacyHeaders(headers http.Header) {
+	sanitizeClaudePrivacyHeadersForAccount(headers, nil)
+}
+
+func sanitizeClaudePrivacyHeadersForAccount(headers http.Header, account *Account) {
+	var overrides map[string]string
+	if account != nil && account.Type == AccountTypeAPIKey {
+		// 仅放行管理员显式配置且已完成替换的身份变量头；静态透传与 OAuth 的边界不变。
+		overrides = account.GetHeaderOverrides()
+	}
 	for key := range headers {
 		name := strings.ToLower(key)
-		allowed := allowedHeaders[name] || name == "authorization" || name == "x-api-key" || name == "x-goog-api-key"
+		override, configured := overrides[name]
+		configured = configured && headerOverrideHasVariable(override)
+		allowed := configured || allowedHeaders[name] || name == "authorization" || name == "x-api-key" || name == "x-goog-api-key"
 		if isClaudePrivacyBlockedHeader(name) {
 			allowed = false
 		}

@@ -31,6 +31,7 @@ const {
   settings,
   options,
   loading,
+  usageRefreshToken,
   busy,
   error,
   notice,
@@ -474,6 +475,8 @@ async function completeChallenge() {
         :accounts="visibleAccounts"
         :runs="history"
         :busy="busy"
+        :usage-refresh-token="usageRefreshToken"
+        @refresh="refresh()"
         @saved="startSaved"
         @login="openLogin"
         @view="account => showSecret(account.email, account.has_imported)"

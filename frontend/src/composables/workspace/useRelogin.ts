@@ -17,6 +17,7 @@ export function useRelogin() {
     settings = ref<ReloginState | null>(null),
     options = ref<ReloginOptions>({ groups: [], proxies: [] })
   const loading = ref(false),
+    usageRefreshToken = ref(0),
     busy = ref(false),
     error = ref(''),
     notice = ref(''),
@@ -62,6 +63,7 @@ export function useRelogin() {
       history.value = result[1]
       settings.value = result[2]
       if (!quiet) {
+        usageRefreshToken.value += 1
         await loadImported()
         options.value = await reloginAPI.options()
         error.value = ''
@@ -121,6 +123,7 @@ export function useRelogin() {
     settings,
     options,
     loading,
+    usageRefreshToken,
     busy,
     error,
     notice,

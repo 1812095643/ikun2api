@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
+import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
 import { formatTime } from '@/api/workspace'
 import type { LoginRun, ReloginAccount } from '@/api/relogin'
-defineProps<{ accounts: ReloginAccount[]; runs: LoginRun[]; busy: boolean }>()
-const emit = defineEmits<{ saved: [account: ReloginAccount]; login: [account: ReloginAccount]; view: [account: ReloginAccount]; remove: [account: ReloginAccount] }>()
+defineProps<{ accounts: ReloginAccount[]; runs: LoginRun[]; busy: boolean; usageRefreshToken?: number }>()
+const emit = defineEmits<{ saved: [account: ReloginAccount]; login: [account: ReloginAccount]; view: [account: ReloginAccount]; remove: [account: ReloginAccount]; refresh: [] }>()
 </script>
 <template>
   <div class="ws-table-wrap">
@@ -13,6 +14,7 @@ const emit = defineEmits<{ saved: [account: ReloginAccount]; login: [account: Re
           <th>渠道账号</th>
           <th>当前状态</th>
           <th>套餐 / 调度</th>
+          <th>5h / 7d 额度</th>
           <th>登录资料</th>
           <th>最近更新</th>
           <th class="text-right">操作</th>
@@ -50,6 +52,13 @@ const emit = defineEmits<{ saved: [account: ReloginAccount]; login: [account: Re
           <td>
             <span>{{ account.plan_type || '未识别' }}</span>
             <p class="ws-muted mt-1">{{ account.schedulable ? '参与调度' : '暂停调度' }}</p>
+          </td>
+          <td>
+            <AccountUsageCell
+              :account="account"
+              :manual-refresh-token="usageRefreshToken"
+              @account-updated="emit('refresh')"
+            />
           </td>
           <td>
             <button v-if="account.has_imported" type="button" class="text-sm text-primary-600 hover:underline" :disabled="busy" @click="emit('view', account)">查看资料</button>

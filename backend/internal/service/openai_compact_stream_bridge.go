@@ -115,7 +115,19 @@ func writeOpenAICompactSSEFailure(c *gin.Context, statusCode int, errorBody []by
 // 不被识别，会退化为 "stream closed before response.completed" 盲重连）。
 // 同时标记流内错误，保证挂在 200 流上的失败仍进入 ops 错误看板。
 func writeOpenAICompactSSEFailureMessage(c *gin.Context, statusCode int, errType, message string) {
-	writeOpenAIResponsesSSEFailure(c, statusCode, gin.H{"code": errType, "message": message})
+	writeOpenAICompactSSEFailureEvent(c, statusCode, errType, errType, message)
+}
+
+// 透传模式保留结构化错误码，监控分类仍沿用上游错误；容量降载码在统一写出时转为可重试码。
+func writeOpenAICompactSSEFailureWithCode(c *gin.Context, statusCode int, code, message string) {
+	if strings.TrimSpace(code) == "" {
+		code = "upstream_error"
+	}
+	writeOpenAICompactSSEFailureEvent(c, statusCode, "upstream_error", code, message)
+}
+
+func writeOpenAICompactSSEFailureEvent(c *gin.Context, statusCode int, opsErrType, code, message string) {
+	writeOpenAIResponsesSSEFailureEvent(c, statusCode, gin.H{"code": code, "message": message}, opsErrType)
 }
 
 // writeOpenAIResponsesErrorJSON preserves early HTTP errors, but never appends
@@ -144,6 +156,10 @@ func writeOpenAIResponsesErrorAfterKeepalive(c *gin.Context, statusCode int, bod
 }
 
 func writeOpenAIResponsesSSEFailure(c *gin.Context, statusCode int, errorBody gin.H) {
+	writeOpenAIResponsesSSEFailureEvent(c, statusCode, errorBody, "")
+}
+
+func writeOpenAIResponsesSSEFailureEvent(c *gin.Context, statusCode int, errorBody gin.H, opsErrType string) {
 	if c == nil {
 		return
 	}
@@ -158,13 +174,21 @@ func writeOpenAIResponsesSSEFailure(c *gin.Context, statusCode int, errorBody gi
 		}
 		errorBody["code"] = code
 	}
+	if opsErrType == "" {
+		opsErrType = code
+	}
+	// 心跳已提交后所有失败都必须以 SSE 收尾，不能让容量降载终止客户端会话。
+	switch strings.ToLower(strings.TrimSpace(code)) {
+	case "server_is_overloaded", "slow_down":
+		errorBody["code"] = openAICapacityShedRetryableClientCode
+	}
 	message, _ := errorBody["message"].(string)
 	if message == "" {
 		message = "Upstream request failed with HTTP " + strconv.Itoa(statusCode)
 		errorBody["message"] = message
 	}
 	MarkResponseCommitted(c)
-	MarkOpsStreamError(c, code, message, statusCode)
+	MarkOpsStreamError(c, opsErrType, message, statusCode)
 	payload, err := json.Marshal(map[string]any{
 		"type":            "response.failed",
 		"sequence_number": 0,
