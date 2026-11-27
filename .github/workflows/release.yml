@@ -212,7 +212,9 @@ jobs:
           go test -tags unit ./internal/service ./internal/workspace ./internal/handler/admin -run 'Test(AdminReceivables|ManualReceivables|ValidateReceivable|OnAccount|BusinessAdmin|Downstream|Relogin|AutomaticRelogin|UpstreamBalance|PaymentFee|PaymentMethodLimitsExpose|CreateOrderInTxKeepsMethod|GetAvailableMethodLimits|UpdatePaymentConfig|ParsePaymentConfig|GetPaymentConfig|CalculateCreateOrder)' -count=1 -timeout=180s
           go test -tags unit ./internal/repository -run 'Test(UsageBillingBatchPostgres|OpenAIServiceTierPostgresPersistence|SchedulerMetadata|SchedulerSnapshotKeepsOpenAIServiceTiers|OpenAIRecoveryPostgres)' -count=1 -timeout=180s
           docker exec -e PGPASSWORD=fixture-only ikun-release-business createdb -h 127.0.0.1 -U ikun_test ikun_monitor_fixture
+          docker exec -e PGPASSWORD=fixture-only ikun-release-business createdb -h 127.0.0.1 -U ikun_test ikun_monitor_store_fixture
           export OPS_MONITOR_TEST_DSN='host=127.0.0.1 port=19984 user=ikun_test password=fixture-only dbname=ikun_monitor_fixture sslmode=disable'
+          export OPS_MONITOR_STORE_TEST_DSN='host=127.0.0.1 port=19984 user=ikun_test password=fixture-only dbname=ikun_monitor_store_fixture sslmode=disable'
           go test ./internal/monitoring/... -count=1 -timeout=180s
           go test -tags unit ./internal/service -run 'TestGetUserGroupVisibility' -count=1 -timeout=180s
           go test -tags embed ./internal/web -count=1 -timeout=120s

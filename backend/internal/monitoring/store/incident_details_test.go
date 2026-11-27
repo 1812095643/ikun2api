@@ -16,11 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// 只连接显式指定的隔离测试库，验证真实 SQL、终态保留与分页，不发起模型或通知请求。
+// 存储层使用独立测试库，避免与运行时测试并发写入全局通知配置。
 func TestIncidentDetailsPostgres(t *testing.T) {
-	dsn := os.Getenv("OPS_MONITOR_TEST_DSN")
+	dsn := os.Getenv("OPS_MONITOR_STORE_TEST_DSN")
 	if dsn == "" {
-		t.Skip("需要独立的本地 OPS_MONITOR_TEST_DSN")
+		t.Skip("需要独立的本地 OPS_MONITOR_STORE_TEST_DSN")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
