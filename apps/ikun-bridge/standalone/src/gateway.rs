@@ -70,6 +70,17 @@ fn base_url(input: &str) -> Result<Url, String> {
     Ok(u)
 }
 
+pub(crate) fn normalize_gateway(input: &str) -> Result<String, String> {
+    Ok(base_url(input)?.as_str().trim_end_matches('/').to_owned())
+}
+
+pub(crate) fn validate_credential(key: &str) -> Result<(), String> {
+    if key.is_empty() || key.len() > 512 || !key.bytes().all(|b| b.is_ascii_graphic()) {
+        return Err("API Key 格式无效".into());
+    }
+    Ok(())
+}
+
 impl Gateway {
     #[cfg(test)]
     pub(crate) fn local_fixture(base: Url, key: String) -> Self {
@@ -82,9 +93,7 @@ impl Gateway {
 
     fn with_url(base: Url, key: String) -> Result<Self, String> {
         let key = Zeroizing::new(key);
-        if key.is_empty() || key.len() > 512 || !key.bytes().all(|b| b.is_ascii_graphic()) {
-            return Err("API Key 格式无效".into());
-        }
+        validate_credential(&key)?;
         let client = Client::builder()
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())

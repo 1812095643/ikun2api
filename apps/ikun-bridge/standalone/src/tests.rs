@@ -4,6 +4,89 @@ use serde_json::json;
 use std::sync::atomic::AtomicUsize;
 
 #[tokio::test]
+async fn switching_gateway_keeps_local_listener_and_inflight_request() {
+    let started = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let old = Router::new()
+        .route(
+            "/v1/ikun/bridge/session",
+            post(|| async { Json(json!({"ticket":"A".repeat(66),"expires_in":300})) }),
+        )
+        .route(
+            "/v1/messages",
+            post({
+                let started = started.clone();
+                let release = release.clone();
+                move |headers: HeaderMap| {
+                    let started = started.clone();
+                    let release = release.clone();
+                    async move {
+                        assert_eq!(headers["x-api-key"], "old-private-key");
+                        started.notify_one();
+                        release.notified().await;
+                        "old"
+                    }
+                }
+            }),
+        );
+    let new = Router::new()
+        .route(
+            "/v1/ikun/bridge/session",
+            post(|| async { Json(json!({"ticket":"B".repeat(66),"expires_in":300})) }),
+        )
+        .route(
+            "/v1/messages",
+            post(|headers: HeaderMap| async move {
+                assert_eq!(headers["x-api-key"], "new-private-key");
+                assert_eq!(headers["x-ikun-bridge-pass"], "B".repeat(66));
+                "new"
+            }),
+        );
+    let old_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let new_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let old_url = format!("http://{}/", old_listener.local_addr().unwrap())
+        .parse()
+        .unwrap();
+    let new_url = format!("http://{}/", new_listener.local_addr().unwrap())
+        .parse()
+        .unwrap();
+    let old_server = tokio::spawn(async move { axum::serve(old_listener, old).await.unwrap() });
+    let new_server = tokio::spawn(async move { axum::serve(new_listener, new).await.unwrap() });
+    let bridge = LocalBridge::serve(
+        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+        Gateway::local_fixture(old_url, "old-private-key".into()),
+        Zeroizing::new("local-only".into()),
+    )
+    .unwrap();
+    let endpoint = format!("{}/v1/messages", bridge.endpoint);
+    let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    let first = tokio::spawn(
+        client
+            .post(&endpoint)
+            .header("x-api-key", "local-only")
+            .send(),
+    );
+    tokio::time::timeout(Duration::from_secs(5), started.notified())
+        .await
+        .unwrap();
+    bridge
+        .connection
+        .switch_gateway(Gateway::local_fixture(new_url, "new-private-key".into()));
+    let second = client
+        .post(&endpoint)
+        .header("x-api-key", "local-only")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(second.text().await.unwrap(), "new");
+    release.notify_one();
+    assert_eq!(first.await.unwrap().unwrap().text().await.unwrap(), "old");
+    assert_eq!(bridge.connection.requests.load(Ordering::Relaxed), 2);
+    old_server.abort();
+    new_server.abort();
+}
+
+#[tokio::test]
 #[ignore = "需要与 Go 的 TestBridgePassUsesAuthenticatedAPIKey 联调，只访问本机接收器"]
 async fn go_gateway_authenticates_the_actual_bridge_pass() {
     let origin = std::env::var("IKUN_BRIDGE_INTEROP_ORIGIN").expect("需要本机 Go 接收器地址");
@@ -27,7 +110,10 @@ async fn go_gateway_authenticates_the_actual_bridge_pass() {
     assert!(gateway.verify_access().await.unwrap());
     let mut headers = HeaderMap::new();
     headers.insert("authorization", "Bearer local-client-key".parse().unwrap());
-    headers.insert("x-ikun-bridge-pass", "ignored-client-ticket".parse().unwrap());
+    headers.insert(
+        "x-ikun-bridge-pass",
+        "ignored-client-ticket".parse().unwrap(),
+    );
     let response = gateway
         .forward(
             Method::POST,

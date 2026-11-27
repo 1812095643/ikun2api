@@ -7,6 +7,7 @@ mod desktop_profile;
 mod gateway;
 mod launch;
 mod local_profile;
+mod profiles;
 mod protection;
 #[cfg(test)]
 mod tests;
@@ -25,7 +26,7 @@ use serde::Serialize;
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
+        Arc, RwLock,
     },
     time::Duration,
 };
@@ -43,15 +44,19 @@ struct BridgeState(Mutex<Option<LocalBridge>>);
 #[derive(Default)]
 struct ExitIntent(AtomicBool);
 
+#[derive(Default)]
+struct ProfilesLock(std::sync::Mutex<()>);
+
 struct LocalBridge {
     connection: Arc<Connection>,
     endpoint: String,
     protection: Option<Arc<protection::Protection>>,
+    profile_id: Option<String>,
 }
 
 struct Connection {
     host: String,
-    gateway: Gateway,
+    gateway: RwLock<Arc<Gateway>>,
     client_key: Zeroizing<String>,
     desktop_key: Zeroizing<String>,
     requests: AtomicU64,
@@ -59,6 +64,23 @@ struct Connection {
     desktop_configured: AtomicBool,
     desktop_trust: AtomicBool,
     shutdown: CancellationToken,
+}
+
+impl Connection {
+    fn gateway(&self) -> Arc<Gateway> {
+        self.gateway
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+    }
+
+    fn switch_gateway(&self, gateway: Gateway) {
+        // 仅替换后续请求的网关；进行中的请求保留原会话，本地代理端口和客户端配置不变。
+        *self
+            .gateway
+            .write()
+            .unwrap_or_else(|error| error.into_inner()) = Arc::new(gateway);
+    }
 }
 
 impl Drop for LocalBridge {
@@ -80,7 +102,7 @@ impl LocalBridge {
         let endpoint = format!("http://{host}");
         let connection = Arc::new(Connection {
             host,
-            gateway,
+            gateway: RwLock::new(Arc::new(gateway)),
             client_key: Zeroizing::new(local_profile::new_key()),
             desktop_key,
             requests: AtomicU64::new(0),
@@ -102,7 +124,7 @@ impl LocalBridge {
                 let mut tick = tokio::time::interval(Duration::from_secs(4));
                 loop {
                     tick.tick().await;
-                    let _ = renew.gateway.refresh(false).await;
+                    let _ = renew.gateway().refresh(false).await;
                 }
             };
             tokio::select! { _ = renew.shutdown.cancelled() => {}, _ = refresh => {} }
@@ -111,6 +133,7 @@ impl LocalBridge {
             connection,
             endpoint,
             protection: None,
+            profile_id: None,
         })
     }
 }
@@ -124,6 +147,7 @@ struct Status {
     requests: u64,
     version: &'static str,
     gateway: Option<String>,
+    profile_id: Option<String>,
     client_endpoint: &'static str,
     actions: Vec<OperationStatus>,
 }
@@ -142,6 +166,7 @@ async fn bridge_status(state: AppState<'_, BridgeState>) -> Result<Status, ()> {
             value.connection.clone(),
             value.endpoint.clone(),
             value.protection.clone(),
+            value.profile_id.clone(),
         )
     });
     let mut status = Status {
@@ -152,6 +177,7 @@ async fn bridge_status(state: AppState<'_, BridgeState>) -> Result<Status, ()> {
         requests: 0,
         version: env!("CARGO_PKG_VERSION"),
         gateway: None,
+        profile_id: None,
         client_endpoint: "https://api.anthropic.com",
         actions: vec![OperationStatus {
             label: "本地代理",
@@ -159,17 +185,12 @@ async fn bridge_status(state: AppState<'_, BridgeState>) -> Result<Status, ()> {
             detail: "等待启动".into(),
         }],
     };
-    if let Some((connection, endpoint, protection)) = bridge {
-        let (label, reason) = connection.gateway.status().await;
+    if let Some((connection, endpoint, protection, profile_id)) = bridge {
+        let gateway = connection.gateway();
+        let (label, reason) = gateway.status().await;
         status.running = true;
-        status.gateway = Some(
-            connection
-                .gateway
-                .base
-                .as_str()
-                .trim_end_matches('/')
-                .to_owned(),
-        );
+        status.profile_id = profile_id;
+        status.gateway = Some(gateway.base.as_str().trim_end_matches('/').to_owned());
         status.endpoint = Some(protection.as_ref().map_or(endpoint, |p| p.url()));
         status.ticket = Some(label);
         status.reason = reason;
@@ -180,7 +201,7 @@ async fn bridge_status(state: AppState<'_, BridgeState>) -> Result<Status, ()> {
             state: "done",
             detail: status.gateway.clone().unwrap_or_default(),
         });
-        let verified = connection.gateway.admission().await;
+        let verified = gateway.admission().await;
         status.actions.push(OperationStatus {
             label: "通行证校验",
             state: if verified.0 { "done" } else { "pending" },
@@ -271,16 +292,21 @@ async fn bridge_status(state: AppState<'_, BridgeState>) -> Result<Status, ()> {
 async fn bridge_start(
     app: tauri::AppHandle,
     state: AppState<'_, BridgeState>,
-    gateway: String,
-    key: String,
+    profile_id: String,
 ) -> Result<(), String> {
     let mut current = state.0.lock().await;
-    if current.is_some() {
-        return Err("请先停止本地服务".into());
-    }
-    let gateway = Gateway::new(&gateway, key)?;
+    let id = profile_id.clone();
+    let profile = profile_task(app.clone(), move |repo| repo.get(&id)).await?;
+    let gateway = Gateway::new(&profile.gateway, profile.key.clone())?;
     gateway.refresh(true).await?;
     gateway.verify_access().await?;
+    let id = profile_id.clone();
+    profile_task(app.clone(), move |repo| repo.select(&id)).await?;
+    if let Some(bridge) = current.as_mut() {
+        bridge.connection.switch_gateway(gateway);
+        bridge.profile_id = Some(profile_id);
+        return Ok(());
+    }
     let root = app
         .path()
         .app_local_data_dir()
@@ -293,8 +319,60 @@ async fn bridge_start(
             .await
             .map_err(|e| e.to_string())?,
     ));
+    bridge.profile_id = Some(profile_id);
     *current = Some(bridge);
     Ok(())
+}
+
+async fn profile_task<T: Send + 'static>(
+    app: tauri::AppHandle,
+    task: impl FnOnce(&mut profiles::Repository) -> anyhow::Result<T> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let lock = app.state::<ProfilesLock>();
+        let _guard = lock
+            .0
+            .lock()
+            .map_err(|_| "连接配置正忙，请重试".to_owned())?;
+        let root = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "无法找到 Bridge 配置目录".to_owned())?;
+        let mut repo = profiles::Repository::open(root).map_err(|error| error.to_string())?;
+        task(&mut repo).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|_| "无法处理连接配置".to_owned())?
+}
+
+#[tauri::command]
+async fn bridge_profiles(app: tauri::AppHandle) -> Result<profiles::ProfileList, String> {
+    profile_task(app, |repo| Ok(repo.list())).await
+}
+
+#[tauri::command]
+async fn bridge_profile_save(
+    app: tauri::AppHandle,
+    input: profiles::ProfileInput,
+) -> Result<profiles::ProfileList, String> {
+    profile_task(app, move |repo| repo.save(input)).await
+}
+
+#[tauri::command]
+async fn bridge_profile_delete(
+    app: tauri::AppHandle,
+    state: AppState<'_, BridgeState>,
+    id: String,
+) -> Result<profiles::ProfileList, String> {
+    let current = state.0.lock().await;
+    if current
+        .as_ref()
+        .and_then(|bridge| bridge.profile_id.as_deref())
+        == Some(&id)
+    {
+        return Err("此连接正在使用，请先停止服务或切换连接".into());
+    }
+    profile_task(app, move |repo| repo.delete(&id)).await
 }
 
 #[tauri::command]
@@ -308,7 +386,7 @@ async fn bridge_check(state: AppState<'_, BridgeState>) -> Result<(), String> {
         .ok_or("本地服务未启动")?;
     tokio::select! {
         _ = connection.shutdown.cancelled() => Err("本地服务已停止".into()),
-        result = async { connection.gateway.refresh(true).await?; connection.gateway.verify_access().await.map(|_| ()) } => result,
+        result = async { let gateway = connection.gateway(); gateway.refresh(true).await?; gateway.verify_access().await.map(|_| ()) } => result,
     }
 }
 
@@ -544,10 +622,11 @@ async fn forward(
     body: Bytes,
 ) -> Response {
     connection.requests.fetch_add(1, Ordering::Relaxed);
+    let gateway = connection.gateway();
     let response = tokio::select! {
         biased;
         _ = connection.shutdown.cancelled() => return error(StatusCode::SERVICE_UNAVAILABLE, "本地服务已停止"),
-        response = connection.gateway.forward(method, uri, headers, body) => response,
+        response = gateway.forward(method, uri, headers, body) => response,
     };
     response
 }
@@ -603,9 +682,13 @@ fn main() {
         })
         .manage(BridgeState::default())
         .manage(ExitIntent::default())
+        .manage(ProfilesLock::default())
         .invoke_handler(tauri::generate_handler![
             bridge_status,
             bridge_start,
+            bridge_profiles,
+            bridge_profile_save,
+            bridge_profile_delete,
             bridge_check,
             bridge_stop,
             bridge_clients,

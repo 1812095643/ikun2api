@@ -6,6 +6,21 @@ use ikun_bridge_lib::{
 };
 
 #[test]
+fn certificate_marker_does_not_claim_system_trust() -> Result<()> {
+    let directory = tempfile::tempdir()?;
+    let mut params = rcgen::CertificateParams::new(vec![])?;
+    params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Constrained(0));
+    let key = rcgen::KeyPair::generate()?;
+    let cert = params.self_signed(&key)?;
+    std::fs::write(directory.path().join("bridge-ca.pem"), cert.pem())?;
+    std::fs::write(directory.path().join("certificate-installed"), "1")?;
+    assert!(!ikun_bridge_lib::platform::user_certificate_trusted(
+        directory.path()
+    )?);
+    Ok(())
+}
+
+#[test]
 fn partial_transaction_reverts_first_file_and_keeps_concurrent_edit() -> Result<()> {
     let d = tempfile::tempdir()?;
     let store = Store::new(d.path().join("bridge"))?;

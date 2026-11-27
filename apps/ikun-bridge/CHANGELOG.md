@@ -1,9 +1,9 @@
-# IKUN Bridge 0.2.5
+# IKUN Bridge 0.2.6
 
-- 正式提供 Windows x64 便携 EXE 和 macOS Universal 应用。
-- Claude Code／Desktop 自动配置官方 API Key 入口、本地 TLS 代理与隐私过滤，保留精确撤销。
-- 连接、客户端设置使用弹窗；底部显示准入、配置、过滤与实际请求接管状态。
-- 系统关闭按钮隐藏到托盘，界面内退出才结束服务；兼容迁移旧版 Bridge 自建配置。
-- 加入完整源码和可复现的本地／GitHub 原生构建流程。
+- 新增多套网关连接的保存、编辑、删除与快速切换，记住上次选择。
+- API Key 使用 Windows DPAPI／macOS 钥匙串密钥加密保存；界面只显示掩码，编辑留空保留原 Key。
+- 切换网关保留本地代理和客户端配置，进行中的请求继续使用原连接。
+- macOS 启动 Desktop 前先核验实际证书信任，已信任时不再重复弹出密码确认；首次授权、证书变化或信任撤销仍由系统确认。
+- 补齐桌面界面图标资源。
 
-开启分组强制 Bridge 时，配合 IKUN2api 1.6.4 的验票修复。Windows 未做商业签名，macOS 使用本地签名、未做 Apple 公证。
+Windows 未做商业签名，macOS 使用本地签名、未做 Apple 公证。

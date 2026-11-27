@@ -733,6 +733,13 @@ pub fn remove_guards(root: &Path) -> Result<()> {
 pub fn install_user_certificate(root: &Path) -> Result<()> {
     let cert = root.join("bridge-ca.pem");
     ensure!(cert.is_file(), "请先初始化本地证书");
+    // 查询系统实际信任，不以本地标记冒充成功；已信任时不重复修改 macOS 信任设置。
+    if user_certificate_trusted(root)? {
+        if !root.join("certificate-installed").exists() {
+            atomic_write(&root.join("certificate-installed"), b"1")?;
+        }
+        return Ok(());
+    }
     #[cfg(windows)]
     {
         let o = output(
@@ -755,8 +762,41 @@ pub fn install_user_certificate(root: &Path) -> Result<()> {
         )?;
         ensure!(o.status.success(), "安装用户钥匙串证书失败");
     }
+    ensure!(
+        user_certificate_trusted(root)?,
+        "证书授权尚未生效，请完成系统确认后重试"
+    );
     atomic_write(&root.join("certificate-installed"), b"1")?;
     Ok(())
+}
+
+pub fn user_certificate_trusted(root: &Path) -> Result<bool> {
+    let pem = std::fs::read(root.join("bridge-ca.pem")).context("无法读取本机证书")?;
+    let der = rustls_pemfile::certs(&mut std::io::BufReader::new(&pem[..]))
+        .next()
+        .context("证书不可读")??;
+    #[cfg(windows)]
+    {
+        use sha1::{Digest, Sha1};
+        let hash = hex::encode(Sha1::digest(&der));
+        let result = output(Command::new("certutil.exe").args(["-user", "-store", "Root", &hash]))?;
+        Ok(result.status.success())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use security_framework::{certificate::SecCertificate, policy::SecPolicy, trust::SecTrust};
+        let certificate = SecCertificate::from_der(&der)?;
+        let mut trust =
+            SecTrust::create_with_certificates(&[certificate], &[SecPolicy::create_x509()])?;
+        trust.set_network_fetch_allowed(false)?;
+        // 使用系统已有锚点离线验信任；不注入自定义锚点，也不调用任何写入或授权接口。
+        Ok(trust.evaluate_with_error().is_ok())
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = der;
+        anyhow::bail!("此平台暂不支持系统证书信任检查")
+    }
 }
 pub fn remove_user_certificate(root: &Path) -> Result<()> {
     let p = root.join("bridge-ca.pem");

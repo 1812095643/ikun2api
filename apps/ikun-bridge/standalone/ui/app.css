@@ -48,6 +48,10 @@ svg.icon { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap:
 .setting-value { color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .dialog-feedback { margin-block-start: 8px; color: var(--red); font-size: 12px; overflow-wrap: anywhere; }
 .dialog-feedback[data-kind="success"] { color: var(--green); }
+.profile-control { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.profile-control select { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--control); border-radius: var(--radius); color: var(--text); background: var(--surface); font: inherit; text-overflow: ellipsis; }
+.profile-control .button { flex: none; padding-inline: 10px; }
+.delete-profile { margin-inline-end: auto; color: var(--red); }
 
 @media (max-width: 420px) {
   .client-rows .connection-row { grid-template-columns: minmax(0, 1fr) 60px 32px 65px; gap: 4px; }

@@ -13,6 +13,8 @@ let clients = {};
 let statusGeneration = 0;
 let afterConnect;
 let desktopUndo = false;
+let profiles = { selected: null, entries: [] };
+let editingId = null;
 const operationErrors = [];
 
 function operationStatus() {
@@ -47,18 +49,20 @@ function row(id, label, tone) {
 
 function controls() {
   const running = status.running;
-  $('connect').hidden = running;
+  $('connect').hidden = false;
+  $('connect').lastChild.textContent = running ? '切换连接' : '连接设置';
   $('stop').hidden = !running;
   $('stop').disabled = Boolean(busy) || ended || !running;
-  for (const id of ['connect', 'check', 'launch-cli', 'launch-desktop', 'cli-settings', 'desktop-settings', 'quit', 'desktop-apply', 'desktop-restore', 'cli-restore', 'save-cli']) {
+  for (const id of ['connect', 'check', 'launch-cli', 'launch-desktop', 'cli-settings', 'desktop-settings', 'quit', 'desktop-apply', 'desktop-restore', 'cli-restore', 'save-cli', 'profile-new', 'profile-save', 'profile']) {
     $(id).disabled = Boolean(busy) || ended;
   }
-  for (const input of ['gateway', 'key', 'cli-path']) $(input).readOnly = Boolean(busy) || ended;
+  for (const input of ['gateway', 'key', 'cli-path', 'profile-name']) $(input).readOnly = Boolean(busy) || ended;
+  $('profile-delete').disabled = Boolean(busy) || ended || editingId === status.profile_id;
   document.querySelectorAll('[data-close]').forEach(button => { button.disabled = Boolean(busy); });
   $('desktop-restore').hidden = !desktopUndo;
   $('desktop-backup').textContent = desktopUndo ? '可恢复' : '无';
   $('start').disabled = Boolean(busy) || ended;
-  $('start').textContent = busy === 'start' ? '连接中…' : afterConnect ? '连接并启动' : '启动服务';
+  $('start').textContent = busy === 'start' ? '连接中…' : afterConnect ? '保存并启动' : status.running ? '保存并切换' : '保存并连接';
   $('check').setAttribute('aria-busy', busy === 'check');
 }
 
@@ -109,12 +113,53 @@ function open(dialog) {
   dialog.showModal();
 }
 
-function openConnection(after) {
-  afterConnect = after;
-  $('gateway').value = gatewayUrl;
+function applyProfiles(next) {
+  profiles = next;
+  const selected = next.entries.find(entry => entry.id === next.selected);
+  if (selected) gatewayUrl = selected.gateway;
+}
+
+function editProfile(id) {
+  const entry = profiles.entries.find(entry => entry.id === id);
+  editingId = entry?.id || null;
+  $('profile').replaceChildren(...profiles.entries.map(entry => new Option(`${entry.name} · ${entry.gateway.replace(/^https:\/\//, '')}`, entry.id)), new Option('新连接', ''));
+  $('profile').value = editingId || '';
+  $('profile-name').value = entry?.name || '';
+  $('gateway').value = entry?.gateway || (profiles.entries.length ? '' : gatewayUrl);
   $('key').value = '';
+  $('key').required = !entry;
+  $('key').placeholder = entry ? `${entry.key_hint} · 留空保留` : '填写 API Key';
+  $('profile-delete').hidden = !entry;
+  $('profile-delete').textContent = '删除';
+  delete $('profile-delete').dataset.confirm;
   controls();
+}
+
+async function openConnection(after) {
+  await profilesReady;
+  afterConnect = after;
+  editProfile(status.profile_id || profiles.selected);
   open(connectionDialog);
+}
+
+async function saveProfile() {
+  if (!$('gateway-form').reportValidity()) return null;
+  const next = await invoke('bridge_profile_save', { input: { id: editingId, name: $('profile-name').value.trim(), gateway: $('gateway').value.trim(), key: $('key').value.trim() || null } });
+  applyProfiles(next);
+  editProfile(next.selected);
+  return next.selected;
+}
+
+async function connectProfile(id) {
+  await invoke('bridge_start', { profileId: id });
+  applyProfiles(await invoke('bridge_profiles'));
+  await refresh();
+}
+
+async function connectAndLaunch(client) {
+  await profilesReady;
+  if (!profiles.selected) return openConnection(client);
+  run('start', async () => { await connectProfile(profiles.selected); await launchClient(client); });
 }
 
 function openCli() {
@@ -148,7 +193,22 @@ for (const dialog of document.querySelectorAll('.settings-dialog')) {
 }
 connectionDialog.addEventListener('close', () => { $('key').value = ''; });
 
-$('connect').onclick = () => openConnection(undefined);
+$('connect').onclick = () => openConnection(undefined).catch(error => feedback(String(error), false, null));
+$('profile').onchange = () => { editProfile($('profile').value); feedback(); };
+$('profile-new').onclick = () => { editProfile(null); $('profile-name').focus(); feedback(); };
+$('profile-save').onclick = () => run('save-profile', async () => { if (await saveProfile()) feedback('连接已保存', true, connectionDialog); });
+$('profile-delete').onclick = () => {
+  if ($('profile-delete').dataset.confirm !== editingId) {
+    $('profile-delete').dataset.confirm = editingId;
+    $('profile-delete').textContent = '确认删除';
+    return;
+  }
+  run('delete-profile', async () => {
+    applyProfiles(await invoke('bridge_profile_delete', { id: editingId }));
+    editProfile(profiles.selected);
+    feedback('连接已删除', true, connectionDialog);
+  });
+};
 $('cli-settings').onclick = openCli;
 $('desktop-settings').onclick = () => {
   open(desktopDialog);
@@ -157,13 +217,10 @@ $('desktop-settings').onclick = () => {
 
 $('gateway-form').addEventListener('submit', event => {
   event.preventDefault();
-  const gateway = $('gateway').value.trim();
-  const key = $('key').value.trim();
   run('start', async () => {
-    await invoke('bridge_start', { gateway, key });
-    await refresh();
-    // Store only the address; the gateway key is held by Rust for this session.
-    gatewayUrl = gateway;
+    const id = await saveProfile();
+    if (!id) return;
+    await connectProfile(id);
     preference('bridge.gatewayUrl', gatewayUrl);
     connectionDialog.close();
     if (afterConnect) await launchClient(afterConnect);
@@ -189,14 +246,14 @@ $('check').onclick = () => run('check', async () => {
 $('stop').onclick = () => run('stop', async () => { await invoke('bridge_stop'); await refresh(); });
 $('launch-cli').onclick = () => {
   if (clients.cli === false) return openCli();
-  if (!status.running) return openConnection('cli');
+  if (!status.running) return connectAndLaunch('cli').catch(error => feedback(String(error), false, null));
   run('cli', () => launchClient('cli'));
 };
 function launchDesktop() {
   if (clients.desktop === false) return feedback('未找到 Claude Desktop');
   if (!status.running) {
     if (desktopDialog.open) desktopDialog.close();
-    return openConnection('desktop');
+    return connectAndLaunch('desktop').catch(error => feedback(String(error), false, null));
   }
   run('desktop', () => launchClient('desktop'));
 }
@@ -218,6 +275,7 @@ $('quit').onclick = () => run('quit', async () => {
   catch (error) { ended = false; throw error; }
 });
 
+const profilesReady = invoke('bridge_profiles').then(applyProfiles).catch(error => { feedback(String(error), false, null); });
 controls();
 refresh().catch(error => feedback(String(error), false, null));
 inspectClients().catch(error => feedback(String(error), false, null));

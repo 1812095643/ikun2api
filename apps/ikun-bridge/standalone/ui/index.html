@@ -70,13 +70,17 @@
         <button class="icon-button" type="button" data-close title="关闭" aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
       </header>
       <div class="dialog-body">
+        <div class="field"><label for="profile">已存连接</label><div class="profile-control"><select id="profile" aria-label="已存连接"></select><button id="profile-new" type="button" class="button">新增</button></div></div>
+        <div class="field"><label for="profile-name">名称</label><div class="input-control"><input type="text" maxlength="80" id="profile-name" placeholder="默认使用网关地址" autocomplete="off"></div></div>
         <div class="field"><label for="gateway">网关地址</label><div class="input-control"><input type="url" required maxlength="2048" id="gateway" placeholder="https://" autocomplete="off" spellcheck="false" autofocus></div></div>
         <div class="field"><label for="key">API Key</label><div class="input-control"><input type="password" required maxlength="512" id="key" autocomplete="off" spellcheck="false"></div></div>
         <p class="dialog-feedback" role="status" hidden></p>
       </div>
       <footer class="dialog-footer">
+        <button id="profile-delete" type="button" class="button quiet delete-profile" hidden>删除</button>
         <button type="button" class="button" data-close>取消</button>
-        <button id="start" type="submit" class="button primary">启动服务</button>
+        <button id="profile-save" type="button" class="button">保存</button>
+        <button id="start" type="submit" class="button primary">保存并连接</button>
       </footer>
     </form>
   </dialog>
