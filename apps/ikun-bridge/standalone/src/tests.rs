@@ -108,22 +108,38 @@ async fn go_gateway_authenticates_the_actual_bridge_pass() {
     let gateway = Gateway::local_fixture(origin.clone(), "bridge-real-auth-key".into());
     gateway.refresh(true).await.unwrap();
     assert!(gateway.verify_access().await.unwrap());
-    let mut headers = HeaderMap::new();
-    headers.insert("authorization", "Bearer local-client-key".parse().unwrap());
-    headers.insert(
-        "x-ikun-bridge-pass",
-        "ignored-client-ticket".parse().unwrap(),
+    let mut bridge = LocalBridge::serve(
+        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+        gateway,
+        Zeroizing::new("fixture-relay-key".into()),
+    )
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let protection = Arc::new(
+        protection::Protection::start(directory.path(), &bridge.endpoint, "fixture-relay-key")
+            .await
+            .unwrap(),
     );
-    let response = gateway
-        .forward(
-            Method::POST,
-            "/v1/messages".parse().unwrap(),
-            headers,
-            Bytes::from_static(br#"{"model":"claude-test"}"#),
+    bridge.protection = Some(protection.clone());
+    let desktop = reqwest::Client::builder()
+        .no_proxy()
+        .proxy(reqwest::Proxy::all(protection.url()).unwrap())
+        .add_root_certificate(
+            reqwest::Certificate::from_pem(protection.secrets.ca_cert.as_bytes()).unwrap(),
         )
-        .await;
+        .build()
+        .unwrap();
+    let response = desktop
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", protection.secrets.local_token.as_str())
+        .header("user-agent", "claude-cli/2.1.326 (external, claude-desktop-3p)")
+        .header("x-app", "cli")
+        .header("anthropic-beta", "claude-code-20250219")
+        .header("anthropic-version", "2023-06-01")
+        .json(&json!({"model":"claude-test","max_tokens":16,"messages":[{"role":"user","content":"hello"}],"system":[{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude."}],"metadata":{"user_id":"private-canary"}}))
+        .send().await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    assert!(gateway.admission().await.0);
+    assert!(bridge.connection.gateway().admission().await.0);
     let done = client
         .post(origin.join("_fixture/done").unwrap())
         .send()
@@ -160,6 +176,11 @@ async fn official_api_route_filters_and_attaches_bridge_pass() {
                     calls.fetch_add(1, Ordering::Relaxed);
                     assert_eq!(headers["x-api-key"], "fixture-upstream-key");
                     assert_eq!(headers["x-ikun-bridge-pass"], "A".repeat(66));
+                    assert_eq!(
+                        headers["user-agent"],
+                        "claude-cli/2.1.326 (external, claude-desktop-3p)"
+                    );
+                    assert_eq!(headers["x-app"], "cli");
                     assert!(!headers.contains_key("authorization"));
                     let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
                     assert!(value.get("metadata").is_none());
@@ -205,6 +226,8 @@ async fn official_api_route_filters_and_attaches_bridge_pass() {
         .unwrap();
     let response = client.post("https://api.anthropic.com/v1/messages")
         .header("x-api-key", protected.secrets.local_token.as_str())
+        .header("user-agent", "claude-cli/2.1.326 (external, claude-desktop-3p)")
+        .header("x-app", "cli")
         .json(&json!({"model":"claude-test", "messages":[{"role":"user","content":"hello 中文 😀"}], "metadata":{"leak":"private-canary"}, "max_tokens":16, "stream":true}))
         .send().await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);

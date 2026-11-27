@@ -91,6 +91,11 @@ func WithBridgePassState(ctx context.Context, state BridgePassState) context.Con
 	return context.WithValue(ctx, bridgePassContextKey{}, state)
 }
 
+func HasValidBridgePass(ctx context.Context) bool {
+	state, _ := ctx.Value(bridgePassContextKey{}).(BridgePassState)
+	return state == BridgePassValid
+}
+
 func BridgeGroupDenied(ctx context.Context, group *Group) (code string) {
 	if group == nil || !group.BridgeRequired {
 		return ""

@@ -133,6 +133,11 @@ func (v *ClaudeCodeValidator) Validate(r *http.Request, body map[string]any) boo
 	if anthropicVersion == "" {
 		return false
 	}
+	// Bridge 会删除客户端身份元数据；仅在服务端已经验票通过后免查该字段，
+	// UA、协议头、system 校验及 Desktop 独立权限均保持原规则。
+	if HasValidBridgePass(r.Context()) {
+		return true
+	}
 
 	// 4.3 验证 metadata.user_id
 	if body == nil {

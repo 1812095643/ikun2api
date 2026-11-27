@@ -39,9 +39,21 @@ func TestBridgePassUsesAuthenticatedAPIKey(t *testing.T) {
 			router := gin.New()
 			router.POST("/v1/ikun/bridge/session", auth, IssueBridgePass(service.NewBridgePassSigner(cfg.JWT.Secret)))
 			var accepted atomic.Int32
+			var validateClient atomic.Bool
 			for _, path := range []string{"/v1/models", "/v1/messages"} {
 				router.Any(path, APIKeySmartRouting(router, keys, cfg), auth, BridgeGroupAccess(), func(c *gin.Context) {
 					require.Empty(t, c.GetHeader(service.BridgePassHeader))
+					if validateClient.Load() && c.Request.Method == http.MethodPost {
+						var body map[string]any
+						require.NoError(t, json.NewDecoder(c.Request.Body).Decode(&body))
+						require.NotContains(t, body, "metadata", "客户端身份元数据必须已经在 Bridge 移除")
+						valid := service.NewClaudeCodeValidator().Validate(c.Request, body)
+						ctx := service.SetClaudeDesktopClient(service.SetClaudeCodeClient(c.Request.Context(), valid), service.IsClaudeDesktopUserAgent(c.Request.UserAgent()))
+						if !(&service.Group{Platform: service.PlatformAnthropic, ClaudeCodeOnly: true, AllowClaudeDesktop: true}).AllowsClaudeClient(ctx) {
+							c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "claude_client_required"})
+							return
+						}
+					}
 					accepted.Add(1)
 					c.JSON(http.StatusOK, gin.H{"data": []string{}})
 				})
@@ -82,6 +94,7 @@ func TestBridgePassUsesAuthenticatedAPIKey(t *testing.T) {
 			}
 			require.EqualValues(t, 2, accepted.Load())
 			if interop != "" {
+				validateClient.Store(true)
 				done := make(chan struct{}, 1)
 				router.POST("/_fixture/done", func(c *gin.Context) {
 					done <- struct{}{}

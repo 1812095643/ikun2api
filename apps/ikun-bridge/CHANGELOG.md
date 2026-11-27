@@ -4,6 +4,7 @@
 - API Key 使用 Windows DPAPI／macOS 钥匙串密钥加密保存；界面只显示掩码，编辑留空保留原 Key。
 - 切换网关保留本地代理和客户端配置，进行中的请求继续使用原连接。
 - macOS 启动 Desktop 前先核验实际证书信任，已信任时不再重复弹出密码确认；首次授权、证书变化或信任撤销仍由系统确认。
+- 保留原始 Claude Code／Desktop 识别头；配合 IKUN2api 1.6.5，修复隐私过滤后被“仅允许 Claude 客户端”误拦的问题。
 - 补齐桌面界面图标资源。
 
 Windows 未做商业签名，macOS 使用本地签名、未做 Apple 公证。

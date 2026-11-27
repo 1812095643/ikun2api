@@ -340,6 +340,8 @@ impl Gateway {
             "anthropic-beta",
             "content-type",
             "accept",
+            "user-agent",
+            "x-app",
         ] {
             for value in headers.get_all(name) {
                 req = req.header(name, value);
@@ -413,6 +415,11 @@ mod tests {
                     assert_eq!(headers["x-api-key"], "fixture-api-key");
                     assert_eq!(headers[PASS_HEADER], "A".repeat(66).as_str());
                     assert_eq!(headers["anthropic-version"], "2023-06-01");
+                    assert_eq!(
+                        headers["user-agent"],
+                        "claude-cli/2.1.326 (external, claude-desktop-3p)"
+                    );
+                    assert_eq!(headers["x-app"], "cli");
                     assert!(!headers.contains_key("authorization"));
                     assert!(!headers.contains_key("x-test-client-private"));
                     assert_eq!(
@@ -437,6 +444,11 @@ mod tests {
                 HeaderValue::from_static("Bearer local-key"),
             );
             headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
+            headers.insert(
+                "user-agent",
+                HeaderValue::from_static("claude-cli/2.1.326 (external, claude-desktop-3p)"),
+            );
+            headers.insert("x-app", HeaderValue::from_static("cli"));
             headers.insert(PASS_HEADER, HeaderValue::from_static("ignored"));
             headers.insert("x-test-client-private", HeaderValue::from_static("ignored"));
             let response = gateway

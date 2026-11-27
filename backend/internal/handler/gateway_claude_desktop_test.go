@@ -84,3 +84,29 @@ func TestGatewayClaudeDesktopStillRequiresProtocolValidation(t *testing.T) {
 	SetClaudeCodeClientContext(c, nil, nil)
 	require.False(t, service.IsClaudeDesktopClient(c.Request.Context()))
 }
+
+func TestGatewayClaudeDesktopBridgePrivacyAndSeparatePermission(t *testing.T) {
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(validClaudeCodeBodyJSON(), &body))
+	delete(body, "metadata")
+	clean, err := json.Marshal(body)
+	require.NoError(t, err)
+	for _, pass := range []service.BridgePassState{service.BridgePassMissing, service.BridgePassExpired, service.BridgePassValid} {
+		for _, allowDesktop := range []bool{false, true} {
+			c, _ := newHelperTestContext(http.MethodPost, "/v1/messages")
+			c.Request = c.Request.WithContext(service.WithBridgePassState(c.Request.Context(), pass))
+			c.Request.Header.Set("User-Agent", "claude-cli/2.1.326 (external, claude-desktop-3p)")
+			c.Request.Header.Set("X-App", "cli")
+			c.Request.Header.Set("anthropic-beta", "claude-code-20250219")
+			c.Request.Header.Set("anthropic-version", "2023-06-01")
+			SetClaudeCodeClientContext(c, clean, nil)
+			require.Equal(t, pass == service.BridgePassValid, service.IsClaudeCodeClient(c.Request.Context()))
+			group := &service.Group{Platform: service.PlatformAnthropic, ClaudeCodeOnly: true, AllowClaudeDesktop: allowDesktop}
+			require.Equal(t, pass != service.BridgePassValid || !allowDesktop, (&GatewayHandler{}).rejectClaudeClientRestriction(c, &service.APIKey{Group: group}))
+			// 即使票据有效，缺少客户端识别头也不能通过现有协议校验。
+			c.Request.Header.Del("X-App")
+			SetClaudeCodeClientContext(c, clean, nil)
+			require.False(t, service.IsClaudeCodeClient(c.Request.Context()))
+		}
+	}
+}
