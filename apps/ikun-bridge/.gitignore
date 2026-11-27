@@ -11,4 +11,5 @@
 /src-tauri/gen/
 *.log
 .DS_Store
+!/standalone/vite.config.js
 
