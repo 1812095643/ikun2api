@@ -58,7 +58,8 @@ export function mediaPrice(
   entry: ModelEntry,
   currency: ModelPlazaCurrency = 'usd',
   creditsPerCny = 0,
-  billingMode?: MediaBillingMode
+  billingMode?: MediaBillingMode,
+  tierLabel?: string
 ): string {
   const modes = mediaBillingModes.filter(mode => entry.offers.some(offer => offer.model.pricing?.billing_mode === mode))
   // A dollar per second cannot be compared with a dollar per request.
@@ -67,7 +68,9 @@ export function mediaPrice(
   const prices = entry.offers.flatMap(({ group, model }) => {
     const pricing = model.pricing
     if (!pricing || pricing.billing_mode !== selectedMode) return []
-    const tierPrices = (pricing.intervals ?? []).flatMap(interval =>
+    const tierPrices = (pricing.intervals ?? []).filter(interval =>
+      !tierLabel || interval.tier_label === tierLabel
+    ).flatMap(interval =>
       interval.per_request_price != null && Number.isFinite(interval.per_request_price) && interval.per_request_price >= 0
         ? [interval.per_request_price] : [])
     const values = tierPrices.length ? tierPrices : [pricing.per_request_price]
@@ -86,7 +89,18 @@ export function mediaPrice(
 export function mediaPriceRows(entry: ModelEntry, currency: ModelPlazaCurrency = 'usd', creditsPerCny = 0) {
   return mediaBillingModes
     .filter(mode => entry.offers.some(offer => offer.model.pricing?.billing_mode === mode))
-    .map(mode => ({ mode, price: mediaPrice(entry, currency, creditsPerCny, mode) }))
+    .map(mode => {
+      const labels = mode === 'image' ? [...new Set(entry.offers.flatMap(({ model }) =>
+        model.pricing?.billing_mode === 'image'
+          ? (model.pricing.intervals ?? []).flatMap(interval => interval.tier_label ? [interval.tier_label] : [])
+          : []
+      ))] : []
+      return {
+        mode,
+        price: mediaPrice(entry, currency, creditsPerCny, mode),
+        tiers: labels.map(label => ({ label, price: mediaPrice(entry, currency, creditsPerCny, mode, label) }))
+      }
+    })
 }
 
 export function useModelSquare() {

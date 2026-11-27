@@ -519,6 +519,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			zap.String("normalization", "call_output_to_user_message"),
 		)
 	}
+	if mayContainCodexCallOutputCandidate(body, "automation_update", "create_thread", "send_message_to_thread") {
+		if outputs := invalidResponsesToolOutputs(body, true); len(outputs) > 0 {
+			reqLog.Warn("openai.codex_bootstrap_normalization_skipped", zap.String("reason", "unrecognized_tool_context"), zap.Any("invalid_outputs", outputs))
+		}
+	}
 
 	reqStream, ok := parseOpenAICompatibleStream(body)
 	if !ok {
@@ -1775,20 +1780,18 @@ func (h *OpenAIGatewayHandler) validateFunctionCallOutputRequest(c *gin.Context,
 	}
 
 	if validation.HasFunctionCallOutputMissingCallID {
-		reqLog.Warn("openai.request_validation_failed",
-			zap.String("reason", "function_call_output_missing_call_id"),
-		)
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "function_call_output requires call_id on HTTP requests; continuation via previous_response_id is only supported on Responses WebSocket v2")
+		outputs := invalidResponsesToolOutputs(body, true)
+		logInvalidResponsesToolOutputs(reqLog, "function_call_output_missing_call_id", outputs)
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", fmt.Sprintf("function_call_output requires call_id: input[%d] is missing the original tool call's call_id; known Codex external context is converted automatically, while other tool outputs must preserve their original call_id", firstInvalidResponsesOutputIndex(outputs)))
 		return false
 	}
 	if validation.HasItemReferenceForAllCallIDs {
 		return true
 	}
 
-	reqLog.Warn("openai.request_validation_failed",
-		zap.String("reason", "function_call_output_missing_item_reference"),
-	)
-	h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "function_call_output requires item_reference ids matching each call_id on HTTP requests; continuation via previous_response_id is only supported on Responses WebSocket v2")
+	outputs := invalidResponsesToolOutputs(body, false)
+	logInvalidResponsesToolOutputs(reqLog, "function_call_output_missing_item_reference", outputs)
+	h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", fmt.Sprintf("function_call_output requires item_reference ids matching each call_id: input[%d] has no matching reference; include the original function_call and call_id, matching item_reference, or a valid previous_response_id for stateful continuation", firstInvalidResponsesOutputIndex(outputs)))
 	return false
 }
 
@@ -1871,7 +1874,8 @@ func normalizeCodexCallOutputBootstrap(body []byte, isCandidate func(map[string]
 			continue
 		}
 		typ := stringField(item, "type")
-		if isCandidate(item) {
+		// 两种已验证的客户端引导项可混排；本轮只转换自己的候选项，真实工具历史不变。
+		if isCandidate(item) || isCodexDelegationCandidate(item) || isCodexAutomationCandidate(item) {
 			callIDValue, exists := item["call_id"]
 			callID, isString := callIDValue.(string)
 			if exists && (!isString || strings.TrimSpace(callID) != "") {

@@ -19,8 +19,8 @@ func (e *evaluation) request(o domain.Observation) {
 	p := e.cfg.Profile(o.Model)
 	if (o.Kind == "attempt.failed" || o.Kind == "request.error") && o.UpstreamStatus >= 400 {
 		rule := "U02"
-		switch o.UpstreamStatus {
-		case 429, 502, 503, 504:
+		switch {
+		case o.UpstreamStatus == 429 || o.UpstreamStatus >= 500 && o.UpstreamStatus <= 599:
 			rule = "U01"
 		}
 		severity := "P2"

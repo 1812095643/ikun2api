@@ -57,15 +57,16 @@ func (s *Store) ListIncidents(ctx context.Context, f IncidentFilter) (IncidentPa
 		add("body->>'model'=$%d", f.Model)
 	}
 	if f.AccountID > 0 {
-		add("body#>>'{sample,account_id}'=$%d", fmt.Sprint(f.AccountID))
+		add("(body#>>'{sample,account_id}'=$%[1]d OR EXISTS(SELECT 1 FROM ops_monitor_incident_impact p WHERE p.incident_id=ops_monitor_incidents.id AND p.kind='account' AND p.value=$%[1]d))", fmt.Sprint(f.AccountID))
 	}
 	if f.Status != "" {
 		switch f.Status {
 		case "active":
 			where = append(where, "body->>'status' NOT IN ('resolved','closed','superseded')")
 		case "acknowledged":
-			where = append(where, "body->>'acknowledged'='true'")
+			where = append(where, "body->>'status' NOT IN ('resolved','closed','superseded') AND body->>'acknowledged'='true'")
 		case "silenced":
+			where = append(where, "body->>'status' NOT IN ('resolved','closed','superseded')")
 			add("COALESCE(NULLIF(body->>'silenced_until',''),'0001-01-01')::timestamptz>$%d", time.Now())
 		default:
 			add("body->>'status'=$%d", f.Status)
@@ -77,18 +78,20 @@ func (s *Store) ListIncidents(ctx context.Context, f IncidentFilter) (IncidentPa
 	if f.Rule != "" {
 		add("body->>'rule_id'=$%d", f.Rule)
 	}
-	if !f.Start.IsZero() {
-		add("updated>=$%d", f.Start.UnixMilli())
+	// 未解决事件不能因顶部时间范围而消失；历史列表按观测时间过滤，人工操作不会伪装成新异常。
+	unresolved := f.Status == "active" || f.Status == "acknowledged" || f.Status == "silenced" || f.Status == "recovering"
+	if !f.Start.IsZero() && !unresolved {
+		add("updated>=$%[1]d AND (body->>'last_seen')::timestamptz>=to_timestamp($%[1]d/1000.0)", f.Start.UnixMilli())
 	}
-	if !f.End.IsZero() {
-		add("updated<=$%d", f.End.UnixMilli())
+	if !f.End.IsZero() && !unresolved {
+		add("(body->>'last_seen')::timestamptz<=to_timestamp($%d/1000.0)", f.End.UnixMilli())
 	}
 	if f.BeforeTime > 0 && f.BeforeID != "" {
 		args = append(args, f.BeforeTime, f.BeforeID)
 		where = append(where, fmt.Sprintf("(updated,id)<($%d,$%d)", len(args)-1, len(args)))
 	}
 	args = append(args, f.Limit+1)
-	items, err := readJSON[domain.Incident](ctx, s.db, "SELECT (body - 'recent_hits' - 'members' - 'legacy_variables') || jsonb_build_object('updated_cursor',updated,'explanation', (body->'explanation') - 'facts' - 'inferences' - 'missing_evidence' - 'advice') FROM ops_monitor_incidents WHERE "+strings.Join(where, " AND ")+fmt.Sprintf(" ORDER BY updated DESC,id DESC LIMIT $%d", len(args)), args...)
+	items, err := readJSON[domain.Incident](ctx, s.db, "SELECT (i.body - 'recent_hits' - 'members' - 'legacy_variables') || jsonb_build_object('updated_cursor',i.updated,'group_name',g.name,'sample_account_name',a.name,'explanation', (i.body->'explanation') - 'facts' - 'inferences' - 'missing_evidence' - 'advice') FROM (SELECT id,body,updated FROM ops_monitor_incidents WHERE "+strings.Join(where, " AND ")+fmt.Sprintf(" ORDER BY updated DESC,id DESC LIMIT $%d", len(args))+") i LEFT JOIN groups g ON g.id=(i.body->>'group_id')::bigint LEFT JOIN accounts a ON a.id=(i.body#>>'{sample,account_id}')::bigint ORDER BY i.updated DESC,i.id DESC", args...)
 	if err != nil {
 		return IncidentPage{}, err
 	}

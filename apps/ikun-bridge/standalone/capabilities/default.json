@@ -1,0 +1,6 @@
+{
+  "identifier": "main",
+  "description": "IKUN Bridge window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -123,6 +123,8 @@ backend/.installed
 # 其他
 # ===================
 tests
+!apps/ikun-bridge/src-tauri/tests/
+!apps/ikun-bridge/src-tauri/tests/**
 !deploy/tests/
 !deploy/tests/**
 CLAUDE.md

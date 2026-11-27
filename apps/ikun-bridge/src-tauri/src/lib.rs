@@ -1,0 +1,9 @@
+#[cfg(feature = "desktop")]
+pub mod app;
+pub mod config_edit;
+pub mod launcher;
+pub mod platform;
+pub mod privacy;
+pub mod proxy;
+pub mod settings;
+pub mod store;

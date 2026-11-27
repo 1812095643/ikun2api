@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "IKUN Bridge",
+  "version": "0.1.0",
+  "identifier": "com.ikun.claude-bridge",
+  "build": {"beforeDevCommand": "npm run dev", "devUrl": "http://127.0.0.1:1420", "beforeBuildCommand": "npm run build", "frontendDist": "../dist"},
+  "app": {
+    "windows": [{"label": "main", "title": "IKUN Bridge", "width": 680, "height": 460, "minWidth": 540, "minHeight": 380}],
+    "security": {"csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'"}
+  },
+  "bundle": {"active": true, "targets": ["nsis"], "shortDescription": "Claude 本地接管工具", "category": "DeveloperTool", "windows": {"nsis": {"displayLanguageSelector": false, "languages": ["SimpChinese", "English"]}}}
+}

@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
 	"github.com/MACOS-DO/sub4api/internal/pkg/httputil"
@@ -71,13 +70,7 @@ func APIKeySmartRouting(engine http.Handler, keys SmartRouteKeyService, configs 
 			attempt.retryable = smartRouteCanContinue(c, attempt)
 			return
 		}
-		var bridgeTicket string
-		if values := c.Request.Header.Values(service.BridgePassHeader); len(values) != 0 {
-			if len(values) == 1 {
-				bridgeTicket = values[0]
-			}
-			c.Request.Header.Del(service.BridgePassHeader)
-		}
+		captureBridgePass(c, passes)
 		if keys == nil || engine == nil || apiKeyHeadersTooLarge(c) {
 			c.Next()
 			return
@@ -97,9 +90,6 @@ func APIKeySmartRouting(engine http.Handler, keys SmartRouteKeyService, configs 
 		}
 		key, err := keys.GetByKey(c.Request.Context(), credential)
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), smartRouteLookupKey{}, &smartRouteLookup{credential: credential, key: key, err: err}))
-		if err == nil && key != nil && bridgeTicket != "" {
-			c.Request = c.Request.WithContext(service.WithBridgePassState(c.Request.Context(), passes.Verify(bridgeTicket, key.ID, credential, time.Now())))
-		}
 		if err != nil || key == nil || len(key.CandidateGroupIDs()) < 2 {
 			c.Next()
 			return

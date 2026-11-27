@@ -225,7 +225,11 @@ jobs:
 
       - name: 运维事件、通知配置与常驻布局回归
         working-directory: frontend
-        run: pnpm exec vitest run src/views/admin/ops/components/__tests__/OpsIncidentEvents.spec.ts src/views/admin/ops/components/__tests__/OpsNotificationChannelDialog.spec.ts src/components/layout/__tests__/PersistentLayout.spec.ts src/composables/__tests__/useRoutePrefetch.spec.ts
+        run: pnpm exec vitest run src/views/admin/ops/components/__tests__/OpsIncidentEvents.spec.ts src/views/admin/ops/components/__tests__/OpsIncidentDetail.spec.ts src/views/admin/ops/components/__tests__/OpsIncidentRecords.spec.ts src/views/admin/ops/components/__tests__/OpsNotificationChannelDialog.spec.ts src/components/layout/__tests__/PersistentLayout.spec.ts src/composables/__tests__/useRoutePrefetch.spec.ts
+
+      - name: 生图计价与 Codex 上下文兼容回归
+        working-directory: backend
+        run: go test -tags unit ./internal/service ./internal/handler -run 'Test(PlazaImageCount|WorkspacePlazaImagePricing|CodexContextMixedWithBothBootstraps|InvalidCodexContextReportsIndexWithoutOutputContent|MissingToolReferenceReportsUnmatchedOutput)' -count=1 -timeout=180s
 
       - name: 网关请求校验和账号模型白名单回归
         working-directory: backend

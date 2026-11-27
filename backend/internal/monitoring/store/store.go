@@ -51,6 +51,20 @@ func (s *Store) Ingest(ctx context.Context, observations []domain.Observation, c
 		if _, e = tx.ExecContext(ctx, `INSERT INTO ops_monitor_observations(source,event_id,occurred,body) SELECT x.source,x.event_id,x.occurred,x.body FROM jsonb_to_recordset($1::jsonb) AS x(source text,event_id text,occurred bigint,body jsonb) ON CONFLICT DO NOTHING`, string(raw)); e != nil {
 			return e
 		}
+		// 只为已关联事件的请求保存终态，不为全站健康请求新增长期存储。
+		if _, e = tx.ExecContext(ctx, `INSERT INTO ops_monitor_request_outcomes(request_id,occurred,body)
+		 SELECT DISTINCT ON (x.body->>'request_id') x.body->>'request_id',x.occurred,
+		 x.body || jsonb_build_object('outcome',CASE WHEN x.body->>'kind'='request.cancelled' THEN 'cancelled'
+		 WHEN x.body->>'outcome' IN ('success','failed','cancelled') THEN x.body->>'outcome' ELSE 'unknown' END)
+		 FROM jsonb_to_recordset($1::jsonb) AS x(source text,event_id text,occurred bigint,body jsonb)
+		 WHERE x.source='gateway' AND x.body->>'kind' IN ('request.finished','request.cancelled') AND COALESCE(x.body->>'request_id','')<>''
+		 AND EXISTS(SELECT 1 FROM ops_monitor_incident_impact p WHERE p.kind='request' AND p.value=x.body->>'request_id')
+		 ORDER BY x.body->>'request_id',x.occurred DESC
+		 ON CONFLICT(request_id) DO UPDATE SET occurred=excluded.occurred,body=excluded.body
+		 WHERE excluded.occurred>=ops_monitor_request_outcomes.occurred
+		 AND (excluded.body->>'outcome'<>'unknown' OR ops_monitor_request_outcomes.body->>'outcome'='unknown')`, string(raw)); e != nil {
+			return e
+		}
 	}
 	for _, o := range observations {
 		if o.TaskID != "" && o.Quality != domain.Stale && o.Quality != domain.Unsupported {
@@ -268,7 +282,9 @@ func (s *Store) SaveConfig(ctx context.Context, c domain.Config, expected int) e
 		if _, e = tx.ExecContext(ctx, "UPDATE ops_monitor_incidents SET body=$1 WHERE id=$2", string(raw), i.ID); e != nil {
 			return e
 		}
-		if _, e = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incident_transitions(incident_id,created,body) VALUES($1,$2,$3)", i.ID, time.Now().UnixMilli(), string(raw)); e != nil {
+		now := time.Now().UTC()
+		transition, _ := json.Marshal(domain.IncidentTransition{Incident: i, RecordedAt: now, Action: "configuration", Actor: c.Actor})
+		if _, e = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incident_transitions(incident_id,created,body) VALUES($1,$2,$3)", i.ID, now.UnixMilli(), string(transition)); e != nil {
 			return e
 		}
 	}
@@ -331,8 +347,19 @@ func (s *Store) SaveFinding(ctx context.Context, i domain.Incident, ds []domain.
 			}
 			for kind, value := range impacts {
 				if value != "" {
-					if _, err = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incident_impact VALUES($1,$2,$3) ON CONFLICT DO NOTHING", i.ID, kind, value); err != nil {
+					var inserted sql.Result
+					if inserted, err = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incident_impact VALUES($1,$2,$3) ON CONFLICT DO NOTHING", i.ID, kind, value); err != nil {
 						return err
+					}
+					if n, _ := inserted.RowsAffected(); n > 0 && kind == "request" {
+						// 已完成后才发现的异常，按请求索引补取终态；在途请求则由后续采集更新。
+						if _, err = tx.ExecContext(ctx, `INSERT INTO ops_monitor_request_outcomes(request_id,occurred,body)
+						 SELECT $1,occurred,body || jsonb_build_object('outcome',CASE WHEN body->>'kind'='request.cancelled' THEN 'cancelled'
+						 WHEN body->>'outcome' IN ('success','failed','cancelled') THEN body->>'outcome' ELSE 'unknown' END)
+						 FROM ops_monitor_observations WHERE source='gateway' AND body->>'kind' IN ('request.finished','request.cancelled')
+						 AND body->>'request_id'=$1 ORDER BY occurred DESC,seq DESC LIMIT 1 ON CONFLICT(request_id) DO NOTHING`, value); err != nil {
+							return err
+						}
 					}
 				}
 			}
@@ -351,6 +378,10 @@ func (s *Store) SaveFinding(ctx context.Context, i domain.Incident, ds []domain.
 	if i.ResolvedAt.After(changedAt) {
 		changedAt = i.ResolvedAt
 	}
+	observedAt := changedAt
+	if i.LastControlAt.After(changedAt) {
+		changedAt = i.LastControlAt
+	}
 	b, err := json.Marshal(i)
 	if err != nil {
 		return err
@@ -358,7 +389,8 @@ func (s *Store) SaveFinding(ctx context.Context, i domain.Incident, ds []domain.
 	if _, err = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incidents VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET fingerprint=excluded.fingerprint,updated=excluded.updated,body=excluded.body", i.ID, i.Fingerprint, changedAt.UnixMilli(), string(b)); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incident_transitions(incident_id,created,body) VALUES($1,$2,$3)", i.ID, changedAt.UnixMilli(), string(b)); err != nil {
+	transition, _ := json.Marshal(domain.IncidentTransition{Incident: i, Action: "observation", RecordedAt: observedAt})
+	if _, err = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incident_transitions(incident_id,created,body) VALUES($1,$2,$3)", i.ID, observedAt.UnixMilli(), string(transition)); err != nil {
 		return err
 	}
 	for _, d := range ds {
@@ -515,6 +547,7 @@ func (s *Store) Retain(ctx context.Context, now time.Time) error {
 		{"DELETE FROM ops_monitor_incident_evidence WHERE created<$1 AND NOT EXISTS (SELECT 1 FROM ops_monitor_notification_outbox o WHERE o.incident_id=ops_monitor_incident_evidence.incident_id AND o.state IN ('pending','leased','uncertain','dead')) AND EXISTS(SELECT 1 FROM ops_monitor_incidents i WHERE i.id=ops_monitor_incident_evidence.incident_id AND i.body->>'status' IN ('resolved','closed','superseded'))", history},
 		{"DELETE FROM ops_monitor_task_facts f WHERE occurred<$1 AND EXISTS(SELECT 1 FROM ops_monitor_task_facts done WHERE done.scope=f.scope AND done.kind IN ('media.completed','media.failed','media.cancelled')) AND NOT EXISTS (SELECT 1 FROM ops_monitor_incidents i WHERE i.body->>'status' NOT IN ('resolved','closed','superseded') AND i.body->>'scope'='task:' || (f.body->>'task_id') || '/user:' || COALESCE(f.body->>'user_id','0') || '/key:' || COALESCE(f.body->>'key_id','0'))", history},
 		{"DELETE FROM ops_monitor_mutations WHERE created<$1", now.Add(-90 * 24 * time.Hour)},
+		{"DELETE FROM ops_monitor_request_outcomes o WHERE occurred<$1 AND NOT EXISTS (SELECT 1 FROM ops_monitor_incident_impact p JOIN ops_monitor_incidents i ON i.id=p.incident_id WHERE p.kind='request' AND p.value=o.request_id AND i.body->>'status' NOT IN ('resolved','closed','superseded'))", history},
 		{"DELETE FROM ops_monitor_notification_outbox WHERE state IN ('accepted','shadow','superseded','suppressed') AND next_attempt<$1", history},
 	} {
 		if _, err = tx.ExecContext(ctx, q.sql, q.cut.UnixMilli()); err != nil {

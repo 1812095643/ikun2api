@@ -500,7 +500,7 @@ function requestRate(m: PlazaModel): number {
     return Math.max(0, props.videoRateMultiplier ?? 1)
   }
   return billingMode(m) === BILLING_MODE_IMAGE && props.imageRateIndependent === true
-    ? (props.imageRateMultiplier ?? 1)
+    ? Math.max(0, props.imageRateMultiplier ?? 1)
     : effectiveRate.value
 }
 

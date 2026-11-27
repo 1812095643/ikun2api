@@ -135,7 +135,13 @@ func (s *Store) DeliveryPage(ctx context.Context, incident, channel, state strin
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
-	return readJSON[domain.Delivery](ctx, s.db, `SELECT (body || jsonb_build_object('state',state,'attempts',attempts,'next_attempt',to_char(to_timestamp(next_attempt/1000.0) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))) - 'payload' FROM ops_monitor_notification_outbox WHERE ($1='' OR incident_id=$1) AND ($2='' OR channel=$2) AND ($3='' OR state=$3) ORDER BY next_attempt DESC,id DESC LIMIT $4`, incident, channel, state, limit)
+	return readJSON[domain.Delivery](ctx, s.db, `SELECT (o.body || jsonb_build_object('state',o.state,'attempts',o.attempts,
+	 'target_name',COALESCE(t.name,''),'channel_name',COALESCE(c.name,''),
+	 'next_attempt',to_char(to_timestamp(o.next_attempt/1000.0) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))) - 'payload'
+	 FROM (SELECT * FROM ops_monitor_notification_outbox WHERE ($1='' OR incident_id=$1) AND ($2='' OR channel=$2) AND ($3='' OR state=$3)
+	 ORDER BY next_attempt DESC,id DESC LIMIT $4) o
+	 LEFT JOIN ops_monitor_targets t ON t.id=o.target LEFT JOIN ops_monitor_channels c ON c.id=o.channel
+	 ORDER BY o.next_attempt DESC,o.id DESC`, incident, channel, state, limit)
 }
 
 func (s *Store) MarkDeliverySending(ctx context.Context, d domain.Delivery, now time.Time) error {

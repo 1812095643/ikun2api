@@ -81,6 +81,7 @@ deploy/redis_data/
 
 # GitHub
 .github/
+/apps/ikun-bridge/
 
 # Claude files
 .claude/

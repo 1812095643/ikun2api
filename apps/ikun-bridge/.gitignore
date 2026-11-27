@@ -1,0 +1,14 @@
+/node_modules/
+/dist/
+/target/
+/standalone/target/
+/standalone/dist/
+/standalone/gen/
+/src-tauri/target/
+/artifacts/
+/output/
+/.playwright-cli/
+/src-tauri/gen/
+*.log
+.DS_Store
+

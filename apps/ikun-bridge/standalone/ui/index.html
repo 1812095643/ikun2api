@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="../../src/assets/bridge.svg" type="image/svg+xml">
+  <title>IKUN Bridge</title>
+</head>
+<body>
+  <header class="app-header"><div class="header-inner">
+    <span class="brand"><img src="../../src/assets/bridge.svg" alt="" width="24" height="24">IKUN Bridge</span>
+    <span class="build-version" id="version"></span>
+    <button class="button quiet quit" id="quit" type="button"><svg class="icon" aria-hidden="true"><use href="/icons.svg#log-out"/></svg>退出</button>
+  </div></header>
+
+  <main class="workspace">
+    <div class="toolbar">
+      <h1>连接</h1>
+      <div class="actions">
+        <button id="check" type="button" class="button"><svg class="icon" aria-hidden="true"><use href="/icons.svg#refresh-cw"/></svg>检查</button>
+        <button id="connect" type="button" class="button primary" aria-haspopup="dialog"><svg class="icon" aria-hidden="true"><use href="/icons.svg#plug"/></svg>连接设置</button>
+        <button id="stop" type="button" class="button" hidden><svg class="icon" aria-hidden="true"><use href="/icons.svg#square"/></svg>停止服务</button>
+      </div>
+    </div>
+    <div class="connection-list app-rows service-rows">
+      <div class="connection-row">
+        <span class="row-name"><svg class="icon" aria-hidden="true"><use href="/icons.svg#plug"/></svg>上游网关</span>
+        <span class="row-detail" id="upstream"></span>
+        <span class="state" data-tone="idle" id="gateway-status"><i></i><span>未配置</span></span>
+      </div>
+      <div class="connection-row">
+        <span class="row-name"><svg class="icon" aria-hidden="true"><use href="/icons.svg#plug"/></svg>本地服务</span>
+        <span class="row-detail" id="endpoint"></span>
+        <span class="state" data-tone="idle" id="running"><i></i><span>未启动</span></span>
+      </div>
+      <div class="connection-row">
+        <span class="row-name"><svg class="icon" aria-hidden="true"><use href="/icons.svg#ticket"/></svg>通行证</span>
+        <span class="row-detail" id="ticket-detail"></span>
+        <span class="state" data-tone="idle" id="ticket"><i></i><span>未领取</span></span>
+      </div>
+    </div>
+
+    <div class="toolbar client-toolbar"><h2>客户端</h2><span id="requests" class="metric" hidden></span></div>
+    <div class="connection-list app-rows client-rows">
+      <div class="connection-row">
+        <span class="row-name"><svg class="icon" aria-hidden="true"><use href="/icons.svg#terminal"/></svg>Claude Code</span>
+        <span class="state" data-tone="idle" id="cli-status"><i></i><span>检测中</span></span>
+        <button id="cli-settings" type="button" class="icon-button" title="Claude Code 设置" aria-label="Claude Code 设置" aria-haspopup="dialog"><svg class="icon" aria-hidden="true"><use href="/icons.svg#settings"/></svg></button>
+        <button id="launch-cli" type="button" class="button" aria-label="启动 Claude Code"><svg class="icon" aria-hidden="true"><use href="/icons.svg#play"/></svg>启动</button>
+      </div>
+      <div class="connection-row">
+        <span class="row-name"><svg class="icon" aria-hidden="true"><use href="/icons.svg#monitor"/></svg>Claude Desktop</span>
+        <span class="state" data-tone="idle" id="desktop-status"><i></i><span>检测中</span></span>
+        <button id="desktop-settings" type="button" class="icon-button" title="Claude Desktop 设置" aria-label="Claude Desktop 设置" aria-haspopup="dialog"><svg class="icon" aria-hidden="true"><use href="/icons.svg#settings"/></svg></button>
+        <button id="launch-desktop" type="button" class="button" aria-label="启动 Claude Desktop"><svg class="icon" aria-hidden="true"><use href="/icons.svg#play"/></svg>启动</button>
+      </div>
+    </div>
+    <p class="app-feedback" id="notice" role="status"></p>
+    <section class="operations-panel" aria-labelledby="operations-title">
+      <div class="operations-heading"><h2 id="operations-title">处理状态</h2><span>关闭窗口后仍在托盘运行</span></div>
+      <textarea id="operations" readonly aria-label="处理状态" spellcheck="false">正在检查…</textarea>
+    </section>
+  </main>
+
+  <dialog id="connection-dialog" class="settings-dialog" aria-labelledby="connection-title">
+    <form id="gateway-form">
+      <header class="dialog-header">
+        <h2 id="connection-title">连接设置</h2>
+        <button class="icon-button" type="button" data-close title="关闭" aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
+      </header>
+      <div class="dialog-body">
+        <div class="field"><label for="gateway">网关地址</label><div class="input-control"><input type="url" required maxlength="2048" id="gateway" placeholder="https://" autocomplete="off" spellcheck="false" autofocus></div></div>
+        <div class="field"><label for="key">API Key</label><div class="input-control"><input type="password" required maxlength="512" id="key" autocomplete="off" spellcheck="false"></div></div>
+        <p class="dialog-feedback" role="status" hidden></p>
+      </div>
+      <footer class="dialog-footer">
+        <button type="button" class="button" data-close>取消</button>
+        <button id="start" type="submit" class="button primary">启动服务</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="cli-dialog" class="settings-dialog" aria-labelledby="cli-title">
+    <form id="cli-form">
+      <header class="dialog-header">
+        <h2 id="cli-title">Claude Code 设置</h2>
+        <button class="icon-button" type="button" data-close title="关闭" aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
+      </header>
+      <div class="dialog-body">
+        <div class="field"><label for="cli-path">程序路径</label><div class="input-control"><input type="text" id="cli-path" placeholder="自动识别" autocomplete="off" spellcheck="false" autofocus></div></div>
+        <p class="dialog-feedback" role="status" hidden></p>
+      </div>
+      <footer class="dialog-footer">
+        <button type="button" class="button" data-close>取消</button>
+        <button id="cli-restore" type="button" class="button">恢复原配置</button>
+        <button id="save-cli" type="submit" class="button primary">保存</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="desktop-dialog" class="settings-dialog" aria-labelledby="desktop-title">
+    <header class="dialog-header">
+      <h2 id="desktop-title">Claude Desktop 设置</h2>
+      <button class="icon-button" type="button" data-close title="关闭" aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="/icons.svg#x"/></svg></button>
+    </header>
+    <div class="dialog-body">
+      <div class="field"><span>配置备份</span><output class="setting-value" id="desktop-backup">无</output></div>
+      <div class="field"><span>客户端接口</span><output class="setting-value">https://api.anthropic.com</output></div>
+      <div class="field"><span>本地代理</span><output class="setting-value" id="desktop-endpoint"></output></div>
+      <p class="dialog-feedback" role="status" hidden></p>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="button" data-close>关闭</button>
+      <button id="desktop-restore" type="button" class="button" hidden><svg class="icon" aria-hidden="true"><use href="/icons.svg#undo-2"/></svg>恢复原配置</button>
+      <button id="desktop-apply" type="button" class="button primary"><svg class="icon" aria-hidden="true"><use href="/icons.svg#play"/></svg>启动</button>
+    </footer>
+  </dialog>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

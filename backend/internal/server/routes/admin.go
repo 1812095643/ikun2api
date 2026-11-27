@@ -222,6 +222,7 @@ func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 		ops.GET("/incidents", h.Admin.Ops.ListMonitorIncidents)
 		ops.GET("/incidents/:id", h.Admin.Ops.GetMonitorIncident)
+		ops.GET("/incidents/:id/:records", h.Admin.Ops.ListMonitorIncidentRecords)
 		ops.POST("/incidents/:id/control", h.Admin.Ops.ControlMonitorIncident)
 		ops.GET("/monitor/config", h.Admin.Ops.GetMonitorConfig)
 		ops.PUT("/monitor/config", h.Admin.Ops.UpdateMonitorConfig)

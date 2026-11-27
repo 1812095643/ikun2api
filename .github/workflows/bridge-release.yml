@@ -1,0 +1,127 @@
+name: 发布 IKUN Bridge
+
+on:
+  push:
+    tags: ['bridge-v[0-9]*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bridge-release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: 核对版本与创建草稿
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,tomllib
+          app=pathlib.Path('apps/ikun-bridge')
+          version=tomllib.loads((app/'standalone/Cargo.toml').read_text())['package']['version']
+          assert os.environ['RELEASE_TAG']=='bridge-v'+version
+          assert json.loads((app/'standalone/tauri.conf.json').read_text())['version']==version
+          assert json.loads((app/'package.json').read_text())['version']==version
+          PY
+          if gh release view "$RELEASE_TAG" --json isDraft > /tmp/bridge-release.json; then
+            python3 -c "import json; assert json.load(open('/tmp/bridge-release.json'))['isDraft'], 'Release is already published'"
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --latest=false --title "IKUN Bridge ${RELEASE_TAG#bridge-v}" --notes-file apps/ikun-bridge/CHANGELOG.md
+          fi
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/apps/ikun-bridge/standalone/target
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/ikun-bridge/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.95.0'
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/ikun-bridge/standalone -> target
+      - name: 构建桌面界面与运行回归
+        working-directory: apps/ikun-bridge
+        run: |
+          npm ci
+          npm run build:desktop
+          cargo test --locked --manifest-path standalone/Cargo.toml
+          cargo test --locked --no-default-features --manifest-path src-tauri/Cargo.toml
+      - name: 编译与打包 Windows 便携程序
+        if: runner.os == 'Windows'
+        working-directory: apps/ikun-bridge
+        run: |
+          cargo build --release --locked --manifest-path standalone/Cargo.toml
+          python standalone/tools/package.py --platform windows --binary standalone/target/release/ikun-bridge.exe --output ../../dist/bridge
+      - name: 编译与打包 macOS 通用应用
+        if: runner.os == 'macOS'
+        working-directory: apps/ikun-bridge
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          cargo build --release --locked --manifest-path standalone/Cargo.toml --target aarch64-apple-darwin
+          cargo build --release --locked --manifest-path standalone/Cargo.toml --target x86_64-apple-darwin
+          lipo -create standalone/target/aarch64-apple-darwin/release/ikun-bridge standalone/target/x86_64-apple-darwin/release/ikun-bridge -output standalone/target/IKUNBridge
+          python3 standalone/tools/package.py --platform macos --binary standalone/target/IKUNBridge --output ../../dist/bridge
+          node standalone/tools/verify-mac.mjs "../../dist/bridge/IKUN Bridge.app"
+      - name: 上传已编译的桌面产物
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$RELEASE_TAG" dist/bridge/IKUN-Bridge-* dist/bridge/checksums-*.txt dist/bridge/build-info-*.json --clobber
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: 核对双平台产物并公开发布
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/bridge-manifests
+          gh release download "$RELEASE_TAG" --pattern 'checksums-*.txt' --pattern 'build-info-*.json' --dir /tmp/bridge-manifests
+          gh release view "$RELEASE_TAG" --json assets > /tmp/bridge-manifests/assets.json
+          python3 - <<'PY'
+          import json,os,pathlib
+          root=pathlib.Path('/tmp/bridge-manifests')
+          version=os.environ['RELEASE_TAG'].removeprefix('bridge-v')
+          assets={a['name']:a for a in json.loads((root/'assets.json').read_text())['assets']}
+          checksums=[]
+          for platform,suffix in [('windows','Windows-x64.exe'),('macos','macOS-universal.zip')]:
+              info=json.loads((root/f'build-info-{platform}.json').read_text())
+              expected=f'IKUN-Bridge-{version}-{suffix}'
+              assert info['version']==version and info['commit']==os.environ['GITHUB_SHA']
+              assert info['file']==expected and assets[expected]['size']==info['size']
+              line=(root/f'checksums-{platform}.txt').read_text().strip()
+              assert line==f"{info['sha256']}  {expected}"
+              checksums.append(line)
+          (root/'checksums.txt').write_text('\n'.join(checksums)+'\n')
+          PY
+          gh release upload "$RELEASE_TAG" /tmp/bridge-manifests/checksums.txt --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest=false

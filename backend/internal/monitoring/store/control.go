@@ -109,6 +109,7 @@ func (s *Store) ControlIncident(ctx context.Context, id, action, actor, requestI
 	if i.Revision != revision {
 		return ErrConflict
 	}
+	previousStatus := i.Status
 	switch action {
 	case "ack":
 		i.Acknowledged = true
@@ -124,14 +125,15 @@ func (s *Store) ControlIncident(ctx context.Context, id, action, actor, requestI
 		i.ResolvedAt = now
 	}
 	i.Revision++
-	i.LastSeen = now
+	i.LastControlAt = now
 	i.LastActor = actor
 	i.ControlReason = reason
 	raw, _ = json.Marshal(i)
 	if _, err = tx.ExecContext(ctx, "UPDATE ops_monitor_incidents SET body=$1,updated=$2 WHERE id=$3", string(raw), now.UnixMilli(), id); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incident_transitions(incident_id,created,body) VALUES($1,$2,$3)", id, now.UnixMilli(), string(raw)); err != nil {
+	transition, _ := json.Marshal(domain.IncidentTransition{Incident: i, RecordedAt: now, Action: action, Actor: actor, PreviousStatus: previousStatus})
+	if _, err = tx.ExecContext(ctx, "INSERT INTO ops_monitor_incident_transitions(incident_id,created,body) VALUES($1,$2,$3)", id, now.UnixMilli(), string(transition)); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO ops_monitor_mutations VALUES($1,$2,$3,$4)", requestID, actor, string(body), now.UnixMilli()); err != nil {

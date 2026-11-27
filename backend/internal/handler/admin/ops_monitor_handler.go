@@ -118,7 +118,12 @@ func (h *OpsHandler) GetMonitorIncident(c *gin.Context) {
 		response.Error(c, 404, "这条事件已不存在或超过保留期")
 		return
 	}
-	history, err := n.Store.History(c.Request.Context(), i.ID)
+	outcomes, err := n.Store.IncidentContext(c.Request.Context(), i)
+	if err != nil {
+		response.Error(c, 500, "事件关联信息暂时无法读取，请重试")
+		return
+	}
+	history, err := n.Store.IncidentHistory(c.Request.Context(), i.ID, 0, 30, "operations")
 	if err != nil {
 		response.Error(c, 500, "事件历史暂时无法读取")
 		return
@@ -128,7 +133,64 @@ func (h *OpsHandler) GetMonitorIncident(c *gin.Context) {
 		response.Error(c, 500, "发送记录暂时无法读取")
 		return
 	}
-	response.Success(c, gin.H{"incident": i, "history": history, "deliveries": deliveries})
+	constraint := "unknown"
+	if cfg, configErr := n.Store.Config(c.Request.Context()); configErr == nil {
+		constraint = domain.CurrentNotificationConstraint(*i, cfg, time.Now())
+	}
+	response.Success(c, gin.H{"incident": i, "history": history.Items, "history_has_more": history.HasMore, "history_before_id": history.BeforeID, "outcomes": outcomes, "deliveries": deliveries, "notification_constraint": constraint})
+}
+
+// 关联请求、账号和历史均使用索引游标分页，不在打开详情时拉取全站数据。
+func (h *OpsHandler) ListMonitorIncidentRecords(c *gin.Context) {
+	n := h.requireMonitor(c)
+	if n == nil {
+		return
+	}
+	id, after := c.Param("id"), c.Query("after_id")
+	if len(id) > 128 || len(after) > 256 {
+		response.BadRequest(c, "筛选条件过长")
+		return
+	}
+	limit := 30
+	if value := c.Query("limit"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 1 || parsed > 100 {
+			response.BadRequest(c, "每页数量应为 1 至 100")
+			return
+		}
+		limit = parsed
+	}
+	var result any
+	var err error
+	switch c.Param("records") {
+	case "requests":
+		result, err = n.Store.IncidentRequests(c.Request.Context(), id, after, limit)
+	case "accounts":
+		result, err = n.Store.IncidentAccounts(c.Request.Context(), id, after, limit)
+	case "history":
+		kind := c.Query("kind")
+		if kind != "" && kind != "operations" && kind != "observations" {
+			response.BadRequest(c, "请选择有效的历史类型")
+			return
+		}
+		var before int64
+		if value := c.Query("before_id"); value != "" {
+			before, err = strconv.ParseInt(value, 10, 64)
+			if err != nil || before < 0 {
+				response.BadRequest(c, "请刷新后重新翻页")
+				return
+			}
+		}
+		result, err = n.Store.IncidentHistory(c.Request.Context(), id, before, limit, kind)
+	default:
+		response.Error(c, 404, "未找到这类事件记录")
+		return
+	}
+	if err != nil {
+		response.Error(c, 500, "关联记录暂时无法读取，请重试")
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *OpsHandler) ControlMonitorIncident(c *gin.Context) {

@@ -160,32 +160,35 @@ type IncidentSample struct {
 	At               time.Time `json:"at"`
 }
 type Incident struct {
-	LegacyVariables map[string]string `json:"legacy_variables,omitempty"`
-	LegacyEventID   int64             `json:"legacy_event_id,omitempty"`
-	UpdatedCursor   int64             `json:"updated_cursor,omitempty"`
-	Platform        string            `json:"platform,omitempty"`
-	DisplayScope    string            `json:"-"` // Transient notification labels, never persisted.
-	Sample          *IncidentSample   `json:"sample,omitempty"`
-	GroupID         int64             `json:"group_id,omitempty"`
-	Model           string            `json:"model,omitempty"`
-	ParentID        string            `json:"parent_id,omitempty"`
-	AccountCount    int               `json:"account_count"`
-	LastFault       time.Time         `json:"last_fault"`
-	LastHealthy     time.Time         `json:"last_healthy"`
-	LastNotified    time.Time         `json:"last_notified"`
-	NotifiedCount   int               `json:"notified_count"`
-	RequestCount    int               `json:"request_count"`
-	UserCount       int               `json:"user_count"`
-	LastActor       string            `json:"last_actor,omitempty"`
-	ControlReason   string            `json:"control_reason,omitempty"`
-	RecentHits      []RecentHit       `json:"recent_hits,omitempty"`
-	EpisodeStart    time.Time         `json:"episode_start"`
-	Rollup          bool              `json:"rollup,omitempty"`
-	Members         []Member          `json:"members,omitempty"`
-	ResolvedAt      time.Time         `json:"resolved_at"`
-	ClosedBy        string            `json:"closed_by,omitempty"`
-	DigestOnly      bool              `json:"digest_only,omitempty"`
-	DigestedCount   int               `json:"digested_count,omitempty"`
+	GroupName         string            `json:"group_name,omitempty"`
+	SampleAccountName string            `json:"sample_account_name,omitempty"`
+	LastControlAt     time.Time         `json:"last_control_at,omitempty"`
+	LegacyVariables   map[string]string `json:"legacy_variables,omitempty"`
+	LegacyEventID     int64             `json:"legacy_event_id,omitempty"`
+	UpdatedCursor     int64             `json:"updated_cursor,omitempty"`
+	Platform          string            `json:"platform,omitempty"`
+	DisplayScope      string            `json:"-"` // Transient notification labels, never persisted.
+	Sample            *IncidentSample   `json:"sample,omitempty"`
+	GroupID           int64             `json:"group_id,omitempty"`
+	Model             string            `json:"model,omitempty"`
+	ParentID          string            `json:"parent_id,omitempty"`
+	AccountCount      int               `json:"account_count"`
+	LastFault         time.Time         `json:"last_fault"`
+	LastHealthy       time.Time         `json:"last_healthy"`
+	LastNotified      time.Time         `json:"last_notified"`
+	NotifiedCount     int               `json:"notified_count"`
+	RequestCount      int               `json:"request_count"`
+	UserCount         int               `json:"user_count"`
+	LastActor         string            `json:"last_actor,omitempty"`
+	ControlReason     string            `json:"control_reason,omitempty"`
+	RecentHits        []RecentHit       `json:"recent_hits,omitempty"`
+	EpisodeStart      time.Time         `json:"episode_start"`
+	Rollup            bool              `json:"rollup,omitempty"`
+	Members           []Member          `json:"members,omitempty"`
+	ResolvedAt        time.Time         `json:"resolved_at"`
+	ClosedBy          string            `json:"closed_by,omitempty"`
+	DigestOnly        bool              `json:"digest_only,omitempty"`
+	DigestedCount     int               `json:"digested_count,omitempty"`
 
 	ID              string      `json:"id"`
 	Fingerprint     string      `json:"fingerprint"`
@@ -205,7 +208,20 @@ type Incident struct {
 	Explanation     Explanation `json:"explanation"`
 	Quality         Quality     `json:"quality"`
 }
+
+// 人工操作使用独立时间和动作字段，历史快照不能按当前静默到期时间重新解释。
+type IncidentTransition struct {
+	Incident
+	TransitionID   int64     `json:"transition_id"`
+	RecordedAt     time.Time `json:"recorded_at"`
+	Action         string    `json:"action"`
+	Actor          string    `json:"actor,omitempty"`
+	ActorName      string    `json:"actor_name,omitempty"`
+	PreviousStatus string    `json:"previous_status,omitempty"`
+}
 type Delivery struct {
+	TargetName        string    `json:"target_name,omitempty"`
+	ChannelName       string    `json:"channel_name,omitempty"`
 	RecoveredLease    bool      `json:"-"`
 	FallbackTargetIDs []string  `json:"fallback_target_ids,omitempty"`
 	FallbackFor       string    `json:"fallback_for,omitempty"`

@@ -86,6 +86,40 @@ func (p NotificationPolicy) Allows(kind string, acknowledged bool) bool {
 	return slices.Contains(p.Kinds, kind)
 }
 
+// 只解释当前可确认的配置限制，不把当前配置冒充历史未通知的确定原因。
+func CurrentNotificationConstraint(i Incident, cfg Config, now time.Time) string {
+	switch {
+	case i.Rule == "L02":
+		return "single_request"
+	case !cfg.Rule(i.Rule).Enabled:
+		return "rule_disabled"
+	case cfg.Shadow:
+		return "record_only"
+	case cfg.Owner(i.Rule, i.Scope, i.GroupID, i.Model) != "monitor":
+		return "legacy_owner"
+	case i.ParentID != "":
+		return "child"
+	case now.Before(i.SilencedUntil):
+		return "silenced"
+	}
+	matched := false
+	for _, policy := range cfg.Policies {
+		if !policy.Matches(i) {
+			continue
+		}
+		matched = true
+		for _, target := range cfg.Targets {
+			if target.Enabled && slices.Contains(policy.TargetIDs, target.ID) {
+				return "criteria"
+			}
+		}
+	}
+	if matched {
+		return "no_target"
+	}
+	return "no_policy"
+}
+
 func ValidatePolicies(policies []NotificationPolicy) error {
 	if len(policies) > 100 {
 		return errors.New("通知规则最多 100 条")

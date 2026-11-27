@@ -227,6 +227,11 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 			return
 		}
 	}
+	// 图片端点的按张开关优先于 token 价卡，必须先合成生图价格再解析 token 阶梯。
+	m.Pricing = s.plazaImageDisplayPricing(ctx, m, g)
+	if m.Pricing != nil && m.Pricing.BillingMode == BillingModeImage {
+		return
+	}
 	if s.billingService != nil && s.resolver != nil {
 		sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{
 			Model:    m.Name,
@@ -242,7 +247,6 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 			return
 		}
 	}
-	m.Pricing = plazaImageDisplayPricing(m.Pricing, g)
 	m.Pricing = s.plazaVideoDisplayPricing(ctx, m.Pricing, g, m.Name)
 }
 
@@ -288,51 +292,83 @@ func plazaIntervalsFromTiers(tiers []ContextPricingTier) []PricingInterval {
 	return intervals
 }
 
-// plazaImageDisplayPricing 为图片计费模型合成展示定价，使档位价与实收口径一致：
-// 每档（1K/2K/4K）单价 = 分组图片价 > 渠道同档位价 > 渠道默认按次价，无价的档不展示。
-// 分组未配任何图片价、或定价非图片模式时原样返回。返回克隆，不修改入参
-// （渠道定价指针指向缓存共享数据）。
-func plazaImageDisplayPricing(p *ChannelModelPricing, g *Group) *ChannelModelPricing {
-	if p == nil || g == nil || p.BillingMode != BillingModeImage {
+// plazaImageDisplayPricing 与图片端点使用同一计费函数生成各分辨率的单张基价。
+// 分组模型级固定价已在调用前处理；其余按分组图片价、渠道按张价、默认图片价依次回落。
+// 只识别生图模型，避免按张开关把普通聊天或图片理解模型也改成按张展示。
+func (s *ModelPlazaService) plazaImageDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) *ChannelModelPricing {
+	p := m.Pricing
+	if g == nil {
 		return p
 	}
-	if g.ImagePrice1K == nil && g.ImagePrice2K == nil && g.ImagePrice4K == nil {
+	isImageModel := s.isPlazaImageModel(m)
+	forcePerImage := g.ImageCountBilling && isImageModel
+	if !forcePerImage && isImageModel && s.resolver != nil {
+		resolved := s.resolver.Resolve(WithResolvedTargetPlatform(ctx, m.Platform), PricingInput{Model: m.Name, Group: g, GroupID: &g.ID})
+		// 未配置分组/渠道 token 价时，图片端点本来就按张结算，不能套用目录的 token 价。
+		forcePerImage = resolved.Source != PricingSourceGroup && resolved.Source != PricingSourceChannel
+	}
+	if !forcePerImage && (p == nil || p.BillingMode != BillingModeImage) {
 		return p
 	}
-	channelTierPrice := func(label string) *float64 {
-		for i := range p.Intervals {
-			if p.Intervals[i].TierLabel == label && p.Intervals[i].PerRequestPrice != nil {
-				return p.Intervals[i].PerRequestPrice
+	if !forcePerImage && s.billingService == nil && g.ImagePrice1K == nil && g.ImagePrice2K == nil && g.ImagePrice4K == nil {
+		return p
+	}
+	var resolved *ResolvedPricing
+	if p != nil && (p.BillingMode == BillingModeImage || p.BillingMode == BillingModePerRequest) && s.resolver != nil {
+		resolved = s.resolver.resolveConfiguredPricing(p, m.Name, PricingSourceChannel)
+	}
+	out := &ChannelModelPricing{BillingMode: BillingModeImage}
+	if p != nil {
+		out.ReasoningEffortMultipliers = reasoningEffortMultipliersFromPricing(p)
+	}
+	groupConfig := imagePriceConfigFromAPIKey(&APIKey{Group: g})
+	for i, tier := range []string{ImageBillingSize1K, ImageBillingSize2K, ImageBillingSize4K} {
+		price := g.GetImagePrice(tier)
+		if price == nil && resolved != nil && s.billingService != nil {
+			cost, err := s.billingService.CalculateCostUnified(CostInput{
+				Ctx: ctx, Model: m.Name, Group: g, GroupID: &g.ID,
+				RequestCount: 1, SizeTier: tier, RateMultiplier: 1,
+				Resolver: s.resolver, Resolved: resolved,
+			})
+			if err == nil && cost != nil {
+				price = &cost.TotalCost
 			}
 		}
-		return p.PerRequestPrice
-	}
-	tiers := []struct {
-		label      string
-		groupPrice *float64
-	}{
-		{"1K", g.ImagePrice1K},
-		{"2K", g.ImagePrice2K},
-		{"4K", g.ImagePrice4K},
-	}
-	clone := *p
-	clone.Intervals = make([]PricingInterval, 0, len(tiers))
-	for i, t := range tiers {
-		price := t.groupPrice
-		if price == nil {
-			price = channelTierPrice(t.label)
+		if price == nil && s.billingService == nil && p != nil && p.BillingMode == BillingModeImage {
+			price = p.PerRequestPrice
+			for _, interval := range p.Intervals {
+				if interval.TierLabel == tier && interval.PerRequestPrice != nil {
+					price = interval.PerRequestPrice
+					break
+				}
+			}
 		}
-		if price == nil {
-			continue
+		if price == nil && s.billingService != nil {
+			price = &s.billingService.CalculateImageCost(m.Name, tier, 1, groupConfig, 1).TotalCost
 		}
-		v := *price
-		clone.Intervals = append(clone.Intervals, PricingInterval{
-			TierLabel:       t.label,
-			PerRequestPrice: &v,
-			SortOrder:       i,
-		})
+		if price != nil {
+			out.Intervals = append(out.Intervals, PricingInterval{TierLabel: tier, PerRequestPrice: price, SortOrder: i})
+		}
 	}
-	return &clone
+	if len(out.Intervals) == 0 {
+		return p
+	}
+	return out
+}
+
+func (s *ModelPlazaService) isPlazaImageModel(m *PlazaModel) bool {
+	name := strings.ToLower(strings.TrimSpace(m.Name))
+	if at := strings.LastIndex(name, "/"); at >= 0 {
+		name = name[at+1:]
+	}
+	if isOpenAIImageGenerationModel(name) || isGeminiImageOutputModel(name) || isImageGenerationModel(name) {
+		return true
+	}
+	if s.pricingService != nil {
+		pricing := s.pricingService.GetModelPricing(m.Name)
+		return pricing != nil && pricing.Mode == "image_generation"
+	}
+	return false
 }
 
 // plazaVideoDisplayPricing mirrors per-resolution video billing without charging:

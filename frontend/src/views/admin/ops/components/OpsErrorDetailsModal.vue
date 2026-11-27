@@ -18,6 +18,7 @@ interface Props {
   requestId?: string
   model?: string
   errorType: 'request' | 'upstream'
+  initialView?: 'errors' | 'excluded' | 'all'
   resumeState?: boolean
 }
 
@@ -162,9 +163,9 @@ async function fetchErrorLogs() {
   function resetFilters() {
     q.value = ''
     statusCode.value = null
-    phase.value = props.errorType === 'upstream' ? 'upstream' : ''
+    phase.value = ''
     errorOwner.value = ''
-    viewMode.value = 'errors'
+    viewMode.value = props.initialView || 'errors'
     page.value = 1
     fetchErrorLogs()
   }

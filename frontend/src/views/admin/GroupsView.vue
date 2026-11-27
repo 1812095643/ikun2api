@@ -4306,6 +4306,7 @@
 import OpenAIServiceTierSelect from "@/components/common/OpenAIServiceTierSelect.vue";
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
 import { useOnboardingStore } from "@/stores/onboarding";
@@ -6259,6 +6260,20 @@ const handleEdit = async (group: AdminGroup) => {
   loadModelAllowlistCandidates("edit", group.id, group.platform);
   showEditModal.value = true;
 };
+
+const groupRoute = useRoute();
+watch(() => groupRoute?.query.group_id, async (raw, _previous, onCleanup) => {
+  const id = typeof raw === "string" && /^\d+$/.test(raw) ? Number(raw) : 0;
+  if (!Number.isSafeInteger(id) || id <= 0) return;
+  let canceled = false;
+  onCleanup(() => { canceled = true; });
+  try {
+    const group = await adminAPI.groups.getById(id);
+    if (!canceled) await handleEdit(group);
+  } catch {
+    if (!canceled) appStore.showError(t("admin.groups.failedToLoad"));
+  }
+}, { immediate: true });
 
 const closeEditModal = () => {
   editModelRoutingRules.value.forEach((rule) => {

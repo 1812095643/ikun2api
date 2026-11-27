@@ -1,0 +1,45 @@
+[package]
+name = "ikun-bridge"
+version = "0.2.5"
+edition = "2021"
+publish = false
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+anyhow = "1"
+ikun-bridge-core = { package = "ikun-bridge", path = "../src-tauri", default-features = false }
+axum = "0.8.9"
+rand = "0.8.6"
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls", "json", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+socket2 = "0.6"
+subtle = "2.6"
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+zeroize = "1.9"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Networking_WinSock", "Win32_Security_Cryptography", "Win32_Storage_Packaging_Appx", "Win32_System_Com", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Registry", "Win32_System_RemoteDesktop", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["NSRunningApplication"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["NSArray", "NSString"] }
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1

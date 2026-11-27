@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/MACOS-DO/sub4api/internal/config"
 	"github.com/stretchr/testify/require"
@@ -419,6 +420,103 @@ func TestListPlazaGroups_GroupImagePriceIgnoredForNonImageModes(t *testing.T) {
 	require.Empty(t, p.Intervals)
 	require.NotNil(t, p.InputPrice)
 	require.Nil(t, p.PerRequestPrice)
+}
+
+func TestPlazaImageCountPricingMatchesGatewayBilling(t *testing.T) {
+	for _, tc := range []struct {
+		name, platform, model string
+		channelMode           BillingMode
+		groupTokenPricing     bool
+		partialPrices         bool
+	}{
+		{name: "OpenAI渠道token价", platform: PlatformOpenAI, model: "gpt-image-2", channelMode: BillingModeToken},
+		{name: "复合分组token价", platform: PlatformComposite, model: "gpt-image-1.5", channelMode: BillingModeToken, groupTokenPricing: true},
+		{name: "缺失分辨率回落默认且保留免费档", platform: PlatformOpenAI, model: "gpt-image-2", channelMode: BillingModeToken, partialPrices: true},
+		{name: "渠道图片价回落", platform: PlatformOpenAI, model: "gpt-image-2", channelMode: BillingModeImage, partialPrices: true},
+		{name: "目录声明的生图模型", platform: PlatformOpenAI, model: "custom-drawing-model", channelMode: BillingModeToken},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			channel := plazaPricedChannel(1, "image", []int64{10}, PlatformOpenAI, tc.model)
+			channel.ModelPricing[0].BillingMode = tc.channelMode
+			channel.ModelPricing[0].PerRequestPrice = testPtrFloat64(0.2)
+			group := Group{
+				ID: 10, Name: "image", Platform: tc.platform, RateMultiplier: 0.8,
+				ImageCountBilling: true, ImageRateIndependent: true, ImageRateMultiplier: 0.25,
+				ImagePrice1K: testPtrFloat64(0.4), ImagePrice2K: testPtrFloat64(0.5), ImagePrice4K: testPtrFloat64(0.8),
+			}
+			if tc.groupTokenPricing {
+				group.ModelPricing = []ChannelModelPricing{channel.ModelPricing[0]}
+			}
+			if tc.partialPrices {
+				group.ImagePrice1K = testPtrFloat64(0)
+				group.ImagePrice2K = nil
+			}
+			catalog := newStubPricingServiceFromMap(map[string]*LiteLLMModelPricing{
+				tc.model: {Mode: "image_generation", InputCostPerToken: 1e-6, OutputCostPerToken: 2e-6, OutputCostPerImage: 0.12},
+			})
+			svc := newPlazaServiceWithBilling([]Channel{channel}, []Group{group}, map[int64]string{10: tc.platform}, catalog)
+			out, err := svc.ListGroups(context.Background())
+			require.NoError(t, err)
+			require.Len(t, out, 1)
+			pricing := out[0].Models[0].Pricing
+			require.Equal(t, BillingModeImage, pricing.BillingMode)
+			require.Nil(t, pricing.InputPrice, "按张价格不能再混入每token单价")
+			require.Nil(t, pricing.PerRequestPrice, "卡片最低价只能取生效的分辨率档位")
+			require.Len(t, pricing.Intervals, 3)
+			gateway := &GatewayService{billingService: svc.billingService, resolver: svc.resolver}
+			apiKey := &APIKey{GroupID: &group.ID, Group: &group}
+			for _, tier := range pricing.Intervals {
+				cost := gateway.calculateRecordUsageCost(context.Background(), &ForwardResult{
+					Model: tc.model, ImageCount: 1, ImageSize: tier.TierLabel, ImageEndpoint: true,
+				}, apiKey, tc.model, group.RateMultiplier, resolveImageRateMultiplier(apiKey, group.RateMultiplier), time.Time{})
+				require.InDelta(t, cost.TotalCost, *tier.PerRequestPrice, 1e-12, tier.TierLabel)
+				require.InDelta(t, cost.ActualCost, *tier.PerRequestPrice*out[0].ImageRateMultiplier, 1e-12, tier.TierLabel)
+			}
+			if tc.partialPrices {
+				require.Equal(t, 0.0, *pricing.Intervals[0].PerRequestPrice)
+				expected := 0.18
+				if tc.channelMode == BillingModeImage {
+					expected = 0.2
+				}
+				require.InDelta(t, expected, *pricing.Intervals[1].PerRequestPrice, 1e-12)
+			}
+			require.Equal(t, tc.channelMode, channel.ModelPricing[0].BillingMode, "不能修改共享渠道配置")
+		})
+	}
+}
+
+func TestPlazaImageCountSwitchPreservesConfiguredTokenModels(t *testing.T) {
+	for _, tc := range []struct {
+		model   string
+		enabled bool
+	}{
+		{model: "gpt-image-2", enabled: false},
+		{model: "gpt-5", enabled: true},
+	} {
+		t.Run(tc.model, func(t *testing.T) {
+			group := Group{ID: 10, Platform: PlatformOpenAI, ImageCountBilling: tc.enabled, ImagePrice1K: testPtrFloat64(0.5)}
+			svc := newPlazaServiceWithBilling([]Channel{plazaPricedChannel(1, "ch", []int64{10}, PlatformOpenAI, tc.model)},
+				[]Group{group}, map[int64]string{10: PlatformOpenAI}, nil)
+			out, err := svc.ListGroups(context.Background())
+			require.NoError(t, err)
+			pricing := out[0].Models[0].Pricing
+			require.Equal(t, BillingModeToken, pricing.BillingMode)
+			require.NotNil(t, pricing.InputPrice)
+			require.Nil(t, pricing.PerRequestPrice)
+		})
+	}
+}
+
+func TestWorkspacePlazaImagePricingWithoutChannel(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		group := Group{ID: 10, Platform: PlatformOpenAI, ImageCountBilling: enabled, ImagePrice1K: testPtrFloat64(0.3)}
+		svc := newPlazaServiceWithBilling(nil, []Group{group}, nil, nil)
+		out, err := svc.ListWorkspaceGroups(context.Background(), func(context.Context, *Group) []string { return []string{"gpt-image-2"} })
+		require.NoError(t, err)
+		require.Equal(t, BillingModeImage, out[0].Models[0].Pricing.BillingMode)
+		require.Len(t, out[0].Models[0].Pricing.Intervals, 3)
+		require.InDelta(t, 0.3, *out[0].Models[0].Pricing.Intervals[0].PerRequestPrice, 1e-12)
+	}
 }
 
 func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {

@@ -52,7 +52,14 @@ async function copy() {
       <div v-for="row in rows" :key="row.key" class="model-price-row" :data-price-field="row.key"><span>{{ row.label }}</span><strong>{{ row.paid }}</strong><span class="model-original-price">{{ row.official }}</span></div>
       <p v-if="!rows.length" class="ws-muted">查看分组计价</p>
     </div>
-    <div v-for="row in mediaRows" :key="row.mode" class="model-media" :data-billing-mode="row.mode"><strong>{{ row.price }}</strong><span>{{ row.suffix }}</span></div>
+    <div v-for="row in mediaRows" :key="row.mode" class="model-media" :data-billing-mode="row.mode">
+      <template v-if="row.tiers.length">
+        <div v-for="tier in row.tiers" :key="tier.label" class="model-image-tier" :data-resolution="tier.label">
+          <span>{{ tier.label }}</span><strong>{{ tier.price }}</strong><span>{{ row.suffix }}</span>
+        </div>
+      </template>
+      <template v-else><strong>{{ row.price }}</strong><span>{{ row.suffix }}</span></template>
+    </div>
     <footer class="model-footer">
       <span v-if="copied" class="copy-feedback" role="status">模型名已复制</span>
       <span v-else-if="copyError" class="copy-feedback" role="alert">请手动复制模型名</span>
@@ -87,6 +94,9 @@ async function copy() {
 .model-media { padding: 24px 0; }
 .model-media strong { font-size: 26px; font-weight: 550; }
 .model-media > span { color: var(--ws-muted); font-size: 11px; margin-left: 7px; }
+.model-image-tier { display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 8px; padding: 5px 0; font-variant-numeric: tabular-nums; }
+.model-image-tier > span { color: var(--ws-muted); font-size: 11px; }
+.model-image-tier > strong { font-size: 17px; }
 .model-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--ws-line); }
 .model-offers { color: var(--model-accent); font-size: 11px; white-space: nowrap; }
 .price-caption, .copy-feedback { color: var(--ws-muted); font-size: 10px; }

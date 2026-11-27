@@ -116,7 +116,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminPaymentAPI } from '@/api/admin/payment'
@@ -226,6 +227,26 @@ async function showOrderDetail(order: PaymentOrder) {
     orderAuditLogs.value = ((data.auditLogs || data.audit_logs || []) as unknown) as AuditLog[]
   } catch (_err: unknown) { /* keep cached order data */ }
 }
+
+const orderRoute = useRoute()
+watch(() => orderRoute?.query.order_id, async (raw, _previous, onCleanup) => {
+  const id = typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : 0
+  if (!Number.isSafeInteger(id) || id <= 0) return
+  let canceled = false
+  onCleanup(() => { canceled = true })
+  try {
+    const res = await adminPaymentAPI.getOrder(id)
+    if (canceled) return
+    const data = res.data as unknown as Record<string, unknown>
+    if (data.order) {
+      selectedOrder.value = data.order as PaymentOrder
+      orderAuditLogs.value = (data.auditLogs || data.audit_logs || []) as AuditLog[]
+      showDetailDialog.value = true
+    }
+  } catch (err: unknown) {
+    if (!canceled) appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
+  }
+}, { immediate: true })
 
 async function handleCancelOrder(order: PaymentOrder) {
   try { await adminPaymentAPI.cancelOrder(order.id); appStore.showSuccess(t('payment.admin.orderCancelled')); loadOrders() }

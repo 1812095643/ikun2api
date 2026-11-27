@@ -97,4 +97,7 @@ func TestBridgePassRouteAdmission(t *testing.T) {
 	protected.BridgeRequired = false
 	require.Equal(t, 200, request("POST", "/v1/messages", key.Key).Code)
 	require.EqualValues(t, 1, chosen, "turning the switch off restores direct use")
+	protected.BridgeRequired = true
+	require.Equal(t, 200, request("POST", "/v1/messages", key.Key, session.Ticket).Code)
+	require.EqualValues(t, 1, chosen, "有效票据必须保留到智能路由选中的受保护分组")
 }

@@ -1,0 +1,22 @@
+{
+  "name": "ikun-claude-bridge",
+  "version": "0.2.5",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config standalone/vite.config.js --host 127.0.0.1 --port 1420 --strictPort",
+    "build": "npm run build:desktop",
+    "build:desktop": "vite build --config standalone/vite.config.js",
+    "test:core": "cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
+    "test:desktop": "cargo test --manifest-path standalone/Cargo.toml --locked"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.0",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "lucide-static": "1.73.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.0",
+    "vite": "^7.3.1"
+  }
+}

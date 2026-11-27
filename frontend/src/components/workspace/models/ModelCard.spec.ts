@@ -122,3 +122,44 @@ it('mixed per-request and per-second offers display separate prices', () => {
     wrapper.unmount()
   }
 })
+
+it('生图卡片按分辨率分别取最低实付价，响应独立倍率、专属倍率和币种', async () => {
+  const value = entry('gpt-image-2', 'openai')
+  const offer = value.offers[0]
+  offer.group.image_rate_independent = true
+  offer.group.image_rate_multiplier = 0.25
+  offer.model.pricing!.billing_mode = 'image'
+  offer.model.pricing!.intervals = [0.4, 0.6, 0.8].map((per_request_price, index) => ({
+    min_tokens: 0, max_tokens: null, tier_label: ['1K', '2K', '4K'][index],
+    input_price: null, output_price: null, cache_write_price: null, cache_read_price: null,
+    per_request_price
+  }))
+  const other = structuredClone(offer)
+  other.group.id = 2
+  other.group.image_rate_independent = false
+  other.model.pricing!.intervals[0].per_request_price = 0.1
+  other.model.pricing!.intervals[1].per_request_price = 1
+  value.offers.push(other)
+  const wrapper = mount(ModelCard, { props: { entry: value } })
+  const tierPrice = (label: string) => wrapper.get(`[data-resolution="${label}"] strong`).text()
+  try {
+    expect(wrapper.find('.model-prices').exists()).toBe(false)
+    expect(wrapper.findAll('.model-image-tier')).toHaveLength(3)
+    expect(tierPrice('1K')).toBe('$0.05')
+    expect(tierPrice('2K')).toBe('$0.15')
+    expect(tierPrice('4K')).toBe('$0.20')
+    expect(wrapper.get('[data-billing-mode="image"]').text()).toContain('modelPlaza.table.perUnitImage')
+    await wrapper.setProps({ currency: 'cny', creditsPerCny: 10 })
+    expect(tierPrice('1K')).toBe('¥0.005')
+    expect(tierPrice('2K')).toBe('¥0.015')
+    expect(tierPrice('4K')).toBe('¥0.02')
+    const changed = structuredClone(value)
+    changed.offers[0].group.image_rate_independent = false
+    await wrapper.setProps({ entry: changed, currency: 'usd' })
+    expect(tierPrice('1K')).toBe('$0.05')
+    expect(tierPrice('2K')).toBe('$0.30')
+    expect(tierPrice('4K')).toBe('$0.40')
+  } finally {
+    wrapper.unmount()
+  }
+})
